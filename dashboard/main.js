@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, nativeTheme, safeStorage, Tray, Menu, screen, Notification, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, nativeTheme, safeStorage, Tray, Menu, screen, Notification, globalShortcut, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -1540,14 +1540,22 @@ function loadPastSessions() {
     try {
       const fullPath = path.join(sessionsDir, mdFile);
       const stat = fs.statSync(fullPath);
-      const preview = fs.readFileSync(fullPath, 'utf8').slice(0, 600);
+      const content = fs.readFileSync(fullPath, 'utf8');
+      const preview = content.slice(0, 600);
+      const qMatches = (content.match(/Question:\s*"[^"]+"/gi) || []).length;
+      const aMatches = (content.match(/>\s*\*\*Suggestion/gi) || []).length;
+      const lats = [...content.matchAll(/1st token in ([0-9.]+) s/gi)].map((m) => parseFloat(m[1]) * 1000);
+      const avgLat = lats.length > 0 ? Math.round(lats.reduce((a, b) => a + b, 0) / lats.length) : null;
       sessions.push({
         id: path.basename(mdFile, '.md'),
         fileName: mdFile,
         fullPath,
         updatedAt: stat.mtimeMs,
         sizeKb: Math.max(1, Math.round(stat.size / 1024)),
-        preview: preview.replace(/\r?\n/g, ' ').slice(0, 220)
+        preview: preview.replace(/\r?\n/g, ' ').slice(0, 220),
+        questionsCount: qMatches,
+        answersCount: aMatches,
+        avgLatencyMs: avgLat
       });
     } catch (_e) {}
   }
@@ -2167,6 +2175,9 @@ function showSettingsWindow(section) {
 
 function createWindow() {
   const initialTheme = getThemeState();
+  if (initialTheme && initialTheme.preference) {
+    nativeTheme.themeSource = initialTheme.preference;
+  }
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 920,
@@ -2259,6 +2270,16 @@ function createWindow() {
 
 app.whenReady().then(() => {
   if (!gotSingleInstanceLock) return;
+  if (session && session.defaultSession) {
+    session.defaultSession.setPermissionCheckHandler((_webContents, permission) => {
+      if (permission === 'media') return true;
+      return true;
+    });
+    session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+      if (permission === 'media') return callback(true);
+      callback(true);
+    });
+  }
   // Ensure at least one rich starter Mini-Agent exists if agents folder is empty
   const existingAgents = loadAllAgents();
   if (existingAgents.length === 0) {

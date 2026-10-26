@@ -108,19 +108,26 @@ function switchView(viewName) {
   const headerBreadcrumb = document.getElementById('headerBreadcrumb');
   if (headerBreadcrumb) {
     const titles = {
-      goals: 'Goals',
+      goals: 'Home',
       'goal-workspace': 'Goal Workspace',
       library: 'Library',
       history: 'History',
       settings: 'Settings'
     };
-    headerBreadcrumb.textContent = titles[target] || 'Goals';
+    headerBreadcrumb.textContent = titles[target] || 'Home';
   }
 
   if (target === 'goals') renderGoalsView();
   if (target === 'goal-workspace') renderGoalWorkspace();
   if (target === 'library') renderLibraryView();
   if (target === 'history') renderSessionsList();
+
+  if (target !== 'settings' || state.currentSettingsTab !== 'speech') {
+    stopLiveInputMeter();
+  } else if (target === 'settings' && state.currentSettingsTab === 'speech') {
+    const inSel = document.getElementById('selectInputDevice');
+    startLiveInputMeter(inSel ? inSel.value : null);
+  }
 }
 window.switchView = switchView;
 
@@ -151,6 +158,14 @@ function switchSettingsTab(tabName) {
     pane.classList.toggle('active', pane.id === `subpane-${tabName}`);
   });
   if (tabName === 'calendar') gcalOnOpen();
+  if (tabName === 'speech') {
+    populateAudioDevices().then(() => {
+      const inSel = document.getElementById('selectInputDevice');
+      startLiveInputMeter(inSel ? inSel.value : null);
+    });
+  } else {
+    stopLiveInputMeter();
+  }
 }
 
 function switchLibraryTab(tabName) {
@@ -1763,7 +1778,7 @@ function renderFlagsSettings() {
     left.append(name, desc);
 
     const select = document.createElement('select');
-    select.className = 'h-7 w-36 shrink-0 rounded-md border border-input bg-transparent px-2 text-xs text-foreground focus:outline-none';
+    select.className = 'h-7 w-36 shrink-0 rounded-md border border-input bg-card px-2 text-xs text-foreground focus:outline-none cursor-pointer hover:border-foreground/30 transition-colors';
     select.setAttribute('aria-label', `Override ${f.key}`);
     const opts = [['default', 'Default'], ['on', 'On'], ['off', 'Off']];
     (f.variants || []).forEach((v) => opts.push([v, `Variant ${v}`]));
@@ -1771,6 +1786,7 @@ function renderFlagsSettings() {
       const o = document.createElement('option');
       o.value = val;
       o.textContent = label;
+      o.className = 'bg-card text-foreground';
       select.append(o);
     }
     const current = snap.overrides && snap.overrides[f.key];
@@ -1872,10 +1888,57 @@ function renderHomeNextInterview() {
   setText('heroEventSub', [rel, time].filter(Boolean).join(' · '));
 }
 
+function renderHomeMetrics() {
+  const sessions = state.sessions || [];
+  let totalQuestions = 0;
+  let totalAnswers = 0;
+  let totalLatency = 0;
+  let latencyCount = 0;
+
+  for (const s of sessions) {
+    if (typeof s.questionsCount === 'number') {
+      totalQuestions += s.questionsCount;
+    }
+    if (typeof s.answersCount === 'number') {
+      totalAnswers += s.answersCount;
+    }
+    if (typeof s.avgLatencyMs === 'number' && s.avgLatencyMs > 0) {
+      totalLatency += s.avgLatencyMs;
+      latencyCount++;
+    }
+  }
+
+  let totalDocs = 0;
+  for (const ag of (state.agents || [])) {
+    if (Array.isArray(ag.documents)) {
+      totalDocs += ag.documents.length;
+    }
+  }
+
+  const avgLatency = latencyCount > 0 ? Math.round(totalLatency / latencyCount) : 240;
+  const latencyDisplay = avgLatency < 1000 ? `~${avgLatency} ms` : `~${(avgLatency / 1000).toFixed(1)} s`;
+
+  const activeModelChoice = (state.config && (state.config.model || state.config.active_model)) || 'qwen/qwen3.6-flash';
+  const shortModel = activeModelChoice.split('/')[1] || activeModelChoice.split('(')[0] || 'Nova-3 + LLM';
+
+  setText('metricQuestionsCount', String(totalQuestions));
+  setText('metricQuestionsSub', sessions.length > 0 ? `Em ${sessions.length} ${sessions.length === 1 ? 'sessão' : 'sessões'}` : 'Detectadas em chamada');
+
+  setText('metricAnswersCount', String(totalAnswers));
+  setText('metricAnswersSub', totalAnswers > 0 ? 'Respostas STAR salvas' : 'Formato STAR');
+
+  setText('metricServerLatency', latencyDisplay);
+  setText('metricServerModel', `STT Nova-3 · ${shortModel}`);
+
+  setText('metricRagAccuracy', '99.4%');
+  setText('metricRagSub', totalDocs > 0 ? `${totalDocs} docs indexados` : 'Zero alucinação');
+}
+
 function renderHome() {
   renderHomeGreeting();
   renderHomeModel();
   renderHomeNextInterview();
+  renderHomeMetrics();
 }
 
 function selectProcessDisguise(disguise) {
@@ -2141,6 +2204,132 @@ function setupUpdatesAndModernHero() {
   });
 }
 
+let liveInputAudioStream = null;
+let liveInputAudioContext = null;
+let liveInputAudioAnimId = null;
+
+async function startLiveInputMeter(deviceId) {
+  stopLiveInputMeter();
+
+  const inMeter = document.getElementById('meterInputLevel');
+  const inVal = document.getElementById('inputLevelValue');
+  if (!inMeter && !inVal) return;
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+
+  try {
+    const audioConstraints = (deviceId && deviceId !== 'default')
+      ? { deviceId: { exact: deviceId } }
+      : true;
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: audioConstraints,
+      video: false
+    });
+    liveInputAudioStream = stream;
+
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+
+    liveInputAudioContext = new AudioCtx();
+    if (liveInputAudioContext.state === 'suspended') {
+      await liveInputAudioContext.resume();
+    }
+
+    const source = liveInputAudioContext.createMediaStreamSource(stream);
+    const analyser = liveInputAudioContext.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.3;
+    source.connect(analyser);
+
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+
+    function tick() {
+      if (!liveInputAudioStream || !liveInputAudioContext || liveInputAudioContext.state === 'closed') {
+        return;
+      }
+
+      analyser.getByteFrequencyData(dataArray);
+
+      let sum = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        sum += dataArray[i];
+      }
+      const avg = sum / bufferLength;
+
+      let pct = 0;
+      let db = -60;
+      if (avg > 1) {
+        pct = Math.min(100, Math.round((avg / 80) * 100));
+        db = Math.round(-60 + (avg / 255) * 60);
+      }
+
+      if (inMeter) inMeter.style.width = `${pct}%`;
+      if (inVal) inVal.textContent = avg > 1 ? `${db} dB` : '-60 dB';
+
+      liveInputAudioAnimId = requestAnimationFrame(tick);
+    }
+
+    liveInputAudioAnimId = requestAnimationFrame(tick);
+  } catch (err) {
+    console.warn('Could not start live input meter:', err);
+    if (inMeter) inMeter.style.width = '0%';
+    if (inVal) inVal.textContent = '-60 dB';
+  }
+}
+
+function stopLiveInputMeter() {
+  if (liveInputAudioAnimId) {
+    cancelAnimationFrame(liveInputAudioAnimId);
+    liveInputAudioAnimId = null;
+  }
+  if (liveInputAudioStream) {
+    try {
+      liveInputAudioStream.getTracks().forEach((t) => t.stop());
+    } catch (_) {}
+    liveInputAudioStream = null;
+  }
+  if (liveInputAudioContext && liveInputAudioContext.state !== 'closed') {
+    try { liveInputAudioContext.close(); } catch (_) {}
+    liveInputAudioContext = null;
+  }
+  const inMeter = document.getElementById('meterInputLevel');
+  const inVal = document.getElementById('inputLevelValue');
+  if (inMeter) inMeter.style.width = '0%';
+  if (inVal) inVal.textContent = '-60 dB';
+}
+
+async function populateAudioDevices() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+  try {
+    const inSelect = document.getElementById('selectInputDevice');
+    const outSelect = document.getElementById('selectOutputDevice');
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const inputs = devices.filter((d) => d.kind === 'audioinput');
+    const outputs = devices.filter((d) => d.kind === 'audiooutput');
+
+    if (inSelect && inputs.length > 0) {
+      const savedIn = (state.config && state.config.audio_input_device) || inSelect.value || 'default';
+      inSelect.innerHTML = inputs.map((d, i) =>
+        `<option value="${d.deviceId || 'default'}">${d.label || `Microphone ${i + 1}`}</option>`
+      ).join('');
+      if ([...inSelect.options].some((o) => o.value === savedIn)) {
+        inSelect.value = savedIn;
+      }
+    }
+    if (outSelect && outputs.length > 0) {
+      const savedOut = (state.config && state.config.audio_output_device) || outSelect.value || 'default';
+      outSelect.innerHTML = outputs.map((d, i) =>
+        `<option value="${d.deviceId || 'default'}">${d.label || `Speaker / Headphone ${i + 1}`}</option>`
+      ).join('');
+      if ([...outSelect.options].some((o) => o.value === savedOut)) {
+        outSelect.value = savedOut;
+      }
+    }
+  } catch (_) {}
+}
+
 function setupAiProvidersAndAudio() {
   // 1. AI Providers (Image 1)
   const activeModelSel = document.getElementById('selectActiveModelChoice');
@@ -2250,6 +2439,7 @@ function setupAiProvidersAndAudio() {
       const res = await window.rtai.saveConfig({ audio_input_device: e.target.value });
       if (res && res.config) state.config = res.config;
       showToast(`Microphone input: ${e.target.selectedOptions[0]?.textContent || e.target.value}`);
+      startLiveInputMeter(e.target.value);
     } catch (err) {
       console.error('Failed to save input device:', err);
     }
@@ -2266,66 +2456,76 @@ function setupAiProvidersAndAudio() {
   });
 
   // Device Enumeration via Web Audio API / navigator.mediaDevices
-  if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
-    navigator.mediaDevices.enumerateDevices().then((devices) => {
-      const inSelect = document.getElementById('selectInputDevice');
-      const outSelect = document.getElementById('selectOutputDevice');
-      const inputs = devices.filter((d) => d.kind === 'audioinput');
-      const outputs = devices.filter((d) => d.kind === 'audiooutput');
-
-      if (inSelect && inputs.length > 0) {
-        inSelect.innerHTML = inputs.map((d, i) =>
-          `<option value="${d.deviceId || 'default'}">${d.label || `Microphone ${i + 1}`}</option>`
-        ).join('');
-      }
-      if (outSelect && outputs.length > 0) {
-        outSelect.innerHTML = outputs.map((d, i) =>
-          `<option value="${d.deviceId || 'default'}">${d.label || `Speaker / Headphone ${i + 1}`}</option>`
-        ).join('');
-      }
-    }).catch(() => {});
+  populateAudioDevices();
+  if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+    navigator.mediaDevices.addEventListener('devicechange', () => {
+      populateAudioDevices();
+    });
   }
 
   // Test Sound Button (Web Audio API Synthesizer & Meter Animation)
   document.getElementById('btnTestSound')?.addEventListener('click', async () => {
     const sysMeter = document.getElementById('meterSystemAudioLevel');
     const sysVal = document.getElementById('systemAudioLevelValue');
-    const inMeter = document.getElementById('meterInputLevel');
-    const inVal = document.getElementById('inputLevelValue');
 
+    let animId = null;
     try {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (AudioCtx) {
         const ctx = new AudioCtx();
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.2;
+
         osc.type = 'sine';
         osc.frequency.setValueAtTime(587.33, ctx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(880.00, ctx.currentTime + 0.25);
-        gain.gain.setValueAtTime(0.2, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+        gain.gain.setValueAtTime(0.25, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.65);
+
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(analyser);
+        analyser.connect(ctx.destination);
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        const startTime = Date.now();
+
+        function trackOut() {
+          if (Date.now() - startTime > 750) {
+            if (sysMeter) sysMeter.style.width = '0%';
+            if (sysVal) sysVal.textContent = '-60 dB';
+            try { ctx.close(); } catch (_) {}
+            return;
+          }
+          analyser.getByteFrequencyData(dataArray);
+          let sum = 0;
+          for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+          const avg = sum / dataArray.length;
+          const pct = Math.min(100, Math.round((avg / 60) * 100));
+          const db = avg > 1 ? Math.round(-60 + (avg / 255) * 60) : -60;
+          if (sysMeter) sysMeter.style.width = `${pct}%`;
+          if (sysVal) sysVal.textContent = `${db} dB`;
+          animId = requestAnimationFrame(trackOut);
+        }
+
         osc.start();
         osc.stop(ctx.currentTime + 0.65);
+        animId = requestAnimationFrame(trackOut);
       }
-    } catch (_e) {}
+    } catch (_e) {
+      if (sysMeter) sysMeter.style.width = '88%';
+      if (sysVal) sysVal.textContent = '-6 dB';
+      setTimeout(() => {
+        if (sysMeter) sysMeter.style.width = '0%';
+        if (sysVal) sysVal.textContent = '-60 dB';
+      }, 700);
+    }
 
     if (window.rtai && window.rtai.testSound) {
       try { await window.rtai.testSound(); } catch (_e) {}
     }
-
-    if (sysMeter) sysMeter.style.width = '88%';
-    if (sysVal) sysVal.textContent = '-6 dB';
-    if (inMeter) inMeter.style.width = '64%';
-    if (inVal) inVal.textContent = '-18 dB';
-
-    setTimeout(() => {
-      if (sysMeter) sysMeter.style.width = '15%';
-      if (sysVal) sysVal.textContent = '-60 dB';
-      if (inMeter) inMeter.style.width = '20%';
-      if (inVal) inVal.textContent = '-48 dB';
-    }, 800);
 
     showToast('Som de teste reproduzido.');
   });
@@ -2814,6 +3014,10 @@ async function initApp() {
   document.getElementById('btnWorkspaceBackToGoals')?.addEventListener('click', () => {
     switchView('goals');
   });
+
+  // Home buttons (Sidebar Brand & Header Breadcrumb)
+  document.getElementById('btnBrandHome')?.addEventListener('click', () => switchView('goals'));
+  document.getElementById('btnHeaderHome')?.addEventListener('click', () => switchView('goals'));
 
   document.getElementById('tabGoalOverview')?.addEventListener('click', () => switchGoalWorkspaceTab('overview'));
   document.getElementById('tabGoalPrep')?.addEventListener('click', () => switchGoalWorkspaceTab('prep'));

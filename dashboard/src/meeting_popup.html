@@ -6,115 +6,318 @@
 <title>RealTimeAI · Meeting detected</title>
 <style>
   :root {
-    --bg: #ffffff;
-    --fg: #16161d;
-    --muted: #6b6b76;
-    --border: #e6e6ea;
-    --card: #f6f6f8;
+    --bg: rgba(255, 255, 255, 0.98);
+    --fg: #0f172a;
+    --muted: #64748b;
+    --border: rgba(0, 0, 0, 0.09);
+    --card: #f8fafc;
     --primary: #2563eb;
     --primary-fg: #ffffff;
     --primary-hover: #1d4ed8;
-    --ghost-hover: #ededf0;
-    --live: #e11d48;
-    --track: #ececf0;
-    --focus: rgba(37, 99, 235, 0.45);
+    --ghost-bg: rgba(0, 0, 0, 0.04);
+    --ghost-hover: rgba(0, 0, 0, 0.08);
+    --live: #ef4444;
+    --track: rgba(0, 0, 0, 0.06);
+    --focus: rgba(37, 99, 235, 0.35);
   }
   :root[data-theme="dark"] {
-    --bg: #15151a;
-    --fg: #f4f4f5;
-    --muted: #a1a1aa;
-    --border: #2a2a31;
-    --card: #1c1c22;
-    --primary: #60a5fa;
-    --primary-fg: #0b1220;
-    --primary-hover: #93c5fd;
-    --ghost-hover: #24242b;
+    --bg: rgba(18, 18, 22, 0.96);
+    --fg: #f8fafc;
+    --muted: #94a3b8;
+    --border: rgba(255, 255, 255, 0.1);
+    --card: #1e1e24;
+    --primary: #3b82f6;
+    --primary-fg: #ffffff;
+    --primary-hover: #60a5fa;
+    --ghost-bg: rgba(255, 255, 255, 0.06);
+    --ghost-hover: rgba(255, 255, 255, 0.12);
     --live: #f43f5e;
-    --track: #24242b;
-    --focus: rgba(96, 165, 250, 0.5);
+    --track: rgba(255, 255, 255, 0.08);
+    --focus: rgba(59, 130, 246, 0.4);
   }
   * { box-sizing: border-box; }
   html, body {
     margin: 0;
-    background: var(--bg);
+    padding: 0;
+    background: transparent;
     color: var(--fg);
-    font: 13px/1.4 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     user-select: none;
     overflow: hidden;
   }
-  .wrap { position: relative; padding: 14px 16px 16px; border: 1px solid var(--border); border-radius: 8px; }
-  .top { display: flex; align-items: center; gap: 8px; -webkit-app-region: drag; }
-  .brand { font-size: 11px; font-weight: 600; letter-spacing: .02em; color: var(--muted); flex: 1; }
-  .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--live); box-shadow: 0 0 0 0 var(--live); animation: pulse 1.8s ease-out infinite; }
-  .ended .pulse { background: var(--muted); animation: none; }
-  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(244,63,94,.55); } 80%,100% { box-shadow: 0 0 0 7px rgba(244,63,94,0); } }
-  .x { -webkit-app-region: no-drag; border: 0; background: transparent; color: var(--muted); width: 24px; height: 24px; border-radius: 6px; cursor: pointer; display: grid; place-items: center; }
-  .x:hover { background: var(--ghost-hover); color: var(--fg); }
-  .head { display: flex; gap: 12px; align-items: center; margin-top: 10px; }
-  .badge { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; font-weight: 700; font-size: 15px; color: #fff; flex: none; }
-  .titles { min-width: 0; }
-  .kicker { font-size: 11px; color: var(--muted); }
-  .app { font-size: 16px; font-weight: 650; margin-top: 1px; }
-  .sub { color: var(--muted); font-size: 12px; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 290px; }
-  .field { margin-top: 14px; }
-  .field label { display: block; font-size: 11px; font-weight: 600; color: var(--muted); margin-bottom: 5px; }
-  select {
-    width: 100%; height: 32px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--border);
-    background: var(--card); color: var(--fg); font: inherit; outline: none; cursor: pointer;
+  body {
+    padding: 6px;
   }
-  select:focus-visible, button:focus-visible { box-shadow: 0 0 0 3px var(--focus); outline: none; }
-  .note { margin-top: 12px; font-size: 12px; color: var(--muted); }
-  .actions { display: flex; gap: 8px; margin-top: 14px; }
-  .btn { height: 34px; padding: 0 14px; border-radius: 6px; border: 1px solid transparent; font: inherit; font-weight: 600; cursor: pointer; }
-  .btn-primary { flex: 1; background: var(--primary); color: var(--primary-fg); display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
-  .btn-primary:hover { background: var(--primary-hover); }
-  .btn-primary[disabled] { opacity: .7; cursor: default; }
-  .btn-ghost { background: transparent; color: var(--fg); border-color: var(--border); }
-  .btn-ghost:hover { background: var(--ghost-hover); }
-  .kbd { font-size: 10px; font-weight: 600; opacity: .75; border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; }
-  .links { display: flex; justify-content: space-between; margin-top: 12px; }
-  .link { border: 0; background: none; padding: 0; font: inherit; font-size: 11.5px; color: var(--muted); cursor: pointer; }
-  .link:hover { color: var(--fg); text-decoration: underline; }
-  .error { margin-top: 10px; font-size: 12px; color: var(--live); display: none; }
-  .bar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--track); border-radius: 0 0 8px 8px; overflow: hidden; }
-  .bar > i { display: block; height: 100%; width: 100%; background: var(--primary); transform-origin: left; }
-  .spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin .7s linear infinite; display: none; }
-  .busy .spin { display: inline-block; }
+  .wrap {
+    position: relative;
+    padding: 13px 15px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: 0 16px 36px -6px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+  }
+  .top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    -webkit-app-region: drag;
+  }
+  .brand-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    flex: 1;
+  }
+  .badge {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 13px;
+    color: #fff;
+    flex: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  }
+  .meta {
+    min-width: 0;
+    flex: 1;
+  }
+  .app-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .app {
+    font-size: 13.5px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+  }
+  .pulse {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--live);
+    box-shadow: 0 0 0 0 var(--live);
+    animation: pulse 1.8s ease-out infinite;
+    flex-shrink: 0;
+  }
+  .ended .pulse {
+    background: var(--muted);
+    animation: none;
+  }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(244,63,94,.55); } 80%,100% { box-shadow: 0 0 0 6px rgba(244,63,94,0); } }
+  .kicker {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .sub {
+    color: var(--muted);
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 270px;
+    margin-top: 1px;
+  }
+  .x {
+    -webkit-app-region: no-drag;
+    border: 0;
+    background: var(--ghost-bg);
+    color: var(--muted);
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    transition: all .15s ease;
+    flex-shrink: 0;
+  }
+  .x:hover {
+    background: var(--ghost-hover);
+    color: var(--fg);
+  }
+  .field {
+    margin-top: 11px;
+  }
+  select {
+    width: 100%;
+    height: 32px;
+    padding: 0 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--fg);
+    font: inherit;
+    font-size: 12px;
+    outline: none;
+    cursor: pointer;
+    color-scheme: light;
+    transition: border-color .15s ease;
+  }
+  [data-theme="dark"] select,
+  :root[data-theme="dark"] select {
+    color-scheme: dark;
+  }
+  select option,
+  select optgroup {
+    background-color: var(--card);
+    color: var(--fg);
+  }
+  select:focus-visible, button:focus-visible {
+    box-shadow: 0 0 0 2px var(--focus);
+    outline: none;
+  }
+  .actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 11px;
+  }
+  .btn {
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .15s ease;
+  }
+  .btn-primary {
+    flex: 1;
+    background: var(--primary);
+    color: var(--primary-fg);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .btn-primary:hover {
+    background: var(--primary-hover);
+  }
+  .btn-primary[disabled] {
+    opacity: .7;
+    cursor: default;
+  }
+  .btn-ghost {
+    background: var(--ghost-bg);
+    color: var(--fg);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover {
+    background: var(--ghost-hover);
+  }
+  .kbd {
+    font-size: 9.5px;
+    font-weight: 600;
+    opacity: .8;
+    background: rgba(255,255,255,0.18);
+    border-radius: 4px;
+    padding: 1px 4px;
+  }
+  .links {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 9px;
+    padding-top: 2px;
+  }
+  .link {
+    border: 0;
+    background: none;
+    padding: 0;
+    font: inherit;
+    font-size: 11px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: color .15s;
+  }
+  .link:hover {
+    color: var(--fg);
+    text-decoration: underline;
+  }
+  .note {
+    margin-top: 10px;
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+  .error {
+    margin-top: 8px;
+    font-size: 11.5px;
+    color: var(--live);
+    display: none;
+  }
+  .bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2px;
+    background: var(--track);
+    border-radius: 0 0 16px 16px;
+    overflow: hidden;
+  }
+  .bar > i {
+    display: block;
+    height: 100%;
+    width: 100%;
+    background: var(--primary);
+    transform-origin: left;
+  }
+  .spin {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    animation: spin .7s linear infinite;
+    display: none;
+  }
+  .busy .spin {
+    display: inline-block;
+  }
   @keyframes spin { to { transform: rotate(360deg); } }
   [hidden] { display: none !important; }
 </style>
 </head>
 <body>
 <div class="wrap" id="wrap">
-  <div class="top">
-    <span class="pulse" aria-hidden="true"></span>
-    <span class="brand">RealTimeAI</span>
+  <div class="top-row">
+    <div class="brand-group">
+      <div class="badge" id="badge">M</div>
+      <div class="meta">
+        <div class="app-line">
+          <span class="app" id="appName">Meeting</span>
+          <span class="pulse" aria-hidden="true"></span>
+          <span class="kicker" id="kicker">Meeting detected</span>
+        </div>
+        <div class="sub" id="subtitle"></div>
+      </div>
+    </div>
     <button class="x" id="btnClose" type="button" aria-label="Close" title="Close (Esc)">
       <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
     </button>
   </div>
 
-  <div class="head">
-    <div class="badge" id="badge">M</div>
-    <div class="titles">
-      <div class="kicker" id="kicker">Meeting detected</div>
-      <div class="app" id="appName">Meeting</div>
-      <div class="sub" id="subtitle"></div>
-    </div>
-  </div>
-
   <!-- Started: pick the goal and launch the copilot -->
   <div id="paneStart">
     <div class="field">
-      <label for="selGoal">Goal</label>
       <select id="selGoal"></select>
     </div>
     <div class="actions">
       <button class="btn btn-primary" id="btnStart" type="button">
         <span class="spin" aria-hidden="true"></span>
         <span id="btnStartLabel">Start copilot</span>
-        <span class="kbd" aria-hidden="true">Enter</span>
+        <span class="kbd" aria-hidden="true">↵ Enter</span>
       </button>
       <button class="btn btn-ghost" id="btnLater" type="button">Not now</button>
     </div>

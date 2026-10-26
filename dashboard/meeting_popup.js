@@ -9,10 +9,10 @@
 
 const path = require('path');
 
-const WIDTH = 372;
-const MARGIN = 16;
-const MIN_H = 150;
-const MAX_H = 420;
+const WIDTH = 390;
+const MARGIN = 18;
+const MIN_H = 130;
+const MAX_H = 340;
 
 function createMeetingPopup(deps) {
   const {
@@ -38,8 +38,8 @@ function createMeetingPopup(deps) {
       area = display.workArea;
     } catch (_e) {}
     return {
-      x: Math.round(area.x + area.width - WIDTH - MARGIN),
-      y: Math.round(area.y + area.height - height - MARGIN),
+      x: Math.round(area.x + (area.width - WIDTH) / 2),
+      y: Math.round(area.y + MARGIN),
       width: WIDTH,
       height
     };
@@ -56,10 +56,10 @@ function createMeetingPopup(deps) {
       if (!win.isVisible()) win.showInactive();
       return;
     }
-    const dark = payload.theme === 'dark';
     win = new BrowserWindow({
-      ...anchor(230),
+      ...anchor(200),
       frame: false,
+      transparent: true,
       resizable: false,
       minimizable: false,
       maximizable: false,
@@ -68,7 +68,7 @@ function createMeetingPopup(deps) {
       alwaysOnTop: true,
       show: false,
       title: 'RealTimeAI',
-      backgroundColor: dark ? '#15151A' : '#FFFFFF',
+      backgroundColor: '#00000000',
       webPreferences: {
         preload: preloadPath,
         contextIsolation: true,

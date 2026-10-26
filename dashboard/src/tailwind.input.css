@@ -81,6 +81,20 @@
   select {
     user-select: text;
   }
+
+  select {
+    color-scheme: light;
+  }
+
+  .dark select {
+    color-scheme: dark;
+  }
+
+  select option,
+  select optgroup {
+    background-color: hsl(var(--card));
+    color: hsl(var(--foreground));
+  }
 }
 
 /* Custom Scrollbar */
@@ -220,6 +234,10 @@
   }
   .sh-select-pill {
     @apply inline-flex h-9 items-center rounded-lg border border-input bg-background/70 px-3 py-1.5 text-xs font-medium text-foreground transition-all hover:bg-accent hover:border-foreground/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/15 cursor-pointer;
+  }
+  select.sh-input,
+  select.sh-select-pill {
+    @apply bg-card;
   }
 
   /* Card */
