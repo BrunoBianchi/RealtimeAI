@@ -18,7 +18,7 @@ MIT License, Copyright (c) Microsoft Corporation. Texto completo em `ONNXRUNTIME
 
 ## multilingual-e5-small (modelo de embeddings do RAG híbrido)
 
-Modelo `intfloat/multilingual-e5-small` (MIT License, Copyright (c) Liang Wang et al.), usado na conversão ONNX int8 publicada em `Xenova/multilingual-e5-small`. Baixado à parte por `scripts/baixar-modelo-embeddings.ps1`; não vai no instalador.
+Modelo `intfloat/multilingual-e5-small` (MIT License, Copyright (c) Liang Wang et al.), usado na conversão ONNX int8 publicada em `Xenova/multilingual-e5-small`. Baixado à parte por `scripts/windows/download-embeddings-model.bat`; não vai no instalador.
 
 ## Silero VAD (modelo `silero_vad.onnx`)
 

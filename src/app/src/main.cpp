@@ -475,7 +475,7 @@ std::unique_ptr<HybridRagLoader> start_hybrid_rag(AsyncLog& log, const AppConfig
     const fs::path tokenizer = dir / L"tokenizer.json";
     if (!fs::exists(model, ec) || !fs::exists(tokenizer, ec)) {
         log.line("Hybrid RAG: embedding model not found in " + path_utf8(dir) +
-                 " (run scripts\\baixar-modelo-embeddings.ps1). Using BM25 only.");
+                 " (run scripts\\windows\\download-embeddings-model.bat). Using BM25 only.");
         return nullptr;
     }
 #ifdef _WIN32

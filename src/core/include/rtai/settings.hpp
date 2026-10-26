@@ -409,7 +409,7 @@ limiar_energia = 0.01
 
 [rag]
 ; Hybrid retrieval: BM25 (exact names, acronyms, numbers) + local embeddings
-; (paraphrases, PT<->EN). Needs the model: scripts\baixar-modelo-embeddings.ps1
+; (paraphrases, PT<->EN). Needs the model: scripts\windows\download-embeddings-model.bat
 hibrido = sim
 ; Empty = %LOCALAPPDATA%\RealTimeAI\models\multilingual-e5-small
 modelo_embeddings =

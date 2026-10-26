@@ -1,6 +1,6 @@
 # Downloads the hybrid RAG embedding model (multilingual-e5-small, ONNX int8,
 # about 118 MB) to %LOCALAPPDATA%\RealTimeAI\models\multilingual-e5-small.
-# Run once: powershell -ExecutionPolicy Bypass -File scripts\baixar-modelo-embeddings.ps1
+# Run once: scripts\windows\download-embeddings-model.bat
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $dest = Join-Path $env:LOCALAPPDATA 'RealTimeAI\models\multilingual-e5-small'

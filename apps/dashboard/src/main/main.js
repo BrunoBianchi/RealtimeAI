@@ -114,9 +114,7 @@ function getOverlayExecutablePath() {
     // Installed app: the CI bundles the native overlay as an extra resource.
     ...(app.isPackaged ? [path.join(process.resourcesPath, 'native', 'rtai_app.exe')] : []),
     path.join(workspaceRoot, 'build', 'bin', 'Release', 'rtai_app.exe'),
-    path.join(workspaceRoot, 'build', 'bin', 'Debug', 'rtai_app.exe'),
-    path.join(workspaceRoot, 'overlay', 'rtai_overlay.exe'),
-    path.join(workspaceRoot, 'overlay', 'rtai_app.exe')
+    path.join(workspaceRoot, 'build', 'bin', 'Debug', 'rtai_app.exe')
   ];
   for (const p of candidates) {
     if (fs.existsSync(p)) return p;
@@ -1658,7 +1656,7 @@ function launchOverlay({ agent, demo = false, configOverrides = {} }) {
   // 3. Stop any previous overlay instance
   stopRunningOverlay();
 
-  // 4. Spawn the standalone native C++20 Overlay executable from ../overlay/
+  // 4. Spawn the native C++20 overlay (packaged resource or local CMake build).
   const exePath = getOverlayExecutablePath();
   const args = ['--no-launcher', '--server'];
   if (savedAgent && savedAgent.id) {
@@ -2000,7 +1998,7 @@ function registerStealthShortcuts() {
 async function startCopilotForMeeting(agentId) {
   const exePath = getOverlayExecutablePath();
   if (!exePath || !fs.existsSync(exePath)) {
-    return { ok: false, error: 'Overlay not found. Build it with recompilar.bat first.' };
+    return { ok: false, error: 'Overlay not found. Build it first: npm run build:native (scripts\\windows\\build.bat).' };
   }
   if (!readConfigIni().has_deepgram_key) {
     showSettingsWindow('general');
