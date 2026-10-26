@@ -48,6 +48,13 @@ struct Settings {
     std::string vad{"silero"};      // "silero" | "energia"
     std::string silero_model;       // empty = silero_vad.onnx next to the exe
     double energy_threshold{0.01};
+    // [rag] hybrid retrieval: BM25 + local multilingual-e5 embeddings.
+    // Only active when the model is present (builds with RTAI_ENABLE_EMBEDDINGS).
+    bool rag_hybrid{true};
+    std::string embed_model_dir;    // empty = %LOCALAPPDATA%\RealTimeAI\models\multilingual-e5-small
+    int embed_budget_ms{12};        // longest a question waits for its embedding (0 = never waits)
+    double embed_min_score{0.80};   // minimum cosine for a match found only by meaning
+    int embed_threads{2};
     // [overlay]
     int overlay_width{860};
     int overlay_max_height_pct{60};
@@ -257,6 +264,18 @@ inline Settings load_settings(const ini::File& f, const EnvLookup& env, const Se
         }
     }
 
+    boolean("rag", "hibrido", "RTAI_RAG_HYBRID", s.rag_hybrid);
+    str("rag", "modelo_embeddings", "RTAI_EMBED_MODEL_DIR", s.embed_model_dir);
+    integer("rag", "orcamento_ms", 0, 100, s.embed_budget_ms);
+    integer("rag", "threads", 1, 8, s.embed_threads);
+    {
+        std::string raw;
+        if (str("rag", "similaridade_minima", nullptr, raw)) {
+            if (auto t = detail::to_double(raw); t && *t > 0.0 && *t < 1.0) s.embed_min_score = *t;
+            else s.warnings.push_back("[rag] similaridade_minima: use a number between 0 and 1 (e.g. 0.80)");
+        }
+    }
+
     integer("overlay", "largura", 420, 1100, s.overlay_width);
     integer("overlay", "altura_max_pct", 20, 95, s.overlay_max_height_pct);
 
@@ -304,6 +323,7 @@ inline bool is_known_setting(std::string_view section, std::string_view key) {
         {"turn", "speculative_pause_ms"}, {"turn", "boundary_grace_ms"}, {"turn", "stale_ms"},
         {"audio", "microfone"}, {"audio", "audio_sistema"}, {"audio", "sistema"}, {"audio", "loopback"}, {"audio", "vad"}, {"audio", "silero_modelo"},
         {"audio", "limiar_energia"},
+        {"rag", "hibrido"}, {"rag", "modelo_embeddings"}, {"rag", "orcamento_ms"}, {"rag", "threads"}, {"rag", "similaridade_minima"},
         {"overlay", "largura"}, {"overlay", "altura_max_pct"},
         {"sessao", "salvar"}, {"sessao", "pasta"}, {"sessao", "ultimo_agente"},
         {"stealth", "invisivel_barra_tarefas"}, {"stealth", "dock"}, {"stealth", "taskbar"},
@@ -386,6 +406,19 @@ vad = silero
 silero_modelo =
 ; Only for vad = energia: sensitivity (lower = more sensitive)
 limiar_energia = 0.01
+
+[rag]
+; Hybrid retrieval: BM25 (exact names, acronyms, numbers) + local embeddings
+; (paraphrases, PT<->EN). Needs the model: scripts\baixar-modelo-embeddings.ps1
+hibrido = sim
+; Empty = %LOCALAPPDATA%\RealTimeAI\models\multilingual-e5-small
+modelo_embeddings =
+; Longest a question waits for its embedding, in ms (0 = only reuse ready ones)
+orcamento_ms = 12
+; Minimum similarity (0-1) for an excerpt found only by meaning
+similaridade_minima = 0.80
+; CPU threads for the embedding model
+threads = 2
 
 [overlay]
 ; Initial width in pixels (420 to 1100). After that, the width you drag on the HUD edge wins.

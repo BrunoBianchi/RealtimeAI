@@ -12,9 +12,13 @@ Permission to use, copy, modify, and/or distribute this software for any purpose
 
 THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-## ONNX Runtime (VAD Silero, opcional)
+## ONNX Runtime (VAD Silero e embeddings do RAG híbrido, opcionais)
 
 MIT License, Copyright (c) Microsoft Corporation. Texto completo em `ONNXRUNTIME-LICENSE.txt` no pacote.
+
+## multilingual-e5-small (modelo de embeddings do RAG híbrido)
+
+Modelo `intfloat/multilingual-e5-small` (MIT License, Copyright (c) Liang Wang et al.), usado na conversão ONNX int8 publicada em `Xenova/multilingual-e5-small`. Baixado à parte por `scripts/baixar-modelo-embeddings.ps1`; não vai no instalador.
 
 ## Silero VAD (modelo `silero_vad.onnx`)
 

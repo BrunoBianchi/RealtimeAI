@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -18,6 +19,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "rtai/dense_rag.hpp"
 #include "rtai/json_min.hpp"
 #include "rtai/text_util.hpp"
 
@@ -320,6 +322,10 @@ struct RagDecision {
     double top_score{0.0};
     std::string reason;
     std::vector<const RagChunk*> chunks;
+    // Hybrid retrieval: the dense side answered in time and was fused in.
+    bool hybrid{false};
+    std::size_t dense_hits{0};   // dense hits that survived the filters
+    std::size_t dense_only{0};   // selected chunks BM25 alone would not have found
 };
 
 // What the interviewer is asking for; decides which material leads.
@@ -425,6 +431,49 @@ public:
         return prev[m] <= max_d;
     }
     [[nodiscard]] std::size_t chunk_count() const noexcept { return chunks_.size(); }
+
+    // ------------------------------------------------------------------
+    // Hybrid retrieval (optional). The dense side ranks chunks by meaning
+    // (paraphrases, PT<->EN); BM25 keeps names, acronyms and numbers exact.
+    // Without a dense search attached, or when it does not answer within its
+    // budget, retrieval is exactly the BM25 path.
+    // ------------------------------------------------------------------
+    struct DenseOptions {
+        // Minimum cosine for a dense-only hit to count (multilingual-e5
+        // similarities are compressed: unrelated text still scores ~0.7).
+        float min_score{0.80f};
+        // Direct/conceptual questions are the strictest: a project of mine
+        // rides along only when it is really about the subject.
+        float direct_extra{0.03f};
+        std::size_t top_k{20};
+        // Reciprocal Rank Fusion: small k because the corpus is small (a few
+        // hundred chunks); BM25 weighs a bit more (exact names matter most).
+        double rrf_k{10.0};
+        double bm25_weight{1.0};
+        double dense_weight{0.8};
+    };
+
+    void attach_dense(std::shared_ptr<IDenseSearch> dense, DenseOptions opts) {
+        dense_ = std::move(dense);
+        dense_opts_ = opts;
+    }
+    void attach_dense(std::shared_ptr<IDenseSearch> dense) { attach_dense(std::move(dense), DenseOptions{}); }
+    [[nodiscard]] bool has_dense() const noexcept { return dense_ != nullptr; }
+
+    // Text embedded for each chunk, in chunk order (the dense index rows).
+    // The document title travels with the text, as it does for BM25.
+    [[nodiscard]] std::vector<std::string> dense_passages() const {
+        std::vector<std::string> out;
+        out.reserve(chunks_.size());
+        for (const auto& ch : chunks_) out.push_back(ch.source + ": " + ch.text);
+        return out;
+    }
+
+    // Starts the question embedding early (e.g. while the question is still
+    // being spoken); harmless when no dense search is attached.
+    void prefetch(std::string_view query) const {
+        if (dense_) dense_->prefetch(query);
+    }
 
     [[nodiscard]] std::string mini_compact() const {
         std::lock_guard<std::mutex> lk(compact_mu_);
@@ -833,6 +882,15 @@ public:
             dec.top_score = scored.front().score;
         }
 
+        // ---- Hybrid: fuse the dense ranking in (Reciprocal Rank Fusion) ----
+        // The same hard rules apply to dense hits: a cited project filters to
+        // that project, company material never anchors a story of mine, and
+        // a direct question needs a stronger match.
+        std::vector<char> dense_ok(chunks_.size(), 0);
+        std::vector<double> bm25_score(chunks_.size(), 0.0);
+        for (const auto& sc : scored) bm25_score[sc.idx] = sc.score;
+        const bool fused = fuse_dense(query, intent, story_q, cites_proj, cited_terms, scored, dense_ok, dec);
+
         // Relative cut: keep chunks that score at least 30% of the best one
         // (and an absolute floor), so weak keyword collisions don't ride along
         // and mix unrelated facts into the answer.
@@ -841,12 +899,20 @@ public:
         // when it is about the same subject. A cited project is exempt.
         const double min_coverage = cites_proj ? 0.0 : intent.direct() ? 0.5 : 0.3;
         auto take_ranked = [&](std::size_t limit) {
-            const double floor_score = std::max(0.25, dec.top_score * 0.30);
+            // Fused scores are rank-based: only the relative cut applies.
+            const double rank_top = scored.empty() ? 0.0 : scored.front().score;
+            const double floor_score = fused ? rank_top * 0.30 : std::max(0.25, dec.top_score * 0.30);
             for (std::size_t i = 0; i < scored.size() && dec.chunks.size() < limit; ++i) {
-                const bool context_boosted = cites_in_context && chunks_[scored[i].idx].is_candidate_project &&
-                                             scored[i].score >= 1.0;
-                if (coverage[scored[i].idx] < min_coverage && !context_boosted) continue;
-                if (dec.chunks.empty() || scored[i].score >= floor_score) dec.chunks.push_back(&chunks_[scored[i].idx]);
+                const std::size_t ci = scored[i].idx;
+                const bool context_boosted = cites_in_context && chunks_[ci].is_candidate_project &&
+                                             bm25_score[ci] >= 1.0;
+                // A dense match is a match by meaning: the word-coverage rule
+                // (made against word collisions) does not apply to it.
+                if (coverage[ci] < min_coverage && !context_boosted && !dense_ok[ci]) continue;
+                if (dec.chunks.empty() || scored[i].score >= floor_score) {
+                    dec.chunks.push_back(&chunks_[ci]);
+                    if (fused && bm25_score[ci] <= 0.0) ++dec.dense_only;
+                }
             }
         };
 
@@ -872,7 +938,7 @@ public:
                     }
                 }
             }
-        } else if (!scored.empty() && (dec.top_score >= 0.35 || any_intent)) {
+        } else if (!scored.empty() && (dec.top_score >= 0.35 || any_intent || fused)) {
             dec.needed = true;
             dec.reason = "Pergunta requer aprofundamento específico nos documentos/dossiê indexados no RAG.";
             take_ranked(top_k);
@@ -1058,9 +1124,26 @@ public:
     // Per-question part of the context: the retrieved chunks (only the
     // relevant ones, deduplicated, within budget), split by who they are
     // about so the model never tells company material as my experience.
+    // What one retrieval did (for logs and latency measurement).
+    struct RetrievalTrace {
+        bool hybrid{false};
+        std::size_t chunks{0};
+        std::size_t dense_hits{0};
+        std::size_t dense_only{0};
+        double ms{0.0};
+    };
+
     [[nodiscard]] std::string retrieve_block(std::string_view query, std::string_view context = {},
-                                             std::size_t max_chars = 3200) const {
+                                             std::size_t max_chars = 3200, RetrievalTrace* trace = nullptr) const {
+        const auto t0 = std::chrono::steady_clock::now();
         const RagDecision dec = decide_rag_for_query(query, 5, context);
+        if (trace) {
+            trace->hybrid = dec.hybrid;
+            trace->chunks = dec.chunks.size();
+            trace->dense_hits = dec.dense_hits;
+            trace->dense_only = dec.dense_only;
+            trace->ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+        }
         const QueryIntent intent = classify_query(query);
         std::string out = "=== DECISÃO AUTÔNOMA DO RAG ===\n";
         out += "Tipo de pergunta: " + std::string(intent_guidance(intent, cites_candidate_project(query), asks_about_me(query))) + "\n";
@@ -1216,6 +1299,57 @@ public:
     }
 
 private:
+    // Replaces `scored` with the fused ranking when the dense side answered.
+    // Returns false (and leaves everything untouched) otherwise.
+    template <class ScoredVec>
+    bool fuse_dense(std::string_view query, const QueryIntent& intent, bool story_q, bool cites_proj,
+                    const std::vector<std::string>& cited_terms, ScoredVec& scored, std::vector<char>& dense_ok,
+                    RagDecision& dec) const {
+        if (!dense_ || chunks_.empty()) return false;
+        const std::vector<DenseHit> hits = dense_->search(query, dense_opts_.top_k);
+        if (hits.empty()) return false;
+        const float min_s = dense_opts_.min_score + (intent.direct() && !cites_proj ? dense_opts_.direct_extra : 0.0f);
+        std::vector<std::size_t> dense_rank;
+        for (const DenseHit& h : hits) {
+            if (h.index >= chunks_.size() || h.score < min_s) continue;
+            const RagChunk& ch = chunks_[h.index];
+            const bool names_cited = std::any_of(cited_terms.begin(), cited_terms.end(),
+                                                 [&](const std::string& ct) { return chunk_mentions(ch, ct); });
+            if (cites_proj) {
+                if (ch.is_candidate_project && !names_cited) continue; // one story per answer
+                if (ch.is_cultural_or_company && !names_cited && !intent.company) continue;
+            } else if (story_q && !intent.company && ch.is_cultural_or_company) {
+                continue; // a story question is answered with my files
+            }
+            dense_ok[h.index] = 1;
+            dense_rank.push_back(h.index);
+        }
+        dec.dense_hits = dense_rank.size();
+        if (dense_rank.empty()) return false;
+
+        std::unordered_map<std::size_t, double> rrf;
+        const std::size_t bm25_n = std::min<std::size_t>(scored.size(), dense_opts_.top_k);
+        for (std::size_t r = 0; r < bm25_n; ++r)
+            rrf[scored[r].idx] += dense_opts_.bm25_weight / (dense_opts_.rrf_k + static_cast<double>(r + 1));
+        for (std::size_t r = 0; r < dense_rank.size(); ++r)
+            rrf[dense_rank[r]] += dense_opts_.dense_weight / (dense_opts_.rrf_k + static_cast<double>(r + 1));
+
+        ScoredVec fusedv;
+        fusedv.reserve(rrf.size());
+        for (const auto& [idx, sc] : rrf) fusedv.push_back({idx, sc});
+        std::sort(fusedv.begin(), fusedv.end(), [](const auto& a, const auto& b) {
+            return a.score != b.score ? a.score > b.score : a.idx < b.idx;
+        });
+        // BM25 hits past its top-k keep their order after the fused ones, so
+        // the STAR fallback (which walks `scored`) still sees them.
+        for (std::size_t r = bm25_n; r < scored.size(); ++r) {
+            if (!rrf.count(scored[r].idx)) fusedv.push_back({scored[r].idx, 0.0});
+        }
+        scored = std::move(fusedv);
+        dec.hybrid = true;
+        return true;
+    }
+
     struct WeightedTerm {
         std::string term;
         double weight;
@@ -1843,6 +1977,8 @@ private:
     std::vector<std::string> candidate_project_terms_;
     bool has_candidate_chunks_{false};
     std::size_t company_chunks_{0};
+    std::shared_ptr<IDenseSearch> dense_;
+    DenseOptions dense_opts_{};
 };
 
 } // namespace rtai

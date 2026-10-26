@@ -69,6 +69,10 @@
 #ifdef RTAI_HAVE_ONNX
 #include "rtai/silero_vad.hpp"
 #endif
+#ifdef RTAI_HAVE_EMBEDDINGS
+#include "rtai/e5_embedder.hpp"
+#endif
+#include "rtai/dense_rag.hpp"
 
 using namespace rtai;
 namespace fs = std::filesystem;
@@ -426,6 +430,116 @@ bool open_settings_popup(const fs::path& path) {
     return gui::open_settings_gui(path, [](const char* name) { return env(name); });
 }
 
+// ---------------------------------------------------------------------------
+// Hybrid RAG (BM25 + local multilingual-e5 embeddings)
+// ---------------------------------------------------------------------------
+// Everything heavy (250k-piece vocabulary, ONNX session, passage index) loads
+// on a background thread; retrieval runs BM25-only until it is ready, and
+// afterwards each question waits at most [rag] orcamento_ms for its vector.
+struct HybridRagLoader {
+    std::shared_ptr<DeferredDenseSearch> slot = std::make_shared<DeferredDenseSearch>();
+    std::thread thread;
+    ~HybridRagLoader() {
+        if (thread.joinable()) thread.join();
+    }
+};
+
+// Remote kill switch: flags-active.json written by the dashboard
+// ({"flags": {"hybrid_rag": false}}). Missing file or flag = allowed.
+bool hybrid_flag_allows(const fs::path& app_dir) {
+    std::error_code ec;
+    const fs::path p = app_dir / L"flags-active.json";
+    if (!fs::exists(p, ec)) return true;
+    const auto doc = json::Parser::parse(read_text_file(p, 256 * 1024));
+    if (!doc) return true;
+    const auto& v = (*doc)["flags"]["hybrid_rag"];
+    return !(v.is_bool() && !v.as_bool(true));
+}
+
+std::unique_ptr<HybridRagLoader> start_hybrid_rag(AsyncLog& log, const AppConfig& cfg, MiniAgentRag& rag) {
+    if (!cfg.st.rag_hybrid || rag.chunk_count() == 0) return nullptr;
+    if (!hybrid_flag_allows(cfg.app_dir)) {
+        log.line("Hybrid RAG: off by feature flag (BM25 only).");
+        return nullptr;
+    }
+#ifndef RTAI_HAVE_EMBEDDINGS
+    (void)log; (void)cfg; (void)rag;
+    return nullptr;
+#else
+    const fs::path dir = cfg.st.embed_model_dir.empty()
+                             ? cfg.app_dir / L"models" / L"multilingual-e5-small"
+                             : path_from_utf8(cfg.st.embed_model_dir);
+    std::error_code ec;
+    fs::path model = dir / L"model_quantized.onnx";
+    if (!fs::exists(model, ec)) model = dir / L"onnx" / L"model_quantized.onnx";
+    const fs::path tokenizer = dir / L"tokenizer.json";
+    if (!fs::exists(model, ec) || !fs::exists(tokenizer, ec)) {
+        log.line("Hybrid RAG: embedding model not found in " + path_utf8(dir) +
+                 " (run scripts\\baixar-modelo-embeddings.ps1). Using BM25 only.");
+        return nullptr;
+    }
+#ifdef _WIN32
+    // onnxruntime.dll is delay-loaded: load OUR copy (never the older one in
+    // System32) and stay BM25-only if it is missing.
+    if (!LoadLibraryExW((cfg.exe_dir / L"onnxruntime.dll").c_str(), nullptr, LOAD_WITH_ALTERED_SEARCH_PATH)) {
+        log.line("Hybrid RAG: onnxruntime.dll not found next to the program. Using BM25 only.");
+        return nullptr;
+    }
+#endif
+    auto loader = std::make_unique<HybridRagLoader>();
+    MiniAgentRag::DenseOptions dopts;
+    dopts.min_score = static_cast<float>(cfg.st.embed_min_score);
+    rag.attach_dense(loader->slot, dopts);
+
+    OnnxE5Embedder::Options eo;
+    eo.model_path = path_utf8(model);
+    eo.tokenizer_path = path_utf8(tokenizer);
+    eo.threads = cfg.st.embed_threads;
+    EmbeddingDenseSearch::Options so;
+    so.budget = std::chrono::milliseconds(cfg.st.embed_budget_ms);
+    std::string id = rag.profile().id.empty() ? MiniAgentProfile::slugify(rag.profile().name) : rag.profile().id;
+    if (id.empty()) id = "default";
+    const fs::path cache_file = cfg.app_dir / L"models" / L"cache" / path_from_utf8(id + ".emb");
+    std::vector<std::string> passages = rag.dense_passages();
+    std::shared_ptr<DeferredDenseSearch> slot = loader->slot;
+
+    loader->thread = std::thread([&log, eo, so, cache_file, passages = std::move(passages), slot]() mutable {
+        const auto t0 = std::chrono::steady_clock::now();
+        std::string err;
+        std::shared_ptr<IEmbedder> emb = OnnxE5Embedder::create(eo, &err);
+        if (!emb) {
+            log.line("Hybrid RAG: could not load the embedding model (" + err + "). Using BM25 only.");
+            return;
+        }
+        auto search = std::make_shared<EmbeddingDenseSearch>(emb, so);
+        auto load = [cache_file](const std::string&) -> std::optional<std::string> {
+            std::error_code e;
+            if (!fs::exists(cache_file, e)) return std::nullopt;
+            return read_text_file(cache_file, 64 * 1024 * 1024);
+        };
+        auto store = [cache_file](const std::string&, const std::string& bytes) {
+            std::error_code e;
+            fs::create_directories(cache_file.parent_path(), e);
+            wincfg::write_file_atomic(cache_file, bytes);
+        };
+        search->build_index(std::move(passages), load, store);
+        // Waiting here is off the live path: this is the loader thread.
+        if (!search->wait_ready(std::chrono::minutes(5))) {
+            log.line("Hybrid RAG: the passage index did not finish. Using BM25 only.");
+            return;
+        }
+        slot->set(search);
+        const auto st = search->stats();
+        const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+        char buf[160];
+        std::snprintf(buf, sizeof buf, "Hybrid RAG: ready (%zu excerpts, %s, %.0f ms).", st.indexed,
+                      st.loaded_from_cache ? "index from cache" : "index built", ms);
+        log.line(buf);
+    });
+    return loader;
+#endif
+}
+
 // No Deepgram key yet: tell the UI and only accept configuration commands.
 int run_setup_mode(const AppConfig& cfg, LineChannel& out, AsyncLog& log) {
     server::Hello h = make_hello(cfg, false, cfg.st.model);
@@ -621,6 +735,9 @@ int run_app(AppConfig cfg) {
         }
     }
 
+    std::unique_ptr<HybridRagLoader> hybrid_rag;
+    if (agent_rag && !cfg.demo) hybrid_rag = start_hybrid_rag(log, cfg, *agent_rag);
+
     const auto session_start = std::chrono::steady_clock::now();
 
     if (!cfg.demo && cfg.st.deepgram_key.empty() && out) {
@@ -741,8 +858,16 @@ int run_app(AppConfig cfg) {
         cc.prompt.session_profile = [agent_rag, base_ctx = cfg.context_text]() {
             return agent_rag->session_profile_block(base_ctx);
         };
-        cc.prompt.rag_retrieve = [agent_rag](std::string_view q, std::string_view recent) {
-            return agent_rag->retrieve_block(q, recent);
+        cc.prompt.rag_retrieve = [agent_rag, &log](std::string_view q, std::string_view recent) {
+            MiniAgentRag::RetrievalTrace tr;
+            std::string block = agent_rag->retrieve_block(q, recent, 3200, &tr);
+            if (agent_rag->has_dense()) {
+                char buf[160];
+                std::snprintf(buf, sizeof buf, "   RAG: %s, %zu excerpt(s), %zu by meaning only, %.2f ms",
+                              tr.hybrid ? "hybrid" : "bm25", tr.chunks, tr.dense_only, tr.ms);
+                log.line(buf);
+            }
+            return block;
         };
     }
     if (cfg.st.turn_boundary_grace_ms >= 0) cc.turns.boundary_grace_ms = cfg.st.turn_boundary_grace_ms;

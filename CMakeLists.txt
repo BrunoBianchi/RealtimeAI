@@ -21,6 +21,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 # ---------------------------------------------------------------------------
 option(RTAI_BUILD_TESTS "Build unit/integration tests" ON)
 option(RTAI_ENABLE_ONNX "Build the ONNX Silero VAD adapter (requires onnxruntime)" OFF)
+option(RTAI_ENABLE_EMBEDDINGS "Hybrid RAG: local multilingual-e5 embeddings via ONNX Runtime (downloaded if RTAI_ONNXRUNTIME_ROOT is empty)" OFF)
 
 # ---------------------------------------------------------------------------
 # Compiler flags
@@ -51,16 +52,21 @@ endif()
 # ---------------------------------------------------------------------------
 add_subdirectory(src/core)
 
+# ONNX adapters first: the app reads their runtime paths.
+if (RTAI_ENABLE_EMBEDDINGS)
+    add_subdirectory(src/embed_onnx)
+endif()
+
+if (RTAI_ENABLE_ONNX)
+    add_subdirectory(src/vad_onnx)
+endif()
+
 if (WIN32)
     add_subdirectory(src/audio_wasapi)
     add_subdirectory(src/net)
     add_subdirectory(src/deepgram)
     add_subdirectory(src/overlay)
     add_subdirectory(src/app)
-endif()
-
-if (RTAI_ENABLE_ONNX)
-    add_subdirectory(src/vad_onnx)
 endif()
 
 if (RTAI_BUILD_TESTS)

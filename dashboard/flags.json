@@ -17,6 +17,10 @@
       "description": "A/B test: label of the main start button on Home",
       "rollout": { "stable": 100, "beta": 100 },
       "variants": { "start_session": 50, "go_live": 50 }
+    },
+    "hybrid_rag": {
+      "description": "Hybrid RAG in the overlay (BM25 + local embeddings). Set the rollout to 0 to switch it off remotely",
+      "rollout": { "stable": 100, "beta": 100 }
     }
   }
 }
