@@ -38,7 +38,7 @@ jobs:
           fetch-depth: 0 # tags and history for the release notes
 
       - name: Cache ONNX Runtime and GoogleTest downloads
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: build/_deps
           key: deps-${{ runner.os }}-${{ hashFiles('cmake/*.cmake') }}
