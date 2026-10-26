@@ -80,6 +80,27 @@ LlmFailure classify_winhttp_error(DWORD code) {
 // add a failed round trip before the error is shown).
 bool has_fallback(const WinHttpLlmOptions& o) { return !o.fallback.host.empty() && !o.fallback.api_key.empty(); }
 
+// "/openai/v1/chat/completions" -> "/openai/v1/models": a cheap authenticated
+// GET on the same host, used to open/keep the TLS connection.
+std::string models_path(const std::string& chat_path) {
+    const std::string tail = "chat/completions";
+    if (chat_path.size() >= tail.size() &&
+        chat_path.compare(chat_path.size() - tail.size(), tail.size(), tail) == 0) {
+        return chat_path.substr(0, chat_path.size() - tail.size()) + "models";
+    }
+    return "/v1/models";
+}
+
+// One host the keep-alive worker keeps warm.
+struct WarmTarget {
+    std::string host;
+    std::string key;
+    std::wstring method;
+    std::string path;
+    bool drain{false};      // read the (small) body so the connection is reused
+    bool immediately{true}; // first ping at start-up (no other warm-up covers it)
+};
+
 // Outcome of a single endpoint attempt: the stream result plus the failover
 // classification the worker uses to decide whether to fall over (Req 4.2).
 struct AttemptOutcome {
@@ -123,16 +144,19 @@ WinHttpLlmClient::WinHttpLlmClient(WinHttpLlmOptions opts)
                        opts_.send_timeout_ms, opts_.receive_timeout_ms);
     win::enable_modern_tls(shared_->session.get());
     // Prefer HTTP/2: multiplexed streams, RST_STREAM on cancel keeps TLS hot.
-    DWORD proto = WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_2 | WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_3;
-    (void)proto;
     DWORD http2 = WINHTTP_PROTOCOL_FLAG_HTTP2;
     WinHttpSetOption(shared_->session.get(), WINHTTP_OPTION_ENABLE_HTTP_PROTOCOL, &http2, sizeof(http2));
+    // Faster cold connects, plus HTTP/2 PINGs between questions on the live client.
+    win::enable_low_latency(shared_->session.get(),
+                            opts_.keep_alive ? static_cast<DWORD>(opts_.keep_alive_ms) : 0);
 
-    // Keep the connection warm (Req 4.1/4.5): the direct primary endpoint, or
-    // OpenRouter in single-host mode. An idle TLS connection is dropped by the
-    // server after a while; without the ping the first question after a quiet
-    // stretch would pay DNS + TCP + TLS (often 100-300 ms) before any token.
-    if (opts_.keep_alive && (!opts_.primary.host.empty() || opts_.host == "openrouter.ai")) start_keep_alive();
+    // Keep the connections warm (Req 4.1/4.5): the direct primary endpoint, or
+    // OpenRouter in single-host mode, plus a configured fallback provider. An
+    // idle TLS connection is dropped by the server after a while; without the
+    // ping the first question after a quiet stretch would pay DNS + TCP + TLS
+    // (often 100-300 ms) before any token.
+    if (opts_.keep_alive && (!opts_.primary.host.empty() || opts_.host == "openrouter.ai" || has_fallback(opts_)))
+        start_keep_alive();
 }
 
 WinHttpLlmClient::~WinHttpLlmClient() { shutdown(std::chrono::milliseconds(1500)); }
@@ -142,52 +166,74 @@ WinHttpLlmClient::~WinHttpLlmClient() { shutdown(std::chrono::milliseconds(1500)
 // keep_alive_ms interval has elapsed. A ping failure is non-fatal — the next
 // real request re-establishes the connection on its own.
 void WinHttpLlmClient::start_keep_alive() {
+    // Hosts to keep warm: the live endpoint, then the fallback provider so a
+    // failover does not pay a cold handshake either.
+    std::vector<WarmTarget> targets;
+    if (!opts_.primary.host.empty()) {
+        targets.push_back({opts_.primary.host, opts_.primary.api_key, L"HEAD", models_path(opts_.primary.path), false, true});
+    } else if (opts_.host == "openrouter.ai") {
+        // warm_up() already opens this connection at start-up.
+        targets.push_back({opts_.host, opts_.api_key, L"GET", "/api/v1/key", true, false});
+    }
+    if (has_fallback(opts_) && (targets.empty() || targets.front().host != opts_.fallback.host)) {
+        targets.push_back({opts_.fallback.host, opts_.fallback.api_key, L"HEAD", models_path(opts_.fallback.path), false, true});
+    }
+    if (targets.empty()) return;
+
     {
         std::lock_guard<std::mutex> lk(shared_->mu);
         if (shared_->shutting_down) return;
         ++shared_->active;
     }
-    shared_->keep_alive = std::thread([sh = shared_, opts = opts_] {
+    shared_->keep_alive = std::thread([sh = shared_, opts = opts_, targets = std::move(targets)] {
         using clock = std::chrono::steady_clock;
         auto now_ms = [] {
             return std::chrono::duration_cast<std::chrono::milliseconds>(
                        clock::now().time_since_epoch()).count();
         };
-        std::int64_t last_ping = now_ms();
+        auto ping = [&](const WarmTarget& t) {
+            if (!sh->session) return;
+            win::HInternet conn(WinHttpConnect(sh->session.get(), win::widen(t.host).c_str(), opts.port, 0));
+            if (!conn) return;
+            win::HInternet hreq(WinHttpOpenRequest(conn.get(), t.method.c_str(), win::widen(t.path).c_str(),
+                                                   nullptr, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
+                                                   opts.secure ? WINHTTP_FLAG_SECURE : 0));
+            if (!hreq) return;
+            const std::wstring headers = auth_headers(t.key, opts, false);
+            if (WinHttpSendRequest(hreq.get(), headers.c_str(), static_cast<DWORD>(-1L),
+                                   WINHTTP_NO_REQUEST_DATA, 0, 0, 0) &&
+                WinHttpReceiveResponse(hreq.get(), nullptr) && t.drain) {
+                (void)win::read_body(hreq.get(), 4096);
+            }
+        };
+
+        // Start-up warm-up: the first question must not pay DNS + TCP + TLS.
+        const std::int64_t start = now_ms();
+        std::vector<std::int64_t> last_ping(targets.size(), start);
+        for (std::size_t i = 0; i < targets.size(); ++i) {
+            if (!targets[i].immediately) continue;
+            {
+                std::lock_guard<std::mutex> lk(sh->mu);
+                if (sh->shutting_down) break;
+            }
+            ping(targets[i]);
+            last_ping[i] = now_ms();
+        }
+
         for (;;) {
             {
                 std::unique_lock<std::mutex> lk(sh->mu);
                 // Wake early on shutdown; otherwise re-check at a coarse cadence.
-                sh->cv.wait_for(lk, std::chrono::milliseconds(500),
-                                [&] { return sh->shutting_down; });
+                sh->cv.wait_for(lk, std::chrono::milliseconds(500), [&] { return sh->shutting_down; });
                 if (sh->shutting_down) break;
             }
-            if (!sh->session) continue;
-            const std::int64_t t = now_ms();
-            if (!should_ping(t, last_ping, opts.keep_alive_ms)) continue;
-            last_ping = t;
-
-            // Light application ping over the already-HTTP/2-enabled session.
-            // Reuses the pooled TLS connection so the next generation pays no
-            // handshake: HEAD /v1/models on a direct primary, or the tiny
-            // GET /api/v1/key on OpenRouter.
-            const bool direct = !opts.primary.host.empty();
-            const std::string host = direct ? opts.primary.host : opts.host;
-            const std::string key = direct ? opts.primary.api_key : opts.api_key;
-            win::HInternet conn(WinHttpConnect(sh->session.get(), win::widen(host).c_str(),
-                                               opts.port, 0));
-            if (!conn) continue;
-            win::HInternet hreq(WinHttpOpenRequest(conn.get(), direct ? L"HEAD" : L"GET",
-                                                   direct ? L"/v1/models" : L"/api/v1/key", nullptr,
-                                                   WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
-                                                   opts.secure ? WINHTTP_FLAG_SECURE : 0));
-            if (!hreq) continue;
-            const std::wstring headers = auth_headers(key, opts, false);
-            if (WinHttpSendRequest(hreq.get(), headers.c_str(), static_cast<DWORD>(-1L),
-                                   WINHTTP_NO_REQUEST_DATA, 0, 0, 0) &&
-                WinHttpReceiveResponse(hreq.get(), nullptr)) {
-                // Drain the (small) body so the connection goes back to the pool.
-                if (!direct) (void)win::read_body(hreq.get(), 4096);
+            // Light application ping over the HTTP/2 session: it reuses the
+            // pooled TLS connection, so the next generation pays no handshake.
+            for (std::size_t i = 0; i < targets.size(); ++i) {
+                const std::int64_t t = now_ms();
+                if (!should_ping(t, last_ping[i], opts.keep_alive_ms)) continue;
+                last_ping[i] = t;
+                ping(targets[i]);
             }
         }
         {

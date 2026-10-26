@@ -760,6 +760,7 @@ int run_app(AppConfig cfg) {
     std::shared_ptr<ILlmClient> llm;
     std::shared_ptr<WinHttpLlmClient> openrouter;
     std::shared_ptr<WinHttpLlmClient> openrouter_sol_client;
+    bool llm_on_openrouter = false; // live answers go to openrouter.ai
     if (cfg.demo) {
         ScriptedLlmClient::Options so;
         so.reply_for = [agent_rag](const LlmRequest& r) {
@@ -791,6 +792,7 @@ int run_app(AppConfig cfg) {
             return 2;
         }
         WinHttpLlmOptions lo;
+        llm_on_openrouter = !use_cerebras && url.host == "openrouter.ai";
         lo.api_key = use_cerebras ? cfg.st.cerebras_key : cfg.st.llm_key;
         lo.host = url.host;
         lo.port = url.port;
@@ -1243,7 +1245,9 @@ int run_app(AppConfig cfg) {
         engine->notify(NoticeLevel::Warning,
                        "Suggestions are off: add the OpenRouter key in Settings > General.");
     }
-    if (openrouter && parse_url(cfg.st.llm_url).host == "openrouter.ai") {
+    if (openrouter && llm_on_openrouter) {
+        // Opens the TLS connection now (and validates the key), so the first
+        // answer does not pay the handshake.
         std::weak_ptr<CopilotEngine> weak = engine;
         openrouter->warm_up([weak](bool ok, std::string msg) {
             if (auto e = weak.lock()) e->notify(ok ? NoticeLevel::Info : NoticeLevel::Error, std::move(msg));

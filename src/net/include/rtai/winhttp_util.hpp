@@ -141,6 +141,48 @@ inline void enable_modern_tls(HINTERNET session) {
     }
 }
 
+// Session options that shave connection setup time. Option ids come from the
+// Windows SDK; the fallbacks cover older SDK/MinGW headers. Every option is
+// best effort: a Windows build that does not know one rejects it and the
+// session keeps working exactly as before.
+#ifdef WINHTTP_OPTION_IPV6_FAST_FALLBACK
+inline constexpr DWORD kOptIpv6FastFallback = WINHTTP_OPTION_IPV6_FAST_FALLBACK;
+#else
+inline constexpr DWORD kOptIpv6FastFallback = 140;
+#endif
+#ifdef WINHTTP_OPTION_TCP_FAST_OPEN
+inline constexpr DWORD kOptTcpFastOpen = WINHTTP_OPTION_TCP_FAST_OPEN;
+#else
+inline constexpr DWORD kOptTcpFastOpen = 153;
+#endif
+#ifdef WINHTTP_OPTION_TLS_FALSE_START
+inline constexpr DWORD kOptTlsFalseStart = WINHTTP_OPTION_TLS_FALSE_START;
+#else
+inline constexpr DWORD kOptTlsFalseStart = 154;
+#endif
+#ifdef WINHTTP_OPTION_HTTP2_KEEPALIVE
+inline constexpr DWORD kOptHttp2Keepalive = WINHTTP_OPTION_HTTP2_KEEPALIVE;
+#else
+inline constexpr DWORD kOptHttp2Keepalive = 164;
+#endif
+
+//   * IPv6 fast fallback (Happy Eyeballs): a broken IPv6 route no longer
+//     stalls the connect until the IPv6 attempt times out;
+//   * TCP Fast Open + TLS False Start: one round trip less on a cold connect
+//     (first question after start-up, reconnects after a network change);
+//   * HTTP/2 PING keep-alive (`http2_ping_ms` > 0, minimum 5 s): the pooled
+//     connection stays open between questions without an HTTP request.
+inline void enable_low_latency(HINTERNET session, DWORD http2_ping_ms = 0) {
+    for (const DWORD opt : {kOptIpv6FastFallback, kOptTcpFastOpen, kOptTlsFalseStart}) {
+        BOOL on = TRUE;
+        WinHttpSetOption(session, opt, &on, sizeof(on));
+    }
+    if (http2_ping_ms > 0) {
+        DWORD ms = http2_ping_ms < 5000 ? 5000 : http2_ping_ms;
+        WinHttpSetOption(session, kOptHttp2Keepalive, &ms, sizeof(ms));
+    }
+}
+
 // WinHttpOpen with automatic proxy discovery (Windows 8.1+), falling back to
 // the default proxy configuration.
 inline HINTERNET open_session(const wchar_t* user_agent) {

@@ -161,6 +161,7 @@ std::unique_ptr<IWebSocket> WinHttpWebSocketFactory::connect(const WsConnectRequ
     WinHttpSetTimeouts(session.get(), opts_.resolve_timeout_ms, opts_.connect_timeout_ms,
                        opts_.send_timeout_ms, opts_.handshake_receive_timeout_ms);
     win::enable_modern_tls(session.get());
+    win::enable_low_latency(session.get()); // faster (re)connects to Deepgram
 
     const std::wstring host = win::widen(request.host);
     HInternet connection(WinHttpConnect(session.get(), host.c_str(), request.port, 0));
