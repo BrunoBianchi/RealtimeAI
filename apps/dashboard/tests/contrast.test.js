@@ -73,7 +73,7 @@ function contrastRatio(lum1, lum2) {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-const inputCssPath = path.resolve(__dirname, '../src/tailwind.input.css');
+const inputCssPath = path.resolve(__dirname, '../src/renderer/tailwind.input.css');
 
 test('Feature: dashboard-ui-redesign, Property 1: Contraste de texto atende AA nos dois temas', () => {
   const css = fs.readFileSync(inputCssPath, 'utf8');

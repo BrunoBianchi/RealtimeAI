@@ -3,9 +3,9 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const indexHtmlPath = path.resolve(__dirname, '../src/index.html');
-const appJsPath = path.resolve(__dirname, '../src/app.js');
-const mainJsPath = path.resolve(__dirname, '../main.js');
+const indexHtmlPath = path.resolve(__dirname, '../src/renderer/index.html');
+const appJsPath = path.resolve(__dirname, '../src/renderer/app.js');
+const mainJsPath = path.resolve(__dirname, '../src/main/main.js');
 
 test('Model Tier Selection: HTML contains 3 accessible cards (Fast, Balanced, Ultra)', () => {
   const html = fs.readFileSync(indexHtmlPath, 'utf8');

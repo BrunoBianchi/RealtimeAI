@@ -7,10 +7,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
-const mainJs = fs.readFileSync(path.join(root, 'main.js'), 'utf8');
-const preload = fs.readFileSync(path.join(root, 'preload.js'), 'utf8');
-const appJs = fs.readFileSync(path.join(root, 'src', 'app.js'), 'utf8');
-const html = fs.readFileSync(path.join(root, 'src', 'index.html'), 'utf8');
+const mainJs = fs.readFileSync(path.join(root, 'src', 'main', 'main.js'), 'utf8');
+const preload = fs.readFileSync(path.join(root, 'src', 'preload', 'preload.js'), 'utf8');
+const appJs = fs.readFileSync(path.join(root, 'src', 'renderer', 'app.js'), 'utf8');
+const html = fs.readFileSync(path.join(root, 'src', 'renderer', 'index.html'), 'utf8');
 
 test('every invoked IPC channel has a handler in main.js', () => {
   const channels = [...preload.matchAll(/ipcRenderer\.invoke\('(rtai:[^']+)'/g)].map((m) => m[1]);

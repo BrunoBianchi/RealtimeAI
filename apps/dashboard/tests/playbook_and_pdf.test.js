@@ -32,9 +32,9 @@ Module._load = function (request, ...rest) {
   if (request === 'electron') return fakeElectron;
   return realLoad.call(this, request, ...rest);
 };
-const main = require('../main.js');
+const main = require('../src/main/main.js');
 Module._load = realLoad;
-const pdfText = require('../pdf_text.js');
+const pdfText = require('../src/main/pdf_text.js');
 const fixtures = path.join(__dirname, 'fixtures');
 
 function readGoal(id) {

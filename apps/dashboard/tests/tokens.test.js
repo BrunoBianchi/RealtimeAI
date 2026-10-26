@@ -27,7 +27,7 @@ function parseCssBlock(cssContent, selector) {
   return tokens;
 }
 
-const inputCssPath = path.resolve(__dirname, '../src/tailwind.input.css');
+const inputCssPath = path.resolve(__dirname, '../src/renderer/tailwind.input.css');
 const tailwindConfigPath = path.resolve(__dirname, '../tailwind.config.js');
 
 test('Feature: dashboard-ui-redesign, Property 4: Paridade de tokens entre os temas', () => {

@@ -12,6 +12,12 @@ const { createMeetingPopup } = require('./meeting_popup');
 const { createFlagStore } = require('./feature_flags');
 const { createUpdater } = require('./updater');
 
+// apps/dashboard (or the app.asar root once packaged) and the repository root.
+const APP_ROOT = path.resolve(__dirname, '..', '..');
+const REPO_ROOT = path.resolve(APP_ROOT, '..', '..');
+const PRELOAD_DIR = path.join(__dirname, '..', 'preload');
+const RENDERER_DIR = path.join(__dirname, '..', 'renderer');
+
 let mainWindow = null;
 let overlayProcess = null;
 let overlayMode = null;
@@ -73,7 +79,7 @@ function getGoogleCalendar() {
   if (!googleCalendar) {
     googleCalendar = createGoogleCalendar({
       dataDir: getAppDataDir(),
-      searchDirs: [__dirname, path.resolve(__dirname, '..')],
+      searchDirs: [APP_ROOT, REPO_ROOT],
       safeStorage,
       openExternal: (url) => shell.openExternal(url)
     });
@@ -96,14 +102,14 @@ async function gcalCall(fn) {
 // remote flags.json lives. Absent in a dev checkout.
 function readBuildInfo() {
   try {
-    return JSON.parse(fs.readFileSync(path.join(__dirname, 'build-info.json'), 'utf8')) || {};
+    return JSON.parse(fs.readFileSync(path.join(APP_ROOT, 'build-info.json'), 'utf8')) || {};
   } catch (_e) {
     return {};
   }
 }
 
 function getOverlayExecutablePath() {
-  const workspaceRoot = path.resolve(__dirname, '..');
+  const workspaceRoot = REPO_ROOT;
   const candidates = [
     // Installed app: the CI bundles the native overlay as an extra resource.
     ...(app.isPackaged ? [path.join(process.resourcesPath, 'native', 'rtai_app.exe')] : []),
@@ -2145,7 +2151,7 @@ function refreshTrayMenu() {
 function createTray() {
   if (tray || typeof Tray !== 'function') return;
   try {
-    tray = new Tray(path.join(__dirname, 'assets', 'tray.png'));
+    tray = new Tray(path.join(APP_ROOT, 'assets', 'tray.png'));
   } catch (err) {
     console.error('[tray]', err && err.message);
     tray = null;
@@ -2186,15 +2192,15 @@ function createWindow() {
     frame: false,
     backgroundColor: initialTheme.resolved === 'dark' ? '#0D0D10' : '#FFFFFF',
     title: 'RealTimeAI — Copilot Studio',
-    icon: path.join(__dirname, 'assets', 'icon.png'),
+    icon: path.join(APP_ROOT, 'assets', 'icon.png'),
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(PRELOAD_DIR, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false
     }
   });
 
-  const loadPromise = mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'));
+  const loadPromise = mainWindow.loadFile(path.join(RENDERER_DIR, 'index.html'));
   applyElectronStealthMode();
 
   // With meeting detection on, closing the window keeps the app in the tray.
@@ -2780,7 +2786,7 @@ app.whenReady().then(() => {
 
   flagStore = createFlagStore({
     dataDir: getAppDataDir(),
-    bundledPath: path.join(__dirname, 'flags.json'),
+    bundledPath: path.join(APP_ROOT, 'flags.json'),
     remoteUrl: process.env.RTAI_FLAGS_URL || buildInfo.flagsUrl || '',
     appVersion: APP_VERSION,
     getChannel: currentChannel,

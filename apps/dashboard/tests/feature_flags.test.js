@@ -11,7 +11,7 @@ const {
   evaluateFlag,
   evaluateFlags,
   createFlagStore
-} = require('../feature_flags');
+} = require('../src/main/feature_flags');
 
 const bundledPath = path.resolve(__dirname, '../flags.json');
 

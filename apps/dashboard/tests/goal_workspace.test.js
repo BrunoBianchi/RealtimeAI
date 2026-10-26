@@ -3,10 +3,10 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const indexHtmlPath = path.resolve(__dirname, '../src/index.html');
-const appJsPath = path.resolve(__dirname, '../src/app.js');
-const preloadJsPath = path.resolve(__dirname, '../preload.js');
-const mainJsPath = path.resolve(__dirname, '../main.js');
+const indexHtmlPath = path.resolve(__dirname, '../src/renderer/index.html');
+const appJsPath = path.resolve(__dirname, '../src/renderer/app.js');
+const preloadJsPath = path.resolve(__dirname, '../src/preload/preload.js');
+const mainJsPath = path.resolve(__dirname, '../src/main/main.js');
 
 test('Task 5.1 / Property 1: Estrutura HTML do Goal Workspace e 3 Abas (Requirements: 1.1, 1.2, 1.3)', () => {
   const html = fs.readFileSync(indexHtmlPath, 'utf8');

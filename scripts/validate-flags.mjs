@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Validates dashboard/flags.json against the schema in dashboard/feature_flags.js.
+// Validates apps/dashboard/flags.json against the schema in apps/dashboard/src/main/feature_flags.js.
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -7,9 +7,9 @@ import path from 'node:path';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
-const { validateFlagsDocument } = require(path.join(root, 'dashboard', 'feature_flags.js'));
+const { validateFlagsDocument } = require(path.join(root, 'apps', 'dashboard', 'src', 'main', 'feature_flags.js'));
 
-const file = process.argv[2] || path.join(root, 'dashboard', 'flags.json');
+const file = process.argv[2] || path.join(root, 'apps', 'dashboard', 'flags.json');
 let doc;
 try {
   doc = JSON.parse(readFileSync(file, 'utf8'));

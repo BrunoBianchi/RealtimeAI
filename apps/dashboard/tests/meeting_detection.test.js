@@ -9,7 +9,7 @@ const Module = require('node:module');
 const { EventEmitter } = require('node:events');
 
 const { MeetingDetector, classifySnapshot, parseMicEntry, stripBrowserSuffix, scannerScript } =
-  require('../meeting_detector.js');
+  require('../src/main/meeting_detector.js');
 
 const ids = (snap) => classifySnapshot(snap).map((m) => m.id).sort();
 
@@ -139,7 +139,7 @@ Module._load = function (request, ...rest) {
   if (request === 'electron') return fakeElectron;
   return realLoad.call(this, request, ...rest);
 };
-const main = require('../main.js');
+const main = require('../src/main/main.js');
 Module._load = realLoad;
 
 test('the popup preselects the goal whose interview is now', () => {
@@ -164,20 +164,20 @@ test('meeting detection is on by default and stays in the tray', () => {
 
 test('wiring: IPC, preload bridges, settings controls and popup actions', () => {
   const read = (p) => fs.readFileSync(path.join(__dirname, '..', p), 'utf8');
-  const mainJs = read('main.js');
+  const mainJs = read('src/main/main.js');
   for (const ch of ['rtai:meeting-detection-get', 'rtai:meeting-detection-set', 'rtai:meeting-popup-test']) {
     assert.ok(mainJs.includes(`'${ch}'`), `main.js handles ${ch}`);
   }
   assert.ok(mainJs.includes("JSON.stringify({ cmd: 'quit' })"), 'stopping from the popup lets the overlay save the session');
-  const preload = read('preload.js');
+  const preload = read('src/preload/preload.js');
   for (const fn of ['getMeetingDetection', 'setMeetingDetection', 'testMeetingPopup', 'onMeetingDetection']) {
     assert.ok(preload.includes(fn), `preload exposes ${fn}`);
   }
-  const html = read('src/index.html');
+  const html = read('src/renderer/index.html');
   for (const id of ['cfgMeetingDetect', 'cfgMeetingTray', 'meetingDetectStatus', 'btnMeetingTest', 'btnMeetingUnmute']) {
     assert.ok(html.includes(`id="${id}"`), `settings has #${id}`);
   }
-  const popup = read('src/meeting_popup.html');
+  const popup = read('src/renderer/meeting_popup.html');
   for (const id of ['btnStart', 'btnLater', 'btnMute', 'selGoal', 'btnStop', 'btnKeep']) {
     assert.ok(popup.includes(`id="${id}"`), `popup has #${id}`);
   }

@@ -5,7 +5,7 @@
   "description": "RealTimeAI: real-time interview copilot (C++ overlay + Electron dashboard)",
   "scripts": {
     "prepare": "husky",
-    "test": "npm --prefix dashboard test",
+    "test": "npm --prefix apps/dashboard test",
     "check:secrets": "node scripts/check-secrets.mjs --all",
     "check:staged": "node scripts/check-secrets.mjs --staged",
     "flags:validate": "node scripts/validate-flags.mjs",

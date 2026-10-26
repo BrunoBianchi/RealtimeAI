@@ -3,7 +3,7 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const stylesCssPath = path.resolve(__dirname, '../src/styles.css');
+const stylesCssPath = path.resolve(__dirname, '../src/renderer/styles.css');
 
 test('Task 6.2: Snapshot e validação do styles.css gerado (Requirements: 1.1, 2.1, 3.1)', () => {
   assert.ok(fs.existsSync(stylesCssPath), 'dashboard/src/styles.css must exist');

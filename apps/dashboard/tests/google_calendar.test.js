@@ -10,7 +10,7 @@ const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
 
-const gc = require('../google_calendar.js');
+const gc = require('../src/main/google_calendar.js');
 
 const WEB_CLIENT = { web: { client_id: 'abc.apps.googleusercontent.com', project_id: 'proj-1', client_secret: 'shh',
   auth_uri: 'https://accounts.google.com/o/oauth2/auth', token_uri: 'https://oauth2.googleapis.com/token' } };

@@ -3,8 +3,8 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const indexHtmlPath = path.resolve(__dirname, '../src/index.html');
-const appJsPath = path.resolve(__dirname, '../src/app.js');
+const indexHtmlPath = path.resolve(__dirname, '../src/renderer/index.html');
+const appJsPath = path.resolve(__dirname, '../src/renderer/app.js');
 
 test('Task 10.1: Teste de integração / smoke dos controles principais (Requirements: 3.3, 6.1, 6.2, 6.3)', () => {
   const html = fs.readFileSync(indexHtmlPath, 'utf8');

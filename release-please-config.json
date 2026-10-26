@@ -9,7 +9,7 @@
       "package-name": "realtimeai",
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
-        { "type": "json", "path": "dashboard/package.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "apps/dashboard/package.json", "jsonpath": "$.version" },
         { "type": "generic", "path": "CMakeLists.txt" }
       ],
       "changelog-sections": [

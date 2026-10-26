@@ -3,10 +3,10 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const indexHtmlPath = path.resolve(__dirname, '../src/index.html');
-const appJsPath = path.resolve(__dirname, '../src/app.js');
-const mainJsPath = path.resolve(__dirname, '../main.js');
-const preloadJsPath = path.resolve(__dirname, '../preload.js');
+const indexHtmlPath = path.resolve(__dirname, '../src/renderer/index.html');
+const appJsPath = path.resolve(__dirname, '../src/renderer/app.js');
+const mainJsPath = path.resolve(__dirname, '../src/main/main.js');
+const preloadJsPath = path.resolve(__dirname, '../src/preload/preload.js');
 
 test('Electron Stealth Mode: HTML contains header controls and settings panel', () => {
   const html = fs.readFileSync(indexHtmlPath, 'utf8');

@@ -1,6 +1,6 @@
 # Windows installer + auto-update metadata.
-# CI (build-windows.yml) overrides publish.owner/repo with the public
-# releases repository, and stages the native overlay into ./native first.
+# CI (.github/workflows/release.yml) stages the native overlay into ./native
+# and overrides publish.owner/repo with the releases repository.
 appId: com.raiado.realtimeai
 productName: RealTimeAI
 copyright: Copyright © 2026 Bruno Raiado Bianchi
@@ -10,19 +10,13 @@ directories:
   buildResources: assets
 
 files:
-  - main.js
-  - preload.js
-  - feature_flags.js
-  - updater.js
+  - package.json
   - flags.json
-  - google_calendar.js
-  - meeting_detector.js
-  - meeting_popup.js
-  - meeting_popup_preload.js
-  - pdf_text.js
   - assets/**/*
-  - src/**/*
-  - "!src/tailwind.input.css"
+  - src/main/**/*
+  - src/preload/**/*
+  - src/renderer/**/*
+  - "!src/renderer/tailwind.input.css"
   # Written by CI; optional in local builds.
   - build-info.json
   - google_oauth_client.json
@@ -54,6 +48,6 @@ generateUpdatesFilesForAllChannels: true
 
 publish:
   provider: github
-  owner: CHANGE_ME_GITHUB_USER
+  owner: BrunoBianchi
   repo: realtimeai-releases
   releaseType: release
