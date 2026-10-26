@@ -1,0 +1,46 @@
+# ---- Secrets: never commit ------------------------------------------------
+config.ini
+*.env
+.env*
+dashboard/google_oauth_client.json
+client_secret*.json
+*.pem
+*.pfx
+*.p12
+
+# ---- Build output -------------------------------------------------------
+build/
+out/
+dist/
+dashboard/release/
+dashboard/native/
+dashboard/build-info.json
+overlay/*.exe
+*.pdb
+*.ilk
+*.obj
+
+# ---- Dependencies -------------------------------------------------------
+node_modules
+
+# ---- Logs and local scratch ---------------------------------------------
+*.log
+build_log.txt
+_backup_*/
+_to_delete/
+# one-off maintenance scripts kept at the repo root
+/_*.py
+/fix*.py
+/dump*.py
+/build_*.py
+/kill_build.py
+/verify_build.py
+
+# ---- OS / editors -------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+.vs/
+.vscode/*
+!.vscode/extensions.json
+.idea/

@@ -1,0 +1,314 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 240 20% 99%;
+    --foreground: 240 10% 9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 9%;
+    --primary: 221 83% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 14%;
+    --muted: 240 5% 95%;
+    --muted-foreground: 240 4% 44%;
+    --accent: 240 5% 93%;
+    --accent-foreground: 240 6% 10%;
+    --destructive: 347 77% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 6% 91%;
+    --input: 240 6% 89%;
+    --ring: 221 83% 53%;
+    --sidebar-background: 240 15% 98%;
+    --sidebar-foreground: 240 6% 24%;
+    --sidebar-border: 240 6% 91%;
+    --sidebar-accent: 240 5% 93%;
+    --live: 347 77% 50%;
+    --radius: 0.375rem;
+    color-scheme: light;
+  }
+
+  .dark {
+    --background: 240 8% 6.5%;
+    --foreground: 0 0% 96%;
+    --card: 240 7% 9.5%;
+    --card-foreground: 0 0% 96%;
+    --popover: 240 7% 9.5%;
+    --popover-foreground: 0 0% 96%;
+    --primary: 213 94% 68%;
+    --primary-foreground: 222 47% 11%;
+    --secondary: 240 5% 15%;
+    --secondary-foreground: 0 0% 95%;
+    --muted: 240 5% 14%;
+    --muted-foreground: 240 5% 66%;
+    --accent: 240 5% 17%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 347 77% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5% 17.5%;
+    --input: 240 5% 19%;
+    --ring: 213 94% 68%;
+    --sidebar-background: 240 9% 5.5%;
+    --sidebar-foreground: 240 5% 82%;
+    --sidebar-border: 240 5% 14%;
+    --sidebar-accent: 240 5% 12.5%;
+    --live: 347 77% 50%;
+    --radius: 0.375rem;
+    color-scheme: dark;
+  }
+
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    @apply bg-background text-foreground font-sans antialiased select-none overflow-hidden;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  input,
+  textarea,
+  select {
+    user-select: text;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.22);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.38);
+}
+
+.app-drag {
+  -webkit-app-region: drag;
+}
+.app-no-drag {
+  -webkit-app-region: no-drag;
+}
+
+@layer components {
+  /* Tactile, Clean Buttons */
+  .sh-btn {
+    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-[13px] font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 cursor-pointer active:scale-[0.99];
+  }
+  .sh-btn-primary {
+    @apply sh-btn bg-primary text-primary-foreground hover:opacity-90 shadow-sm px-4 py-2 font-semibold;
+  }
+  .sh-btn-live {
+    @apply sh-btn bg-[#E11D48] text-white hover:bg-[#BE123C] shadow-sm px-3.5 py-1.5 font-semibold text-[13px] rounded-md;
+  }
+  .sh-btn-secondary {
+    @apply sh-btn bg-secondary text-secondary-foreground hover:bg-accent px-4 py-2 border border-border;
+  }
+  .sh-btn-outline {
+    @apply sh-btn bg-card text-foreground hover:bg-accent border border-border/80 px-3.5 py-1.5 text-xs;
+  }
+  .sh-btn-dashed {
+    @apply sh-btn bg-transparent text-foreground hover:bg-accent border border-dashed border-input hover:border-foreground/40 rounded-full px-3.5 py-1.5 text-xs;
+  }
+  .sh-btn-pill-primary {
+    @apply sh-btn bg-primary text-primary-foreground hover:opacity-90 rounded-full px-3.5 py-1.5 text-xs font-semibold shadow-sm;
+  }
+  .sh-btn-ghost {
+    @apply sh-btn bg-transparent text-muted-foreground hover:text-foreground hover:bg-accent px-2.5 py-1.5;
+  }
+  .sh-btn-danger {
+    @apply sh-btn bg-destructive/10 text-destructive hover:bg-destructive/20 border border-destructive/20 px-3 py-1.5 text-xs;
+  }
+
+  /* Answer model tier cards */
+  .model-card {
+    @apply relative flex h-full flex-col rounded-xl border border-border/80 bg-card p-4 text-left transition-[border-color,background-color,box-shadow] duration-150 cursor-pointer hover:border-foreground/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50;
+  }
+  .model-card[aria-checked="true"] {
+    @apply border-primary/70 bg-primary/[0.04] shadow-[0_0_0_1px_hsl(var(--primary)/0.45)];
+  }
+  .tier-icon {
+    @apply flex h-9 w-9 shrink-0 items-center justify-center rounded-lg;
+  }
+  .model-radio {
+    @apply mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border border-border transition-colors;
+  }
+  .model-radio-dot {
+    @apply h-2 w-2 scale-0 rounded-full bg-primary-foreground transition-transform;
+  }
+  .model-card[aria-checked="true"] .model-radio {
+    @apply border-primary bg-primary;
+  }
+  .model-card[aria-checked="true"] .model-radio-dot {
+    @apply scale-100;
+  }
+  .tier-meter {
+    @apply flex items-center gap-1;
+  }
+  .tier-meter > i {
+    @apply block h-1.5 w-5 rounded-full bg-muted;
+  }
+  .tier-meter[data-level="1"] > i:nth-child(-n+1),
+  .tier-meter[data-level="2"] > i:nth-child(-n+2),
+  .tier-meter[data-level="3"] > i:nth-child(-n+3),
+  .tier-meter[data-level="4"] > i:nth-child(-n+4),
+  .tier-meter[data-level="5"] > i:nth-child(-n+5) {
+    @apply bg-foreground/55;
+  }
+  .model-card[aria-checked="true"] .tier-meter[data-level="1"] > i:nth-child(-n+1),
+  .model-card[aria-checked="true"] .tier-meter[data-level="2"] > i:nth-child(-n+2),
+  .model-card[aria-checked="true"] .tier-meter[data-level="3"] > i:nth-child(-n+3),
+  .model-card[aria-checked="true"] .tier-meter[data-level="4"] > i:nth-child(-n+4),
+  .model-card[aria-checked="true"] .tier-meter[data-level="5"] > i:nth-child(-n+5) {
+    @apply bg-primary;
+  }
+  .tier-badge {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-card px-2.5 py-1 text-[11px] font-medium text-foreground;
+  }
+  .tier-badge::before {
+    content: '';
+    @apply h-1.5 w-1.5 rounded-full bg-emerald-500;
+  }
+  .tier-badge[data-tier="medium"]::before { @apply bg-blue-500; }
+  .tier-badge[data-tier="ultra"]::before { @apply bg-violet-500; }
+
+  /* Switch (paired with a preceding input.peer.sr-only) */
+  .sh-switch {
+    @apply relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border border-border bg-muted transition-colors;
+  }
+  .sh-switch::after {
+    content: '';
+    @apply absolute left-[2px] h-3.5 w-3.5 rounded-full bg-foreground/60 shadow-sm transition-transform duration-150;
+  }
+  .peer:checked + .sh-switch {
+    @apply border-primary bg-primary;
+  }
+  .peer:checked + .sh-switch::after {
+    @apply translate-x-4 bg-primary-foreground;
+  }
+  .peer:focus-visible + .sh-switch {
+    @apply ring-2 ring-ring/50 ring-offset-1 ring-offset-background;
+  }
+
+  /* Inputs & Textareas */
+  .sh-input {
+    @apply flex h-10 w-full rounded-lg border border-input bg-background/70 px-3.5 py-2 text-[13.5px] text-foreground transition-all placeholder:text-muted-foreground/60 hover:border-foreground/25 focus-visible:bg-card focus-visible:border-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/15;
+  }
+  .sh-textarea {
+    @apply flex w-full rounded-lg border border-input bg-background/70 px-3.5 py-2.5 text-[13.5px] leading-relaxed text-foreground transition-all placeholder:text-muted-foreground/60 hover:border-foreground/25 focus-visible:bg-card focus-visible:border-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/15 resize-y;
+  }
+  .sh-select-pill {
+    @apply inline-flex h-9 items-center rounded-lg border border-input bg-background/70 px-3 py-1.5 text-xs font-medium text-foreground transition-all hover:bg-accent hover:border-foreground/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/15 cursor-pointer;
+  }
+
+  /* Card */
+  .sh-card {
+    @apply rounded-lg border border-border/70 bg-card text-card-foreground shadow-sm;
+  }
+
+  /* Sidebar Nav Item */
+  .sh-nav-item {
+    @apply flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-foreground cursor-pointer;
+  }
+  .sh-nav-item.active {
+    @apply bg-sidebar-accent text-foreground font-semibold;
+  }
+
+  /* Sidebar Goal Item */
+  .sh-goal-item {
+    @apply flex w-full items-center justify-between gap-2.5 rounded-lg px-3 py-2 text-left transition-all hover:bg-sidebar-accent cursor-pointer border border-transparent;
+  }
+  .sh-goal-item.active {
+    @apply bg-card border-border/80 shadow-sm;
+  }
+
+  /* Settings Subnav Item (Image 2 & 3) */
+  .settings-subnav-btn {
+    @apply flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13.5px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground cursor-pointer text-left;
+  }
+  .settings-subnav-btn.active {
+    @apply bg-accent/80 text-foreground font-semibold;
+  }
+
+  /* Library Tab */
+  .library-tab {
+    @apply inline-flex items-center gap-1.5 py-2 px-3 text-[13px] font-medium text-muted-foreground border-b-2 border-transparent transition-all cursor-pointer hover:text-foreground;
+  }
+  .library-tab.active {
+    @apply text-foreground font-semibold border-foreground;
+  }
+
+  /* Goal Workspace Tab */
+  .goal-workspace-tab {
+    @apply inline-flex items-center gap-1.5 py-2 px-3 text-[13.5px] font-medium text-muted-foreground border-b-2 border-transparent transition-all cursor-pointer hover:text-foreground;
+  }
+  .goal-workspace-tab.active {
+    @apply text-foreground font-semibold border-foreground;
+  }
+
+  /* Segmented Toggle Control */
+  .segmented-btn {
+    @apply px-3 py-1.5 text-xs font-medium rounded-md transition-all text-muted-foreground hover:text-foreground cursor-pointer;
+  }
+  .segmented-btn.active {
+    @apply bg-card text-foreground font-semibold shadow-sm;
+  }
+
+  /* Shortcut Badges (Image 3) */
+  .kbd-badge {
+    @apply inline-flex items-center justify-center font-mono text-xs font-semibold px-2.5 py-1 rounded-md bg-muted/80 border border-border/80 text-foreground shadow-sm;
+  }
+
+  /* View Panes */
+  .view-pane {
+    display: none;
+  }
+  .view-pane.active {
+    display: block;
+    animation: fadeIn 140ms ease-out;
+  }
+
+  /* Settings Sub Panes */
+  .settings-subpane {
+    display: none;
+  }
+  .settings-subpane.active {
+    display: block;
+    animation: fadeIn 120ms ease-out;
+  }
+
+  /* Modal Backdrop */
+  .sh-modal-backdrop {
+    @apply fixed inset-0 z-50 hidden items-center justify-center bg-black/45 backdrop-blur-[2px] p-4;
+  }
+  .sh-modal-backdrop.open {
+    @apply flex;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

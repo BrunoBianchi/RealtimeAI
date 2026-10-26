@@ -1,0 +1,18 @@
+{
+  "name": "realtimeai-dashboard",
+  "version": "2.0.0",
+  "description": "RealTimeAI Studio Dashboard — Gerenciador de Sessões, Mini-Agentes RAG, Mini-Compact e Controle do Overlay HUD",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:css": "tailwindcss -i ./src/tailwind.input.css -o ./src/styles.css --minify",
+    "test": "node --test tests/**/*.test.js"
+  },
+  "dependencies": {
+    "electron": "^35.0.0",
+    "pdf-parse": "^1.1.1"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.19"
+  }
+}

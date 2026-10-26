@@ -1,0 +1,1124 @@
+{
+  "pbtResults": {
+    "1.5 Escrever property test para centralização e ancoragem no topo": {
+      "status": "passed",
+      "lastRunTimestamp": 1792607657023
+    },
+    "1.2 Escrever property test para `clamp_width`": {
+      "status": "passed",
+      "lastRunTimestamp": 1792607658731
+    },
+    "2.2 Escrever property test para exatamente 3 âncoras": {
+      "status": "passed",
+      "lastRunTimestamp": 1792607848294
+    },
+    "5.2 Escrever property test para ausência de palavra parcial": {
+      "status": "passed",
+      "lastRunTimestamp": 1792607875199
+    },
+    "5.3 Escrever property test para preservação byte a byte ao concluir": {
+      "status": "passed",
+      "lastRunTimestamp": 1792607882144
+    },
+    "7.2 Escrever property test para should_pin (voz contínua ≥300 ms ou PTT)": {
+      "status": "passed",
+      "lastRunTimestamp": 1792607900513
+    },
+    "9.2 Escrever property test para o mapeamento RMS→altura": {
+      "status": "passed",
+      "lastRunTimestamp": 1792608038516
+    },
+    "10.2 Escrever property test para navegação \"N de M\" com cap 50": {
+      "status": "passed",
+      "lastRunTimestamp": 1792608051685
+    },
+    "6.3 Escrever property test para truncamento do display em 280": {
+      "status": "passed",
+      "lastRunTimestamp": 1792608103861
+    },
+    "6.2 Escrever property test para congelamento sob TranscriptUpdate": {
+      "status": "passed",
+      "lastRunTimestamp": 1792608121810
+    },
+    "3.3 Escrever property test para a Headline como primeira linha não vazia": {
+      "status": "passed",
+      "lastRunTimestamp": 1792608526537
+    },
+    "3.5 Escrever property test para bullet com `:` (termo-chave de destaque)": {
+      "status": "passed",
+      "lastRunTimestamp": 1792608938954
+    }
+  },
+  "executionHistory": {
+    "1.1 Implementar `clamp_width` e `clamp_height_fraction` com as constantes de layout": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606805748
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606816368
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607094644
+      }
+    ],
+    "1.2 Escrever property test para `clamp_width`": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606805870
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607520001
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607735759
+      }
+    ],
+    "1.3 Escrever property test para `clamp_height_fraction`": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606805939
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607520892
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607737161
+      }
+    ],
+    "1.4 Implementar `resolve_anchor` (ancoragem Top-Center e multi-monitor)": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606806043
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606817809
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607095952
+      }
+    ],
+    "1.5 Escrever property test para centralização e ancoragem no topo": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606806095
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607522447
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607737885
+      }
+    ],
+    "1.6 Escrever property test para seleção de monitor e fallback": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606806151
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607523310
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607733427
+      }
+    ],
+    "1.7 Implementar cálculo puro de altura da janela (`min(conteúdo, teto)`)": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606806196
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606819226
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607097415
+      }
+    ],
+    "1.8 Escrever property test para altura mínima entre conteúdo e teto": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606806246
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607524429
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607734396
+      }
+    ],
+    "2.1 Implementar `normalize_anchors` para sempre produzir 3 posições": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606806295
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606820609
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607098344
+      }
+    ],
+    "2.2 Escrever property test para exatamente 3 âncoras": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606806346
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607742279
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607920677
+      }
+    ],
+    "3.1 Adicionar flag `streaming` e semântica de `**` órfão a `format_suggestion`": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606806395
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606821503
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607099811
+      }
+    ],
+    "3.2 Tratar a primeira linha não vazia como Headline": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606806441
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607743684
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607916006
+      }
+    ],
+    "3.3 Escrever property test para a Headline como primeira linha não vazia": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606806487
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792608331660
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792608775865
+      }
+    ],
+    "3.4 Escrever property test para entrada vazia/só espaços": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606806530
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792608333035
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792608777230
+      }
+    ],
+    "3.5 Escrever property test para bullet com `:` (termo-chave de destaque)": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606806577
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792608334439
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792608961200
+      }
+    ],
+    "3.6 Escrever property test para bullet sem `:`": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606806636
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792608336418
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792608778637
+      }
+    ],
+    "3.7 Escrever property test para pares `**...**` fechados": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606806683
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792608965264
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792609255782
+      }
+    ],
+    "3.8 Escrever property test para `**` órfão com a flag streaming": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606806729
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792608966635
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792609257121
+      }
+    ],
+    "3.9 Escrever property test para preservação de conteúdo como subsequência estável": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606806774
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792608967378
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792609257892
+      }
+    ],
+    "4. Checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606806832
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792612864287
+      }
+    ],
+    "5.1 Implementar `StreamBuffer::commit_words` e esvaziamento na conclusão": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606806883
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607104194
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607299738
+      }
+    ],
+    "5.2 Escrever property test para ausência de palavra parcial": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606806929
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607745075
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607917012
+      }
+    ],
+    "5.3 Escrever property test para preservação byte a byte ao concluir": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606806979
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607746037
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607918363
+      }
+    ],
+    "6.1 Implementar `FrozenQuestion` com captura verbatim e truncamento em 280": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606807036
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607105595
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607296031
+      }
+    ],
+    "6.2 Escrever property test para congelamento sob TranscriptUpdate": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606807085
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607925318
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792608191645
+      }
+    ],
+    "6.3 Escrever property test para truncamento do display em 280": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606807138
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607926763
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792608193060
+      }
+    ],
+    "7.1 Implementar `UserSpeechGate::on_mic_rms` e `should_pin`": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606807191
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607106543
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607296947
+      }
+    ],
+    "7.2 Escrever property test para should_pin (voz contínua ≥300 ms ou PTT)": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606807236
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607747133
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607919751
+      }
+    ],
+    "8.1 Implementar `SuggestionQueue::push` com cap 5 FIFO": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606807321
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607107931
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607300696
+      }
+    ],
+    "8.2 Escrever property test para cap 5 FIFO": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606807370
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607927705
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792608194514
+      }
+    ],
+    "9.1 Implementar `pulse_bar_height` (RMS → [2,24] DIP)": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606807416
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607108957
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607298361
+      }
+    ],
+    "9.2 Escrever property test para o mapeamento RMS→altura": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606807462
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607929119
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792608195415
+      }
+    ],
+    "10.1 Implementar `History` com cap 50 e navegação com cursor limitado": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606807506
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607304809
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607515054
+      }
+    ],
+    "10.2 Escrever property test para navegação \"N de M\" com cap 50": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606807551
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607929976
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792608196491
+      }
+    ],
+    "11. Checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606807598
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792612868152
+      }
+    ],
+    "12.1 Tornar o caso 4.5 explícito em `copilot_system_prompt()`": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606807645
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607305874
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607514233
+      }
+    ],
+    "12.2 Escrever unit tests para as instruções do prompt de sistema": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606807691
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792608200992
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792608326950
+      }
+    ],
+    "13.1 Integrar `UserSpeechGate` ao fluxo de decisão do engine": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606807740
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792608335390
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792608779548
+      }
+    ],
+    "13.2 Escrever unit tests para o fluxo de enfileiramento/substituição": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606807787
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792609268246
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792609484097
+      }
+    ],
+    "14.1 Corrigir constantes de largura/ancoragem e `OverlayOptions`": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606807833
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792609269366
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792609484978
+      }
+    ],
+    "14.2 Aplicar `resolve_anchor` em `create()` e no reposicionamento": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606807885
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792609490150
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792609671491
+      }
+    ],
+    "15.1 Renderizar a Strip_Unificada (38 DIP) com toggles, níveis e reticências": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606807935
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792609676646
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792609840434
+      }
+    ],
+    "16.1 Renderizar Headline (15.5 DIP SemiBold) e 3 âncoras via `normalize_anchors`": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606807982
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792609845884
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792610036103
+      }
+    ],
+    "16.2 Renderizar o Micro_Footer (hints, telemetria, \"N de M\", feedback)": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606808027
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792610039807
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792610217409
+      }
+    ],
+    "16.3 Empilhar as três zonas com gap de 6 DIP sem sobreposição": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606808073
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792610222320
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792610338030
+      }
+    ],
+    "17.1 Integrar `StreamBuffer` ao dreno e à expansão animada do card": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606808118
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792610339232
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792610546195
+      }
+    ],
+    "18.1 Capturar e exibir a `FrozenQuestion` no cabeçalho do card": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606808165
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792610550614
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792610723797
+      }
+    ],
+    "18.2 Integrar `SuggestionQueue` e a pílula \"Nova pergunta\" com [Tab]": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606808208
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792610727796
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792610951901
+      }
+    ],
+    "19.1 Registrar as hotkeys globais e tratar seus acionamentos": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606808255
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792610956400
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792611172027
+      }
+    ],
+    "19.2 Implementar Modo_Setup/Modo_Ao_Vivo e Modo_Panic": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606808301
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792611175799
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792611352853
+      }
+    ],
+    "20.1 Aplicar estilos sem foco, `MA_NOACTIVATE` e gestão de foco do chat": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606808346
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792611357842
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792611453904
+      }
+    ],
+    "20.2 Aplicar anti-captura e exclusão da taskbar/Alt+Tab": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606808397
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792611457782
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792611559613
+      }
+    ],
+    "21.1 Implementar Pulse_Bar, shimmer e fade-in via `kTimerAnim`": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606808478
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792611564542
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792611816162
+      }
+    ],
+    "21.2 Implementar renderização de texto com contraste e cache de layout": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606808520
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792611819973
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792612417081
+      }
+    ],
+    "22. Testes de integração Win32/Direct2D": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606808566
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792612421361
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792612769736
+      }
+    ],
+    "23. Final checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792606808614
+      },
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792612872320
+      }
+    ],
+    "1. Funções puras de dimensionamento e ancoragem em `ui_models.hpp`": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607737942
+      }
+    ],
+    "5. Buffer de streaming sem jitter (`StreamBuffer`)": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607918433
+      }
+    ],
+    "7. Gate de voz (`UserSpeechGate`) em `decision_policy.hpp`": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607919804
+      }
+    ],
+    "2. Normalização de âncoras (exatamente 3 posições)": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792607920732
+      }
+    ],
+    "6. Pergunta congelada (`FrozenQuestion`)": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792608193217
+      }
+    ],
+    "8. Fila de pendentes (`SuggestionQueue`)": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792608194679
+      }
+    ],
+    "9. Mapeamento RMS→altura da Pulse_Bar": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792608195658
+      }
+    ],
+    "10. Navegação de histórico \"N de M\" (`History`)": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792608196657
+      }
+    ],
+    "12. Ajuste fino do prompt teleprompter em `copilot_prompt.hpp` (Req 4)": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792608327047
+      }
+    ],
+    "3. Ajustes no Rich_Layout_Parser em `suggestion_format.hpp` (Req 5)": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792609258157
+      }
+    ],
+    "13. Gate de voz e fila no engine (`copilot_engine.cpp`)": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792609484318
+      }
+    ],
+    "14. Constantes de layout e janela em `overlay_window.cpp`/`overlay_window.hpp` (Req 1, 2)": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792609671735
+      }
+    ],
+    "15. Zona Strip_Unificada e densidade responsiva (Req 2)": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792609840716
+      }
+    ],
+    "16. Zona Headline + 3 Âncoras e Micro_Footer (Req 3, 15)": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792610338247
+      }
+    ],
+    "17. Streaming sem jitter na UI (Req 6)": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792610546272
+      }
+    ],
+    "18. Trigger Lock e Pin on Speak na UI (Req 8, 9)": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792610952115
+      }
+    ],
+    "19. Hotkeys globais e modos Setup/Ao Vivo/Panic (Req 7, 12)": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792611352962
+      }
+    ],
+    "20. Zero-Focus-Steal e anti-captura (Req 10, 11)": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792611559843
+      }
+    ],
+    "21. Micro-animações e renderização de texto (Req 13, 14)": [
+      {
+        "executionId": "73d8eef2-0257-4c18-8a20-38d1faef51ef",
+        "chatSessionId": "sess_b2acde8c-bfc6-4fd1-ae39-567aaf3fd19b",
+        "timestamp": 1792612417178
+      }
+    ]
+  }
+}
