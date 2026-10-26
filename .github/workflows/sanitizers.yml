@@ -14,7 +14,7 @@ jobs:
   tsan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: sudo apt-get install -y --no-install-recommends ninja-build
       - run: cmake --preset linux-tsan
       - run: cmake --build --preset linux-tsan
