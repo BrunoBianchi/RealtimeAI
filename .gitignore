@@ -44,6 +44,7 @@ node_modules/
 apps/dashboard/release/
 apps/dashboard/native/
 apps/dashboard/build-info.json
+apps/dashboard/assets/release-notes.md
 .eslintcache
 *.tsbuildinfo
 

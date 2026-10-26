@@ -14,12 +14,15 @@
     "dev": "npm --prefix apps/dashboard start",
     "build:native": "cmake --preset windows-release && cmake --build --preset windows-release",
     "build:css": "npm --prefix apps/dashboard run build:css",
-    "test": "npm run test:dashboard",
+    "test": "npm run test:scripts && npm run test:dashboard",
     "test:dashboard": "npm --prefix apps/dashboard test",
+    "test:scripts": "node --test \"scripts/tests/*.test.mjs\"",
     "test:native": "ctest --preset windows-release",
     "check:secrets": "node scripts/check-secrets.mjs --all",
     "check:staged": "node scripts/check-secrets.mjs --staged",
     "flags:validate": "node scripts/validate-flags.mjs",
+    "version:next": "node scripts/version.mjs --json --pre beta",
+    "version:notes": "node scripts/version.mjs notes",
     "commitlint": "commitlint --edit"
   },
   "devDependencies": {

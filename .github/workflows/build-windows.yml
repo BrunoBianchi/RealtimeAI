@@ -5,7 +5,7 @@ on:
   workflow_call:
     inputs:
       version:
-        description: "App version for the installer (empty = keep package.json)"
+        description: "Semver of this build (2.1.0, 2.1.0-beta.3). Empty = dev build, cannot publish"
         type: string
         default: ""
       channel:
@@ -27,7 +27,15 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
+      - name: A published build needs a version
+        if: inputs.publish && inputs.version == ''
+        run: |
+          echo "::error::publish=true requires the version input"
+          exit 1
+
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # tags and history for the release notes
 
       - name: Cache ONNX Runtime and GoogleTest downloads
         uses: actions/cache@v4
@@ -36,11 +44,22 @@ jobs:
           key: deps-${{ runner.os }}-${{ hashFiles('cmake/*.cmake') }}
 
       - name: Configure
-        run: cmake --preset windows-release -DRTAI_WARNINGS_AS_ERRORS=OFF
+        shell: pwsh
+        run: |
+          $extra = @("-DRTAI_GIT_COMMIT=${{ github.sha }}")
+          if ("${{ inputs.version }}") { $extra += "-DRTAI_VERSION_STRING=${{ inputs.version }}" }
+          cmake --preset windows-release @extra
       - name: Build
         run: cmake --build --preset windows-release
       - name: Test
         run: ctest --preset windows-release
+      - name: The exe reports the release version
+        if: inputs.version != ''
+        shell: pwsh
+        run: |
+          $v = (& build/bin/Release/rtai_app.exe --version | Out-String).Trim()
+          if ($v -ne "RealTimeAI ${{ inputs.version }}") { throw "rtai_app --version says '$v'" }
+          (Get-Item build/bin/Release/rtai_app.exe).VersionInfo | Format-List ProductVersion, FileVersion
 
       - uses: actions/setup-node@v4
         if: inputs.publish
@@ -67,9 +86,20 @@ jobs:
             ConvertTo-Json | Set-Content apps/dashboard/build-info.json
 
       - name: Set installer version
-        if: inputs.publish && inputs.version != ''
+        if: inputs.publish
         working-directory: apps/dashboard
         run: npm version "${{ inputs.version }}" --no-git-tag-version --allow-same-version
+
+      # electron-builder puts assets/release-notes.md into the release and the
+      # update metadata, so the in-app updater shows what changed.
+      - name: Release notes
+        if: inputs.publish
+        shell: bash
+        run: |
+          since=""
+          if [ "${{ inputs.channel }}" = "stable" ]; then since="--since-stable"; fi
+          node scripts/version.mjs notes $since --version "${{ inputs.version }}" > apps/dashboard/assets/release-notes.md
+          cat apps/dashboard/assets/release-notes.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Build and publish installer
         if: inputs.publish
@@ -100,9 +130,11 @@ jobs:
             $assets = @(Get-ChildItem release -File | Where-Object { $_.Extension -in '.exe', '.yml', '.blockmap' } | ForEach-Object FullName)
             gh release view "v$version" --repo "${{ github.repository }}" *> $null
             if ($LASTEXITCODE -ne 0) {
-              $flags = @("v$version", "--repo", "${{ github.repository }}", "--target", "${{ github.sha }}", "--title", "v$version", "--notes", "Automated $type build")
+              # Betas: beta.yml pushed the tag. Stable: release-please already made the release.
+              $flags = @("v$version", "--repo", "${{ github.repository }}", "--verify-tag", "--title", "RealTimeAI $version", "--notes-file", "assets/release-notes.md")
               if ($beta) { $flags += "--prerelease" }
               gh release create @flags
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             }
             gh release upload "v$version" @assets --repo "${{ github.repository }}" --clobber
           }

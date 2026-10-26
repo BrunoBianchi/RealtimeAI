@@ -1,5 +1,10 @@
-# Every push to `beta` publishes a pre-release X.Y.(Z+1)-beta.N. Only installs
-# on the Beta channel (Settings > General > Beta and experiments) receive it.
+# Pre-releases. Every push to `beta` (or a manual run on any branch) gets the
+# next beta version from the Conventional Commits since the last stable tag,
+# tags the commit (vX.Y.Z-beta.N) and publishes the installer as a
+# pre-release. Only installs on the Beta channel (Settings > General > Beta and
+# experiments) receive it; when X.Y.Z ships as stable they move onto it.
+#
+#   feat: -> 2.1.0-beta.N   fix:/perf: -> 2.0.1-beta.N   feat!: -> 3.0.0-beta.N
 name: Beta
 
 on:
@@ -7,25 +12,41 @@ on:
     branches: [beta]
   workflow_dispatch:
 
+# Queue instead of cancelling: every run owns the beta number it tags.
 concurrency:
   group: beta
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: write
 
 jobs:
   version:
+    name: Version and tag
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.v.outputs.version }}
     steps:
       - uses: actions/checkout@v4
-      - id: v
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Next beta version
+        id: v
         run: |
-          base=$(node -p "require('./.release-please-manifest.json')['.']")
-          IFS=. read -r major minor patch <<< "$base"
-          echo "version=${major}.${minor}.$((patch + 1))-beta.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          node scripts/version.mjs --json --pre beta
+          echo "version=$(node scripts/version.mjs --pre beta)" >> "$GITHUB_OUTPUT"
+      - name: Tag the commit
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "RealTimeAI $VERSION"
+          git push origin "v$VERSION"
+          echo "### RealTimeAI $VERSION" >> "$GITHUB_STEP_SUMMARY"
 
   installer:
     needs: version

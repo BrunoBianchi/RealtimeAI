@@ -17,7 +17,8 @@ Os commits seguem o padrão [Conventional Commits](https://www.conventionalcommi
 | `fix:` | `fix(audio): reabre o loopback no device de comunicação` | 2.1.0 → 2.1.1 |
 | `feat:` | `feat(ui): card de próxima entrevista` | 2.1.0 → 2.2.0 |
 | `feat!:` ou `BREAKING CHANGE:` | `feat!: novo formato do config.ini` | 2.1.0 → 3.0.0 |
-| `chore:` `docs:` `test:` `ci:` `refactor:` | | não gera versão sozinho |
+| `perf:` | `perf(engine): acorda no deadline do turno` | 2.1.0 → 2.1.1 |
+| `chore:` `docs:` `test:` `ci:` `refactor:` `build:` | | não gera versão estável sozinho |
 
 Hooks (husky):
 
@@ -27,11 +28,48 @@ Hooks (husky):
 
 ## Como uma versão chega nos usuários
 
-1. Push na `main` → o workflow **Release** abre (ou atualiza) um PR `chore(release): vX.Y.Z` com a versão nova e o `CHANGELOG.md`.
-2. Merge desse PR → tag `vX.Y.Z` → o workflow compila o overlay C++ e o instalador Electron no Windows, roda os testes e publica `RealTimeAI-Setup-X.Y.Z.exe` + `latest.yml` no repositório público de releases.
+### Estável
+
+1. Push na `main` → o workflow **Release** abre (ou atualiza) um PR `chore(release): vX.Y.Z` com a versão nova, o `CHANGELOG.md` e os números atualizados em `package.json`, `apps/dashboard/package.json` e `CMakeLists.txt`.
+2. Merge desse PR → tag `vX.Y.Z` → o workflow compila o overlay C++ e o instalador Electron no Windows, roda os testes, confere que o `rtai_app.exe` diz a versão certa e publica `RealTimeAI-Setup-X.Y.Z.exe` + `latest.yml` com as notas da versão.
 3. Os apps instalados checam a cada 4 h (e ao abrir), baixam em segundo plano e instalam ao reiniciar. Settings → General → Updates mostra o estado e tem "Check now".
 
-Beta: todo push na branch `beta` publica uma pré-release `X.Y.(Z+1)-beta.N`. Só recebe quem escolheu o canal **Beta** em Settings → General → Beta and experiments. Quem está no beta também recebe as versões estáveis.
+### Pré-release (beta)
+
+Todo push na branch `beta` (ou o botão **Run workflow** do workflow **Beta**, em qualquer branch) gera uma pré-release. O número sai dos commits desde a última versão estável, com as mesmas regras do release-please:
+
+| Commits desde a última estável (2.0.0) | Betas publicados | Estável depois |
+|---|---|---|
+| só `fix:` / `perf:` | `2.0.1-beta.1`, `2.0.1-beta.2`, ... | `2.0.1` |
+| algum `feat:` | `2.1.0-beta.1`, `2.1.0-beta.2`, ... | `2.1.0` |
+| algum `feat!:` / `BREAKING CHANGE:` | `3.0.0-beta.1`, ... | `3.0.0` |
+| só `chore:` / `docs:` / ... | `2.0.1-beta.1` | (nenhuma) |
+
+- O `N` de `-beta.N` vem das tags que já existem (`v2.1.0-beta.*`), então nunca repete e recomeça em 1 depois de cada versão estável.
+- Cada beta vira uma tag `vX.Y.Z-beta.N` no commit e uma pré-release no GitHub com notas geradas dos commits (Novidades, Correções, Desempenho).
+- O beta sempre fica acima de qualquer versão estável já publicada, mesmo que a branch `beta` ainda não tenha recebido a `main`. Ainda assim, faça merge da `main` na `beta` depois de cada versão estável.
+- Pela ordem do semver, `2.1.0-beta.5` < `2.1.0`: quando a estável sai, quem está no beta recebe ela normalmente, e o próximo beta já é `2.1.1-beta.1` ou `2.2.0-beta.1`.
+- Só recebe beta quem escolheu o canal **Beta** em Settings → General → Beta and experiments. Quem está no beta também recebe as versões estáveis.
+- Os arquivos de versão (`package.json`, `CMakeLists.txt`) não mudam num beta: só a tag. A versão completa é injetada na hora do build.
+
+Para ver o que vai sair antes de publicar:
+
+```bash
+npm run version:next     # {"next": "2.1.0", "prerelease": "2.1.0-beta.3", ...}
+npm run version:notes    # notas desde a última tag
+```
+
+Publicar um beta:
+
+```bash
+git push origin main:beta        # ou: git checkout beta && git merge main && git push
+```
+
+### A versão dentro do app
+
+- **Overlay (`rtai_app.exe`)**: a versão vem do CMake (`RTAI_VERSION_STRING`, passada pelo CI). Aparece em `rtai_app.exe --version`, na primeira linha do log, no `hello` do modo `--server` (`app_version`), no User-Agent das conexões e em Propriedades → Detalhes do arquivo (`FileVersion` 2.1.0.3 para `2.1.0-beta.3`, marcado como pré-release).
+- **Build local**: sem `RTAI_VERSION_STRING`, o exe usa a versão do `CMakeLists.txt` com o commit como metadado (`2.0.0+dev.07e1001`), para nunca se passar por uma versão publicada.
+- **Dashboard**: `app.getVersion()` (do `apps/dashboard/package.json`, que o CI ajusta para a versão do build) e a versão do overlay recebida no `hello`.
 
 ## Feature flags e testes A/B
 

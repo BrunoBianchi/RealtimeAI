@@ -37,6 +37,10 @@ jobs:
           fi
       - run: npm run check:secrets
       - run: npm run flags:validate
+      - name: Versioning scripts
+        run: npm run test:scripts
+      - name: Next versions from the commits
+        run: node scripts/version.mjs --json --pre beta | tee -a "$GITHUB_STEP_SUMMARY"
 
   dashboard:
     name: Dashboard tests
