@@ -10,7 +10,7 @@ add_library(rtai::net ALIAS rtai_net)
 
 target_include_directories(rtai_net PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(rtai_net
-    PUBLIC rtai::core
+    PUBLIC rtai::core rtai::version
     PRIVATE rtai::options winhttp)
 
 set_target_properties(rtai_net PROPERTIES FOLDER "adapters")

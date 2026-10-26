@@ -30,6 +30,7 @@ option(RTAI_ENABLE_ONNX "Silero VAD adapter via ONNX Runtime" OFF)
 option(RTAI_ENABLE_EMBEDDINGS "Hybrid RAG: local multilingual-e5 embeddings via ONNX Runtime" OFF)
 
 include(RtaiCompilerOptions)
+include(RtaiVersion)
 
 # ---------------------------------------------------------------------------
 # Libraries and the app

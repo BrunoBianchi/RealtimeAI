@@ -36,6 +36,7 @@
 
 #include "rtai/openrouter_protocol.hpp"
 #include "rtai/sse_parser.hpp"
+#include "rtai/version.hpp"
 #include "rtai/winhttp_util.hpp"
 
 namespace rtai {
@@ -63,7 +64,7 @@ std::vector<std::string> split_feedback_lines(const std::string& text) {
 // set so a stalled connect/resolve/send cannot outlive the worker. The
 // per-stream gap is enforced separately via the receive timeout argument.
 win::HInternet open_worker_session(int receive_timeout_ms) {
-    win::HInternet session(win::open_session(L"RealTimeAI/0.2 (WinHTTP; Jev)"));
+    win::HInternet session(win::open_session(L"RealTimeAI/" RTAI_VERSION_WSTRING L" (WinHTTP; Jev)"));
     if (!session) return session;
     // resolve/connect/send are bounded by the worker timeout too; receive is
     // the max gap between body chunks before we give up on this worker.

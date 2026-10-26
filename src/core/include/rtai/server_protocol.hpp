@@ -59,6 +59,7 @@ struct Hello {
     std::string llm_url;
     std::string config_path;
     std::string session_path;  // .jsonl being written, empty if not saving
+    std::string app_version;   // engine build version ("2.1.0-beta.3"), lets the UI spot a mismatch
 };
 
 inline std::string encode_hello(const Hello& h) {
@@ -81,6 +82,7 @@ inline std::string encode_hello(const Hello& h) {
         .field("llm_url", h.llm_url)
         .field("config_path", h.config_path)
         .field("session_path", h.session_path)
+        .field("app_version", h.app_version)
         .end_object();
     return std::move(w).str();
 }

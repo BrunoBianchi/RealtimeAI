@@ -1,0 +1,32 @@
+// Windows version resource (Explorer > Properties > Details). Generated values
+// come from cmake/RtaiVersion.cmake.
+#include <winver.h>
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION     @RTAI_VERSION_MAJOR@,@RTAI_VERSION_MINOR@,@RTAI_VERSION_PATCH@,@RTAI_VERSION_BUILD@
+ PRODUCTVERSION  @RTAI_VERSION_MAJOR@,@RTAI_VERSION_MINOR@,@RTAI_VERSION_PATCH@,@RTAI_VERSION_BUILD@
+ FILEFLAGSMASK   VS_FFI_FILEFLAGSMASK
+ FILEFLAGS       @RTAI_RC_FILEFLAGS@
+ FILEOS          VOS_NT_WINDOWS32
+ FILETYPE        VFT_APP
+ FILESUBTYPE     VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"
+        BEGIN
+            VALUE "CompanyName",      "Bruno Raiado Bianchi"
+            VALUE "FileDescription",  "RealTimeAI overlay"
+            VALUE "FileVersion",      "@RTAI_VERSION_FULL@"
+            VALUE "InternalName",     "rtai_app"
+            VALUE "LegalCopyright",   "Copyright (C) 2026 Bruno Raiado Bianchi"
+            VALUE "OriginalFilename", "rtai_app.exe"
+            VALUE "ProductName",      "RealTimeAI"
+            VALUE "ProductVersion",   "@RTAI_VERSION_FULL@"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

@@ -12,6 +12,7 @@
 
 #include "rtai/openrouter_protocol.hpp"
 #include "rtai/sse_parser.hpp"
+#include "rtai/version.hpp"
 #include "rtai/winhttp_util.hpp"
 
 namespace rtai {
@@ -135,7 +136,7 @@ struct WinHttpLlmClient::Shared {
 
 WinHttpLlmClient::WinHttpLlmClient(WinHttpLlmOptions opts)
     : opts_(std::move(opts)), shared_(std::make_shared<Shared>()) {
-    shared_->session.reset(win::open_session(L"RealTimeAI/0.2 (WinHTTP)"));
+    shared_->session.reset(win::open_session(L"RealTimeAI/" RTAI_VERSION_WSTRING L" (WinHTTP)"));
     if (!shared_->session) {
         shared_->session_error = "WinHttpOpen: " + win::winhttp_error_text(GetLastError());
         return;

@@ -4,10 +4,23 @@ add_executable(rtai_app
     src/main.cpp
 )
 
+# Version resource (file properties in Explorer, installer metadata).
+if (WIN32)
+    enable_language(RC)
+    if (RTAI_VERSION_IS_PRERELEASE)
+        set(RTAI_RC_FILEFLAGS "VS_FF_PRERELEASE")
+    else()
+        set(RTAI_RC_FILEFLAGS "0x0L")
+    endif()
+    configure_file(rtai_app.rc.in "${CMAKE_CURRENT_BINARY_DIR}/rtai_app.rc" @ONLY)
+    target_sources(rtai_app PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/rtai_app.rc")
+endif()
+
 target_include_directories(rtai_app PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
 
 target_link_libraries(rtai_app PRIVATE
     rtai::options
+    rtai::version
     rtai::core
     rtai::audio_wasapi
     rtai::net

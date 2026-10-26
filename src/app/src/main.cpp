@@ -18,6 +18,7 @@
 // OPENROUTER_API_KEY, RTAI_*) are used when a config field is empty.
 //   --config             open config.ini in Notepad and exit
 //   --config-file PATH   use another config file (or RTAI_CONFIG)
+//   --version            print the build version and exit
 #include <windows.h>
 #include <shlobj.h>
 
@@ -32,6 +33,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <type_traits>
 #include <variant>
@@ -57,6 +59,7 @@
 #include "rtai/stdio_server.hpp"
 #include "rtai/text_util.hpp"
 #include "rtai/url.hpp"
+#include "rtai/version.hpp"
 #include "rtai/wasapi_capture.hpp"
 #include "rtai/wav_file_source.hpp"
 #include "rtai/winhttp_llm_client.hpp"
@@ -402,6 +405,7 @@ server::Hello make_hello(const AppConfig& cfg, bool llm_on, const std::string& m
     h.has_llm_key = !cfg.st.llm_key.empty();
     h.llm_url = cfg.st.llm_url;
     h.config_path = path_utf8(cfg.config_path);
+    h.app_version = rtai::build::kVersion;
     return h;
 }
 
@@ -613,6 +617,7 @@ int run_app(AppConfig cfg) {
     AsyncLog log(cfg.server ? stderr : stdout);
     std::FILE* log_file = open_log_file(cfg.app_dir);
     if (log_file) log.set_tee(log_file);
+    log.line(std::string("RealTimeAI ") + rtai::build::kVersion);
     // --server: protocol lines only on stdout, written by one thread.
     std::unique_ptr<LineChannel> out;
     if (cfg.server) {
@@ -1467,6 +1472,12 @@ int run_app(AppConfig cfg) {
 }
 
 int main(int argc, char** argv) {
+    for (int i = 1; i < argc; ++i) {
+        if (std::string_view(argv[i]) == "--version") {
+            std::cout << "RealTimeAI " << rtai::build::kVersion << "\n";
+            return 0;
+        }
+    }
     // Real-time scheduling for the whole run: 1 ms timers and no EcoQoS.
     const rtai::win::TimerResolution timer_resolution(1);
     rtai::win::disable_power_throttling();

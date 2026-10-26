@@ -12,6 +12,7 @@
 #include "rtai/json_min.hpp"
 #include "rtai/text_util.hpp"
 #include "rtai/url.hpp"
+#include "rtai/version.hpp"
 #include "rtai/winhttp_util.hpp"
 
 namespace rtai::web {
@@ -47,7 +48,7 @@ void append_topic_text(const json::Value& topic, std::string& out) {
 std::string http_get_string(const std::wstring& host, INTERNET_PORT port, bool secure,
                             const std::wstring& path, const std::wstring& extra_headers = {},
                             int timeout_ms = 1800, std::size_t max_bytes = 64000) {
-    HINTERNET session = win::open_session(L"RealTimeAI/2.0 (InterviewCopilot)");
+    HINTERNET session = win::open_session(L"RealTimeAI/" RTAI_VERSION_WSTRING L" (WinHTTP)");
     if (!session) return {};
     win::enable_modern_tls(session);
     win::HInternet session_owner(session);

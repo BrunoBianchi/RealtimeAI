@@ -79,12 +79,14 @@ TEST(ServerProtocol, HelloLevelsAndBye) {
     h.ready = false;
     h.needs = "deepgram_key";
     h.config_path = "C:\\Users\\bruno\\AppData\\Local\\RealTimeAI\\config.ini";
+    h.app_version = "2.1.0-beta.3";
     const auto v = parse(server::encode_hello(h));
     EXPECT_EQ(v["type"].as_string(), "hello");
     EXPECT_EQ(v["version"].as_number(), server::kProtocolVersion);
     EXPECT_TRUE(v["mode"].as_bool());
     EXPECT_FALSE(v["ready"].as_bool());
     EXPECT_EQ(v["config_path"].as_string(), h.config_path);
+    EXPECT_EQ(v["app_version"].as_string(), "2.1.0-beta.3");
 
     server::Levels l;
     l.voce = 0.456f;

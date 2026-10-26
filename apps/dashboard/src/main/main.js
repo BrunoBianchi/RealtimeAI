@@ -28,6 +28,7 @@ let mainWindow = null;
 let overlayProcess = null;
 let overlayMode = null;
 let overlayAgentId = null;
+let overlayVersion = ''; // reported by the overlay's hello (rtai_app --server)
 let isQuitting = false;
 let flagStore = null;
 let updater = null;
@@ -1737,6 +1738,13 @@ function launchOverlay({ agent, demo = false, configOverrides = {} }) {
           if (msg.type === 'mode' && mainWindow && !mainWindow.isDestroyed()) {
             mainWindow.webContents.send('rtai:mode', Boolean(msg.on));
           } else if (msg.type === 'hello' && mainWindow && !mainWindow.isDestroyed()) {
+            if (msg.app_version) {
+              overlayVersion = String(msg.app_version);
+              // An installed app always ships both halves from the same build.
+              if (app.isPackaged && overlayVersion.split('+')[0] !== app.getVersion()) {
+                console.warn(`[overlay] version ${overlayVersion} differs from the dashboard ${app.getVersion()}`);
+              }
+            }
             if (msg.mode !== undefined) {
               mainWindow.webContents.send('rtai:mode', Boolean(msg.mode));
             }
@@ -2840,7 +2848,8 @@ app.whenReady().then(() => {
     version: APP_VERSION,
     channel: currentChannel(),
     commit: buildInfo.commit || '',
-    packaged: app.isPackaged
+    packaged: app.isPackaged,
+    overlayVersion
   }));
 
   ipcMain.handle('rtai:check-update', async () => updater.check());

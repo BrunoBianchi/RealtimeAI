@@ -10,12 +10,13 @@
 #include <memory>
 #include <string>
 
+#include "rtai/version.hpp"
 #include "rtai/websocket.hpp"
 
 namespace rtai {
 
 struct WinHttpWebSocketOptions {
-    std::wstring user_agent{L"RealTimeAI/0.2 (WinHTTP)"};
+    std::wstring user_agent{L"RealTimeAI/" RTAI_VERSION_WSTRING L" (WinHTTP)"};
     int resolve_timeout_ms{5000};
     int connect_timeout_ms{8000};
     int send_timeout_ms{10000};
