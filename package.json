@@ -2,10 +2,21 @@
   "name": "realtimeai",
   "version": "2.0.0",
   "private": true,
-  "description": "RealTimeAI: real-time interview copilot (C++ overlay + Electron dashboard)",
+  "description": "RealTimeAI: real-time meeting and interview copilot (native C++ overlay + Electron dashboard)",
+  "author": "Bruno Raiado Bianchi",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BrunoBianchi/RealtimeAI.git"
+  },
   "scripts": {
     "prepare": "husky",
-    "test": "npm --prefix apps/dashboard test",
+    "setup": "npm ci && npm --prefix apps/dashboard ci",
+    "dev": "npm --prefix apps/dashboard start",
+    "build:native": "cmake --preset windows-release && cmake --build --preset windows-release",
+    "build:css": "npm --prefix apps/dashboard run build:css",
+    "test": "npm run test:dashboard",
+    "test:dashboard": "npm --prefix apps/dashboard test",
+    "test:native": "ctest --preset windows-release",
     "check:secrets": "node scripts/check-secrets.mjs --all",
     "check:staged": "node scripts/check-secrets.mjs --staged",
     "flags:validate": "node scripts/validate-flags.mjs",

@@ -1,0 +1,6 @@
+# Full checks before anything leaves the machine.
+node scripts/check-secrets.mjs --all
+npm --prefix apps/dashboard test --silent
+if [ -x build/bin/Release/core_tests.exe ]; then
+  build/bin/Release/core_tests.exe --gtest_brief=1
+fi

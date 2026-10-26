@@ -1,0 +1,11 @@
+{
+  "cmake.useCMakePresets": "always",
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json",
+  "search.exclude": {
+    "**/node_modules": true,
+    "build": true,
+    "apps/dashboard/src/renderer/styles.css": true
+  }
+}

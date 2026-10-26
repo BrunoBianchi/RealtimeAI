@@ -1,0 +1,3 @@
+# Fast checks on what is being committed (a few seconds).
+node scripts/check-secrets.mjs --staged
+node scripts/validate-flags.mjs
