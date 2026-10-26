@@ -260,7 +260,10 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
 
     std::mutex mu;
     std::condition_variable cv;
-    std::deque<Input> inbox; // guarded by mu
+    // Inbox (guarded by mu) and the orchestrator's drain buffer. Swapping two
+    // vectors keeps both capacities, so steady-state posting allocates nothing.
+    std::vector<Input> inbox;
+    std::vector<Input> batch; // orchestrator-only
     bool stop_requested{false};
     bool started{false};
     std::once_flag stop_once;
@@ -404,25 +407,57 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
         cv.notify_one();
     }
 
+    // Earliest engine-clock time (ms) later than `after_ms` at which a
+    // timer-driven step is due: turn close (grace/stale), stable-interim
+    // speculation, speculative commit fallback, held-question settle/hold, or
+    // the Pin-on-Speak window that releases a queued suggestion. -1 = none.
+    // Deadlines at or before `after_ms` were already handled by the last timer
+    // step (some legitimately stay in the past, e.g. a queued suggestion while
+    // the user speaks); skipping them keeps the loop from spinning.
+    std::int64_t next_deadline_ms(std::int64_t after_ms) const {
+        std::int64_t next = turns.next_deadline_ms(after_ms);
+        auto take = [&next, after_ms](std::int64_t t) {
+            if (t >= 0 && t > after_ms && (next < 0 || t < next)) next = t;
+        };
+        if (shadow && shadow->state == ShadowState::Speculating) take(shadow->commit_deadline_ms);
+        if (held_q_ && held_q_->due_ms >= 0) take(held_q_->due_ms);
+        if (!pending.empty() && last_card_ms >= 0 && cfg.decision.cooldown_ms > 0)
+            take(last_card_ms + cfg.decision.cooldown_ms);
+        return next;
+    }
+
     // ------------------------------------------------------------------
     void run() {
-        // Req 5.1/5.4: the consumer blocks on cv.wait_until(next_tick, pred) and
-        // is woken immediately by post()'s notify_one() whenever an event lands.
-        // cfg.tick (50 ms) is NOT a polling sleep for the event path — it serves
-        // only as the periodic clock deadline for the TurnAssembler tick below.
-        auto next_tick = std::chrono::steady_clock::now() + cfg.tick;
+        // Req 5.1/5.4: the consumer blocks on cv.wait_until(wake, pred) and is
+        // woken immediately by post()'s notify_one() whenever an event lands.
+        // Timer-driven steps wake it at their exact deadline (next_deadline_ms)
+        // instead of the next periodic tick, which removes up to one tick of
+        // latency from every turn close and speculative commit. cfg.tick stays
+        // as a coarse safety net for anything without an explicit deadline.
+        using clock = std::chrono::steady_clock;
+        auto next_tick = clock::now() + cfg.tick;
+        std::int64_t last_step_ms = -1; // engine time of the last timer step
         for (;;) {
-            std::deque<Input> batch;
+            const std::int64_t deadline = next_deadline_ms(last_step_ms);
+            auto wake = next_tick;
+            if (deadline >= 0) {
+                const auto at = cfg.session_start + std::chrono::milliseconds(deadline);
+                if (at < wake) wake = at;
+            }
             {
                 std::unique_lock<std::mutex> lk(mu);
-                cv.wait_until(lk, next_tick, [&] { return stop_requested || !inbox.empty(); });
+                cv.wait_until(lk, wake, [&] { return stop_requested || !inbox.empty(); });
                 if (stop_requested) break;
                 batch.swap(inbox);
             }
             for (auto& in : batch) {
                 std::visit([&](auto& v) { handle(v); }, in);
             }
-            if (std::chrono::steady_clock::now() >= next_tick) {
+            batch.clear();
+            const auto now = clock::now();
+            const std::int64_t due = next_deadline_ms(last_step_ms);
+            if (now >= next_tick || (due >= 0 && now_ms() >= due)) {
+                last_step_ms = now_ms();
                 for (auto& t : turns.tick(now_ms())) on_turn(t);
                 if (!transcription_only_.load()) {
                     for (auto& c : turns.poll_speculative(now_ms())) on_speculative(c);
@@ -438,7 +473,7 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
                 // frames, so release pending suggestions on the periodic tick.
                 maybe_release_pending(now_ms());
                 check_held(now_ms());
-                next_tick = std::chrono::steady_clock::now() + cfg.tick;
+                if (now >= next_tick) next_tick = clock::now() + cfg.tick;
             }
         }
     }

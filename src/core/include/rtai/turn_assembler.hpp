@@ -99,7 +99,9 @@ public:
         return out;
     }
 
-    // Periodic check (the engine calls it every ~50 ms).
+    // Periodic check. The engine calls it on its tick and as soon as
+    // next_deadline_ms() is reached, so a turn closes on time instead of up to
+    // one tick late.
     std::vector<Turn> tick(std::int64_t now_ms) {
         std::vector<Turn> out;
         for (AudioSource s : {AudioSource::Microphone, AudioSource::Loopback}) {
@@ -134,6 +136,27 @@ public:
             out.push_back(SpeculativeCandidate{s, live, now_ms});
         }
         return out;
+    }
+
+    // Earliest session time later than `after_ms` at which tick() or
+    // poll_speculative() can produce something (a grace/stale close or a
+    // stable-interim candidate); -1 when nothing is pending. Conservative:
+    // waking at it may find nothing to do. Deadlines at or before `after_ms`
+    // were already checked by the caller and are skipped.
+    [[nodiscard]] std::int64_t next_deadline_ms(std::int64_t after_ms = -1) const noexcept {
+        std::int64_t next = -1;
+        auto take = [&next, after_ms](std::int64_t t) {
+            if (t > after_ms && (next < 0 || t < next)) next = t;
+        };
+        for (const Lane& l : lanes_) {
+            if (l.boundary_ms >= 0) {
+                take(l.boundary_ms + effective_grace(l));
+                continue; // a closing lane neither goes stale nor speculates
+            }
+            if (!l.committed.empty() && l.interim.empty() && l.last_final_ms >= 0) take(l.last_final_ms + cfg_.stale_ms);
+            if (!l.speculative_fired && l.last_interim_ms >= 0) take(l.last_interim_ms + cfg_.speculative_pause_ms);
+        }
+        return next;
     }
 
     // Committed finals of the open turn plus the current interim: what the

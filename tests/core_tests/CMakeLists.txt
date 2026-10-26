@@ -39,6 +39,7 @@ add_executable(core_tests
     test_question_flow.cpp
     test_question_interpretation.cpp
     test_hybrid_rag.cpp
+    test_engine_deadlines.cpp
 )
 
 target_include_directories(core_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
