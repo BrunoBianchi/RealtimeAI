@@ -107,4 +107,4 @@ O repositório `BrunoBianchi/RealtimeAI` é **público**, então os instaladores
 
 Sem `RELEASES_REPO`, o instalador é anexado à release deste repositório e os apps buscam as flags em `apps/dashboard/flags.json` da `main`.
 
-Build local do instalador (sem publicar): rode `scripts\windows\build.bat`, copie `build\bin\Release\rtai_app.exe` (e `onnxruntime.dll`) para `apps\dashboard\native\` e rode `npm --prefix apps/dashboard run dist`.
+Instalador local (sem publicar): `scripts\windows\package.bat` compila o overlay com a versão `<próxima>-local.<data-hora>`, coloca o `rtai_app.exe` e o `onnxruntime.dll` em `apps\dashboard\native\`, gera as notas e cria `dist\RealTimeAI-Setup-<versão>.exe`. Um build local instalado se atualiza sozinho para a próxima release publicada.

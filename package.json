@@ -13,6 +13,7 @@
     "setup": "npm ci && npm --prefix apps/dashboard ci",
     "dev": "npm --prefix apps/dashboard start",
     "build:native": "cmake --preset windows-release && cmake --build --preset windows-release",
+    "package": "scripts\\windows\\package.bat",
     "build:css": "npm --prefix apps/dashboard run build:css",
     "test": "npm run test:scripts && npm run test:dashboard",
     "test:dashboard": "npm --prefix apps/dashboard test",

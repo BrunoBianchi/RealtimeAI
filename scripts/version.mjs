@@ -3,6 +3,7 @@
 //
 //   node scripts/version.mjs                  next stable version (2.1.0)
 //   node scripts/version.mjs --pre beta       next pre-release   (2.1.0-beta.3)
+//   node scripts/version.mjs --local          local test build (2.1.0-local.202610261405)
 //   node scripts/version.mjs --json           every detail, as JSON
 //   node scripts/version.mjs notes [--since-stable] [--version X.Y.Z]
 //                                             Markdown release notes up to HEAD
@@ -134,6 +135,14 @@ export function nextPrerelease({ current, commits, tags = [], preid = 'beta' }) 
   return { level, base: baseText, version: `${baseText}-${preid}.${n + 1}` };
 }
 
+// A build made on a developer machine: the next version with a minute stamp,
+// so it sorts below the real release and above every earlier local build.
+export function localVersion({ current, commits, tags = [], date = new Date() }) {
+  const pad = (n) => String(n).padStart(2, '0');
+  const stamp = `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}${pad(date.getHours())}${pad(date.getMinutes())}`;
+  return `${nextPrerelease({ current, commits, tags, preid: 'local' }).base}-local.${stamp}`;
+}
+
 // ---------------------------------------------------------------- notes
 
 const SECTIONS = [
@@ -229,6 +238,10 @@ function main(argv) {
   }
   const st = repoState('HEAD');
   const commits = commitsBetween(st.lastStableTag);
+  if (argv.includes('--local')) {
+    process.stdout.write(`${localVersion({ current: st.current, commits, tags: st.all })}\n`);
+    return;
+  }
   const preid = arg(argv, '--pre');
   const stable = nextStable(st.current, commits);
   const pre = preid ? nextPrerelease({ current: st.current, commits, tags: st.all, preid }) : null;

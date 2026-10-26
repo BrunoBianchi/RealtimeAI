@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   compareVersions,
+  localVersion,
   nextPrerelease,
   nextStable,
   parseCommit,
@@ -83,4 +84,13 @@ test('release notes group commits like the changelog', () => {
   assert.match(notes, /### Desempenho/);
   assert.doesNotMatch(notes, /readme/);
   assert.match(releaseNotes([c('chore: x')]), /Manutenção e melhorias internas/);
+});
+
+test('local builds sort between the last release and the next one', () => {
+  const v = localVersion({ current: '2.0.0', commits: [c('feat: a')], tags: ['v2.0.0'], date: new Date(2026, 9, 26, 14, 5) });
+  assert.equal(v, '2.1.0-local.202610261405');
+  assert.ok(compareVersions(v, '2.0.0') > 0);
+  assert.ok(compareVersions(v, '2.1.0') < 0);
+  const later = localVersion({ current: '2.0.0', commits: [c('feat: a')], tags: ['v2.0.0'], date: new Date(2026, 9, 26, 15, 0) });
+  assert.ok(compareVersions(later, v) > 0);
 });

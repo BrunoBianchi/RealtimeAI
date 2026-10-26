@@ -51,10 +51,18 @@ Requisitos: Windows 10/11, Visual Studio 2022/2026 com **Desktop development wit
 Node.js 22 LTS e Git.
 
 ```bat
-scripts\windows\setup-dev.bat        :: dependências Node e hooks do git
-scripts\windows\build.bat            :: overlay nativo + testes do core
-scripts\windows\start-dashboard.bat  :: dashboard (inicia o overlay pelas sessões)
+scripts\windows\setup-dev.bat   :: uma vez: dependências Node e hooks do git
+scripts\windows\dev.bat         :: versão de teste: recompila e abre o app com o código atual
+scripts\windows\package.bat     :: instalador: dist\RealTimeAI-Setup-<versão>.exe
 ```
+
+- **Versão de teste (`dev.bat`)**: recompila só o que mudou e abre o dashboard direto do código, usando o
+  overlay recém-compilado. Não se atualiza sozinha e mostra a versão como `X.Y.Z+dev.<commit>`.
+  `dev.bat --skip` abre sem recompilar.
+- **Instalador (`package.bat`)**: compila tudo e gera o mesmo instalador das releases (um clique, atalho no
+  menu Iniciar, desinstalador e auto-update). A versão é `<próxima>-local.<data-hora>`, que fica abaixo da
+  próxima release: quando ela sair, o app instalado se atualiza sozinho. `package.bat 2.1.0-beta.2` usa
+  uma versão explícita.
 
 Sem chaves de API, `scripts\windows\run-demo.bat` abre o HUD com uma conversa roteirizada.
 Para usar ao vivo, configure as chaves do Deepgram e do LLM no dashboard (Settings) ou no
@@ -67,6 +75,7 @@ O modelo de embeddings do RAG híbrido é baixado uma vez com
 | Comando | O que faz |
 |---|---|
 | `npm run build:native` | configura e compila com o preset `windows-release` |
+| `npm run package` | gera o instalador local (`scripts\windows\package.bat`) |
 | `npm run test:native` | `ctest` do build nativo |
 | `npm test` | testes do dashboard |
 | `npm run dev` | abre o dashboard a partir do código |
