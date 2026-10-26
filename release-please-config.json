@@ -1,5 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "4194869372bb5cd707f2b96d9899a51d54174d37",
   "include-component-in-tag": false,
   "include-v-in-tag": true,
   "pull-request-title-pattern": "chore(release): v${version}",
@@ -9,19 +10,59 @@
       "package-name": "realtimeai",
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
-        { "type": "json", "path": "apps/dashboard/package.json", "jsonpath": "$.version" },
-        { "type": "generic", "path": "CMakeLists.txt" }
+        {
+          "type": "json",
+          "path": "apps/dashboard/package.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "generic",
+          "path": "CMakeLists.txt"
+        }
       ],
       "changelog-sections": [
-        { "type": "feat", "section": "Novidades" },
-        { "type": "fix", "section": "Correções" },
-        { "type": "perf", "section": "Desempenho" },
-        { "type": "refactor", "section": "Refatoração", "hidden": true },
-        { "type": "docs", "section": "Documentação", "hidden": true },
-        { "type": "test", "section": "Testes", "hidden": true },
-        { "type": "build", "section": "Build", "hidden": true },
-        { "type": "ci", "section": "CI", "hidden": true },
-        { "type": "chore", "section": "Manutenção", "hidden": true }
+        {
+          "type": "feat",
+          "section": "Novidades"
+        },
+        {
+          "type": "fix",
+          "section": "Correções"
+        },
+        {
+          "type": "perf",
+          "section": "Desempenho"
+        },
+        {
+          "type": "refactor",
+          "section": "Refatoração",
+          "hidden": true
+        },
+        {
+          "type": "docs",
+          "section": "Documentação",
+          "hidden": true
+        },
+        {
+          "type": "test",
+          "section": "Testes",
+          "hidden": true
+        },
+        {
+          "type": "build",
+          "section": "Build",
+          "hidden": true
+        },
+        {
+          "type": "ci",
+          "section": "CI",
+          "hidden": true
+        },
+        {
+          "type": "chore",
+          "section": "Manutenção",
+          "hidden": true
+        }
       ]
     }
   }

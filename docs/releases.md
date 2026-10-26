@@ -93,16 +93,18 @@ As flags ficam em `apps/dashboard/flags.json`:
 - Na interface: `data-flag="chave"` esconde o elemento quando a flag está desligada; `data-ab="chave" data-ab-<variante>="texto"` troca o texto por variante. No JS: `isFlagEnabled('chave')` e `flagVariant('chave')`.
 - O overlay C++ pode ler o resultado em `%LOCALAPPDATA%\RealTimeAI\flags-active.json`.
 
-Mudar o `flags.json` na `main` publica o arquivo no repositório de releases (workflow **Feature flags**). Os apps buscam a cada 30 min, então dá pra liberar uma feature para 10%, 50%, 100% sem lançar versão nova. Em Settings, cada flag pode ser forçada (On/Off/variante) na própria máquina para testar.
+Mudar o `flags.json` na `main` já vale para os apps instalados (com `RELEASES_REPO`, o workflow **Feature flags** copia o arquivo para lá). Os apps buscam a cada 30 min, então dá pra liberar uma feature para 10%, 50%, 100% sem lançar versão nova. Em Settings, cada flag pode ser forçada (On/Off/variante) na própria máquina para testar.
 
 ## Configuração do GitHub (uma vez)
 
-1. Repositório **privado** com este código.
-2. Repositório **público** só para os instaladores, por exemplo `realtimeai-releases`, com um README (precisa ter ao menos um commit).
-3. No repositório privado, em Settings → Secrets and variables → Actions:
-   - variável `RELEASES_REPO` = `seu-usuario/realtimeai-releases`
-   - secret `RELEASES_TOKEN` = token fine-grained com **Contents: Read and write** só no repositório de releases
-   - secret `GOOGLE_OAUTH_CLIENT_JSON` (opcional) = conteúdo do `apps/dashboard/google_oauth_client.json`
-4. Em Settings → Actions → General, marque "Allow GitHub Actions to create and approve pull requests" (o release-please abre o PR de versão).
+O repositório `BrunoBianchi/RealtimeAI` é **público**, então os instaladores, o `latest.yml`/`beta.yml` do auto-update e o `flags.json` podem ficar nele mesmo:
+
+1. Em Settings → Actions → General → Workflow permissions, marque **Read and write permissions** e **Allow GitHub Actions to create and approve pull requests** (sem isso o release-please não consegue abrir o PR de versão).
+2. Opcional, em Settings → Secrets and variables → Actions:
+   - secret `GOOGLE_OAUTH_CLIENT_JSON` = conteúdo do `apps/dashboard/google_oauth_client.json` (integração com o Google Agenda no instalador).
+   - Para publicar os instaladores em outro repositório (por exemplo se este voltar a ser privado): variável `RELEASES_REPO` = `usuario/realtimeai-releases` e secret `RELEASES_TOKEN` = token fine-grained com **Contents: Read and write** só nesse repositório. Com isso o workflow **Feature flags** também copia o `flags.json` para lá.
+3. Recomendado: em Settings → Branches, proteja a `main` exigindo os checks do CI (`Commits, secrets and flags`, `Dashboard tests`) antes do merge.
+
+Sem `RELEASES_REPO`, o instalador é anexado à release deste repositório e os apps buscam as flags em `apps/dashboard/flags.json` da `main`.
 
 Build local do instalador (sem publicar): rode `scripts\windows\build.bat`, copie `build\bin\Release\rtai_app.exe` (e `onnxruntime.dll`) para `apps\dashboard\native\` e rode `npm --prefix apps/dashboard run dist`.
