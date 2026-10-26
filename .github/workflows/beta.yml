@@ -1,0 +1,37 @@
+# Every push to `beta` publishes a pre-release X.Y.(Z+1)-beta.N. Only installs
+# on the Beta channel (Settings > General > Beta and experiments) receive it.
+name: Beta
+
+on:
+  push:
+    branches: [beta]
+  workflow_dispatch:
+
+concurrency:
+  group: beta
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        run: |
+          base=$(node -p "require('./.release-please-manifest.json')['.']")
+          IFS=. read -r major minor patch <<< "$base"
+          echo "version=${major}.${minor}.$((patch + 1))-beta.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+  installer:
+    needs: version
+    uses: ./.github/workflows/build-windows.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+      channel: beta
+      publish: true
+    secrets: inherit

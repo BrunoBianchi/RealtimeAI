@@ -1,0 +1,38 @@
+# Publishes apps/dashboard/flags.json to the releases repository, where
+# installed apps fetch it every 30 min (rollouts without a new version).
+name: Feature flags
+
+on:
+  push:
+    branches: [main]
+    paths: [apps/dashboard/flags.json]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: vars.RELEASES_REPO != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/validate-flags.mjs
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.RELEASES_REPO }}
+          token: ${{ secrets.RELEASES_TOKEN }}
+          path: releases-repo
+      - name: Commit flags.json
+        working-directory: releases-repo
+        run: |
+          cp ../apps/dashboard/flags.json flags.json
+          if git diff --quiet -- flags.json; then echo "flags.json unchanged"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add flags.json
+          git commit -m "chore(flags): publish flags.json from ${GITHUB_SHA::7}"
+          git push

@@ -1,0 +1,23 @@
+# ThreadSanitizer run of the core suite (the engine, Deepgram stream and
+# session store are multi-threaded). Weekly and on demand.
+name: Sanitizers
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tsan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get install -y --no-install-recommends ninja-build
+      - run: cmake --preset linux-tsan
+      - run: cmake --build --preset linux-tsan
+      - run: ctest --preset linux-tsan
+        env:
+          TSAN_OPTIONS: halt_on_error=1 second_deadlock_stack=1

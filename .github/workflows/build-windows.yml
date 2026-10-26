@@ -1,0 +1,120 @@
+# Reusable: native overlay + tests, then (optionally) the Electron installer.
+name: Build Windows
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "App version for the installer (empty = keep package.json)"
+        type: string
+        default: ""
+      channel:
+        description: "stable | beta"
+        type: string
+        default: stable
+      publish:
+        description: "Build the installer and publish it"
+        type: boolean
+        default: false
+    secrets:
+      RELEASES_TOKEN:
+        required: false
+      GOOGLE_OAUTH_CLIENT_JSON:
+        required: false
+
+# Permissions come from the caller (CI: read-only; Release/Beta: contents write).
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache ONNX Runtime and GoogleTest downloads
+        uses: actions/cache@v4
+        with:
+          path: build/_deps
+          key: deps-${{ runner.os }}-${{ hashFiles('cmake/*.cmake') }}
+
+      - name: Configure
+        run: cmake --preset windows-release -DRTAI_WARNINGS_AS_ERRORS=OFF
+      - name: Build
+        run: cmake --build --preset windows-release
+      - name: Test
+        run: ctest --preset windows-release
+
+      - uses: actions/setup-node@v4
+        if: inputs.publish
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/dashboard/package-lock.json
+
+      - name: Stage native overlay and build info
+        if: inputs.publish
+        shell: pwsh
+        env:
+          GOOGLE_OAUTH_CLIENT_JSON: ${{ secrets.GOOGLE_OAUTH_CLIENT_JSON }}
+          RELEASES_REPO: ${{ vars.RELEASES_REPO }}
+        run: |
+          $native = "apps/dashboard/native"
+          New-Item -ItemType Directory -Force -Path $native | Out-Null
+          Copy-Item build/bin/Release/rtai_app.exe $native/
+          if (Test-Path build/bin/Release/onnxruntime.dll) { Copy-Item build/bin/Release/onnxruntime.dll $native/ }
+          if ($env:GOOGLE_OAUTH_CLIENT_JSON) { Set-Content -Path apps/dashboard/google_oauth_client.json -Value $env:GOOGLE_OAUTH_CLIENT_JSON -NoNewline }
+          $repo = if ($env:RELEASES_REPO) { $env:RELEASES_REPO } else { "${{ github.repository }}" }
+          @{ version = "${{ inputs.version }}"; channel = "${{ inputs.channel }}"; commit = "${{ github.sha }}";
+             flagsUrl = "https://raw.githubusercontent.com/$repo/main/flags.json" } |
+            ConvertTo-Json | Set-Content apps/dashboard/build-info.json
+
+      - name: Set installer version
+        if: inputs.publish && inputs.version != ''
+        working-directory: apps/dashboard
+        run: npm version "${{ inputs.version }}" --no-git-tag-version --allow-same-version
+
+      - name: Build and publish installer
+        if: inputs.publish
+        working-directory: apps/dashboard
+        shell: pwsh
+        env:
+          # Releases repo (public, for auto-update) when configured; otherwise
+          # the installer is attached to this repository's release.
+          RELEASES_REPO: ${{ vars.RELEASES_REPO }}
+          RELEASES_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm ci
+          npm run build:css
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          $beta = "${{ inputs.channel }}" -eq "beta"
+          $type = if ($beta) { "prerelease" } else { "release" }
+          if ($env:RELEASES_REPO) {
+            $owner, $name = $env:RELEASES_REPO.Split('/')
+            $env:GH_TOKEN = $env:RELEASES_TOKEN
+            npx electron-builder --win nsis --x64 --publish always `
+              "-c.publish.owner=$owner" "-c.publish.repo=$name" "-c.publish.releaseType=$type"
+          } else {
+            $owner, $name = "${{ github.repository }}".Split('/')
+            npx electron-builder --win nsis --x64 --publish never `
+              "-c.publish.owner=$owner" "-c.publish.repo=$name" "-c.publish.releaseType=$type"
+            $env:GH_TOKEN = $env:GITHUB_TOKEN
+            $assets = @(Get-ChildItem release -File | Where-Object { $_.Extension -in '.exe', '.yml', '.blockmap' } | ForEach-Object FullName)
+            gh release view "v$version" --repo "${{ github.repository }}" *> $null
+            if ($LASTEXITCODE -ne 0) {
+              $flags = @("v$version", "--repo", "${{ github.repository }}", "--target", "${{ github.sha }}", "--title", "v$version", "--notes", "Automated $type build")
+              if ($beta) { $flags += "--prerelease" }
+              gh release create @flags
+            }
+            gh release upload "v$version" @assets --repo "${{ github.repository }}" --clobber
+          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: realtimeai-windows-${{ inputs.channel }}${{ inputs.version != '' && format('-{0}', inputs.version) || '' }}
+          path: |
+            build/bin/Release/rtai_app.exe
+            build/bin/Release/onnxruntime.dll
+            apps/dashboard/release/*.exe
+            apps/dashboard/release/*.yml
+          if-no-files-found: ignore
+          retention-days: 14

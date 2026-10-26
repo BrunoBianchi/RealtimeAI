@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main, beta]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Commits, secrets and flags
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Commit messages (Conventional Commits)
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            npx commitlint --from "${{ github.event.pull_request.base.sha }}" --to "${{ github.event.pull_request.head.sha }}" --verbose
+          elif [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ] && git cat-file -e "${{ github.event.before }}" 2>/dev/null; then
+            npx commitlint --from "${{ github.event.before }}" --to "${{ github.sha }}" --verbose
+          else
+            npx commitlint --last --verbose
+          fi
+      - run: npm run check:secrets
+      - run: npm run flags:validate
+
+  dashboard:
+    name: Dashboard tests
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/dashboard/package-lock.json
+      - run: npm ci
+        working-directory: apps/dashboard
+      - name: Compiled CSS is up to date
+        working-directory: apps/dashboard
+        run: |
+          npm run build:css
+          git diff --exit-code -- src/renderer/styles.css
+      - run: npm test
+        working-directory: apps/dashboard
+
+  core-linux:
+    name: Core (Linux, GCC)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get install -y --no-install-recommends ninja-build
+      - run: cmake --preset linux -DRTAI_WARNINGS_AS_ERRORS=ON
+      - run: cmake --build --preset linux
+      - run: ctest --preset linux
+
+  windows:
+    name: Windows (MSVC, full build)
+    uses: ./.github/workflows/build-windows.yml
+    with:
+      publish: false

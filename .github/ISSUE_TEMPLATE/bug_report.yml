@@ -1,0 +1,29 @@
+name: Bug
+description: Algo não funciona como deveria
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: O que aconteceu
+      description: E o que você esperava que acontecesse.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Como reproduzir
+      placeholder: "1. Abrir o dashboard\n2. ..."
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versão
+      placeholder: "2.1.0 (Settings > General > Updates)"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: "%LOCALAPPDATA%\\RealTimeAI\\logs\\rtai.log ou o .md da sessão. Remova chaves e dados pessoais."
+      render: text
