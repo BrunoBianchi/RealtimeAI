@@ -20,6 +20,7 @@ target_link_libraries(rtai_app PRIVATE
     gdi32
     user32
     dwmapi
+    winmm # timeBeginPeriod: 1 ms timer resolution for the real-time threads
 )
 
 # Optional Silero VAD adapter.

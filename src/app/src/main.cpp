@@ -47,6 +47,7 @@
 #include "rtai/fake_vad.hpp"
 #include "rtai/latency.hpp"
 #include "rtai/line_channel.hpp"
+#include "rtai/low_latency_win.hpp"
 #include "rtai/overlay_window.hpp"
 #include "rtai/qpc_clock.hpp"
 #include "rtai/scripted_llm.hpp"
@@ -1462,6 +1463,9 @@ int run_app(AppConfig cfg) {
 }
 
 int main(int argc, char** argv) {
+    // Real-time scheduling for the whole run: 1 ms timers and no EcoQoS.
+    const rtai::win::TimerResolution timer_resolution(1);
+    rtai::win::disable_power_throttling();
     prepare_console();
     g_stop_event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
     g_done_event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
