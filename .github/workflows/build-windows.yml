@@ -25,7 +25,7 @@ on:
 # Permissions come from the caller (CI: read-only; Release/Beta: contents write).
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: windows-2025
     steps:
       - name: A published build needs a version
         if: inputs.publish && inputs.version == ''
@@ -33,12 +33,12 @@ jobs:
           echo "::error::publish=true requires the version input"
           exit 1
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # tags and history for the release notes
 
       - name: Cache ONNX Runtime and GoogleTest downloads
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: build/_deps
           key: deps-${{ runner.os }}-${{ hashFiles('cmake/*.cmake') }}
@@ -61,7 +61,7 @@ jobs:
           if ($v -ne "RealTimeAI ${{ inputs.version }}") { throw "rtai_app --version says '$v'" }
           (Get-Item build/bin/Release/rtai_app.exe).VersionInfo | Format-List ProductVersion, FileVersion
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         if: inputs.publish
         with:
           node-version: 22
@@ -80,9 +80,12 @@ jobs:
           Copy-Item build/bin/Release/rtai_app.exe $native/
           if (Test-Path build/bin/Release/onnxruntime.dll) { Copy-Item build/bin/Release/onnxruntime.dll $native/ }
           if ($env:GOOGLE_OAUTH_CLIENT_JSON) { Set-Content -Path apps/dashboard/google_oauth_client.json -Value $env:GOOGLE_OAUTH_CLIENT_JSON -NoNewline }
-          $repo = if ($env:RELEASES_REPO) { $env:RELEASES_REPO } else { "${{ github.repository }}" }
+          # Remote feature flags: the copy flags.yml publishes to the releases
+          # repository, or the file on this repository's main branch.
+          $flagsUrl = if ($env:RELEASES_REPO) { "https://raw.githubusercontent.com/$($env:RELEASES_REPO)/main/flags.json" }
+                      else { "https://raw.githubusercontent.com/${{ github.repository }}/main/apps/dashboard/flags.json" }
           @{ version = "${{ inputs.version }}"; channel = "${{ inputs.channel }}"; commit = "${{ github.sha }}";
-             flagsUrl = "https://raw.githubusercontent.com/$repo/main/flags.json" } |
+             flagsUrl = $flagsUrl } |
             ConvertTo-Json | Set-Content apps/dashboard/build-info.json
 
       - name: Set installer version
@@ -140,7 +143,7 @@ jobs:
           }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: realtimeai-windows-${{ inputs.channel }}${{ inputs.version != '' && format('-{0}', inputs.version) || '' }}
           path: |

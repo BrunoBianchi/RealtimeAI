@@ -14,14 +14,40 @@ permissions:
   contents: read
 
 jobs:
-  checks:
-    name: Commits, secrets and flags
-    runs-on: ubuntu-latest
+  # Which parts changed: the Windows build (~10 min) and the Linux core build
+  # only run when native code, the build system or CI itself changed.
+  changes:
+    name: Changed paths
+    runs-on: ubuntu-24.04
+    outputs:
+      native: ${{ steps.diff.outputs.native }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - id: diff
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$BASE" 2>/dev/null; then
+            echo "native=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          files=$(git diff --name-only "$BASE" "${{ github.sha }}")
+          echo "$files"
+          if grep -qE '^(src/|tests/|cmake/|CMakeLists\.txt|CMakePresets\.json|\.github/workflows/(ci|build-windows)\.yml)' <<<"$files"; then
+            echo "native=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "native=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  checks:
+    name: Commits, secrets and flags
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -44,12 +70,12 @@ jobs:
 
   dashboard:
     name: Dashboard tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -66,9 +92,11 @@ jobs:
 
   core-linux:
     name: Core (Linux, GCC)
-    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.native == 'true'
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: sudo apt-get install -y --no-install-recommends ninja-build
       - run: cmake --preset linux -DRTAI_WARNINGS_AS_ERRORS=ON
       - run: cmake --build --preset linux
@@ -76,6 +104,8 @@ jobs:
 
   windows:
     name: Windows (MSVC, full build)
+    needs: changes
+    if: needs.changes.outputs.native == 'true'
     uses: ./.github/workflows/build-windows.yml
     with:
       publish: false
