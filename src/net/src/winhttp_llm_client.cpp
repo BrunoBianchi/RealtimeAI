@@ -76,6 +76,10 @@ LlmFailure classify_winhttp_error(DWORD code) {
     }
 }
 
+// A fallback provider is only usable with its own key (an empty key would just
+// add a failed round trip before the error is shown).
+bool has_fallback(const WinHttpLlmOptions& o) { return !o.fallback.host.empty() && !o.fallback.api_key.empty(); }
+
 // Outcome of a single endpoint attempt: the stream result plus the failover
 // classification the worker uses to decide whether to fall over (Req 4.2).
 struct AttemptOutcome {
@@ -381,7 +385,7 @@ std::shared_ptr<ILlmCall> WinHttpLlmClient::start(LlmRequest request, LlmCallbac
             }
 
             // AUTO-FAILOVER: If OpenRouter failed (network/5xx/out of credit) and fallback endpoint is configured (e.g. Cerebras)
-            if (final_out.res.status == LlmStatus::Failed && !opts.fallback.host.empty() && !call->cancelled.load()) {
+            if (final_out.res.status == LlmStatus::Failed && has_fallback(opts) && !call->cancelled.load()) {
                 const LlmEndpoint& ep = opts.fallback;
                 LlmRequest fb_req = active_req;
                 if (!ep.model.empty()) fb_req.model = ep.model;
@@ -399,7 +403,7 @@ std::shared_ptr<ILlmCall> WinHttpLlmClient::start(LlmRequest request, LlmCallbac
             for (int attempt = 0; attempt < 2; ++attempt) {
                 if (call->cancelled.load()) { final_out.res.status = LlmStatus::Cancelled; break; }
                 const LlmEndpoint& ep = choose_endpoint(attempt, opts);
-                if (ep.host.empty()) break; // no fallback configured
+                if (ep.host.empty() || (attempt > 0 && ep.api_key.empty())) break; // no fallback configured
                 LlmRequest r = req;
                 if (!ep.model.empty()) r.model = ep.model; // per-endpoint model (Req 4.1/4.2)
                 r.max_tokens = std::max(r.max_tokens, 1500);
