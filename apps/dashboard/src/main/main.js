@@ -2306,13 +2306,13 @@ function createWindow() {
 app.whenReady().then(() => {
   if (!gotSingleInstanceLock) return;
   if (session && session.defaultSession) {
-    session.defaultSession.setPermissionCheckHandler((_webContents, permission) => {
-      if (permission === 'media') return true;
-      return true;
-    });
-    session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
-      if (permission === 'media') return callback(true);
-      callback(true);
+    // Only the bundled UI (file://) may use the microphone meter, clipboard and
+    // notifications; anything remote that ends up in a window gets nothing.
+    const isBundledUi = (url) => typeof url === 'string' && url.startsWith('file://');
+    session.defaultSession.setPermissionCheckHandler((webContents, _permission, requestingOrigin) =>
+      isBundledUi(requestingOrigin) || isBundledUi(webContents && webContents.getURL()));
+    session.defaultSession.setPermissionRequestHandler((webContents, _permission, callback, details) => {
+      callback(isBundledUi((details && details.requestingUrl) || (webContents && webContents.getURL())));
     });
   }
   // Ensure at least one rich starter Mini-Agent exists if agents folder is empty
