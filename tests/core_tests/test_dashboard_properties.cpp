@@ -64,9 +64,9 @@ TEST(DashboardThetaProps, MapsScoreIntoBandMonotonically) {
         EXPECT_LE(tb, 360.0f) << "trial " << t << " score=" << b;
 
         // (b) scores <= 0 clamp to 0 deg.
-        if (a <= 0.0f) EXPECT_FLOAT_EQ(ta, 0.0f) << "trial " << t << " score=" << a;
+        if (a <= 0.0f) { EXPECT_FLOAT_EQ(ta, 0.0f) << "trial " << t << " score=" << a; }
         // (c) scores >= 10 clamp to 360 deg.
-        if (a >= 10.0f) EXPECT_FLOAT_EQ(ta, 360.0f) << "trial " << t << " score=" << a;
+        if (a >= 10.0f) { EXPECT_FLOAT_EQ(ta, 360.0f) << "trial " << t << " score=" << a; }
 
         // (e) monotonic non-decreasing: order the two samples and confirm the
         // smaller score never yields a larger angle.

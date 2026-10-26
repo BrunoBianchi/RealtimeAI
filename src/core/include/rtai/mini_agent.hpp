@@ -30,7 +30,7 @@ struct RagDocument {
     std::string path;
     std::string content;
     // Dashboard tag: "resume", "project", "job", "company", "material", "doc"...
-    std::string tag;
+    std::string tag{};
 };
 
 // Who a document is about. Only Candidate documents are "my experience";

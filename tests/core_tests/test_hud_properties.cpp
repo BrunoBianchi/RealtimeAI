@@ -637,9 +637,9 @@ TEST(HudPulseBarProperties, HeightMapsRmsIntoBandMonotonically) {
         EXPECT_LE(hb, kPulseBarMaxDIP) << "trial " << t << " rms=" << b;
 
         // (b) RMS <= 0.0 floors to the minimum (Req 13.5).
-        if (a <= 0.0f) EXPECT_FLOAT_EQ(ha, kPulseBarMinDIP) << "trial " << t << " rms=" << a;
+        if (a <= 0.0f) { EXPECT_FLOAT_EQ(ha, kPulseBarMinDIP) << "trial " << t << " rms=" << a; }
         // (c) RMS >= 1.0 saturates to the maximum (Req 13.1).
-        if (a >= 1.0f) EXPECT_FLOAT_EQ(ha, kPulseBarMaxDIP) << "trial " << t << " rms=" << a;
+        if (a >= 1.0f) { EXPECT_FLOAT_EQ(ha, kPulseBarMaxDIP) << "trial " << t << " rms=" << a; }
 
         // (d) monotonic non-decreasing: order the two samples and confirm the
         // smaller RMS never yields a taller bar.

@@ -18,7 +18,7 @@ struct ChatMessage {
     std::string content;
     // Image URLs sent with the message (vision models); usually
     // "data:image/jpeg;base64,...". Empty for text-only messages.
-    std::vector<std::string> images;
+    std::vector<std::string> images{};
 };
 
 struct LlmRequest {

@@ -219,7 +219,7 @@ TEST(RagQuality, UnknownTechKeepsCompanyAndMineApart) {
     ASSERT_NE(clojure, std::string::npos);
     EXPECT_GT(clojure, theirs);
     const auto mine = block.find("[SOBRE MIM");
-    if (mine != std::string::npos && mine > theirs) EXPECT_LT(clojure, mine);
+    if (mine != std::string::npos && mine > theirs) { EXPECT_LT(clojure, mine); }
 }
 
 TEST(RagQuality, SmallTalkDoesNotRetrieve) {

@@ -205,10 +205,10 @@ TEST(ClampHeightFraction, Property2_ClampsToBandAndIsIdempotent) {
         EXPECT_GE(r, lo) << "input=" << f;
         EXPECT_LE(r, hi) << "input=" << f;
         // Out-of-band inputs snap to the nearest limit (Req 1.7).
-        if (f < lo) EXPECT_FLOAT_EQ(r, lo) << "input=" << f;
-        if (f > hi) EXPECT_FLOAT_EQ(r, hi) << "input=" << f;
+        if (f < lo) { EXPECT_FLOAT_EQ(r, lo) << "input=" << f; }
+        if (f > hi) { EXPECT_FLOAT_EQ(r, hi) << "input=" << f; }
         // In-band inputs pass through unchanged.
-        if (f >= lo && f <= hi) EXPECT_FLOAT_EQ(r, f) << "input=" << f;
+        if (f >= lo && f <= hi) { EXPECT_FLOAT_EQ(r, f) << "input=" << f; }
         // Idempotent: clamping an already-clamped value is a no-op.
         EXPECT_FLOAT_EQ(ui::clamp_height_fraction(r), r) << "input=" << f;
     };

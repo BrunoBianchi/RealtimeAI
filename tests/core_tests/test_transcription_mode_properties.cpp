@@ -400,9 +400,10 @@ TEST(TranscriptionModeProperties, Property5_HelloPayloadCarriesCurrentModeState)
 // ============================================================================
 TEST(TranscriptionModeProperties, Property4_StateConvergenceAfterPropagation) {
     // Models Core, Dashboard mirror, and Overlay mirror
+    // Written on the engine thread, read on the test thread.
     struct SurfaceMirror {
-        bool mode{false};
-        void on_mode_event(bool on) { mode = on; }
+        std::atomic<bool> mode{false};
+        void on_mode_event(bool on) { mode.store(on); }
     };
 
     SurfaceMirror dashboard_mirror;
@@ -437,12 +438,17 @@ TEST(TranscriptionModeProperties, Property4_StateConvergenceAfterPropagation) {
             engine.set_transcription_only(target_val);
         }
 
-        std::this_thread::sleep_for(3ms);
+        // Propagation is asynchronous: wait (bounded) for the republication.
+        const auto deadline = std::chrono::steady_clock::now() + 1s;
+        while ((dashboard_mirror.mode.load() != target_val || overlay_mirror.mode.load() != target_val) &&
+               std::chrono::steady_clock::now() < deadline) {
+            std::this_thread::sleep_for(1ms);
+        }
 
         // Core, Dashboard mirror, and Overlay mirror must all converge to target_val
         EXPECT_EQ(engine.transcription_only(), target_val) << "Trial " << trial;
-        EXPECT_EQ(dashboard_mirror.mode, target_val) << "Trial " << trial;
-        EXPECT_EQ(overlay_mirror.mode, target_val) << "Trial " << trial;
+        EXPECT_EQ(dashboard_mirror.mode.load(), target_val) << "Trial " << trial;
+        EXPECT_EQ(overlay_mirror.mode.load(), target_val) << "Trial " << trial;
     }
 
     engine.stop();
@@ -587,12 +593,14 @@ TEST(TranscriptionModeProperties, Property4_StateConvergenceAcrossObservers) {
         std::atomic<bool> overlay_mirror{false};
         std::atomic<bool> dashboard_mirror{false};
         std::atomic<bool> logger_mirror{false};
+        std::atomic<int> delivered{0};
 
         engine->add_sink([&](const EngineEvent& e) {
             if (const auto* m = std::get_if<TranscriptionModeEvent>(&e)) {
                 overlay_mirror.store(m->enabled);
                 dashboard_mirror.store(m->enabled);
                 logger_mirror.store(m->enabled);
+                delivered.fetch_add(1);
             }
         });
 
@@ -601,21 +609,24 @@ TEST(TranscriptionModeProperties, Property4_StateConvergenceAcrossObservers) {
         // Perform random mode transitions (including redundant idempotent calls)
         const int steps = 5 + (trial % 10);
         bool target_mode = false;
+        bool current = false;
+        int published = 0; // only real transitions are republished
         for (int s = 0; s < steps; ++s) {
             target_mode = (bool_dist(rng) == 1);
             engine->set_transcription_only(target_mode);
+            if (target_mode != current) {
+                current = target_mode;
+                ++published;
+            }
         }
 
-        // Wait brief moment for worker thread to process inbox
-        for (int w = 0; w < 50; ++w) {
-            if (engine->transcription_only() == target_mode &&
-                overlay_mirror.load() == target_mode &&
-                dashboard_mirror.load() == target_mode &&
-                logger_mirror.load() == target_mode) {
-                break;
-            }
+        // Wait (bounded, generous for sanitizer builds) until every
+        // republication reached the observers. Comparing the mirrors to the
+        // target is not enough: an intermediate state can equal it.
+        for (int w = 0; w < 1000 && delivered.load() < published; ++w) {
             std::this_thread::sleep_for(2ms);
         }
+        EXPECT_EQ(delivered.load(), published) << "Trial " << trial;
 
         EXPECT_EQ(engine->transcription_only(), target_mode) << "Trial " << trial;
         EXPECT_EQ(overlay_mirror.load(), target_mode) << "Trial " << trial;
