@@ -1,3 +1,9 @@
+// Node's on-disk compile cache (Node >= 22.1, Electron >= 33): the main
+// process modules are parsed once and reused on the next launches.
+try {
+  require('node:module').enableCompileCache?.();
+} catch (_e) {}
+
 const { app, BrowserWindow, ipcMain, dialog, shell, nativeTheme, safeStorage, Tray, Menu, screen, Notification, globalShortcut, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -5,7 +11,7 @@ const os = require('os');
 const https = require('https');
 const http = require('http');
 const zlib = require('zlib');
-const { spawn, execSync } = require('child_process');
+const { spawn, execFile, execSync } = require('child_process');
 const { createGoogleCalendar } = require('./google_calendar');
 const { MeetingDetector, APP_NAMES } = require('./meeting_detector');
 const { createMeetingPopup } = require('./meeting_popup');
@@ -36,7 +42,16 @@ if (!gotSingleInstanceLock) {
   app.on('second-instance', () => showMainWindow());
 }
 
+// The registry probe spawns `reg.exe` (tens of ms, blocking the main
+// process), so its answer is cached until Windows reports a theme change.
+let windowsDarkCache = null;
 function isWindowsDarkTheme() {
+  if (windowsDarkCache !== null) return windowsDarkCache;
+  windowsDarkCache = probeWindowsDarkTheme();
+  return windowsDarkCache;
+}
+
+function probeWindowsDarkTheme() {
   try {
     const out = execSync(
       'reg query "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize" /v AppsUseLightTheme',
@@ -1597,17 +1612,30 @@ function saveUserProfile(profile) {
 // ---------------------------------------------------------------------------
 // Overlay Process Controller
 // ---------------------------------------------------------------------------
+const OVERLAY_IMAGES = ['rtai_overlay.exe', 'rtai_app.exe'];
+// An overlay started outside the dashboard (a script, a second install) is
+// found with `tasklist`. That probe runs in the background and is cached, so
+// callers never block the main process on a child process.
+const EXTERNAL_PROBE_TTL_MS = 3000;
+let externalOverlay = { running: false, checkedAt: 0, pending: false };
+
+function refreshExternalOverlayProbe() {
+  if (externalOverlay.pending || process.platform !== 'win32') return;
+  externalOverlay.pending = true;
+  execFile('tasklist', ['/FO', 'CSV', '/NH'], { windowsHide: true, timeout: 4000 }, (err, stdout) => {
+    const out = err ? '' : String(stdout || '').toLowerCase();
+    externalOverlay = {
+      running: OVERLAY_IMAGES.some((img) => out.includes(`"${img}"`)),
+      checkedAt: Date.now(),
+      pending: false
+    };
+  });
+}
+
 function isOverlayRunning() {
   if (overlayProcess && !overlayProcess.killed) return true;
-  try {
-    const out = execSync('tasklist /FI "IMAGENAME eq rtai_overlay.exe" /FI "IMAGENAME eq rtai_app.exe" /NH', {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore']
-    });
-    return out.includes('rtai_overlay.exe') || out.includes('rtai_app.exe');
-  } catch (_e) {
-    return false;
-  }
+  if (Date.now() - externalOverlay.checkedAt > EXTERNAL_PROBE_TTL_MS) refreshExternalOverlayProbe();
+  return externalOverlay.running;
 }
 
 function broadcastOverlayStatus() {
@@ -1629,12 +1657,15 @@ function stopRunningOverlay() {
   }
   overlayProcess = null;
   overlayMode = null;
+  // One taskkill for both image names (a stray overlay holds the hotkeys and
+  // the audio devices, so it must be gone before the next one starts).
   try {
-    execSync('taskkill /F /IM rtai_overlay.exe /T', { stdio: 'ignore' });
+    execSync(`taskkill /F /T ${OVERLAY_IMAGES.map((img) => `/IM ${img}`).join(' ')}`, {
+      stdio: 'ignore',
+      windowsHide: true
+    });
   } catch (_e) {}
-  try {
-    execSync('taskkill /F /IM rtai_app.exe /T', { stdio: 'ignore' });
-  } catch (_e) {}
+  externalOverlay = { running: false, checkedAt: Date.now(), pending: false };
   broadcastOverlayStatus();
 }
 
@@ -2349,6 +2380,7 @@ app.whenReady().then(() => {
   });
 
   nativeTheme.on('updated', () => {
+    windowsDarkCache = null; // the OS theme may have changed
     const nextTheme = getThemeState();
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.setBackgroundColor(nextTheme.resolved === 'dark' ? '#0D0D10' : '#FFFFFF');
