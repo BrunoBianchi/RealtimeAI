@@ -1,46 +1,78 @@
-# ---- Secrets: never commit ------------------------------------------------
+# =============================================================================
+# RealTimeAI - files that never belong in the repository
+# =============================================================================
+
+# ---- Secrets (scripts/check-secrets.mjs also blocks them on commit) ---------
 config.ini
-*.env
-.env*
-dashboard/google_oauth_client.json
+.env
+.env.*
+!.env.example
+**/google_oauth_client.json
 client_secret*.json
 *.pem
 *.pfx
 *.p12
+*.key
 
-# ---- Build output -------------------------------------------------------
-build/
-out/
-dist/
-dashboard/release/
-dashboard/native/
-dashboard/build-info.json
-overlay/*.exe
-*.pdb
-*.ilk
+# ---- Native build (CMake) ---------------------------------------------------
+/build/
+/out/
+/cmake-build-*/
+CMakeUserPresets.json
+compile_commands.json
 *.obj
+*.o
+*.lib
+*.a
+*.exp
+*.ilk
+*.pdb
+*.idb
+*.tlog
+*.ipch
+*.exe
+*.dll
+*.so
+*.dylib
 
-# ---- Dependencies -------------------------------------------------------
-node_modules
+# ---- ONNX models are downloaded, never versioned ----------------------------
+*.onnx
+/models/
 
-# ---- Logs and local scratch ---------------------------------------------
+# ---- Dashboard (Electron) ---------------------------------------------------
+node_modules/
+apps/dashboard/release/
+apps/dashboard/native/
+apps/dashboard/build-info.json
+.eslintcache
+*.tsbuildinfo
+
+# ---- Packaged builds and archives -------------------------------------------
+/dist/
+*.zip
+*.7z
+*.tgz
+
+# ---- Logs, sessions and scratch ---------------------------------------------
 *.log
-build_log.txt
+npm-debug.log*
+/sessions/
+/tmp/
 _backup_*/
 _to_delete/
-# one-off maintenance scripts kept at the repo root
-/_*.py
-/fix*.py
-/dump*.py
-/build_*.py
-/kill_build.py
-/verify_build.py
+_sync_tmp/
 
-# ---- OS / editors -------------------------------------------------------
+# ---- OS / editors -----------------------------------------------------------
 .DS_Store
 Thumbs.db
 desktop.ini
+$RECYCLE.BIN/
 .vs/
 .vscode/*
 !.vscode/extensions.json
+!.vscode/settings.json
 .idea/
+*.suo
+*.user
+*.swp
+*~
