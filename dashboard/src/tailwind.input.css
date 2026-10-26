@@ -112,16 +112,21 @@
     @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-[13px] font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 cursor-pointer active:scale-[0.99];
   }
   .sh-btn-primary {
-    @apply sh-btn bg-primary text-primary-foreground hover:opacity-90 shadow-sm px-4 py-2 font-semibold;
+    @apply sh-btn bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 font-medium;
   }
+  /* High-emphasis neutral button (one per screen). */
+  .sh-btn-solid {
+    @apply sh-btn bg-foreground text-background hover:bg-foreground/90 px-4 py-2 font-medium;
+  }
+  /* Live: neutral surface, the red dot carries the meaning. */
   .sh-btn-live {
-    @apply sh-btn bg-[#E11D48] text-white hover:bg-[#BE123C] shadow-sm px-3.5 py-1.5 font-semibold text-[13px] rounded-md;
+    @apply sh-btn h-8 rounded-md border border-border bg-card px-3 text-[12.5px] font-medium text-foreground hover:bg-accent;
   }
   .sh-btn-secondary {
     @apply sh-btn bg-secondary text-secondary-foreground hover:bg-accent px-4 py-2 border border-border;
   }
   .sh-btn-outline {
-    @apply sh-btn bg-card text-foreground hover:bg-accent border border-border/80 px-3.5 py-1.5 text-xs;
+    @apply sh-btn bg-transparent text-foreground hover:bg-accent border border-border px-3 py-1.5 text-xs;
   }
   .sh-btn-dashed {
     @apply sh-btn bg-transparent text-foreground hover:bg-accent border border-dashed border-input hover:border-foreground/40 rounded-full px-3.5 py-1.5 text-xs;
@@ -219,7 +224,7 @@
 
   /* Card */
   .sh-card {
-    @apply rounded-lg border border-border/70 bg-card text-card-foreground shadow-sm;
+    @apply rounded-xl border border-border/70 bg-card text-card-foreground;
   }
 
   /* Sidebar Nav Item */
@@ -235,7 +240,94 @@
     @apply flex w-full items-center justify-between gap-2.5 rounded-lg px-3 py-2 text-left transition-all hover:bg-sidebar-accent cursor-pointer border border-transparent;
   }
   .sh-goal-item.active {
-    @apply bg-card border-border/80 shadow-sm;
+    @apply bg-sidebar-accent border-transparent;
+  }
+
+  /* ---- Minimal primitives (2026 redesign) ---------------------------- */
+  .icon-btn {
+    @apply inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 cursor-pointer;
+  }
+  .link-quiet {
+    @apply text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline cursor-pointer;
+  }
+  .section-eyebrow {
+    @apply text-[11px] font-medium text-muted-foreground;
+  }
+  .tile {
+    @apply relative flex min-h-[148px] flex-col rounded-xl border border-border/70 bg-card p-4 transition-colors;
+  }
+  button.tile {
+    @apply cursor-pointer hover:border-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50;
+  }
+  .tile-label {
+    @apply text-xs font-medium text-muted-foreground;
+  }
+  .tile-action {
+    @apply mt-auto inline-flex items-center gap-1 pt-4 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground cursor-pointer;
+  }
+  button.tile:hover .tile-action {
+    @apply text-foreground;
+  }
+  .date-chip {
+    @apply flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg border border-border/80 text-[9px] font-medium uppercase leading-tight text-muted-foreground;
+  }
+  .step-row {
+    @apply flex items-center gap-4 px-5 py-3;
+  }
+  .step-index {
+    @apply flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border text-[11px] font-medium text-muted-foreground;
+  }
+  .step-row.done .step-index {
+    @apply border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400;
+  }
+  .step-row.done .text-foreground {
+    @apply text-muted-foreground line-through decoration-muted-foreground/40;
+  }
+  .step-link {
+    @apply shrink-0 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground cursor-pointer;
+  }
+  .theme-icon {
+    @apply inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground cursor-pointer;
+  }
+  .theme-icon.active-theme {
+    @apply bg-card text-foreground shadow-sm;
+  }
+  .update-chip {
+    @apply inline-flex h-8 items-center gap-1.5 rounded-md px-2 font-mono text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground cursor-pointer;
+  }
+  .update-chip[data-state="available"],
+  .update-chip[data-state="downloading"],
+  .update-chip[data-state="downloaded"] {
+    @apply bg-primary/10 font-sans font-medium text-primary hover:bg-primary/15;
+  }
+  .stealth-chip {
+    @apply inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground cursor-pointer;
+  }
+  .stealth-chip[data-active="true"] {
+    @apply text-emerald-600 dark:text-emerald-400;
+  }
+  .segmented {
+    @apply inline-flex items-center rounded-lg bg-muted p-0.5;
+  }
+  .segmented > button {
+    @apply rounded-md px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground cursor-pointer;
+  }
+  .segmented > button[aria-pressed="true"] {
+    @apply bg-card text-foreground shadow-sm;
+  }
+  .flag-row {
+    @apply flex items-center justify-between gap-4 px-4 py-3;
+  }
+  .badge-quiet {
+    @apply inline-flex items-center rounded border border-border/80 px-1.5 py-px text-[10px] font-medium text-muted-foreground;
+  }
+  /* Feature flags: elements gated by data-flag stay hidden until enabled. */
+  [data-flag][data-flag-off="true"] {
+    display: none !important;
+  }
+  /* The header Go live duplicates the Home primary action. */
+  body[data-view="goals"] #btnTopGoLive {
+    display: none;
   }
 
   /* Settings Subnav Item (Image 2 & 3) */

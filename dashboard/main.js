@@ -9,12 +9,16 @@ const { spawn, execSync } = require('child_process');
 const { createGoogleCalendar } = require('./google_calendar');
 const { MeetingDetector, APP_NAMES } = require('./meeting_detector');
 const { createMeetingPopup } = require('./meeting_popup');
+const { createFlagStore } = require('./feature_flags');
+const { createUpdater } = require('./updater');
 
 let mainWindow = null;
 let overlayProcess = null;
 let overlayMode = null;
 let overlayAgentId = null;
 let isQuitting = false;
+let flagStore = null;
+let updater = null;
 
 // One dashboard at a time: it lives in the tray and watches for meetings, so a
 // second launch just brings the first one forward.
@@ -88,9 +92,21 @@ async function gcalCall(fn) {
   }
 }
 
+// Written by the release workflow: version, channel, commit and where the
+// remote flags.json lives. Absent in a dev checkout.
+function readBuildInfo() {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(__dirname, 'build-info.json'), 'utf8')) || {};
+  } catch (_e) {
+    return {};
+  }
+}
+
 function getOverlayExecutablePath() {
   const workspaceRoot = path.resolve(__dirname, '..');
   const candidates = [
+    // Installed app: the CI bundles the native overlay as an extra resource.
+    ...(app.isPackaged ? [path.join(process.resourcesPath, 'native', 'rtai_app.exe')] : []),
     path.join(workspaceRoot, 'build', 'bin', 'Release', 'rtai_app.exe'),
     path.join(workspaceRoot, 'build', 'bin', 'Debug', 'rtai_app.exe'),
     path.join(workspaceRoot, 'overlay', 'rtai_overlay.exe'),
@@ -226,6 +242,7 @@ function readConfigIni() {
     electron_opacity: parseFloat(stealth.electron_opacity || '1.0'),
     auto_update: (sistema.auto_update ?? sistema.atualizacao_automatica ?? 'sim') !== 'nao' &&
                  (sistema.auto_update ?? sistema.atualizacao_automatica ?? 'sim') !== 'false',
+    update_channel: (sistema.update_channel || sistema.canal || 'stable') === 'beta' ? 'beta' : 'stable',
     process_disguise: stealth.process_disguise || (stealth.electron_disguise === 'sim' ? 'settings' : 'none'),
     interface_opacity: parseFloat(stealth.interface_opacity || stealth.electron_opacity || '1.0'),
     calendar_ics_url: agenda.google_ics_url || '',
@@ -291,6 +308,7 @@ function writeConfigIni(updates) {
   const electronDisguise = (updates.electron_disguise ?? current.electron_disguise) ? 'sim' : 'nao';
   const electronOpacity = String(updates.electron_opacity ?? current.electron_opacity ?? '1.0');
   const autoUpdate = (updates.auto_update ?? current.auto_update) ? 'sim' : 'nao';
+  const updateChannel = (updates.update_channel ?? current.update_channel) === 'beta' ? 'beta' : 'stable';
   const processDisguise = updates.process_disguise ?? current.process_disguise ?? 'none';
   const interfaceOpacity = String(updates.interface_opacity ?? current.interface_opacity ?? '1.0');
   const calendarIcsUrl = updates.calendar_ics_url ?? current.calendar_ics_url;
@@ -378,6 +396,7 @@ function writeConfigIni(updates) {
     '',
     '[sistema]',
     `auto_update = ${autoUpdate}`,
+    `update_channel = ${updateChannel}`,
     '',
     '[agenda]',
     `google_ics_url = ${calendarIcsUrl}`,
@@ -2730,58 +2749,67 @@ app.whenReady().then(() => {
     return { ok: true, status };
   });
 
-  const APP_VERSION = '2.0.0';
-  const AVAILABLE_UPDATE = {
-    hasUpdate: true,
-    currentVersion: APP_VERSION,
-    latestVersion: '2.1.0',
-    releaseName: 'RealTimeAI 2.1.0 — Ultra-Fast Reasoning & Stealth Disguise',
-    releaseDate: '2026-10-25',
-    downloadSize: '46.8 MB',
-    highlights: [
-      '⚡ STAR Framework 2.0 with sub-200ms TTFT speculative execution',
-      '🛡️ Advanced Process Disguise (Settings, Command Prompt, Task Manager)',
-      '🎚️ Dynamic Interface Opacity slider with real-time preview',
-      '🚀 Direct2D Hardware-accelerated HUD rendering with zero dropped frames',
-      '🔒 Enhanced screen protection against Zoom, Meet, Teams and OBS capture'
-    ]
+  // ---- Version, auto-update (GitHub Releases) and feature flags -----------
+  const APP_VERSION = app.getVersion();
+  const buildInfo = readBuildInfo();
+  const sendToWindow = (channel, payload) => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
   };
+  const currentChannel = () => (readConfigIni().update_channel === 'beta' ? 'beta' : 'stable');
 
-  ipcMain.handle('rtai:get-app-version', async () => ({ version: APP_VERSION }));
+  flagStore = createFlagStore({
+    dataDir: getAppDataDir(),
+    bundledPath: path.join(__dirname, 'flags.json'),
+    remoteUrl: process.env.RTAI_FLAGS_URL || buildInfo.flagsUrl || '',
+    appVersion: APP_VERSION,
+    getChannel: currentChannel,
+    onChange: (snap) => sendToWindow('rtai:flags-changed', snap)
+  });
+  flagStore.refresh();
+  setInterval(() => flagStore.refresh(), 30 * 60 * 1000).unref();
 
-  ipcMain.handle('rtai:check-update', async () => {
-    return AVAILABLE_UPDATE;
+  updater = createUpdater({
+    app,
+    send: sendToWindow,
+    getChannel: currentChannel,
+    getAutoUpdate: () => readConfigIni().auto_update !== false,
+    beforeInstall: () => stopOverlayGracefully(4000),
+    markQuitting: () => { isQuitting = true; },
+    log: (...a) => console.log('[updater]', ...a)
+  });
+  updater.start();
+
+  ipcMain.handle('rtai:get-app-version', async () => ({
+    version: APP_VERSION,
+    channel: currentChannel(),
+    commit: buildInfo.commit || '',
+    packaged: app.isPackaged
+  }));
+
+  ipcMain.handle('rtai:check-update', async () => updater.check());
+  ipcMain.handle('rtai:update-status', async () => updater.status());
+  ipcMain.handle('rtai:download-update', async () => updater.download());
+  ipcMain.handle('rtai:install-update', async () => updater.install());
+
+  ipcMain.handle('rtai:set-update-channel', async (_ev, channel) => {
+    const ch = channel === 'beta' ? 'beta' : 'stable';
+    writeConfigIni({ update_channel: ch });
+    const flags = flagStore.notifyChannelChanged();
+    flagStore.refresh();
+    updater.setChannel();
+    return { ok: true, channel: ch, flags };
   });
 
-  ipcMain.handle('rtai:download-update', async () => {
-    const steps = [
-      { percent: 20, transferred: '9.3 MB', speed: '14.2 MB/s' },
-      { percent: 45, transferred: '21.0 MB', speed: '15.1 MB/s' },
-      { percent: 72, transferred: '33.7 MB', speed: '14.8 MB/s' },
-      { percent: 92, transferred: '43.1 MB', speed: '15.4 MB/s' },
-      { percent: 100, transferred: '46.8 MB', speed: '14.9 MB/s' }
-    ];
-    for (const s of steps) {
-      await new Promise((r) => setTimeout(r, 280));
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('rtai:update-progress', s);
-      }
+  ipcMain.handle('rtai:flags-get', async () => flagStore.snapshot());
+  ipcMain.handle('rtai:flags-refresh', async () => flagStore.refresh());
+  ipcMain.handle('rtai:flags-set-override', async (_ev, payload) => {
+    try {
+      return { ok: true, flags: flagStore.setOverride(payload && payload.key, payload && payload.value) };
+    } catch (e) {
+      return { ok: false, error: e.message };
     }
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('rtai:update-downloaded', {
-        version: AVAILABLE_UPDATE.latestVersion,
-        releaseName: AVAILABLE_UPDATE.releaseName
-      });
-    }
-    notify('RealTimeAI Update Ready', 'Version 2.1.0 has been downloaded and is ready to install.');
-    return { ok: true };
   });
-
-  ipcMain.handle('rtai:install-update', async () => {
-    writeConfigIni({ version: AVAILABLE_UPDATE.latestVersion });
-    notify('RealTimeAI Updated', 'Successfully updated to version 2.1.0!');
-    return { ok: true, version: AVAILABLE_UPDATE.latestVersion };
-  });
+  ipcMain.handle('rtai:flags-reset-overrides', async () => ({ ok: true, flags: flagStore.clearOverrides() }));
 
   ipcMain.handle('rtai:set-process-disguise', async (_ev, disguise) => {
     const valid = ['none', 'settings', 'cmd', 'taskmgr'].includes(disguise) ? disguise : 'none';

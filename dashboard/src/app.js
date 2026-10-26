@@ -84,10 +84,8 @@ function applyTheme(resolved, preference) {
   }
   document.querySelectorAll('.theme-pref-btn').forEach((btn) => {
     const active = btn.dataset.themePref === state.themeState.preference;
-    btn.classList.toggle('bg-card', active);
-    btn.classList.toggle('text-foreground', active);
-    btn.classList.toggle('shadow-sm', active);
-    btn.classList.toggle('font-semibold', active);
+    btn.classList.toggle('active-theme', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
   });
 }
 window.applyTheme = applyTheme;
@@ -98,6 +96,7 @@ window.applyTheme = applyTheme;
 function switchView(viewName) {
   const target = viewName === 'session' ? 'goals' : viewName;
   state.currentView = target;
+  document.body.dataset.view = target;
 
   document.querySelectorAll('.sh-nav-item').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.view === target);
@@ -280,6 +279,7 @@ function renderSidebarGoals() {
 // VIEW 1: GOALS (IMAGE 5)
 // ----------------------------------------------------
 function renderGoalsView() {
+  renderHome();
   const container = document.getElementById('goalsCardsContainer');
   const emptyState = document.getElementById('goalsEmptyState');
   const countSubtitle = document.getElementById('goalsCountSubtitle');
@@ -341,55 +341,39 @@ function renderGoalsView() {
 
     const card = document.createElement('div');
     card.className =
-      'sh-card p-5 transition-all hover:border-foreground/30 relative cursor-pointer ' +
-      (isSelected ? 'ring-1 ring-foreground/20' : '');
+      'group rounded-xl border bg-card px-4 py-3.5 transition-colors cursor-pointer hover:border-foreground/20 ' +
+      (isSelected ? 'border-foreground/25' : 'border-border/70');
+
+    const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const meta = [
+      `${docs.length} ${docs.length === 1 ? 'material' : 'materials'}`,
+      hasDossier ? 'Company recon' : '',
+      ag.stage && ag.stage !== 'Active' ? ag.stage : ''
+    ].filter(Boolean).join(' · ');
 
     card.innerHTML = `
-      <div class="flex flex-wrap items-start justify-between gap-4">
-        <div class="flex items-start gap-3.5 min-w-0">
-          <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-accent font-bold text-foreground text-sm border border-border/80">
-            ${cleanCompany.charAt(0).toUpperCase()}
+      <div class="flex items-center justify-between gap-4">
+        <div class="flex min-w-0 items-center gap-3">
+          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border/80 text-[13px] font-semibold text-foreground">
+            ${esc(cleanCompany.charAt(0).toUpperCase())}
           </div>
           <div class="min-w-0">
             <div class="flex items-center gap-2">
-              <h3 class="text-[15px] font-bold text-foreground truncate">${ag.name || cleanCompany}</h3>
-              <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-                Ready for live
-              </span>
-              ${hasDate ? `
-                <span class="inline-flex items-center gap-1 rounded-md bg-accent px-2 py-0.5 text-[10px] font-medium text-foreground">
-                  📅 ${formatDisplayDate(rawDate)}${rawTime ? ' · ' + rawTime : ''}
-                </span>` : ''}
+              <h3 class="truncate text-[13.5px] font-medium text-foreground">${esc(ag.name || cleanCompany)}</h3>
+              ${hasDate ? `<span class="badge-quiet tabular-nums">${esc(formatDisplayDate(rawDate))}${rawTime ? ' · ' + esc(rawTime) : ''}</span>` : ''}
             </div>
-            <div class="text-[13px] font-medium text-muted-foreground mt-0.5">
-              ${ag.role || 'Software Engineer'} · ${cleanCompany}
-            </div>
-            <div class="flex flex-wrap items-center gap-2 mt-2 text-xs text-muted-foreground">
-              <span class="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 font-medium">
-                📄 ${docs.length} material(s)
-              </span>
-              ${hasDossier ? `
-                <span class="inline-flex items-center gap-1 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-0.5 font-medium">
-                  ✨ Recon AI
-                </span>` : ''}
-              <span class="text-[11px] text-muted-foreground/70">
-                Stage: ${ag.stage || 'Active'}
-              </span>
+            <div class="truncate text-xs text-muted-foreground">
+              ${esc(ag.role || 'Software Engineer')} · ${esc(cleanCompany)}${meta ? ' · ' + esc(meta) : ''}
             </div>
           </div>
         </div>
 
-        <div class="flex items-center gap-2">
-          <button type="button" data-action="open-room" class="sh-btn-outline text-xs">
-            Open Room
-          </button>
-          <button type="button" data-action="demo" class="sh-btn-outline text-xs">
-            Demo
-          </button>
-          <button type="button" data-action="golive" class="sh-btn-live text-xs flex items-center gap-1.5">
-            <span class="h-1.5 w-1.5 rounded-full bg-white"></span>
-            <span>Go Live</span>
+        <div class="flex shrink-0 items-center gap-1">
+          <button type="button" data-action="open-room" class="step-link">Open</button>
+          <button type="button" data-action="demo" class="step-link">Demo</button>
+          <button type="button" data-action="golive" class="sh-btn-live">
+            <span class="h-1.5 w-1.5 rounded-full bg-[#E11D48]"></span>
+            <span>Go live</span>
           </button>
         </div>
       </div>
@@ -475,7 +459,7 @@ function renderGoalWorkspace() {
       badgeScheduled.classList.remove('hidden');
       badgeScheduled.classList.add('inline-flex');
       const timeStr = rawTime ? ` · ${rawTime}` : '';
-      textDate.textContent = `📅 ${formatDisplayDate(rawDate)}${timeStr}`;
+      textDate.textContent = `${formatDisplayDate(rawDate)}${timeStr}`;
     } else {
       btnOpenScheduler.classList.remove('hidden');
       badgeScheduled.classList.add('hidden');
@@ -754,7 +738,7 @@ function renderWorkspaceSessions() {
           </div>
           <div class="flex items-center gap-2">
             <button type="button" data-session-debrief="${s.id || idx}" class="sh-btn-outline text-xs">
-              ✨ Generate AI Debrief
+              Generate debrief
             </button>
           </div>
         </div>
@@ -812,6 +796,7 @@ function renderChecklist() {
   if (step1Check && step1Num) {
     step1Check.classList.toggle('hidden', !hasGoals);
     step1Num.classList.toggle('hidden', hasGoals);
+    step1Check.closest('.step-row')?.classList.toggle('done', hasGoals);
   }
 
   const step2Check = document.getElementById('step2Check');
@@ -819,6 +804,7 @@ function renderChecklist() {
   if (step2Check && step2Num) {
     step2Check.classList.toggle('hidden', !hasResume);
     step2Num.classList.toggle('hidden', hasResume);
+    step2Check.closest('.step-row')?.classList.toggle('done', hasResume);
   }
 
   const step3Check = document.getElementById('step3Check');
@@ -826,6 +812,7 @@ function renderChecklist() {
   if (step3Check && step3Num) {
     step3Check.classList.toggle('hidden', !hasSessions);
     step3Num.classList.toggle('hidden', hasSessions);
+    step3Check.closest('.step-row')?.classList.toggle('done', hasSessions);
   }
 
   const step4Check = document.getElementById('step4Check');
@@ -833,6 +820,7 @@ function renderChecklist() {
   if (step4Check && step4Num) {
     step4Check.classList.toggle('hidden', !hasDebrief);
     step4Num.classList.toggle('hidden', hasDebrief);
+    step4Check.closest('.step-row')?.classList.toggle('done', hasDebrief);
   }
 }
 window.renderChecklist = renderChecklist;
@@ -1300,19 +1288,13 @@ function updateStealthUI(st) {
   const electronBadge = document.getElementById('badgeElectronStealth');
 
   if (btn) {
-    if (s.active) {
-      btn.className = 'app-no-drag flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20';
-      if (label) label.textContent = 'Stealth ON';
-      if (indicator) indicator.className = 'h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse';
-      if (icon) icon.classList.add('text-emerald-500');
-      btn.title = 'Modo Stealth ATIVADO (Ctrl+Alt+S) — Invisível no Zoom/Meet/Teams/OBS. Clique para desativar.';
-    } else {
-      btn.className = 'app-no-drag flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer border border-border/80 bg-accent/30 text-muted-foreground hover:bg-accent hover:text-foreground';
-      if (label) label.textContent = 'Stealth OFF';
-      if (indicator) indicator.className = 'h-1.5 w-1.5 rounded-full bg-muted-foreground/50';
-      if (icon) icon.classList.remove('text-emerald-500');
-      btn.title = 'Modo Stealth DESATIVADO (Ctrl+Alt+S) — Clique para ativar proteção contra gravação.';
-    }
+    btn.dataset.active = s.active ? 'true' : 'false';
+    if (label) label.textContent = s.active ? 'Hidden' : 'Visible';
+    if (indicator) indicator.className = s.active ? 'h-1.5 w-1.5 rounded-full bg-emerald-500' : 'h-1.5 w-1.5 rounded-full bg-muted-foreground/40';
+    if (icon) icon.classList.toggle('text-emerald-500', Boolean(s.active));
+    btn.title = s.active
+      ? 'Hidden from screen sharing (Ctrl+Alt+S). Click to make the window visible.'
+      : 'Visible in screen sharing (Ctrl+Alt+S). Click to hide it from recordings.';
   }
 
   if (electronBadge) {
@@ -1337,7 +1319,7 @@ function updateStealthUI(st) {
   const heroToggle = document.getElementById('toggleHeroStealth');
   const heroLabel = document.getElementById('labelHeroStealth');
   if (heroToggle) heroToggle.checked = Boolean(s.active);
-  if (heroLabel) heroLabel.textContent = s.active ? 'Stealth' : 'Detectable';
+  if (heroLabel) heroLabel.textContent = s.active ? 'Hidden' : 'Detectable';
 
   updateStealthBadge();
 }
@@ -1553,44 +1535,109 @@ function populateSettingsForm(cfg) {
 // APP UPDATES, PROCESS DISGUISE & INTERFACE OPACITY
 // ----------------------------------------------------
 let availableAppUpdate = null;
+let appVersionInfo = { version: '', channel: 'stable', packaged: false };
+
+function setText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+
+// Single place that turns the updater status (main process) into UI.
+function renderUpdateStatus(st) {
+  if (!st) return;
+  availableAppUpdate = st;
+  const current = st.currentVersion || appVersionInfo.version || '';
+  const latest = st.latestVersion || current;
+  const statusEl = document.getElementById('updateStatusText');
+  const banner = document.getElementById('updateBanner');
+  const chip = document.getElementById('btnTopVersionBadge');
+  const chipDot = document.getElementById('topVersionBadgeDot');
+  const btnDownload = document.getElementById('btnDownloadUpdate');
+  const btnRestart = document.getElementById('btnRestartUpdate');
+  const btnModal = document.getElementById('btnModalDownloadUpdate');
+  const barWrap = document.getElementById('updateProgressBarContainer');
+  const modalBarWrap = document.getElementById('modalUpdateProgressContainer');
+
+  const messages = {
+    idle: 'Not checked yet.',
+    checking: 'Checking for updates…',
+    'up-to-date': `You're on the latest version${st.channel === 'beta' ? ' (beta channel)' : ''}.`,
+    available: `Version ${latest} is available.`,
+    downloading: `Downloading ${latest}…`,
+    downloaded: `Version ${latest} is ready. Restart to finish.`,
+    error: `Couldn't check for updates: ${st.error || 'unknown error'}`,
+    disabled: st.error || 'Updates are off in this build.'
+  };
+  if (statusEl) statusEl.textContent = messages[st.status] || messages.idle;
+
+  const hasUpdate = ['available', 'downloading', 'downloaded'].includes(st.status);
+  if (banner) banner.classList.toggle('hidden', !hasUpdate);
+  setText('updateBannerTitle', `RealTimeAI ${latest}${st.prerelease ? ' (beta)' : ''}`);
+  setText('updateBannerNotes', (st.releaseNotes || '').split('\n').filter(Boolean).slice(0, 2).join(' · '));
+
+  if (chip) {
+    chip.dataset.state = hasUpdate ? st.status : 'idle';
+    const label = st.status === 'downloaded' ? 'Restart to update'
+      : st.status === 'downloading' ? `Updating ${st.progress ? st.progress.percent + '%' : ''}`.trim()
+      : st.status === 'available' ? `Update ${latest}`
+      : `v${current}`;
+    setText('topVersionBadgeLabel', label);
+    chip.title = messages[st.status] || 'Version and updates';
+  }
+  if (chipDot) chipDot.className = hasUpdate ? 'h-1.5 w-1.5 rounded-full bg-primary' : 'h-1.5 w-1.5 rounded-full bg-muted-foreground/40';
+
+  const downloading = st.status === 'downloading';
+  if (barWrap) barWrap.classList.toggle('hidden', !downloading);
+  if (modalBarWrap) modalBarWrap.classList.toggle('hidden', !downloading);
+  if (downloading && st.progress) applyUpdateProgress(st.progress);
+
+  if (btnDownload) {
+    btnDownload.classList.toggle('hidden', st.status !== 'available' && !downloading);
+    btnDownload.disabled = downloading;
+    btnDownload.textContent = downloading ? 'Downloading…' : 'Download';
+  }
+  if (btnRestart) btnRestart.classList.toggle('hidden', st.status !== 'downloaded');
+
+  // Modal mirrors the same state.
+  setText('modalUpdateVersionTag', hasUpdate ? `v${latest}` : `v${current}`);
+  setText('modalUpdateSubtitle', hasUpdate ? messages[st.status] : messages[st.status] || '');
+  if (st.releaseNotes) setText('modalUpdateNotes', st.releaseNotes);
+  if (btnModal) {
+    btnModal.disabled = downloading || st.status === 'checking';
+    btnModal.textContent = st.status === 'downloaded' ? 'Restart to update'
+      : st.status === 'available' ? `Download ${latest}`
+      : downloading ? 'Downloading…'
+      : 'Check for updates';
+  }
+}
+
+function applyUpdateProgress(info) {
+  const p = Math.max(0, Math.min(100, Number(info.percent) || 0));
+  const text = `Downloading… ${p}%${info.transferred ? ` · ${info.transferred}${info.total ? ' of ' + info.total : ''}` : ''}${info.speed ? ` · ${info.speed}` : ''}`;
+  ['updateProgressBar', 'modalUpdateProgressBar'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.style.width = `${p}%`;
+  });
+  setText('updateProgressPercent', text);
+  setText('modalUpdateProgressPercent', text);
+}
 
 async function checkAppUpdates(silent = false) {
-  const statusEl = document.getElementById('updateStatusText');
   const btnCheck = document.getElementById('btnCheckUpdates');
-  if (statusEl) statusEl.textContent = 'Checking for updates...';
   if (btnCheck) btnCheck.disabled = true;
-
   try {
     if (window.rtai && window.rtai.checkUpdate) {
       const res = await window.rtai.checkUpdate();
-      availableAppUpdate = res;
-      if (res && res.hasUpdate) {
-        if (statusEl) {
-          statusEl.textContent = `New update available: RealTimeAI v${res.latestVersion}!`;
-        }
-        const banner = document.getElementById('updateBanner');
-        if (banner) banner.classList.remove('hidden');
-
-        // Update header badge
-        const topBadge = document.getElementById('btnTopVersionBadge');
-        if (topBadge) {
-          topBadge.className = 'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold border border-blue-500/40 bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-all cursor-pointer animate-pulse';
-          const span = topBadge.querySelector('span');
-          if (span) span.textContent = `Update v${res.latestVersion} ⬇️`;
-        }
-
-        const modalTag = document.getElementById('modalUpdateVersionTag');
-        if (modalTag) modalTag.textContent = `v${res.latestVersion} Available`;
-
-        if (!silent) showToast(`🎉 Nova versão v${res.latestVersion} disponível para download!`);
-      } else {
-        if (statusEl) statusEl.textContent = 'You are currently using RealTimeAI version 2.0.0 (Latest)';
-        if (!silent) showToast('Você já está na versão mais recente (v2.0.0).');
+      renderUpdateStatus(res);
+      if (!silent && res) {
+        if (res.status === 'available') showToast(`Versão ${res.latestVersion} disponível.`);
+        else if (res.status === 'up-to-date') showToast('Você já está na versão mais recente.');
+        else if (res.status === 'disabled') showToast('Atualizações só funcionam no app instalado.');
+        else if (res.status === 'error') showToast('Não foi possível verificar atualizações.');
       }
     }
   } catch (err) {
     console.error('Failed to check updates:', err);
-    if (statusEl) statusEl.textContent = 'Failed to check for updates.';
     if (!silent) showToast('Erro ao verificar atualizações.');
   } finally {
     if (btnCheck) btnCheck.disabled = false;
@@ -1598,89 +1645,237 @@ async function checkAppUpdates(silent = false) {
 }
 
 async function startUpdateDownloadFlow() {
-  const btnDownload = document.getElementById('btnDownloadUpdate');
-  const btnModalDownload = document.getElementById('btnModalDownloadUpdate');
-  const barContainer = document.getElementById('updateProgressBarContainer');
-  const modalBarContainer = document.getElementById('modalUpdateProgressContainer');
-  const bar = document.getElementById('updateProgressBar');
-  const modalBar = document.getElementById('modalUpdateProgressBar');
-  const percentText = document.getElementById('updateProgressPercent');
-  const modalPercentText = document.getElementById('modalUpdateProgressPercent');
-  const btnRestart = document.getElementById('btnRestartUpdate');
-
-  if (btnDownload) {
-    btnDownload.disabled = true;
-    btnDownload.classList.add('opacity-50');
-  }
-  if (btnModalDownload) {
-    btnModalDownload.disabled = true;
-    btnModalDownload.classList.add('opacity-50');
-  }
-  if (barContainer) barContainer.classList.remove('hidden');
-  if (modalBarContainer) modalBarContainer.classList.remove('hidden');
-
-  showToast('Iniciando download do RealTimeAI v2.1.0...');
-
-  if (window.rtai && window.rtai.onUpdateProgress) {
-    window.rtai.onUpdateProgress((info) => {
-      const p = info.percent || 0;
-      if (bar) bar.style.width = `${p}%`;
-      if (modalBar) modalBar.style.width = `${p}%`;
-      if (percentText) percentText.textContent = `Downloading... ${p}% (${info.transferred || ''})`;
-      if (modalPercentText) modalPercentText.textContent = `Downloading... ${p}% (${info.transferred || ''})`;
-    });
-  }
-
-  if (window.rtai && window.rtai.onUpdateDownloaded) {
-    window.rtai.onUpdateDownloaded((_info) => {
-      if (btnDownload) btnDownload.classList.add('hidden');
-      if (btnRestart) btnRestart.classList.remove('hidden');
-      if (btnModalDownload) {
-        btnModalDownload.disabled = false;
-        btnModalDownload.classList.remove('opacity-50');
-        btnModalDownload.innerHTML = `
-          <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-          <span>Restart & Apply Update</span>
-        `;
-        btnModalDownload.onclick = () => finishUpdateInstallation();
-      }
-      showToast('🎉 Download concluído! Pronto para reiniciar e aplicar a versão 2.1.0.');
-    });
-  }
-
-  try {
-    if (window.rtai && window.rtai.downloadUpdate) {
-      await window.rtai.downloadUpdate();
-    }
-  } catch (err) {
-    console.error('Failed to download update:', err);
-    showToast('Falha no download da atualização.');
-  }
+  if (!window.rtai || !window.rtai.downloadUpdate) return;
+  renderUpdateStatus({ ...(availableAppUpdate || {}), status: 'downloading', progress: { percent: 0 } });
+  const res = await window.rtai.downloadUpdate();
+  if (res && res.ok === false) showToast(`Falha no download: ${res.error || 'erro desconhecido'}`);
 }
 
 async function finishUpdateInstallation() {
   try {
     if (window.rtai && window.rtai.installUpdate) {
-      await window.rtai.installUpdate();
+      const res = await window.rtai.installUpdate();
+      if (res && res.ok === false) showToast(res.error || 'Nenhuma atualização pronta.');
+      else showToast('Reiniciando para atualizar…');
     }
-    const sidebarVer = document.getElementById('sidebarAppVersion');
-    if (sidebarVer) sidebarVer.textContent = 'v2.1.0';
-    const topBadge = document.getElementById('btnTopVersionBadge');
-    if (topBadge) {
-      topBadge.className = 'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-all cursor-pointer';
-      const s = topBadge.querySelector('span');
-      if (s) s.textContent = 'v2.1.0';
-    }
-    const updateModal = document.getElementById('modalAppUpdate');
-    if (updateModal) updateModal.classList.remove('open');
-    const updateBanner = document.getElementById('updateBanner');
-    if (updateBanner) updateBanner.classList.add('hidden');
-    const statusText = document.getElementById('updateStatusText');
-    if (statusText) statusText.textContent = 'You are currently using RealTimeAI version 2.1.0 (Latest)';
-    showToast('🚀 RealTimeAI atualizado para a versão 2.1.0!');
   } catch (err) {
     console.error('Failed to install update:', err);
   }
+}
+
+// Modal primary button does whatever the next step is.
+function handleModalUpdateAction() {
+  const st = availableAppUpdate && availableAppUpdate.status;
+  if (st === 'downloaded') return finishUpdateInstallation();
+  if (st === 'available') return startUpdateDownloadFlow();
+  return checkAppUpdates(false);
+}
+
+async function loadAppVersion() {
+  try {
+    if (window.rtai && window.rtai.getAppVersion) {
+      appVersionInfo = { ...appVersionInfo, ...(await window.rtai.getAppVersion()) };
+    }
+  } catch (_e) {}
+  const v = appVersionInfo.version || '2.0.0';
+  setText('sidebarAppVersion', `v${v}`);
+  setText('settingsVersionLabel', v);
+  setText('topVersionBadgeLabel', `v${v}`);
+  setText('homeWhatsNewVersion', `v${v.split('.').slice(0, 2).join('.')}`);
+  renderChannel(appVersionInfo.channel || (state.config && state.config.update_channel) || 'stable');
+}
+
+function renderChannel(channel) {
+  const ch = channel === 'beta' ? 'beta' : 'stable';
+  document.querySelectorAll('[data-update-channel]').forEach((b) => {
+    b.setAttribute('aria-pressed', b.dataset.updateChannel === ch ? 'true' : 'false');
+  });
+  const label = ch === 'beta' ? 'Beta' : 'Stable';
+  setText('sidebarChannelLabel', label);
+  setText('settingsChannelBadge', label);
+}
+
+// ----------------------------------------------------
+// FEATURE FLAGS (A/B tests, staged rollout, beta-only)
+// ----------------------------------------------------
+function isFlagEnabled(key) {
+  const f = state.flags && state.flags.flags && state.flags.flags[key];
+  // Unknown flags (old main process, flags not loaded yet) default to on so
+  // nothing disappears by accident.
+  return f ? Boolean(f.enabled) : true;
+}
+
+function flagVariant(key) {
+  const f = state.flags && state.flags.flags && state.flags.flags[key];
+  return f && f.enabled ? f.variant : null;
+}
+
+function applyFlagsToDom() {
+  document.querySelectorAll('[data-flag]').forEach((el) => {
+    el.dataset.flagOff = isFlagEnabled(el.dataset.flag) ? 'false' : 'true';
+  });
+  // A/B copy: data-ab="<flag>" + data-ab-<variant>="text"
+  document.querySelectorAll('[data-ab]').forEach((el) => {
+    const v = flagVariant(el.dataset.ab);
+    const text = v && el.getAttribute(`data-ab-${v}`);
+    if (text) el.textContent = text;
+  });
+}
+
+function renderFlagsSettings() {
+  const list = document.getElementById('flagsList');
+  if (!list) return;
+  const snap = state.flags || { flags: {} };
+  const entries = Object.values(snap.flags || {});
+  list.innerHTML = '';
+  if (!entries.length) {
+    list.innerHTML = '<div class="px-4 py-3 text-xs text-muted-foreground">No flags defined.</div>';
+  }
+  const sourceLabel = {
+    override: 'Overridden here',
+    rollout: 'Rollout',
+    default: 'Default',
+    channel: 'Beta only',
+    min_version: 'Needs a newer version'
+  };
+  for (const f of entries) {
+    const row = document.createElement('div');
+    row.className = 'flag-row';
+    const left = document.createElement('div');
+    left.className = 'min-w-0';
+    const name = document.createElement('div');
+    name.className = 'flex items-center gap-2 text-[12.5px] font-medium text-foreground';
+    const code = document.createElement('code');
+    code.className = 'font-mono text-[12px]';
+    code.textContent = f.key;
+    const state_ = document.createElement('span');
+    state_.className = `h-1.5 w-1.5 rounded-full ${f.enabled ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`;
+    name.append(state_, code);
+    if (f.variant) {
+      const v = document.createElement('span');
+      v.className = 'badge-quiet';
+      v.textContent = f.variant;
+      name.append(v);
+    }
+    const desc = document.createElement('div');
+    desc.className = 'mt-0.5 truncate text-xs text-muted-foreground';
+    desc.textContent = `${f.description}${sourceLabel[f.source] ? ' · ' + sourceLabel[f.source] : ''}`;
+    left.append(name, desc);
+
+    const select = document.createElement('select');
+    select.className = 'h-7 w-36 shrink-0 rounded-md border border-input bg-transparent px-2 text-xs text-foreground focus:outline-none';
+    select.setAttribute('aria-label', `Override ${f.key}`);
+    const opts = [['default', 'Default'], ['on', 'On'], ['off', 'Off']];
+    (f.variants || []).forEach((v) => opts.push([v, `Variant ${v}`]));
+    for (const [val, label] of opts) {
+      const o = document.createElement('option');
+      o.value = val;
+      o.textContent = label;
+      select.append(o);
+    }
+    const current = snap.overrides && snap.overrides[f.key];
+    select.value = f.source === 'override' ? (current || (f.enabled ? (f.variant || 'on') : 'off')) : 'default';
+    select.addEventListener('change', async () => {
+      const res = await window.rtai.setFlagOverride(f.key, select.value);
+      if (res && res.ok === false) showToast(res.error || 'Override inválido.');
+      else if (res && res.flags) onFlagsChanged(res.flags);
+    });
+    row.append(left, select);
+    list.append(row);
+  }
+  const fetched = snap.lastFetch ? new Date(snap.lastFetch).toLocaleString() : 'never';
+  const src = { remote: 'remote', cache: 'cached', bundled: 'built-in', empty: 'none' }[snap.source] || snap.source || '';
+  setText('flagsMeta', `Install ID ${String(snap.installId || '').slice(0, 8)} · definitions: ${src} · last sync: ${fetched}${snap.lastError ? ' · ' + snap.lastError : ''}`);
+}
+
+function onFlagsChanged(snap) {
+  if (!snap) return;
+  // Remember overrides locally so the select shows the chosen value.
+  const prev = (state.flags && state.flags.overrides) || {};
+  const overrides = { ...prev };
+  for (const f of Object.values(snap.flags || {})) {
+    if (f.source === 'override') overrides[f.key] = f.variant || (f.enabled ? 'on' : 'off');
+    else delete overrides[f.key];
+  }
+  state.flags = { ...snap, overrides };
+  applyFlagsToDom();
+  renderFlagsSettings();
+  if (snap.channel) renderChannel(snap.channel);
+}
+
+async function loadFlags() {
+  try {
+    if (window.rtai && window.rtai.getFlags) onFlagsChanged(await window.rtai.getFlags());
+  } catch (err) {
+    console.error('Failed to load flags:', err);
+  }
+}
+
+// ----------------------------------------------------
+// HOME: greeting, model, next interview
+// ----------------------------------------------------
+function renderHomeGreeting() {
+  const h = new Date().getHours();
+  const part = h < 5 ? 'Good evening' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  const first = String((state.profile && state.profile.name) || '').trim().split(/\s+/)[0];
+  setText('homeGreeting', first ? `${part}, ${first}` : part);
+  const cfg = state.config || {};
+  const missing = [];
+  if (cfg.has_deepgram_key === false) missing.push('Deepgram key');
+  if (cfg.has_llm_key === false) missing.push('LLM key');
+  setText('homeStatusLine', missing.length
+    ? `Add your ${missing.join(' and ')} in Settings to go live.`
+    : 'Everything is ready for your next interview.');
+}
+
+function renderHomeModel() {
+  const sel = document.getElementById('selectActiveModelChoice');
+  let label = '';
+  if (sel && sel.selectedIndex >= 0) label = sel.options[sel.selectedIndex]?.text || '';
+  if (!label) label = (state.config && state.config.model) || '';
+  label = label.split('(')[0].trim() || 'Not set';
+  setText('heroModelName', label);
+}
+
+function nextInterview() {
+  const now = new Date();
+  let best = null;
+  for (const ag of state.agents || []) {
+    const date = ag.next_interview_date || (ag.next_interview && ag.next_interview.date) || '';
+    if (!date) continue;
+    const time = ag.next_interview_time || (ag.next_interview && ag.next_interview.time) || '';
+    const when = new Date(`${date}T${/^\d{1,2}:\d{2}$/.test(time) ? time.padStart(5, '0') : '23:59'}:00`);
+    if (Number.isNaN(when.getTime()) || when < new Date(now.getTime() - 2 * 3600 * 1000)) continue;
+    if (!best || when < best.when) best = { ag, when, hasTime: Boolean(time) };
+  }
+  return best;
+}
+
+function renderHomeNextInterview() {
+  const next = nextInterview();
+  if (!next) {
+    setText('heroEventWeekday', '—');
+    setText('heroEventDay', '—');
+    setText('heroEventTitle', 'Nothing scheduled');
+    setText('heroEventSub', 'Add a date inside a goal');
+    return;
+  }
+  const { ag, when, hasTime } = next;
+  const today = new Date();
+  const startOf = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((startOf(when) - startOf(today)) / 86400000);
+  const rel = days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : when.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+  const time = hasTime ? when.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '';
+  setText('heroEventWeekday', when.toLocaleDateString(undefined, { weekday: 'short' }));
+  setText('heroEventDay', String(when.getDate()));
+  setText('heroEventTitle', ag.name || [ag.company, ag.role].filter(Boolean).join(' · ') || 'Interview');
+  setText('heroEventSub', [rel, time].filter(Boolean).join(' · '));
+}
+
+function renderHome() {
+  renderHomeGreeting();
+  renderHomeModel();
+  renderHomeNextInterview();
 }
 
 function selectProcessDisguise(disguise) {
@@ -1713,11 +1908,7 @@ function selectProcessDisguise(disguise) {
 
 function setupUpdatesAndModernHero() {
   // Auto-update check on startup if enabled
-  if (state.config && state.config.auto_update !== false && window.rtai && window.rtai.checkUpdate) {
-    setTimeout(() => {
-      checkAppUpdates(true);
-    }, 1500);
-  }
+  // The main process checks on its own schedule; this only paints the status.
 
   // Version modal controls
   document.getElementById('btnTopVersionBadge')?.addEventListener('click', () => {
@@ -1742,8 +1933,58 @@ function setupUpdatesAndModernHero() {
   });
 
   document.getElementById('btnModalDownloadUpdate')?.addEventListener('click', () => {
-    startUpdateDownloadFlow();
+    handleModalUpdateAction();
   });
+
+  document.getElementById('btnModalOpenUpdateSettings')?.addEventListener('click', () => {
+    document.getElementById('modalAppUpdate')?.classList.remove('open');
+    switchView('settings');
+    switchSettingsTab('general');
+  });
+
+  document.getElementById('btnTopVersionBadge')?.addEventListener('dblclick', () => {
+    if (availableAppUpdate && availableAppUpdate.status === 'downloaded') finishUpdateInstallation();
+  });
+
+  // Live updater events from the main process.
+  if (window.rtai && window.rtai.onUpdateStatus) window.rtai.onUpdateStatus(renderUpdateStatus);
+  if (window.rtai && window.rtai.onUpdateProgress) window.rtai.onUpdateProgress(applyUpdateProgress);
+  if (window.rtai && window.rtai.getUpdateStatus) {
+    window.rtai.getUpdateStatus().then(renderUpdateStatus).catch(() => {});
+  }
+
+  // Release channel (stable / beta)
+  document.querySelectorAll('[data-update-channel]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const ch = btn.dataset.updateChannel;
+      renderChannel(ch);
+      try {
+        const res = await window.rtai.setUpdateChannel(ch);
+        if (res && res.flags) onFlagsChanged(res.flags);
+        if (state.config) state.config.update_channel = ch;
+        showToast(ch === 'beta' ? 'Canal beta ativado: você vai receber versões de teste.' : 'Canal estável ativado.');
+      } catch (err) {
+        console.error('Failed to change channel:', err);
+        showToast('Falha ao trocar o canal.');
+      }
+    });
+  });
+
+  // Feature flags
+  if (window.rtai && window.rtai.onFlagsChanged) window.rtai.onFlagsChanged(onFlagsChanged);
+  document.getElementById('btnRefreshFlags')?.addEventListener('click', async () => {
+    const snap = await window.rtai.refreshFlags();
+    onFlagsChanged(snap);
+    showToast(snap && snap.lastError ? `Flags: ${snap.lastError}` : 'Flags atualizadas.');
+  });
+  document.getElementById('btnResetFlags')?.addEventListener('click', async () => {
+    const res = await window.rtai.resetFlagOverrides();
+    if (res && res.flags) onFlagsChanged(res.flags);
+    showToast('Overrides removidos.');
+  });
+
+  loadAppVersion();
+  loadFlags();
 
   document.getElementById('btnRestartUpdate')?.addEventListener('click', () => {
     finishUpdateInstallation();
@@ -1772,7 +2013,7 @@ function setupUpdatesAndModernHero() {
       if (res && res.status) {
         state.stealthState = res.status;
         updateStealthUI(res.status);
-        showToast(res.status.active ? '🛡️ Modo Stealth ATIVADO' : 'Modo Stealth Desativado');
+        showToast(res.status.active ? 'Modo stealth ativado' : 'Modo Stealth Desativado');
       }
     } catch (err) {
       console.error('Failed to toggle stealth from hero:', err);
@@ -1908,12 +2149,7 @@ function setupAiProvidersAndAudio() {
       const val = e.target.value;
       const tier = getTierForModel(val);
       selectModelTier(tier, val, true);
-      const btnHeroModel = document.getElementById('btnHeroModelAction');
-      if (btnHeroModel) {
-        const label = activeModelSel.options[activeModelSel.selectedIndex]?.text || val;
-        const span = btnHeroModel.querySelector('span');
-        if (span) span.textContent = `Active Model: ${label.split('(')[0].trim()}`;
-      }
+      renderHomeModel();
     });
   }
 
@@ -2091,7 +2327,7 @@ function setupAiProvidersAndAudio() {
       if (inVal) inVal.textContent = '-48 dB';
     }, 800);
 
-    showToast('🔊 Som de teste reproduzido com sucesso!');
+    showToast('Som de teste reproduzido.');
   });
 
   // 3. Google Calendar Hero & Detect Meetings (Images 3 & 4)
@@ -2418,6 +2654,7 @@ function setupGoogleCalendar() {
 }
 
 async function initApp() {
+  document.body.dataset.view = 'goals';
   const initial = await window.rtai.getState();
   state.config = initial.config || {};
   state.agents = initial.agents || [];
@@ -2482,7 +2719,7 @@ async function initApp() {
         state.stealthState = status;
         updateStealthUI(status);
         if (status.active) {
-          showToast('🛡️ Modo Stealth ATIVADO');
+          showToast('Modo stealth ativado');
         } else {
           showToast('Modo Stealth Desativado');
         }
@@ -2968,7 +3205,7 @@ async function initApp() {
       text.textContent = `${(res.dossier || '').slice(0, 60)}...`;
       showToast('Company context generated!');
     } finally {
-      btn.textContent = '✨ Auto-research company';
+      btn.textContent = 'Auto-research company';
     }
   });
 
@@ -3267,7 +3504,7 @@ async function initApp() {
       if (res && res.status) {
         state.stealthState = res.status;
         updateStealthUI(res.status);
-        showToast(res.status.active ? '🛡️ Modo Stealth ATIVADO — Protegido contra Zoom, Teams, Meet e OBS.' : 'Modo Stealth desativado — Janela visível normalmente.');
+        showToast(res.status.active ? 'Modo stealth ativado: janela protegida contra captura de tela.' : 'Modo Stealth desativado — Janela visível normalmente.');
       }
     } catch (err) {
       console.error('Failed to toggle stealth mode:', err);
@@ -3281,7 +3518,7 @@ async function initApp() {
       if (res && res.status) {
         state.stealthState = res.status;
         updateStealthUI(res.status);
-        showToast(res.status.active ? '🛡️ Modo Stealth ATIVADO' : 'Modo Stealth Desativado');
+        showToast(res.status.active ? 'Modo stealth ativado' : 'Modo Stealth Desativado');
       }
     } catch (err) {
       console.error('Failed to toggle stealth mode:', err);

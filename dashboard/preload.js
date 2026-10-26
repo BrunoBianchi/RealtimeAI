@@ -114,5 +114,22 @@ contextBridge.exposeInMainWorld('rtai', {
     const handler = (_event, info) => cb(info);
     ipcRenderer.on('rtai:update-downloaded', handler);
     return () => ipcRenderer.removeListener('rtai:update-downloaded', handler);
+  },
+  getUpdateStatus: () => ipcRenderer.invoke('rtai:update-status'),
+  setUpdateChannel: (channel) => ipcRenderer.invoke('rtai:set-update-channel', channel),
+  onUpdateStatus: (cb) => {
+    const handler = (_event, st) => cb(st);
+    ipcRenderer.on('rtai:update-status', handler);
+    return () => ipcRenderer.removeListener('rtai:update-status', handler);
+  },
+  // Feature flags (A/B tests, staged rollout, beta-only features)
+  getFlags: () => ipcRenderer.invoke('rtai:flags-get'),
+  refreshFlags: () => ipcRenderer.invoke('rtai:flags-refresh'),
+  setFlagOverride: (key, value) => ipcRenderer.invoke('rtai:flags-set-override', { key, value }),
+  resetFlagOverrides: () => ipcRenderer.invoke('rtai:flags-reset-overrides'),
+  onFlagsChanged: (cb) => {
+    const handler = (_event, snap) => cb(snap);
+    ipcRenderer.on('rtai:flags-changed', handler);
+    return () => ipcRenderer.removeListener('rtai:flags-changed', handler);
   }
 });

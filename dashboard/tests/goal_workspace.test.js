@@ -153,8 +153,8 @@ test('Task 5.1 / Property 10: Remoção visual dos botões extras do topo e link
   const appJs = fs.readFileSync(appJsPath, 'utf8');
 
   // Header should not contain btnToggleTranscriptionMode or btnLaunchDemo in the visible app-no-drag header
-  const headerMatch = html.match(/<div class="app-no-drag flex items-center gap-2\.5">([\s\S]*?)<\/div>/);
-  assert.ok(headerMatch, 'Header flex container must exist');
+  const headerMatch = html.match(/<header\b[^>]*>([\s\S]*?)<\/header>/);
+  assert.ok(headerMatch, 'Header element must exist');
   const headerContent = headerMatch[1];
   assert.ok(!headerContent.includes('id="btnToggleTranscriptionMode"'), 'Top header must NOT contain btnToggleTranscriptionMode');
   assert.ok(!headerContent.includes('id="btnLaunchDemo"'), 'Top header must NOT contain btnLaunchDemo');

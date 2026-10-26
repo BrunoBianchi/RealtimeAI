@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "flags": {
+    "direct_assist": {
+      "description": "Direct Assist toggle in Settings > AI (still experimental)",
+      "rollout": { "stable": 0, "beta": 100 }
+    },
+    "home_next_interview": {
+      "description": "Next interview card on the Home screen",
+      "rollout": { "stable": 100, "beta": 100 }
+    },
+    "getting_started_card": {
+      "description": "Getting started checklist on the Home screen",
+      "default": true
+    },
+    "ab_start_cta": {
+      "description": "A/B test: label of the main start button on Home",
+      "rollout": { "stable": 100, "beta": 100 },
+      "variants": { "start_session": 50, "go_live": 50 }
+    }
+  }
+}

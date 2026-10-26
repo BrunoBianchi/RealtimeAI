@@ -1,18 +1,26 @@
 {
   "name": "realtimeai-dashboard",
   "version": "2.0.0",
-  "description": "RealTimeAI Studio Dashboard — Gerenciador de Sessões, Mini-Agentes RAG, Mini-Compact e Controle do Overlay HUD",
+  "description": "RealTimeAI: interview copilot dashboard, session manager and overlay control",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "build:css": "tailwindcss -i ./src/tailwind.input.css -o ./src/styles.css --minify",
-    "test": "node --test tests/**/*.test.js"
+    "test": "node --test tests/**/*.test.js",
+    "flags:validate": "node ../scripts/validate-flags.mjs",
+    "dist": "npm run build:css && electron-builder --win nsis --x64 --publish never",
+    "dist:dir": "npm run build:css && electron-builder --win dir --x64 --publish never"
   },
   "dependencies": {
-    "electron": "^35.0.0",
+    "electron-updater": "^6.6.2",
     "pdf-parse": "^1.1.1"
   },
   "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^26.0.12",
     "tailwindcss": "^3.4.19"
+  },
+  "author": {
+    "name": "Bruno Raiado Bianchi"
   }
 }

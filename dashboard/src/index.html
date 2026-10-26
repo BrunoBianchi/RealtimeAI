@@ -9,101 +9,84 @@
   <body class="bg-background text-foreground">
     <div class="flex h-screen w-screen overflow-hidden">
       <!-- ==================== LEFT SIDEBAR ==================== -->
-      <aside class="flex w-[250px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar select-none">
-        <!-- Brand Header -->
-        <div class="app-drag flex h-14 items-center justify-between px-4 border-b border-sidebar-border/60">
-          <div class="flex items-center gap-2.5">
-            <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-[#E11D48] text-white shadow-sm">
-              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
+      <aside class="flex w-[240px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar select-none">
+        <!-- Brand -->
+        <div class="app-drag flex h-12 items-center justify-between px-4">
+          <div class="flex items-center gap-2">
+            <div class="flex h-6 w-6 items-center justify-center rounded-md bg-foreground text-background">
+              <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
                 <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
                 <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
                 <line x1="12" x2="12" y1="19" y2="22" />
               </svg>
             </div>
-            <span class="text-[14px] font-bold tracking-tight text-foreground">RealTimeAI</span>
+            <span class="text-[13.5px] font-semibold tracking-tight text-foreground">RealTimeAI</span>
           </div>
 
-          <span
-            id="overlayStatusPill"
-            class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400"
-          >
+          <span id="overlayStatusPill" class="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
             <span id="overlayStatusDot" class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
             <span id="overlayStatusText">Ready</span>
           </span>
         </div>
 
-        <!-- Goals Section (Top Sidebar) -->
-        <div class="flex flex-1 flex-col overflow-hidden px-3 pt-3 pb-2">
-          <div class="flex items-center justify-between px-2 mb-2">
-            <span class="text-[13px] font-semibold text-foreground">Goals</span>
-            <span id="sidebarGoalCount" class="text-xs text-muted-foreground font-medium tabular-nums">0</span>
-          </div>
-
-          <button
-            id="btnNewGoal"
-            type="button"
-            class="app-no-drag mb-3 flex w-full items-center justify-center gap-2 rounded-lg bg-card hover:bg-accent border border-border/80 px-3 py-2 text-[13px] font-medium text-foreground transition-all cursor-pointer shadow-sm"
-          >
-            <svg class="h-3.5 w-3.5 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            <span>New goal</span>
+        <!-- Goals -->
+        <div class="flex flex-1 flex-col overflow-hidden px-2.5 pt-2 pb-2">
+          <button id="btnNewGoal" type="button" class="app-no-drag sh-nav-item mb-3 justify-start text-foreground">
+            <span class="flex items-center gap-2.5">
+              <svg class="h-4 w-4 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              <span>New goal</span>
+            </span>
           </button>
 
-          <div class="px-2 mb-1">
-            <span class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
-              UP NEXT
-            </span>
+          <div class="mb-1 flex items-center justify-between px-3">
+            <span class="section-eyebrow">Up next</span>
+            <span id="sidebarGoalCount" class="text-[11px] tabular-nums text-muted-foreground">0</span>
           </div>
 
-          <div id="agentSelectorBar" class="flex-1 space-y-1 overflow-y-auto pr-1"></div>
+          <div id="agentSelectorBar" class="flex-1 space-y-0.5 overflow-y-auto pr-0.5"></div>
         </div>
 
-        <!-- Bottom Section: Upgrade Banner, Navigation & Profile -->
-        <div class="border-t border-sidebar-border p-3 space-y-2.5">
-          <!-- Setup status: what is still missing before going live -->
-          <button
-            id="sidebarPlanCard"
-            type="button"
-            class="app-no-drag w-full rounded-lg border border-border/70 bg-card p-3 text-left shadow-sm transition-all hover:border-foreground/20 cursor-pointer"
-          >
+        <!-- Bottom: setup status, navigation, theme, profile -->
+        <div class="space-y-2 p-2.5">
+          <button id="sidebarPlanCard" type="button" class="app-no-drag w-full rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-sidebar-accent cursor-pointer">
             <div class="flex items-center gap-2">
               <span id="setupCardDot" class="h-2 w-2 shrink-0 rounded-full bg-amber-500"></span>
-              <span id="setupCardTitle" class="text-[12.5px] font-semibold text-foreground">Finish setup</span>
+              <span id="setupCardTitle" class="text-[12.5px] font-medium text-foreground">Finish setup</span>
             </div>
-            <div id="setupCardDetail" class="mt-1 text-[11px] leading-snug text-muted-foreground">Add your API keys in Settings.</div>
+            <div id="setupCardDetail" class="mt-0.5 pl-4 text-[11px] leading-snug text-muted-foreground">Add your API keys in Settings.</div>
           </button>
 
-          <!-- Bottom Navigation (Library, History, Settings) -->
           <nav class="space-y-0.5">
             <button type="button" data-view="library" class="sh-nav-item">
               <span class="flex items-center gap-2.5">
-                <svg class="h-4 w-4 opacity-75" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg class="h-4 w-4 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
                   <path d="M6 6h10" />
                   <path d="M6 10h10" />
                 </svg>
                 <span>Library</span>
               </span>
-              <span id="navBadgeLibrary" class="text-[11px] text-muted-foreground font-medium">0</span>
+              <span id="navBadgeLibrary" class="text-[11px] tabular-nums text-muted-foreground">0</span>
             </button>
 
             <button type="button" data-view="history" class="sh-nav-item">
               <span class="flex items-center gap-2.5">
-                <svg class="h-4 w-4 opacity-75" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg class="h-4 w-4 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
                   <path d="M3 3v5h5" />
                   <path d="M12 7v5l4 2" />
                 </svg>
                 <span>History</span>
               </span>
-              <span id="navBadgeSessions" class="text-[11px] text-muted-foreground font-medium">0</span>
+              <span id="navBadgeSessions" class="text-[11px] tabular-nums text-muted-foreground">0</span>
             </button>
 
             <button type="button" data-view="settings" class="sh-nav-item">
               <span class="flex items-center gap-2.5">
-                <svg class="h-4 w-4 opacity-75" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg class="h-4 w-4 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="12" cy="12" r="3" />
                   <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
                 </svg>
@@ -112,173 +95,94 @@
             </button>
           </nav>
 
-          <!-- Windows Theme Switcher -->
-          <div class="rounded-lg bg-muted/80 p-1 border border-border/60">
-            <div class="grid grid-cols-3 gap-1 text-[11px]">
-              <button
-                type="button"
-                data-theme-pref="system"
-                class="theme-pref-btn flex items-center justify-center rounded-md py-1 font-medium text-muted-foreground transition-all cursor-pointer"
-                title="Follow Windows theme"
-              >
-                <span>Windows</span>
-              </button>
-              <button
-                type="button"
-                data-theme-pref="light"
-                class="theme-pref-btn flex items-center justify-center rounded-md py-1 font-medium text-muted-foreground transition-all cursor-pointer"
-                title="Light mode"
-              >
-                <span>Light</span>
-              </button>
-              <button
-                type="button"
-                data-theme-pref="dark"
-                class="theme-pref-btn flex items-center justify-center rounded-md py-1 font-medium text-muted-foreground transition-all cursor-pointer"
-                title="Dark mode"
-              >
-                <span>Dark</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- User Profile -->
-          <div
-            id="profileChip"
-            class="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-sidebar-accent transition-colors cursor-pointer"
-          >
-            <div class="flex items-center gap-2.5 min-w-0">
-              <div
-                id="profileAvatar"
-                class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-[11px] font-bold"
-              >
-                BR
-              </div>
-              <div class="min-w-0">
-                <div id="profileNameLabel" class="truncate text-[12.5px] font-semibold text-foreground">
-                  Bruno Raiado
+          <div class="border-t border-sidebar-border pt-2">
+            <div class="flex items-center justify-between gap-2">
+              <div id="profileChip" class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-sidebar-accent cursor-pointer">
+                <div id="profileAvatar" class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent text-[10px] font-semibold text-foreground">BR</div>
+                <div class="min-w-0">
+                  <div id="profileNameLabel" class="truncate text-[12.5px] font-medium text-foreground">Bruno Raiado</div>
                 </div>
+                <span id="profilePlanBadge" class="sr-only">Local</span>
+              </div>
+
+              <div class="flex items-center rounded-md bg-sidebar-accent/70 p-0.5" role="group" aria-label="Theme">
+                <button type="button" data-theme-pref="system" class="theme-pref-btn theme-icon" title="Follow Windows theme" aria-label="Follow Windows theme">
+                  <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
+                  <span class="sr-only">Windows</span>
+                </button>
+                <button type="button" data-theme-pref="light" class="theme-pref-btn theme-icon" title="Light" aria-label="Light">
+                  <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+                  <span class="sr-only">Light</span>
+                </button>
+                <button type="button" data-theme-pref="dark" class="theme-pref-btn theme-icon" title="Dark" aria-label="Dark">
+                  <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+                  <span class="sr-only">Dark</span>
+                </button>
               </div>
             </div>
-            <span id="profilePlanBadge" class="rounded px-1.5 py-0.5 text-[10px] font-semibold bg-muted text-muted-foreground">
-              Local
-            </span>
-          </div>
 
-          <!-- Version Footer -->
-          <div class="px-2 pt-1.5 flex items-center justify-between text-[11px] text-muted-foreground/60 select-none">
-            <span>RealTimeAI</span>
-            <span id="sidebarAppVersion" class="font-mono text-emerald-500 font-semibold">v2.0.0</span>
+            <div class="mt-1 flex items-center justify-between px-2 text-[11px] text-muted-foreground/70">
+              <span id="sidebarChannelLabel">Stable</span>
+              <span id="sidebarAppVersion" class="font-mono">v2.0.0</span>
+            </div>
           </div>
         </div>
       </aside>
 
       <!-- ==================== MAIN CONTENT AREA ==================== -->
       <div class="flex flex-1 flex-col overflow-hidden bg-background">
-        <!-- Top Header Bar (Final Round AI style) -->
-        <header class="app-drag flex h-14 shrink-0 items-center justify-between border-b border-border/70 bg-background/95 px-6">
-          <div class="flex items-center gap-3">
-            <button
-              id="btnToggleSidebar"
-              type="button"
-              class="app-no-drag flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors cursor-pointer"
-              title="Alternar barra lateral"
-            >
+        <header class="app-drag flex h-12 shrink-0 items-center justify-between gap-4 border-b border-border/60 px-4">
+          <div class="flex min-w-0 items-center gap-2">
+            <button id="btnToggleSidebar" type="button" class="app-no-drag icon-btn" title="Toggle sidebar" aria-label="Toggle sidebar">
               <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect width="18" height="18" x="3" y="3" rx="2" />
                 <line x1="9" x2="9" y1="3" y2="21" />
               </svg>
             </button>
-
-            <!-- Breadcrumbs -->
-            <div class="flex items-center gap-2 text-[13px] text-muted-foreground">
-              <span id="headerBreadcrumb" class="font-medium text-foreground">Goals</span>
-              <span id="autoSaveBadge" class="text-xs text-muted-foreground/80 pl-2">
-                • Saved
-              </span>
-            </div>
+            <span id="headerBreadcrumb" class="truncate text-[13px] font-medium text-foreground">Goals</span>
+            <span id="autoSaveBadge" class="text-xs text-muted-foreground/70">Saved</span>
           </div>
 
-          <!-- Centered Sleek Search Input (Image 2 style) -->
-          <div class="app-no-drag relative hidden sm:flex items-center w-72 md:w-80">
-            <svg class="absolute left-3 h-3.5 w-3.5 text-muted-foreground pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <div class="app-no-drag relative hidden w-72 items-center sm:flex md:w-80">
+            <svg class="pointer-events-none absolute left-3 h-3.5 w-3.5 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="11" cy="11" r="8"/>
               <line x1="21" y1="21" x2="16.65" y2="16.65"/>
             </svg>
-            <input
-              id="topSearchInput"
-              type="text"
-              placeholder="Search or ask anything..."
-              class="h-8 w-full rounded-full border border-border/70 bg-accent/40 pl-9 pr-14 text-xs text-foreground placeholder:text-muted-foreground/70 focus:border-primary focus:bg-background focus:outline-none transition-all"
-            />
-            <kbd class="absolute right-2.5 rounded bg-muted/60 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground border border-border/60">Ctrl K</kbd>
+            <input id="topSearchInput" type="text" placeholder="Search…" class="h-8 w-full rounded-md border border-border/70 bg-sidebar-accent/40 pl-9 pr-14 text-xs text-foreground placeholder:text-muted-foreground/70 transition-colors focus:border-foreground/30 focus:bg-background focus:outline-none" />
+            <kbd class="pointer-events-none absolute right-2 rounded border border-border/70 px-1.5 py-px font-mono text-[10px] text-muted-foreground">Ctrl K</kbd>
           </div>
 
-          <div class="app-no-drag flex items-center gap-2.5">
-            <button
-              id="btnTopStopOverlay"
-              type="button"
-              style="display: none;"
-              class="sh-btn-danger"
-            >
-              Parar Overlay
+          <div class="app-no-drag flex items-center gap-1">
+            <button id="btnTopStopOverlay" type="button" style="display: none;" class="sh-btn-danger mr-1">Stop overlay</button>
+
+            <!-- Version / update indicator: quiet until an update exists -->
+            <button id="btnTopVersionBadge" type="button" class="update-chip" data-state="idle" title="Version and updates">
+              <span id="topVersionBadgeDot" class="h-1.5 w-1.5 rounded-full bg-muted-foreground/40"></span>
+              <span id="topVersionBadgeLabel">v2.0.0</span>
             </button>
 
-            <!-- Version Badge Button (Opens What's New & Updates) -->
-            <button
-              id="btnTopVersionBadge"
-              type="button"
-              class="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-all cursor-pointer"
-              title="RealTimeAI Version & Updates"
-            >
-              <span>v2.0.0</span>
-              <span id="topVersionBadgeDot" class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-            </button>
-
-            <!-- The Signature Bright Red "🔴 Go Live" button -->
-            <button
-              id="btnTopGoLive"
-              type="button"
-              class="sh-btn-live flex items-center gap-1.5 cursor-pointer"
-            >
-              <span class="h-2 w-2 rounded-full bg-white animate-pulse"></span>
-              <span>Go Live</span>
-            </button>
-
-            <!-- Stealth Mode Header Button -->
-            <button
-              id="btnTopStealthMode"
-              type="button"
-              class="app-no-drag flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20"
-              title="Alternar Modo Stealth (Ctrl+Alt+S) — Invisível no Zoom/Meet/Teams e na barra de tarefas"
-            >
-              <svg id="iconStealthShield" class="h-3.5 w-3.5 transition-colors text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <button id="btnTopStealthMode" type="button" class="app-no-drag stealth-chip" data-active="false" title="Screen-share protection (Ctrl+Alt+S)">
+              <svg id="iconStealthShield" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
               </svg>
-              <span id="labelTopStealth">Stealth ON</span>
-              <span id="indicatorTopStealth" class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span id="labelTopStealth">Visible</span>
+              <span id="indicatorTopStealth" class="h-1.5 w-1.5 rounded-full bg-muted-foreground/40"></span>
             </button>
 
-            <!-- Settings Cog Button -->
-            <button
-              id="btnTopOpenSettings"
-              type="button"
-              class="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors cursor-pointer"
-              title="Settings"
-            >
+            <button id="btnTopGoLive" type="button" class="sh-btn-live ml-1">
+              <span class="h-1.5 w-1.5 rounded-full bg-[#E11D48]"></span>
+              <span>Go live</span>
+            </button>
+
+            <div class="mx-1.5 h-4 w-px bg-border"></div>
+
+            <button id="btnTopOpenSettings" type="button" class="icon-btn" title="Settings" aria-label="Settings">
               <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="3"/>
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
               </svg>
             </button>
-
-            <!-- Help Icon -->
-            <button
-              id="btnHelpTooltip"
-              type="button"
-              class="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors cursor-pointer"
-              title="Atalhos do Overlay e Ajuda"
-            >
+            <button id="btnHelpTooltip" type="button" class="icon-btn" title="Overlay shortcuts and help" aria-label="Help">
               <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="10" />
                 <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
@@ -286,342 +190,179 @@
               </svg>
             </button>
 
-            <div class="mx-1 h-3.5 w-[1px] bg-border"></div>
+            <div class="mx-1.5 h-4 w-px bg-border"></div>
 
-            <!-- Window Controls -->
-            <div class="flex items-center gap-0.5">
-              <button
-                type="button"
-                data-win="minimize"
-                class="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors cursor-pointer"
-                title="Minimize"
-              >
-                <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
+            <div class="flex items-center">
+              <button type="button" data-win="minimize" class="icon-btn" title="Minimize" aria-label="Minimize">
+                <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12" /></svg>
               </button>
-              <button
-                type="button"
-                data-win="maximize"
-                class="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors cursor-pointer"
-                title="Maximize"
-              >
-                <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="4" y="4" width="16" height="16" rx="2" />
-                </svg>
+              <button type="button" data-win="maximize" class="icon-btn" title="Maximize" aria-label="Maximize">
+                <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2" /></svg>
               </button>
-              <button
-                type="button"
-                data-win="close"
-                class="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-destructive hover:text-white transition-colors cursor-pointer"
-                title="Close"
-              >
-                <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
+              <button type="button" data-win="close" class="icon-btn hover:!bg-destructive hover:!text-white" title="Close" aria-label="Close">
+                <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
               </button>
             </div>
           </div>
         </header>
 
         <!-- Main Scrollable Canvas -->
-        <main class="flex-1 overflow-y-auto px-10 py-8">
+        <main class="flex-1 overflow-y-auto px-8 py-10">
           <!-- ==================== VIEW 1: GOALS (IMAGE 5) ==================== -->
           <section id="view-goals" class="view-pane active">
-            <div class="mx-auto max-w-[840px] space-y-7">
-              <!-- ==================== SIGNATURE HERO SPOTLIGHT (IMAGE 2) ==================== -->
-              <div class="space-y-4">
-                <!-- Top Action Header Row (Image 2 style) -->
-                <div class="flex flex-wrap items-center justify-between gap-4 pb-1">
-                  <div class="flex flex-wrap items-center gap-3">
-                    <h1 class="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-                      <span>My RealTimeAI</span>
-                      <button id="btnRefreshHero" type="button" class="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground transition-all cursor-pointer" title="Refresh workspace">
-                        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M21 21v-5h-5"/></svg>
-                      </button>
-                    </h1>
-
-                    <!-- Pill: Detectable / Stealth Toggle (from Image 2) -->
-                    <div id="heroStealthPill" class="flex items-center gap-2 rounded-full border border-border/80 bg-accent/40 px-3 py-1 text-xs text-muted-foreground hover:border-border transition-colors">
-                      <svg class="h-3.5 w-3.5 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                      <span id="labelHeroStealth" class="font-medium text-foreground">Stealth</span>
-                      <label class="relative inline-flex items-center cursor-pointer">
-                        <input id="toggleHeroStealth" type="checkbox" checked class="peer sr-only" />
-                        <span class="h-4 w-7 rounded-full bg-muted peer-checked:bg-emerald-500 transition-colors inline-block relative after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:h-3 after:w-3 after:rounded-full after:transition-all peer-checked:after:translate-x-3"></span>
-                      </label>
-                    </div>
-
-                    <!-- Pill: What's New in v2.0 (from Image 2) -->
-                    <button id="btnHeroWhatsNew" type="button" class="flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-all cursor-pointer">
-                      <span>What's New in v2.0</span>
-                      <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
+            <div class="mx-auto max-w-[880px] space-y-8">
+              <!-- ==================== HOME: greeting + primary action ==================== -->
+              <div class="flex flex-wrap items-end justify-between gap-4">
+                <div class="min-w-0">
+                  <h1 class="flex items-center gap-2 text-[22px] font-semibold tracking-tight text-foreground">
+                    <span id="homeGreeting">Welcome back</span>
+                    <button id="btnRefreshHero" type="button" class="icon-btn h-7 w-7" title="Refresh workspace" aria-label="Refresh workspace">
+                      <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M21 21v-5h-5"/></svg>
                     </button>
-                  </div>
-
-                  <!-- Glowing Start Pill Action Button (Image 2 style) -->
-                  <button id="btnHeroStartApp" type="button" class="flex items-center gap-2 rounded-full bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer">
-                    <div class="flex h-5 w-5 items-center justify-center rounded-full bg-white/20">
-                      <svg class="h-3 w-3 fill-current text-white" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                    </div>
-                    <span>Start RealTimeAI</span>
-                  </button>
-                </div>
-
-                <!-- Twin Hero Cards Side-by-Side (from Image 2) -->
-                <div class="grid grid-cols-1 md:grid-cols-12 gap-5">
-                  <!-- Card 1: AI Engine Spotlight Banner -->
-                  <div class="md:col-span-7 relative overflow-hidden rounded-2xl border border-blue-500/20 bg-gradient-to-br from-blue-950/70 via-slate-950 to-indigo-950/60 p-6 shadow-xl shadow-blue-950/20 flex flex-col justify-between group hover:border-blue-500/30 transition-all">
-                    <div class="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-blue-500/10 blur-2xl pointer-events-none"></div>
-                    <div class="space-y-2 relative z-10">
-                      <div class="inline-flex items-center gap-1.5 rounded-full bg-blue-500/20 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-blue-400">
-                        <span class="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse"></span>
-                        Ultra-Fast Intelligence
-                      </div>
-                      <h2 class="text-2xl font-extrabold tracking-tight text-white">STAR Copilot AI</h2>
-                      <p class="text-xs text-blue-200/80 leading-relaxed max-w-md">
-                        Zero-latency streaming answers with real-time speech transcription. STAR framework behavioral responses formulated from your resume and materials.
-                      </p>
-                      <div class="pt-2 flex flex-wrap items-center gap-3 text-[11px] text-blue-300/70">
-                        <span class="flex items-center gap-1">⚡ Ultra-fast streaming</span>
-                        <span>•</span>
-                        <span class="flex items-center gap-1">🛡️ DPAPI Encrypted</span>
-                        <span>•</span>
-                        <span class="flex items-center gap-1">🎙️ Deepgram Nova-3</span>
-                      </div>
-                    </div>
-                    <div class="pt-5 relative z-10 flex items-center justify-between">
-                      <button id="btnHeroModelAction" type="button" class="rounded-full bg-amber-400 px-4 py-2 text-xs font-bold text-slate-950 hover:bg-amber-300 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer flex items-center gap-1.5 shadow-md shadow-amber-400/20">
-                        <span>Active Model: Qwen 3.6 Flash</span>
-                        <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-                      </button>
-                      <span class="text-[11px] font-mono text-blue-400/80">v2.0.0</span>
-                    </div>
-                  </div>
-
-                  <!-- Card 2: Calendar & Upcoming Meeting Card -->
-                  <div class="md:col-span-5 relative overflow-hidden rounded-2xl border border-purple-500/20 bg-gradient-to-br from-indigo-950/70 via-purple-950/50 to-slate-950 p-6 shadow-xl shadow-purple-950/20 flex flex-col justify-between group hover:border-purple-500/30 transition-all">
-                    <div class="absolute -right-8 -bottom-8 h-40 w-40 rounded-full bg-purple-500/10 blur-2xl pointer-events-none"></div>
-                    <div class="space-y-2 relative z-10">
-                      <h3 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
-                        <span>Link your calendar</span>
-                        <span class="rounded bg-purple-500/20 px-1.5 py-0.2 text-[10px] font-bold text-purple-300 uppercase">Live Sync</span>
-                      </h3>
-                      <p class="text-xs text-purple-200/80 leading-relaxed">
-                        See upcoming interviews and let RealTimeAI automatically prepare questions and reminders before calls start.
-                      </p>
-                      
-                      <!-- Live mini event widget pill -->
-                      <div id="heroCalendarEventWidget" class="mt-3 rounded-xl border border-white/10 bg-white/5 p-3 flex items-center justify-between gap-3">
-                        <div class="flex items-center gap-2.5 min-w-0">
-                          <div class="flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded-lg bg-blue-600 text-white font-bold leading-none text-center">
-                            <span class="text-[8px] uppercase tracking-tighter opacity-80">MON</span>
-                            <span class="text-sm font-extrabold">26</span>
-                          </div>
-                          <div class="min-w-0">
-                            <div id="heroEventTitle" class="text-xs font-semibold text-white truncate">NUBANK - Estágio</div>
-                            <div id="heroEventSub" class="text-[10px] text-purple-200/70 truncate">Tomorrow · 4:30 pm · Reminders Active</div>
-                          </div>
-                        </div>
-                        <div class="flex -space-x-1.5 shrink-0">
-                          <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-purple-600 text-[9px] font-bold text-white ring-2 ring-slate-900">R</span>
-                          <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[9px] font-bold text-white ring-2 ring-slate-900">AI</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div class="pt-4 relative z-10">
-                      <button id="btnHeroConnectCalendar" type="button" class="w-full rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold text-white hover:bg-white/20 hover:border-white/20 transition-all cursor-pointer flex items-center justify-center gap-2">
-                        <svg class="h-3.5 w-3.5 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                        <span>Manage Calendar Sync</span>
-                        <svg class="h-3 w-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Top Title Row -->
-              <div class="flex items-start justify-between">
-                <div>
-                  <div class="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                    INTERVIEW HORIZON
-                  </div>
-                  <h1 class="text-2xl font-bold tracking-tight text-foreground mt-0.5">
-                    Goals
                   </h1>
-                  <p id="goalsCountSubtitle" class="text-[13px] text-muted-foreground mt-0.5">
-                    0 current goals · 0 upcoming interviews
+                  <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted-foreground">
+                    <span id="homeStatusLine">Everything is ready for your next interview.</span>
+                    <span class="text-muted-foreground/40" aria-hidden="true">/</span>
+                    <button id="btnHeroWhatsNew" type="button" class="link-quiet">What's new in <span id="homeWhatsNewVersion">v2.0</span></button>
                   </p>
                 </div>
 
-                <button
-                  id="btnCanvasNewGoal"
-                  type="button"
-                  class="text-[13px] font-medium text-foreground hover:underline cursor-pointer pt-1"
-                >
-                  + New goal
+                <button id="btnHeroStartApp" type="button" class="sh-btn-solid h-10 px-5 text-[13.5px]">
+                  <span class="h-1.5 w-1.5 rounded-full bg-live" aria-hidden="true"></span>
+                  <span id="heroStartLabel" data-ab="ab_start_cta" data-ab-start_session="Start session" data-ab-go_live="Go live">Start session</span>
                 </button>
               </div>
 
-              <!-- Getting Started Card ("Four steps to your first debrief" - Image 5) -->
-              <div
-                id="gettingStartedCard"
-                class="rounded-lg border border-amber-900/10 dark:border-border/70 bg-[#FDFBF7] dark:bg-card p-6 relative transition-all"
-              >
-                <div class="flex items-center justify-between mb-2">
-                  <span class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    GETTING STARTED
-                  </span>
-                  <button
-                    id="btnDismissGettingStarted"
-                    type="button"
-                    class="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
-                  >
-                    Dismiss
+              <!-- ==================== HOME: three quiet status tiles ==================== -->
+              <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <!-- Next interview -->
+                <div id="heroCalendarEventWidget" data-flag="home_next_interview" class="tile">
+                  <div class="tile-label">Next interview</div>
+                  <div class="mt-3 flex items-center gap-3 min-w-0">
+                    <div class="date-chip" aria-hidden="true">
+                      <span id="heroEventWeekday">—</span>
+                      <span id="heroEventDay" class="text-[15px] font-semibold text-foreground">—</span>
+                    </div>
+                    <div class="min-w-0">
+                      <div id="heroEventTitle" class="truncate text-[13.5px] font-medium text-foreground">Nothing scheduled</div>
+                      <div id="heroEventSub" class="truncate text-xs text-muted-foreground">Add a date inside a goal</div>
+                    </div>
+                  </div>
+                  <button id="btnHeroConnectCalendar" type="button" class="tile-action">
+                    <span>Calendar sync</span>
+                    <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
                   </button>
                 </div>
 
-                <h2 class="text-base font-bold text-foreground mb-4">
-                  Four steps to your first debrief
-                </h2>
+                <!-- Answer model -->
+                <button id="btnHeroModelAction" type="button" class="tile text-left">
+                  <span class="tile-label">Answer model</span>
+                  <span id="heroModelName" class="mt-3 block truncate text-[13.5px] font-medium text-foreground">Qwen 3.6 Flash</span>
+                  <span class="block text-xs text-muted-foreground">Streaming STAR answers from your materials</span>
+                  <span class="tile-action">
+                    <span>Change model</span>
+                    <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                  </span>
+                </button>
 
-                <div class="space-y-3.5 text-[13.5px]">
-                  <div class="flex items-baseline justify-between gap-4">
-                    <div>
-                      <span id="step1Number" class="font-semibold text-foreground mr-2">1</span>
-                      <span id="step1Check" class="hidden text-emerald-600 dark:text-emerald-400 font-bold mr-2">✓</span>
-                      <span class="font-semibold text-foreground">Create a goal</span>
-                      <p class="text-xs text-muted-foreground pl-5 mt-0.5">
-                        One role at one company. Two fields are enough.
-                      </p>
+                <!-- Visibility -->
+                <div id="heroStealthPill" class="tile">
+                  <div class="tile-label">Screen sharing</div>
+                  <div class="mt-3 flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                      <div id="labelHeroStealth" class="text-[13.5px] font-medium text-foreground">Detectable</div>
+                      <div class="text-xs text-muted-foreground">Hide the app from recordings</div>
                     </div>
-                    <button
-                      type="button"
-                      id="stepCreateGoalLink"
-                      class="text-xs font-medium text-foreground hover:underline cursor-pointer shrink-0"
-                    >
-                      New goal →
-                    </button>
+                    <label class="relative inline-flex cursor-pointer items-center">
+                      <input id="toggleHeroStealth" type="checkbox" class="peer sr-only" />
+                      <span class="sh-switch"></span>
+                    </label>
                   </div>
-
-                  <div class="flex items-baseline justify-between gap-4">
-                    <div>
-                      <span id="step2Number" class="font-semibold text-foreground mr-2">2</span>
-                      <span id="step2Check" class="hidden text-emerald-600 dark:text-emerald-400 font-bold mr-2">✓</span>
-                      <span class="font-semibold text-foreground">Add your resume</span>
-                      <p class="text-xs text-muted-foreground pl-5 mt-0.5">
-                        Upload your PDF in the Library. The copilot stays faithful to your real experiences.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      id="stepAddResumeLink"
-                      class="text-xs font-medium text-foreground hover:underline cursor-pointer shrink-0"
-                    >
-                      Open Library →
-                    </button>
-                  </div>
-
-                  <div class="flex items-baseline justify-between gap-4">
-                    <div>
-                      <span id="step3Number" class="font-semibold text-foreground mr-2">3</span>
-                      <span id="step3Check" class="hidden text-emerald-600 dark:text-emerald-400 font-bold mr-2">✓</span>
-                      <span class="font-semibold text-foreground">Run a practice session</span>
-                      <p class="text-xs text-muted-foreground pl-5 mt-0.5">
-                        Launch Demo mode to test latency and see the AI answer in real-time.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      id="stepDemoLink"
-                      class="text-xs font-medium text-foreground hover:underline cursor-pointer shrink-0"
-                    >
-                      Test Demo →
-                    </button>
-                  </div>
-
-                  <div class="flex items-baseline justify-between gap-4">
-                    <div>
-                      <span id="step4Number" class="font-semibold text-foreground mr-2">4</span>
-                      <span id="step4Check" class="hidden text-emerald-600 dark:text-emerald-400 font-bold mr-2">✓</span>
-                      <span class="font-semibold text-foreground">Read your debrief</span>
-                      <p class="text-xs text-muted-foreground pl-5 mt-0.5">
-                        All conversation turns and suggestions are stored in History.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      id="stepHistoryLink"
-                      class="text-xs font-medium text-foreground hover:underline cursor-pointer shrink-0"
-                    >
-                      View History →
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Walkthrough Video Card -->
-                <div class="mt-5 pt-4 border-t border-border/50 flex flex-wrap items-center justify-between gap-4">
-                  <div class="inline-flex items-center gap-3 rounded-lg bg-background/80 px-3.5 py-2.5 border border-border/70 shadow-sm">
-                    <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-foreground">
-                      <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-                        <polygon points="5 3 19 12 5 21 5 3" />
-                      </svg>
-                    </div>
-                    <div>
-                      <div class="text-xs font-semibold text-foreground">Watch the walkthrough</div>
-                      <div class="text-[11px] text-muted-foreground">3:49 min · How to use in interviews</div>
-                    </div>
-                  </div>
-
-                  <a
-                    href="#"
-                    id="linkFirstSessionGuide"
-                    class="text-xs font-medium text-muted-foreground hover:text-foreground"
-                  >
-                    Prefer to read? First-session guide ↗
-                  </a>
+                  <span class="tile-action pointer-events-none opacity-0" aria-hidden="true">&nbsp;</span>
                 </div>
               </div>
 
-              <!-- Filter & Search Controls (Image 5) -->
-              <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
-                <div class="flex items-center gap-4 text-xs font-medium">
-                  <button
-                    id="tabFilterCurrent"
-                    type="button"
-                    class="text-foreground font-semibold border-b-2 border-foreground pb-1 cursor-pointer"
-                  >
-                    Current · <span id="currentGoalsFilterCount">0</span>
-                  </button>
-                  <button
-                    id="tabFilterArchived"
-                    type="button"
-                    class="text-muted-foreground hover:text-foreground pb-1 cursor-pointer"
-                  >
-                    Archived · 0
+              <!-- ==================== HOME: getting started (flag) ==================== -->
+              <div id="gettingStartedCard" data-flag="getting_started_card" class="rounded-xl border border-border/70 bg-card">
+                <div class="flex items-center justify-between px-5 pt-4">
+                  <div>
+                    <h2 class="text-[13.5px] font-semibold text-foreground">Get set up</h2>
+                    <p class="text-xs text-muted-foreground">Four steps to your first debrief</p>
+                  </div>
+                  <button id="btnDismissGettingStarted" type="button" class="link-quiet text-xs">Dismiss</button>
+                </div>
+                <ol class="mt-2 divide-y divide-border/60">
+                  <li class="step-row">
+                    <span class="step-index"><span id="step1Number">1</span><span id="step1Check" class="hidden">✓</span></span>
+                    <div class="min-w-0 flex-1">
+                      <div class="text-[13px] font-medium text-foreground">Create a goal</div>
+                      <div class="text-xs text-muted-foreground">One role at one company. Two fields are enough.</div>
+                    </div>
+                    <button type="button" id="stepCreateGoalLink" class="step-link">New goal</button>
+                  </li>
+                  <li class="step-row">
+                    <span class="step-index"><span id="step2Number">2</span><span id="step2Check" class="hidden">✓</span></span>
+                    <div class="min-w-0 flex-1">
+                      <div class="text-[13px] font-medium text-foreground">Add your resume</div>
+                      <div class="text-xs text-muted-foreground">Upload a PDF in the Library so answers stay true to your experience.</div>
+                    </div>
+                    <button type="button" id="stepAddResumeLink" class="step-link">Open Library</button>
+                  </li>
+                  <li class="step-row">
+                    <span class="step-index"><span id="step3Number">3</span><span id="step3Check" class="hidden">✓</span></span>
+                    <div class="min-w-0 flex-1">
+                      <div class="text-[13px] font-medium text-foreground">Run a practice session</div>
+                      <div class="text-xs text-muted-foreground">Demo mode shows latency and answers without a real call.</div>
+                    </div>
+                    <button type="button" id="stepDemoLink" class="step-link">Try demo</button>
+                  </li>
+                  <li class="step-row">
+                    <span class="step-index"><span id="step4Number">4</span><span id="step4Check" class="hidden">✓</span></span>
+                    <div class="min-w-0 flex-1">
+                      <div class="text-[13px] font-medium text-foreground">Read your debrief</div>
+                      <div class="text-xs text-muted-foreground">Every turn and suggestion is saved in History.</div>
+                    </div>
+                    <button type="button" id="stepHistoryLink" class="step-link">View History</button>
+                  </li>
+                </ol>
+                <div class="flex justify-end border-t border-border/60 px-5 py-3">
+                  <a href="#" id="linkFirstSessionGuide" class="link-quiet text-xs">First-session guide ↗</a>
+                </div>
+              </div>
+
+              <!-- ==================== HOME: goals ==================== -->
+              <div class="space-y-3">
+                <div class="flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <h2 class="text-[15px] font-semibold text-foreground">Goals</h2>
+                    <p id="goalsCountSubtitle" class="text-xs text-muted-foreground">0 current goals · 0 upcoming interviews</p>
+                  </div>
+                  <button id="btnCanvasNewGoal" type="button" class="sh-btn-outline">
+                    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    New goal
                   </button>
                 </div>
 
-                <div class="flex items-center gap-2.5">
-                  <div class="relative">
-                    <svg class="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <circle cx="11" cy="11" r="8" />
-                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                    </svg>
-                    <input
-                      id="inputSearchGoals"
-                      type="text"
-                      class="h-8.5 rounded-lg border border-input bg-card pl-9 pr-3 text-xs placeholder:text-muted-foreground/60 w-44 focus:w-56 transition-all"
-                      placeholder="Search goals"
-                    />
+                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-border/60">
+                  <div class="flex items-center gap-4 text-xs font-medium">
+                    <button id="tabFilterCurrent" type="button" class="text-foreground font-semibold border-b-2 border-foreground pb-2 -mb-px cursor-pointer">
+                      Current · <span id="currentGoalsFilterCount">0</span>
+                    </button>
+                    <button id="tabFilterArchived" type="button" class="text-muted-foreground hover:text-foreground pb-2 -mb-px cursor-pointer">
+                      Archived · 0
+                    </button>
                   </div>
-
-                  <select id="selectGoalsSort" class="h-8.5 rounded-lg border border-input bg-card px-2.5 text-xs text-muted-foreground">
-                    <option value="default">Default order</option>
-                    <option value="recent">Most recent</option>
-                    <option value="name">Alphabetical</option>
-                  </select>
+                  <div class="flex items-center gap-2 pb-2">
+                    <div class="relative">
+                      <svg class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                      <input id="inputSearchGoals" type="text" class="h-8 w-40 rounded-md border border-input bg-transparent pl-8 pr-3 text-xs placeholder:text-muted-foreground/60 transition-all focus:w-52 focus:border-foreground/30 focus:outline-none" placeholder="Search goals" />
+                    </div>
+                    <select id="selectGoalsSort" class="h-8 rounded-md border border-input bg-transparent px-2 text-xs text-muted-foreground focus:outline-none">
+                      <option value="default">Default order</option>
+                      <option value="recent">Most recent</option>
+                      <option value="name">Alphabetical</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -721,7 +462,7 @@
                         <span class="stage-check text-primary font-bold hidden">✓</span>
                       </button>
                       <button type="button" data-stage="I got the offer" class="stage-option-btn w-full text-left px-2.5 py-1.5 text-xs rounded hover:bg-accent flex items-center justify-between text-emerald-600 dark:text-emerald-400 font-medium cursor-pointer">
-                        <span>I got the offer 🎉</span>
+                        <span>I got the offer</span>
                         <span class="stage-check text-primary font-bold hidden">✓</span>
                       </button>
                       <div class="my-1 border-t border-border/60"></div>
@@ -1235,75 +976,90 @@
                     </div>
 
                     <div class="space-y-8">
-                      <!-- Version & Updates (matching Image 3 & Image 4) -->
+                      <!-- Version & Updates: real GitHub Releases via electron-updater -->
                       <section class="space-y-3" aria-labelledby="updatesHeading">
                         <div>
-                          <h3 id="updatesHeading" class="text-sm font-semibold text-foreground flex items-center gap-2">
-                            <span>Version & Updates</span>
-                            <span class="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">v2.0.0</span>
-                          </h3>
-                          <p class="mt-0.5 text-xs text-muted-foreground">Manage your RealTimeAI release channel, automatic updates and check for new versions.</p>
+                          <h3 id="updatesHeading" class="text-sm font-semibold text-foreground">Updates</h3>
+                          <p class="mt-0.5 text-xs text-muted-foreground">New versions are published from GitHub and installed when you restart.</p>
                         </div>
 
                         <div class="divide-y divide-border/70 overflow-hidden rounded-xl border border-border/70 bg-card">
-                          <!-- Version Status Row (Image 3 & 4) -->
                           <div class="flex items-center justify-between gap-6 px-4 py-3.5">
-                            <div class="flex items-center gap-3">
-                              <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-accent/60 text-primary">
-                                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 11 12 14 22 4"/></svg>
+                            <div class="min-w-0">
+                              <div class="flex items-center gap-2 text-[13px] font-medium text-foreground">
+                                <span>RealTimeAI <span id="settingsVersionLabel" class="font-mono">2.0.0</span></span>
+                                <span id="settingsChannelBadge" class="badge-quiet">Stable</span>
                               </div>
-                              <div>
-                                <div class="text-[13px] font-medium text-foreground">Version</div>
-                                <div id="updateStatusText" class="mt-0.5 text-xs text-muted-foreground">You are currently using RealTimeAI version 2.0.0</div>
-                              </div>
+                              <div id="updateStatusText" class="mt-0.5 text-xs text-muted-foreground">Checking for updates…</div>
                             </div>
-                            <button id="btnCheckUpdates" type="button" class="sh-btn-outline shrink-0 text-xs flex items-center gap-1.5 cursor-pointer">
+                            <button id="btnCheckUpdates" type="button" class="sh-btn-outline shrink-0">
                               <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M21 21v-5h-5"/></svg>
-                              <span>Check</span>
+                              <span>Check now</span>
                             </button>
                           </div>
 
-                          <!-- Auto-Update Toggle (Config) -->
+                          <!-- Shown while an update is available / downloading / ready -->
+                          <div id="updateBanner" class="hidden space-y-3 px-4 py-3.5">
+                            <div class="flex items-center justify-between gap-4">
+                              <div class="min-w-0">
+                                <div id="updateBannerTitle" class="text-[13px] font-medium text-foreground">Version available</div>
+                                <div id="updateBannerNotes" class="mt-0.5 line-clamp-2 text-xs text-muted-foreground"></div>
+                              </div>
+                              <div class="flex shrink-0 items-center gap-2">
+                                <button id="btnDownloadUpdate" type="button" class="sh-btn-primary h-8 px-3 text-xs">Download</button>
+                                <button id="btnRestartUpdate" type="button" class="hidden sh-btn-primary h-8 px-3 text-xs">Restart to update</button>
+                              </div>
+                            </div>
+                            <div id="updateProgressBarContainer" class="hidden space-y-1">
+                              <div class="h-1 w-full overflow-hidden rounded-full bg-muted">
+                                <div id="updateProgressBar" class="h-full bg-primary transition-all duration-300" style="width: 0%"></div>
+                              </div>
+                              <div id="updateProgressPercent" class="text-[11px] tabular-nums text-muted-foreground">Downloading… 0%</div>
+                            </div>
+                          </div>
+
                           <label class="flex cursor-pointer items-center justify-between gap-6 px-4 py-3.5 transition-colors hover:bg-accent/30">
                             <div>
-                              <div class="text-[13px] font-medium text-foreground">Automatic updates</div>
-                              <div class="mt-0.5 text-xs text-muted-foreground">Automatically check and download updates in the background when a new version is released.</div>
+                              <div class="text-[13px] font-medium text-foreground">Download updates automatically</div>
+                              <div class="mt-0.5 text-xs text-muted-foreground">Checks every few hours. The update installs the next time the app restarts.</div>
                             </div>
                             <input id="cfgAutoUpdate" type="checkbox" checked class="peer sr-only" />
                             <span class="sh-switch" aria-hidden="true"></span>
                           </label>
                         </div>
+                      </section>
 
-                        <!-- Update Download Banner (Visible when update detected) -->
-                        <div id="updateBanner" class="hidden rounded-xl border border-blue-500/30 bg-blue-500/10 p-4 space-y-3">
-                          <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-2">
-                              <span class="flex h-2 w-2 rounded-full bg-blue-500 animate-pulse"></span>
-                              <span class="text-xs font-bold text-blue-600 dark:text-blue-400">Update Available: RealTimeAI v2.1.0</span>
+                      <!-- Beta channel & feature flags -->
+                      <section class="space-y-3" aria-labelledby="betaHeading">
+                        <div>
+                          <h3 id="betaHeading" class="text-sm font-semibold text-foreground">Beta and experiments</h3>
+                          <p class="mt-0.5 text-xs text-muted-foreground">Beta testers get pre-release builds and features that are not public yet.</p>
+                        </div>
+
+                        <div class="divide-y divide-border/70 overflow-hidden rounded-xl border border-border/70 bg-card">
+                          <div class="flex items-center justify-between gap-6 px-4 py-3.5">
+                            <div>
+                              <div class="text-[13px] font-medium text-foreground">Release channel</div>
+                              <div class="mt-0.5 text-xs text-muted-foreground">Switching back to Stable keeps the current build until a newer stable release ships.</div>
                             </div>
-                            <span class="text-[11px] font-mono text-muted-foreground">46.8 MB</span>
-                          </div>
-                          <p class="text-xs text-muted-foreground">
-                            Includes next-generation STAR reasoning, process disguise options and hardware-accelerated Direct2D HUD rendering.
-                          </p>
-                          <div id="updateProgressBarContainer" class="hidden space-y-1">
-                            <div class="h-2 w-full overflow-hidden rounded-full bg-accent">
-                              <div id="updateProgressBar" class="h-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300" style="width: 0%"></div>
-                            </div>
-                            <div class="flex justify-between text-[10px] text-muted-foreground">
-                              <span id="updateProgressPercent">Downloading... 0%</span>
-                              <span>14.8 MB/s</span>
+                            <div class="segmented shrink-0" role="group" aria-label="Release channel">
+                              <button type="button" data-update-channel="stable" aria-pressed="true">Stable</button>
+                              <button type="button" data-update-channel="beta" aria-pressed="false">Beta</button>
                             </div>
                           </div>
-                          <div class="flex items-center gap-2 pt-1">
-                            <button id="btnDownloadUpdate" type="button" class="sh-btn-primary text-xs px-3.5 py-1.5 flex items-center gap-1.5 cursor-pointer">
-                              <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                              <span>Download & Install v2.1.0</span>
-                            </button>
-                            <button id="btnRestartUpdate" type="button" class="hidden sh-btn-live text-xs px-3.5 py-1.5 flex items-center gap-1.5 cursor-pointer">
-                              <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-                              <span>Restart & Apply Update</span>
-                            </button>
+
+                          <div>
+                            <div class="flex items-center justify-between gap-4 px-4 pt-3.5">
+                              <div class="text-[13px] font-medium text-foreground">Feature flags</div>
+                              <div class="flex items-center gap-1">
+                                <button id="btnRefreshFlags" type="button" class="step-link">Refresh</button>
+                                <button id="btnResetFlags" type="button" class="step-link">Reset overrides</button>
+                              </div>
+                            </div>
+                            <div id="flagsList" class="divide-y divide-border/50"></div>
+                            <div class="px-4 pb-3 pt-1 text-[11px] text-muted-foreground/80">
+                              <span id="flagsMeta">Install ID —</span>
+                            </div>
                           </div>
                         </div>
                       </section>
@@ -1601,12 +1357,12 @@
                             </div>
                           </div>
 
-                          <!-- 4. DIRECT ASSIST (BETA) -->
-                          <label class="flex cursor-pointer items-center justify-between gap-6 rounded-xl border border-border/70 bg-card p-4 hover:bg-accent/20 transition-colors">
+                          <!-- 4. DIRECT ASSIST (BETA, gated by the direct_assist flag) -->
+                          <label data-flag="direct_assist" class="flex cursor-pointer items-center justify-between gap-6 rounded-xl border border-border/70 bg-card p-4 hover:bg-accent/20 transition-colors">
                             <div>
                               <div class="flex items-center gap-2">
                                 <span class="text-[13px] font-semibold text-foreground uppercase tracking-wide">DIRECT ASSIST</span>
-                                <span class="rounded bg-blue-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-400">BETA</span>
+                                <span class="badge-quiet">Beta</span>
                               </div>
                               <div class="text-xs text-muted-foreground mt-0.5">Sends your typed, spoken, screenshot, and page input straight to the model, unprocessed.</div>
                             </div>
@@ -2044,7 +1800,7 @@
                           <span id="inputLevelValue" class="font-mono text-[11px]">-48 dB</span>
                         </div>
                         <div class="h-2 w-full overflow-hidden rounded-full bg-accent/60">
-                          <div id="meterInputLevel" class="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-400 transition-all duration-100" style="width: 20%"></div>
+                          <div id="meterInputLevel" class="h-full bg-emerald-500 transition-all duration-100" style="width: 20%"></div>
                         </div>
                       </div>
 
@@ -2054,7 +1810,7 @@
                           <span id="systemAudioLevelValue" class="font-mono text-[11px]">-60 dB</span>
                         </div>
                         <div class="h-2 w-full overflow-hidden rounded-full bg-accent/60">
-                          <div id="meterSystemAudioLevel" class="h-full bg-gradient-to-r from-blue-500 via-indigo-400 to-purple-400 transition-all duration-100" style="width: 15%"></div>
+                          <div id="meterSystemAudioLevel" class="h-full bg-primary transition-all duration-100" style="width: 15%"></div>
                         </div>
                       </div>
                     </div>
@@ -2582,7 +2338,7 @@
               type="button"
               class="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline cursor-pointer"
             >
-              <span>✨ Research company automatically</span>
+              <span>Research company automatically</span>
             </button>
           </div>
 
@@ -2998,50 +2754,33 @@
       </div>
     </div>
 
-    <!-- Modal: What's New & App Update (matching Image 2 & Image 3) -->
+    <!-- Modal: release notes & update -->
     <div id="modalAppUpdate" class="sh-modal-backdrop">
-      <div class="sh-card w-full max-w-lg p-6 space-y-5 relative">
-        <button id="btnCloseUpdateModal" type="button" class="absolute right-4 top-4 sh-btn-ghost text-base cursor-pointer">✕</button>
+      <div class="sh-card relative w-full max-w-md space-y-5 p-6">
+        <button id="btnCloseUpdateModal" type="button" class="icon-btn absolute right-3 top-3" aria-label="Close">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
 
-        <div class="flex items-center gap-3 border-b border-border/80 pb-4">
-          <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 text-white shadow-md shadow-blue-500/30 font-extrabold text-sm">
-            RTAI
+        <div>
+          <div class="flex items-center gap-2">
+            <h3 class="text-[15px] font-semibold text-foreground">What's new</h3>
+            <span id="modalUpdateVersionTag" class="badge-quiet">v2.0.0</span>
           </div>
-          <div>
-            <div class="flex items-center gap-2">
-              <h3 class="text-base font-bold text-foreground">RealTimeAI Updates</h3>
-              <span id="modalUpdateVersionTag" class="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">v2.1.0 Available</span>
-            </div>
-            <p class="text-xs text-muted-foreground mt-0.5">Release notes and update installer</p>
-          </div>
+          <p id="modalUpdateSubtitle" class="mt-0.5 text-xs text-muted-foreground">You are on the latest version.</p>
         </div>
 
-        <div class="space-y-2 rounded-xl border border-border/60 bg-accent/20 p-4">
-          <div class="text-xs font-bold text-foreground uppercase tracking-wider">What's New in This Release</div>
-          <ul id="modalUpdateNotes" class="space-y-1.5 text-xs text-muted-foreground pt-1">
-            <li class="flex items-start gap-2"><span>⚡</span><span>Sub-200ms TTFT speculative STAR reasoning engine</span></li>
-            <li class="flex items-start gap-2"><span>🛡️</span><span>Process Disguise: Disguise as Settings, CMD, or Task Manager</span></li>
-            <li class="flex items-start gap-2"><span>🎚️</span><span>Dynamic Interface Opacity slider with live preview</span></li>
-            <li class="flex items-start gap-2"><span>🚀</span><span>Direct2D Hardware-accelerated HUD rendering with zero dropped frames</span></li>
-            <li class="flex items-start gap-2"><span>🔒</span><span>Enhanced anti-capture protection for Zoom, Meet, Teams and OBS</span></li>
-          </ul>
+        <div id="modalUpdateNotes" class="max-h-64 overflow-y-auto whitespace-pre-line rounded-lg border border-border/70 p-4 text-xs leading-relaxed text-muted-foreground">Release notes appear here when a new version is published.</div>
+
+        <div id="modalUpdateProgressContainer" class="hidden space-y-1">
+          <div class="h-1 w-full overflow-hidden rounded-full bg-muted">
+            <div id="modalUpdateProgressBar" class="h-full bg-primary transition-all duration-300" style="width: 0%"></div>
+          </div>
+          <div id="modalUpdateProgressPercent" class="text-[11px] tabular-nums text-muted-foreground">Downloading… 0%</div>
         </div>
 
-        <div id="modalUpdateProgressContainer" class="hidden space-y-1.5">
-          <div class="h-2.5 w-full overflow-hidden rounded-full bg-accent">
-            <div id="modalUpdateProgressBar" class="h-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300" style="width: 0%"></div>
-          </div>
-          <div class="flex justify-between text-[11px] text-muted-foreground font-mono">
-            <span id="modalUpdateProgressPercent">Downloading... 0%</span>
-            <span>46.8 MB Total</span>
-          </div>
-        </div>
-
-        <div class="flex items-center justify-end gap-3 pt-2">
-          <button id="btnModalDownloadUpdate" type="button" class="sh-btn-primary text-xs px-4 py-2 flex items-center gap-2 cursor-pointer shadow-md shadow-primary/20">
-            <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            <span>Download &amp; Install Update</span>
-          </button>
+        <div class="flex items-center justify-end gap-2">
+          <button id="btnModalOpenUpdateSettings" type="button" class="sh-btn-ghost text-xs">Update settings</button>
+          <button id="btnModalDownloadUpdate" type="button" class="sh-btn-primary h-8 px-3 text-xs">Check for updates</button>
         </div>
       </div>
     </div>

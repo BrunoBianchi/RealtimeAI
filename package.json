@@ -1,0 +1,22 @@
+{
+  "name": "realtimeai",
+  "version": "2.0.0",
+  "private": true,
+  "description": "RealTimeAI: real-time interview copilot (C++ overlay + Electron dashboard)",
+  "scripts": {
+    "prepare": "husky",
+    "test": "npm --prefix dashboard test",
+    "check:secrets": "node scripts/check-secrets.mjs --all",
+    "check:staged": "node scripts/check-secrets.mjs --staged",
+    "flags:validate": "node scripts/validate-flags.mjs",
+    "commitlint": "commitlint --edit"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "husky": "^9.1.7"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "include-component-in-tag": false,
+  "include-v-in-tag": true,
+  "pull-request-title-pattern": "chore(release): v${version}",
+  "packages": {
+    ".": {
+      "release-type": "node",
+      "package-name": "realtimeai",
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        { "type": "json", "path": "dashboard/package.json", "jsonpath": "$.version" },
+        { "type": "generic", "path": "CMakeLists.txt" }
+      ],
+      "changelog-sections": [
+        { "type": "feat", "section": "Novidades" },
+        { "type": "fix", "section": "Correções" },
+        { "type": "perf", "section": "Desempenho" },
+        { "type": "refactor", "section": "Refatoração", "hidden": true },
+        { "type": "docs", "section": "Documentação", "hidden": true },
+        { "type": "test", "section": "Testes", "hidden": true },
+        { "type": "build", "section": "Build", "hidden": true },
+        { "type": "ci", "section": "CI", "hidden": true },
+        { "type": "chore", "section": "Manutenção", "hidden": true }
+      ]
+    }
+  }
+}
