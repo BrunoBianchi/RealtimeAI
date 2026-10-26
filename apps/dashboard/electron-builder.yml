@@ -1,6 +1,7 @@
 # Windows installer + auto-update metadata.
-# CI (.github/workflows/release.yml) stages the native overlay into ./native
-# and overrides publish.owner/repo with the releases repository.
+# The native overlay is staged into ./native first (CI: build-windows.yml,
+# locally: scripts/windows/package.bat). Updates come from this repository's
+# GitHub releases; CI points publish at vars.RELEASES_REPO when it is set.
 appId: com.raiado.realtimeai
 productName: RealTimeAI
 copyright: Copyright © 2026 Bruno Raiado Bianchi
@@ -49,5 +50,5 @@ generateUpdatesFilesForAllChannels: true
 publish:
   provider: github
   owner: BrunoBianchi
-  repo: realtimeai-releases
+  repo: RealtimeAI
   releaseType: release
