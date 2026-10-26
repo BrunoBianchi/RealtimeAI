@@ -1,0 +1,140 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "cacheVariables": {
+        "RTAI_BUILD_TESTS": "ON",
+        "RTAI_ENABLE_LTO": "ON"
+      }
+    },
+    {
+      "name": "windows-release",
+      "displayName": "Windows (Visual Studio, x64) - app + hybrid RAG",
+      "description": "Default local/CI build. Output: build/bin/Release/rtai_app.exe",
+      "inherits": "base",
+      "binaryDir": "${sourceDir}/build",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "cacheVariables": {
+        "RTAI_ENABLE_EMBEDDINGS": "ON"
+      }
+    },
+    {
+      "name": "windows-lean",
+      "displayName": "Windows (Visual Studio, x64) - no ONNX Runtime",
+      "description": "Smallest build: BM25-only RAG and energy VAD (no download at configure)",
+      "inherits": "windows-release",
+      "cacheVariables": {
+        "RTAI_ENABLE_EMBEDDINGS": "OFF"
+      }
+    },
+    {
+      "name": "linux",
+      "displayName": "Linux - portable core + tests",
+      "description": "rtai_core and core_tests (the Windows adapters are skipped)",
+      "inherits": "base",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/linux",
+      "condition": {
+        "type": "notEquals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "linux-tsan",
+      "displayName": "Linux - ThreadSanitizer",
+      "inherits": "linux",
+      "binaryDir": "${sourceDir}/build/linux-tsan",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "RTAI_ENABLE_LTO": "OFF",
+        "CMAKE_CXX_FLAGS": "-fsanitize=thread -fno-omit-frame-pointer"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "windows-release",
+      "configurePreset": "windows-release",
+      "configuration": "Release"
+    },
+    {
+      "name": "windows-debug",
+      "configurePreset": "windows-release",
+      "configuration": "Debug"
+    },
+    {
+      "name": "windows-lean",
+      "configurePreset": "windows-lean",
+      "configuration": "Release"
+    },
+    {
+      "name": "linux",
+      "configurePreset": "linux"
+    },
+    {
+      "name": "linux-tsan",
+      "configurePreset": "linux-tsan"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "windows-release",
+      "configurePreset": "windows-release",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      },
+      "filter": {
+        "exclude": {
+          "name": "^Deepgram"
+        }
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "jobs": 4
+      }
+    },
+    {
+      "name": "linux",
+      "configurePreset": "linux",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "jobs": 4
+      }
+    },
+    {
+      "name": "linux-tsan",
+      "configurePreset": "linux-tsan",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
+      },
+      "filter": {
+        "exclude": {
+          "name": "UnderAMillisecond"
+        }
+      },
+      "description": "Wall-clock budget tests are skipped: TSan slows everything 5-15x"
+    }
+  ]
+}

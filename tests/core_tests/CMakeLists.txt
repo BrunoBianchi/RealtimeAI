@@ -1,21 +1,5 @@
-# Unit tests for the pure core. GoogleTest is pulled via FetchContent so no
-# external package manager is required; if vcpkg/the system provides GTest,
-# find_package is used instead.
-include(FetchContent)
-
-find_package(GTest CONFIG QUIET)
-
-if (NOT GTest_FOUND AND NOT TARGET GTest::gtest)
-    FetchContent_Declare(
-        googletest
-        GIT_REPOSITORY https://github.com/google/googletest.git
-        GIT_TAG v1.15.2
-    )
-    # For Windows / MSVC: don't override the parent project's runtime settings.
-    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-    FetchContent_MakeAvailable(googletest)
-endif()
-
+# Unit/property tests for the pure core (no network, no audio hardware).
+# GoogleTest comes from cmake/RtaiGoogleTest.cmake (included by the root).
 add_executable(core_tests
     test_audio_format.cpp
     test_resampler.cpp
@@ -60,11 +44,12 @@ add_executable(core_tests
 target_include_directories(core_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 
 target_link_libraries(core_tests PRIVATE
-    rtai_core
+    rtai::options
+    rtai::core
     GTest::gtest
     GTest::gtest_main
 )
+set_target_properties(core_tests PROPERTIES FOLDER "tests")
 
-include(GoogleTest)
 # Discover tests; DISCOVERY_MODE PRE_TEST avoids running the exe at configure.
 gtest_discover_tests(core_tests DISCOVERY_MODE PRE_TEST)

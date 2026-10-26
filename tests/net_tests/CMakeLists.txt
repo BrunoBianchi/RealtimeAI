@@ -1,25 +1,6 @@
 # Unit/property tests for the rtai_net adapter layer (Dual-Path Cold_Path:
 # JevAnalyticsClient builders/parsers, endpoint selection, keep-alive). These
 # exercise the PURE, network-free pieces of rtai_net off Win32.
-#
-# GoogleTest: tests/core_tests is added before this directory and already makes
-# the GTest::gtest / GTest::gtest_main targets available, so we reuse them. If
-# this directory is ever configured standalone, fall back to FetchContent
-# (same source/tag as the rest of the project).
-
-if (NOT TARGET GTest::gtest)
-    include(FetchContent)
-    find_package(GTest CONFIG QUIET)
-    if (NOT GTest_FOUND AND NOT TARGET GTest::gtest)
-        FetchContent_Declare(
-            googletest
-            GIT_REPOSITORY https://github.com/google/googletest.git
-            GIT_TAG v1.15.2
-        )
-        set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-        FetchContent_MakeAvailable(googletest)
-    endif()
-endif()
 
 # Property tests for the Cold_Path land here later (tasks 8.4-8.7). Adding a
 # source is a one-line change to this list; test_net_smoke.cpp keeps the target
@@ -40,13 +21,13 @@ add_executable(net_tests
 target_include_directories(net_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 
 target_link_libraries(net_tests PRIVATE
-    rtai_net
+    rtai::options
+    rtai::net
     GTest::gtest
     GTest::gtest_main
 )
 
 set_target_properties(net_tests PROPERTIES FOLDER "tests")
 
-include(GoogleTest)
 # Discover tests; DISCOVERY_MODE PRE_TEST avoids running the exe at configure.
 gtest_discover_tests(net_tests DISCOVERY_MODE PRE_TEST)

@@ -5,24 +5,6 @@
 # desktop (it self-skips on headless sessions). The timing/visual items that
 # need the live renderer are documented in MANUAL_CHECKLIST.md, and the
 # "no rotating spinner" rule (Req 13.4) is enforced statically below.
-#
-# GoogleTest: tests/core_tests is added before this directory and already makes
-# the GTest::gtest / GTest::gtest_main targets available, so we reuse them. If
-# this directory is ever configured standalone, fall back to FetchContent.
-
-if (NOT TARGET GTest::gtest)
-    include(FetchContent)
-    find_package(GTest CONFIG QUIET)
-    if (NOT GTest_FOUND AND NOT TARGET GTest::gtest)
-        FetchContent_Declare(
-            googletest
-            GIT_REPOSITORY https://github.com/google/googletest.git
-            GIT_TAG v1.15.2
-        )
-        set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-        FetchContent_MakeAvailable(googletest)
-    endif()
-endif()
 
 add_executable(overlay_tests
     test_overlay_win32.cpp
@@ -33,7 +15,8 @@ target_include_directories(overlay_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 # rtai_overlay brings the overlay headers and the Win32/D2D link deps; we also
 # link user32/gdi32 directly for the window-creation calls in the test itself.
 target_link_libraries(overlay_tests PRIVATE
-    rtai_overlay
+    rtai::options
+    rtai::overlay
     user32
     gdi32
     GTest::gtest
@@ -42,7 +25,6 @@ target_link_libraries(overlay_tests PRIVATE
 
 set_target_properties(overlay_tests PROPERTIES FOLDER "tests")
 
-include(GoogleTest)
 gtest_discover_tests(overlay_tests DISCOVERY_MODE PRE_TEST)
 
 # ---------------------------------------------------------------------------
