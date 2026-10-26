@@ -18,9 +18,15 @@ jobs:
       release_created: ${{ steps.release.outputs.release_created }}
       version: ${{ steps.release.outputs.version }}
     steps:
+      # GitHub only lets Actions open PRs when "Allow GitHub Actions to create
+      # and approve pull requests" is on (Settings > Actions > General). A
+      # RELEASE_PLEASE_TOKEN secret (fine-grained PAT: Contents + Pull requests
+      # read/write on this repository) works even with it off, and also lets
+      # the release PR trigger CI, which PRs opened by GITHUB_TOKEN do not.
       - id: release
         uses: googleapis/release-please-action@v5
         with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 

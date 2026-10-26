@@ -99,7 +99,7 @@ Mudar o `flags.json` na `main` já vale para os apps instalados (com `RELEASES_R
 
 O repositório `BrunoBianchi/RealtimeAI` é **público**, então os instaladores, o `latest.yml`/`beta.yml` do auto-update e o `flags.json` podem ficar nele mesmo:
 
-1. Em Settings → Actions → General → Workflow permissions, marque **Read and write permissions** e **Allow GitHub Actions to create and approve pull requests** (sem isso o release-please não consegue abrir o PR de versão).
+1. Em Settings → Actions → General → Workflow permissions, marque **Read and write permissions** e **Allow GitHub Actions to create and approve pull requests** (sem isso o release-please não consegue abrir o PR de versão). Alternativa: um secret `RELEASE_PLEASE_TOKEN` com um token fine-grained (Contents e Pull requests: Read and write, só neste repositório); com ele o PR de versão também roda o CI.
 2. Opcional, em Settings → Secrets and variables → Actions:
    - secret `GOOGLE_OAUTH_CLIENT_JSON` = conteúdo do `apps/dashboard/google_oauth_client.json` (integração com o Google Agenda no instalador).
    - Para publicar os instaladores em outro repositório (por exemplo se este voltar a ser privado): variável `RELEASES_REPO` = `usuario/realtimeai-releases` e secret `RELEASES_TOKEN` = token fine-grained com **Contents: Read and write** só nesse repositório. Com isso o workflow **Feature flags** também copia o `flags.json` para lá.
