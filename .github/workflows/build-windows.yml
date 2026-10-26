@@ -61,7 +61,7 @@ jobs:
           if ($v -ne "RealTimeAI ${{ inputs.version }}") { throw "rtai_app --version says '$v'" }
           (Get-Item build/bin/Release/rtai_app.exe).VersionInfo | Format-List ProductVersion, FileVersion
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         if: inputs.publish
         with:
           node-version: 22
