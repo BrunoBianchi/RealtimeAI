@@ -1,17 +1,39 @@
+# Dependency updates. Minor/patch bumps arrive grouped (one PR per folder);
+# majors arrive one by one so each can be reviewed. Majors that need a code
+# migration are ignored until someone plans it.
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /
     schedule: { interval: monthly }
+    open-pull-requests-limit: 3
     commit-message: { prefix: build, include: scope }
+    groups:
+      tooling:
+        update-types: [minor, patch]
+
   - package-ecosystem: npm
     directory: /apps/dashboard
     schedule: { interval: monthly }
+    open-pull-requests-limit: 3
     commit-message: { prefix: build, include: scope }
     groups:
       electron:
         patterns: ["electron", "electron-builder", "electron-updater"]
+      dashboard:
+        update-types: [minor, patch]
+    ignore:
+      # v4 is a rewrite (CSS-first config, new CLI): needs a planned migration.
+      - dependency-name: tailwindcss
+        update-types: ["version-update:semver-major"]
+      # v2 changed the API used by src/main/pdf_text.js.
+      - dependency-name: pdf-parse
+        update-types: ["version-update:semver-major"]
+
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: monthly }
     commit-message: { prefix: ci }
+    groups:
+      actions:
+        patterns: ["*"]

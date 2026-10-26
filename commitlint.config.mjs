@@ -13,7 +13,7 @@ const scopes = [
   // dashboard (apps/dashboard)
   'dashboard', 'ui', 'updater', 'flags', 'calendar',
   // repository
-  'build', 'cmake', 'ci', 'deps', 'docs', 'release', 'repo', 'scripts', 'tests'
+  'build', 'cmake', 'ci', 'deps', 'deps-dev', 'docs', 'release', 'repo', 'scripts', 'tests'
 ];
 
 export default {

@@ -64,7 +64,7 @@ Escopos aceitos (`commitlint.config.mjs`):
 |---|---|
 | Motor nativo (`src/`) | `core`, `engine`, `audio`, `stt`, `llm`, `rag`, `net`, `overlay`, `app` |
 | Dashboard (`apps/dashboard/`) | `dashboard`, `ui`, `updater`, `flags`, `calendar` |
-| Repositório | `build`, `cmake`, `ci`, `deps`, `docs`, `release`, `repo`, `scripts`, `tests` |
+| Repositório | `build`, `cmake`, `ci`, `deps`, `deps-dev`, `docs`, `release`, `repo`, `scripts`, `tests` |
 
 Exemplos:
 
