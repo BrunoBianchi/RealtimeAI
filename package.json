@@ -1,6 +1,6 @@
 {
   "name": "realtimeai",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "description": "RealTimeAI: real-time meeting and interview copilot (native C++ overlay + Electron dashboard)",
   "author": "Bruno Raiado Bianchi",
