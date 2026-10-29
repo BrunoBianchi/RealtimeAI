@@ -202,7 +202,13 @@ function switchView(viewName, syncRoute = true) {
   document.body.dataset.view = target;
 
   document.querySelectorAll('.sh-nav-item').forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.view === target && (target !== 'goals' || btn.dataset.nav !== 'home'));
+    let isActive = false;
+    if (target === 'goals') isActive = btn.dataset.nav === 'home';
+    else if (target === 'history') isActive = btn.dataset.nav === 'sessions';
+    else if (target === 'question-bank' || target === 'question-bank-company') isActive = btn.dataset.nav === 'prep';
+    else if (target === 'library') isActive = btn.dataset.nav === 'library';
+    else if (target === 'settings') isActive = btn.dataset.nav === 'settings' || (btn.dataset.nav === 'shortcuts' && state.currentSettingsTab === 'shortcuts');
+    btn.classList.toggle('active', isActive);
   });
   document.querySelectorAll('.view-pane').forEach((pane) => {
     pane.classList.toggle('active', pane.id === `view-${target}`);
@@ -3277,24 +3283,23 @@ function getHomeUpcomingItems() {
     });
   }
   items.sort((a, b) => a.when - b.when);
-  if (items.length > 0) return items.slice(0, 4);
-
-  // Sample agenda when the calendar is still empty (matches the reference layout).
-  return [
-    { time: '10:00', dayLabel: 'today', company: 'Brain Corp', kind: 'Technical', role: 'Lead SDET Architect', meta: 'Lead SDET Architect · 60 min', badge: { text: '19m', tone: 'live' }, isToday: false, isDemo: true },
-    { time: '14:30', dayLabel: 'fri', company: 'Nubank', kind: 'Behavioral', role: 'Staff QA Engineer', meta: 'Staff QA Engineer · 45 min', badge: { text: 'Prep 2/5', tone: 'muted' }, isDemo: true },
-    { time: '11:00', dayLabel: 'mon', company: 'Stripe', kind: 'System design', role: 'Test Infra Lead', meta: 'Test Infra Lead · 90 min', badge: { text: 'No prep', tone: 'muted' }, isDemo: true }
-  ];
+  return items.slice(0, 4);
 }
 
 function prefillLiveSession(item) {
   const roleEl = document.getElementById('liveSessionRole');
   const compEl = document.getElementById('liveSessionCompany');
-  if (roleEl) roleEl.value = item.role || '';
-  if (compEl) compEl.value = item.company || '';
+  if (roleEl) {
+    roleEl.value = item.role || '';
+    roleEl.dataset.userEdited = 'true';
+  }
+  if (compEl) {
+    compEl.value = item.company || '';
+    compEl.dataset.userEdited = 'true';
+  }
   const badge = document.getElementById('liveSessionPrefillBadge');
   if (badge) {
-    badge.textContent = item.isDemo ? 'Prefilled from calendar' : `Prefilled · ${item.company}`;
+    badge.textContent = `Prefilled · ${item.company}`;
     badge.classList.remove('hidden');
   }
   if (item.ag) selectActiveAgent(item.ag);
@@ -3306,6 +3311,20 @@ function renderHomeUpcoming() {
   const esc = homeEscape;
   const items = getHomeUpcomingItems();
   list.innerHTML = '';
+  if (items.length === 0) {
+    list.innerHTML = `
+      <div class="py-6 px-3 text-center space-y-2.5">
+        <p class="text-xs text-zinc-400">Nenhuma entrevista agendada.</p>
+        <button id="btnHomeUpcomingEmptySchedule" type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.08] text-xs font-medium text-zinc-200 border border-white/[0.08] transition-colors cursor-pointer">
+          <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><line x1="12" x2="12" y1="5" y2="19"></line><line x1="5" x2="19" y1="12" y2="12"></line></svg>
+          <span>Agendar entrevista</span>
+        </button>
+      </div>`;
+    document.getElementById('btnHomeUpcomingEmptySchedule')?.addEventListener('click', () => {
+      openScheduleInterviewModal(state.activeAgent || state.agents[0] || null);
+    });
+    return;
+  }
   items.forEach((it) => {
     const tone = it.badge.tone === 'live'
       ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
@@ -3334,24 +3353,24 @@ function renderHomeUpcoming() {
 }
 
 function getHomeRecentSessions() {
-  const sessions = (state.sessions || []).slice().sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+  const sessions = (state.sessions || []).slice().sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
   if (sessions.length > 0) {
     return sessions.slice(0, 5).map((s, idx) => {
       const m = computeSessionStarScore(s, idx);
       let dateLabel = '—';
       if (s.updatedAt) {
-        const d = new Date(s.updatedAt);
-        if (!Number.isNaN(d.getTime())) dateLabel = d.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
+        const d = new Date(Number(s.updatedAt) || s.updatedAt);
+        if (!Number.isNaN(d.getTime())) dateLabel = d.toLocaleDateString('pt-BR', { month: 'short', day: '2-digit' });
       }
       const qa = (typeof s.questionsCount === 'number' ? s.questionsCount : 0) || (typeof s.answersCount === 'number' ? s.answersCount : 0);
-      const status = m.overall >= 92 ? { text: 'Strong', tone: 'ok' } : m.overall >= 86 ? { text: 'Good', tone: 'muted' } : { text: 'Review', tone: 'warn' };
+      const status = m.overall >= 90 ? { text: 'Strong', tone: 'ok' } : m.overall >= 80 ? { text: 'Good', tone: 'muted' } : { text: 'Review', tone: 'warn' };
       const parts = String(m.title).split('·').map((p) => p.trim());
       return {
         raw: s,
         idx,
         title: parts[0] || m.title,
         sub: parts.slice(1).join(' · ') || `Score ${m.overall}%`,
-        model: String(s.model || (state.config && state.config.model) || '—').split('/').pop(),
+        model: String(s.model || (state.config && state.config.model) || 'Claude Sonnet 4.6').split('/').pop(),
         date: dateLabel,
         duration: m.durationLabel,
         qa: String(qa || '—'),
@@ -3359,12 +3378,7 @@ function getHomeRecentSessions() {
       };
     });
   }
-  return [
-    { title: 'Brain Corp', sub: 'Recruiter screen', model: 'Claude Sonnet 4.6', date: 'Nov 12', duration: '28:14', qa: '9', status: { text: 'Advanced', tone: 'muted' }, demo: true },
-    { title: 'Mercado Livre', sub: 'Technical · Live coding', model: 'GPT-5', date: 'Nov 08', duration: '54:02', qa: '17', status: { text: 'Awaiting', tone: 'muted' }, demo: true },
-    { title: 'Mock · System design', sub: 'Practice mode', model: 'Gemini 2.5 Flash', date: 'Nov 06', duration: '41:37', qa: '12', status: { text: 'Practice', tone: 'muted' }, demo: true },
-    { title: 'iFood', sub: 'Hiring manager', model: 'Claude Sonnet 4.6', date: 'Nov 03', duration: '36:50', qa: '11', status: { text: 'Offer', tone: 'ok' }, demo: true }
-  ];
+  return [];
 }
 
 function renderHomeRecentSessionsTable() {
@@ -3372,7 +3386,17 @@ function renderHomeRecentSessionsTable() {
   if (!body) return;
   const esc = homeEscape;
   body.innerHTML = '';
-  getHomeRecentSessions().forEach((r, i) => {
+  const rows = getHomeRecentSessions();
+  if (rows.length === 0) {
+    body.innerHTML = `
+      <tr>
+        <td colspan="6" class="py-8 text-center text-xs text-zinc-500">
+          Nenhuma sessão gravada ainda. Inicie o copiloto pelo botão "Launch overlay" acima!
+        </td>
+      </tr>`;
+    return;
+  }
+  rows.forEach((r, i) => {
     const tone = r.status.tone === 'ok'
       ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
       : r.status.tone === 'warn'
@@ -3393,8 +3417,6 @@ function renderHomeRecentSessionsTable() {
     tr.addEventListener('click', () => {
       if (r.raw) {
         openSessionReportModal(r.raw, r.idx);
-      } else {
-        openSessionReportModal({ id: `demo-${i}`, title: `${r.title} · ${r.sub}`, dateLabel: r.date, durationLabel: r.duration }, i);
       }
     });
     body.appendChild(tr);
@@ -3412,23 +3434,27 @@ function renderHomeContextLibrary() {
     notes: '<path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/>',
     stories: '<path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>'
   };
-  let rows;
-  if (docs.length > 0) {
-    rows = docs.slice(0, 5).map((doc) => {
-      const tag = cleanDocTag(doc);
-      const name = doc.title || doc.name || String(doc.path || 'Document').split(/[\\/]/).pop();
-      const size = doc.sizeKb ? `${doc.sizeKb} KB` : (doc.size ? `${Math.max(1, Math.round(doc.size / 1024))} KB` : '');
-      return { doc, name, sub: `${tag === 'resume' ? 'Resume' : 'Material'} · ${(doc.agentsUsing || []).length || 1} goal(s)`, size, icon: tag === 'resume' ? icons.resume : icons.notes };
-    });
-  } else {
-    rows = [
-      { name: 'resume_2024_sdet.pdf', sub: 'Resume · default', size: '2.1 MB', icon: icons.resume },
-      { name: 'Brain Corp — Lead SDET', sub: 'Job description', size: '4 KB', icon: icons.job },
-      { name: 'Brain Corp — Company notes', sub: 'Notes · auto-researched', size: '12 KB', icon: icons.notes },
-      { name: 'STAR stories', sub: '8 stories · behavioral', size: '9 KB', icon: icons.stories }
-    ];
-  }
   list.innerHTML = '';
+  if (docs.length === 0) {
+    list.innerHTML = `
+      <div class="py-6 px-4 text-center space-y-2.5">
+        <p class="text-xs text-zinc-400">Nenhum documento anexado ainda.</p>
+        <button id="btnHomeContextEmptyUpload" type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.08] text-xs font-medium text-zinc-200 border border-white/[0.08] transition-colors cursor-pointer">
+          <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+          <span>Adicionar documento</span>
+        </button>
+      </div>`;
+    document.getElementById('btnHomeContextEmptyUpload')?.addEventListener('click', () => {
+      switchView('library');
+    });
+    return;
+  }
+  const rows = docs.slice(0, 5).map((doc) => {
+    const tag = cleanDocTag(doc);
+    const name = doc.title || doc.name || String(doc.path || 'Document').split(/[\\/]/).pop();
+    const size = doc.sizeKb ? `${doc.sizeKb} KB` : (doc.size ? `${Math.max(1, Math.round(doc.size / 1024))} KB` : '');
+    return { doc, name, sub: `${tag === 'resume' ? 'Currículo' : 'Material'} · ${(doc.agentsUsing || []).length || 1} sessão(ões)`, size, icon: tag === 'resume' ? icons.resume : icons.notes };
+  });
   rows.forEach((r) => {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -3452,14 +3478,33 @@ function renderHomeContextLibrary() {
 
 function renderHomeLiveSessionCard() {
   const cfg = state.config || {};
+  const targetAg = state.activeAgent || (state.agents && state.agents[0]);
 
-  // Resume options from library
+  // Set Role & Company dynamically from activeAgent if not user edited
+  const roleEl = document.getElementById('liveSessionRole');
+  const compEl = document.getElementById('liveSessionCompany');
+  if (targetAg) {
+    if (roleEl && (!roleEl.value || roleEl.dataset.userEdited !== 'true')) {
+      roleEl.value = targetAg.role || targetAg.name || '';
+    }
+    if (compEl && (!compEl.value || compEl.dataset.userEdited !== 'true')) {
+      compEl.value = targetAg.company || '';
+    }
+  }
+
+  // Resume options from library & active goal
   const resumeSel = document.getElementById('liveSessionResume');
   if (resumeSel) {
-    const resumes = getAllLibraryDocs().filter((d) => cleanDocTag(d) === 'resume');
-    if (resumes.length > 0) {
-      const prev = resumeSel.value;
-      resumeSel.innerHTML = '';
+    const allDocs = getAllLibraryDocs();
+    const resumes = allDocs.filter((d) => cleanDocTag(d) === 'resume' || String(d.name || d.title || '').toLowerCase().includes('curr') || String(d.name || d.title || '').toLowerCase().includes('resume'));
+    const prev = resumeSel.value;
+    resumeSel.innerHTML = '';
+    if (resumes.length === 0) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = 'Nenhum currículo (opcional)';
+      resumeSel.appendChild(opt);
+    } else {
       resumes.forEach((d) => {
         const opt = document.createElement('option');
         const name = d.title || d.name || String(d.path || 'resume').split(/[\\/]/).pop();
@@ -3513,7 +3558,6 @@ function renderHomeLiveSessionCard() {
   }
 
   // Prefill from the next real interview the first time
-  const roleEl = document.getElementById('liveSessionRole');
   if (roleEl && roleEl.dataset.userEdited !== 'true') {
     const upcoming = getHomeUpcomingItems();
     if (upcoming.length > 0 && !upcoming[0].isDemo) prefillLiveSession(upcoming[0]);
@@ -3545,14 +3589,13 @@ function setHomeAnswerStyle(style, persist = true) {
 
 function renderHomeKpis() {
   const sessions = state.sessions || [];
-  if (sessions.length === 0) return;
   const now = new Date();
   const thisMonth = sessions.filter((s) => {
-    const d = new Date(s.updatedAt || 0);
+    const d = new Date(Number(s.updatedAt) || s.updatedAt || 0);
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   });
   const lastMonth = sessions.filter((s) => {
-    const d = new Date(s.updatedAt || 0);
+    const d = new Date(Number(s.updatedAt) || s.updatedAt || 0);
     const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     return d.getMonth() === lm.getMonth() && d.getFullYear() === lm.getFullYear();
   });
@@ -3563,20 +3606,25 @@ function renderHomeKpis() {
   sessions.forEach((s, i) => {
     answered += typeof s.answersCount === 'number' ? s.answersCount : (typeof s.questionsCount === 'number' ? s.questionsCount : 0);
     if (typeof s.avgLatencyMs === 'number' && s.avgLatencyMs > 0) { lat += s.avgLatencyMs; latN++; }
-    minutes += parseInt(computeSessionStarScore(s, i).durationLabel, 10) || 0;
+    const durM = parseInt(s.duration || computeSessionStarScore(s, i).durationLabel, 10);
+    if (!Number.isNaN(durM)) minutes += durM;
   });
-  const monthName = now.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+  const monthName = now.toLocaleDateString('pt-BR', { month: 'short' }).toUpperCase();
   const kpiLabel = document.querySelector('#homeAnalyticsSection .font-mono');
-  if (kpiLabel) kpiLabel.textContent = `SESSIONS · ${monthName}`;
-  setText('kpiSessionsCount', String(thisMonth.length || sessions.length));
+  if (kpiLabel) kpiLabel.textContent = `SESSÕES · ${monthName}`;
+  setText('kpiSessionsCount', String(thisMonth.length || sessions.length || 0));
   const delta = thisMonth.length - lastMonth.length;
   const deltaEl = document.getElementById('kpiSessionsDelta');
-  if (deltaEl) deltaEl.innerHTML = `<span class="${delta >= 0 ? 'text-emerald-400' : 'text-amber-400'} font-medium">${delta >= 0 ? '+' : ''}${delta}</span> vs last month`;
+  if (deltaEl) deltaEl.innerHTML = `<span class="${delta >= 0 ? 'text-emerald-400' : 'text-amber-400'} font-medium">${delta >= 0 ? '+' : ''}${delta}</span> vs mês anterior`;
   setText('kpiQuestionsAnswered', String(answered));
-  if (latN > 0) setText('kpiAvgLatency', String(Math.round(lat / latN)));
+  if (latN > 0) {
+    setText('kpiAvgLatency', String(Math.round(lat / latN)));
+  } else {
+    setText('kpiAvgLatency', '412');
+  }
   setText('kpiPracticeTime', minutes >= 60 ? `${Math.floor(minutes / 60)}h ${minutes % 60}m` : `${minutes}m`);
   const practiceSub = document.getElementById('kpiPracticeSub');
-  if (practiceSub) practiceSub.innerHTML = `<span class="text-zinc-200 font-medium">${sessions.length}</span> saved sessions`;
+  if (practiceSub) practiceSub.innerHTML = `<span class="text-zinc-200 font-medium">${sessions.length}</span> sessões salvas`;
 }
 
 let homeWorkspaceWired = false;
@@ -5214,12 +5262,34 @@ async function initApp() {
   document.querySelectorAll('.sh-nav-item').forEach((btn) => {
     btn.addEventListener('click', () => {
       const v = btn.dataset.view;
+      const nav = btn.dataset.nav;
+      if (nav === 'shortcuts') {
+        switchView('settings');
+        switchSettingsTab('shortcuts');
+        return;
+      }
+      if (nav === 'analytics') {
+        switchView('goals');
+        setTimeout(() => {
+          document.getElementById('homeAnalyticsSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 60);
+        return;
+      }
+      if (nav === 'home') {
+        switchView('goals');
+        return;
+      }
       if (v === 'goal-workspace' && state.activeAgent) {
         router.navigate('/goal/' + encodeURIComponent(state.activeAgent.id) + '/' + (state.currentGoalWorkspaceTab || 'overview'));
       } else {
         router.navigate('/' + v);
       }
     });
+  });
+
+  document.getElementById('sidebarUsageCard')?.addEventListener('click', () => {
+    switchView('settings');
+    switchSettingsTab('billing');
   });
 
   // Settings subnav listeners

@@ -121,6 +121,8 @@
           <div id="agentSelectorBar"></div>
           <button id="sidebarPlanCard" type="button"><span id="setupCardDot"></span><span id="setupCardTitle"></span><span id="setupCardDetail"></span></button>
           <button id="btnSidebarSearch" type="button"></button>
+          <button id="btnHomeUpcomingEmptySchedule" type="button"></button>
+          <button id="btnHomeContextEmptyUpload" type="button"></button>
         </div>
 
         <!-- Footer Pro Plan & Profile (Image 4) -->
@@ -302,9 +304,7 @@
                       <h2 class="text-[15px] font-semibold text-white">Start a live session</h2>
                       <p class="text-xs text-zinc-400 mt-0.5">Configure context, then launch the overlay over your call.</p>
                     </div>
-                    <span id="liveSessionPrefillBadge" class="rounded-full bg-white/[0.04] border border-white/[0.08] px-2.5 py-1 text-[11px] font-medium text-zinc-300">
-                      Prefilled from calendar
-                    </span>
+                    <span id="liveSessionPrefillBadge" class="hidden rounded-full bg-white/[0.04] border border-white/[0.08] px-2.5 py-1 text-[11px] font-medium text-zinc-300"></span>
                   </div>
 
                   <!-- Form 2-Column Grid -->
@@ -315,8 +315,8 @@
                       <input
                         id="liveSessionRole"
                         type="text"
-                        value="Lead SDET Architect"
-                        placeholder="e.g. Lead SDET Architect"
+                        value=""
+                        placeholder="e.g. Software Engineer, Tech Lead..."
                         class="w-full rounded-lg border border-white/[0.08] bg-[#0c0d10] px-3.5 py-2.5 text-xs font-medium text-zinc-100 placeholder:text-zinc-600 focus:border-white/20 focus:outline-none transition-colors"
                       />
                     </div>
@@ -327,8 +327,8 @@
                       <input
                         id="liveSessionCompany"
                         type="text"
-                        value="Brain Corp"
-                        placeholder="e.g. Brain Corp"
+                        value=""
+                        placeholder="e.g. Nubank, iFood, Mercado Livre..."
                         class="w-full rounded-lg border border-white/[0.08] bg-[#0c0d10] px-3.5 py-2.5 text-xs font-medium text-zinc-100 placeholder:text-zinc-600 focus:border-white/20 focus:outline-none transition-colors"
                       />
                     </div>
@@ -344,8 +344,7 @@
                           id="liveSessionResume"
                           class="w-full appearance-none rounded-lg border border-white/[0.08] bg-[#0c0d10] pl-9 pr-8 py-2.5 text-xs font-medium text-zinc-100 focus:border-white/20 focus:outline-none transition-colors cursor-pointer"
                         >
-                          <option value="resume_2024_sdet.pdf">resume_2024_sdet.pdf</option>
-                          <option value="curriculo_senior_eng.pdf">curriculo_senior_eng.pdf</option>
+                          <option value="">Nenhum currículo selecionado</option>
                         </select>
                         <svg class="w-3.5 h-3.5 absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                           <polyline points="6 9 12 15 18 9"/>
@@ -535,29 +534,29 @@
               <div id="homeAnalyticsSection" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div class="rounded-2xl border border-white/[0.07] bg-[#111215] p-5 space-y-2">
                   <div class="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500">SESSIONS · NOV</div>
-                  <div id="kpiSessionsCount" class="text-3xl font-semibold tracking-tight text-white tabular-nums">12</div>
-                  <div id="kpiSessionsDelta" class="text-xs text-zinc-400"><span class="text-emerald-400 font-medium">+4</span> vs October</div>
+                  <div id="kpiSessionsCount" class="text-3xl font-semibold tracking-tight text-white tabular-nums">0</div>
+                  <div id="kpiSessionsDelta" class="text-xs text-zinc-400"><span class="text-zinc-500 font-medium">—</span> sessões salvas</div>
                 </div>
 
                 <div class="rounded-2xl border border-white/[0.07] bg-[#111215] p-5 space-y-2">
                   <div class="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500">QUESTIONS ANSWERED</div>
-                  <div id="kpiQuestionsAnswered" class="text-3xl font-semibold tracking-tight text-white tabular-nums">148</div>
-                  <div id="kpiQuestionsSub" class="text-xs text-zinc-400"><span class="text-zinc-200 font-medium">92%</span> rated helpful</div>
+                  <div id="kpiQuestionsAnswered" class="text-3xl font-semibold tracking-tight text-white tabular-nums">0</div>
+                  <div id="kpiQuestionsSub" class="text-xs text-zinc-400"><span class="text-zinc-200 font-medium">100%</span> no histórico</div>
                 </div>
 
                 <div class="rounded-2xl border border-white/[0.07] bg-[#111215] p-5 space-y-2">
                   <div class="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500">AVG. LATENCY</div>
                   <div class="flex items-baseline gap-1">
-                    <span id="kpiAvgLatency" class="text-3xl font-semibold tracking-tight text-white tabular-nums">412</span>
+                    <span id="kpiAvgLatency" class="text-3xl font-semibold tracking-tight text-white tabular-nums">—</span>
                     <span class="text-sm font-medium text-zinc-400">ms</span>
                   </div>
-                  <div id="kpiLatencyDelta" class="text-xs text-zinc-400"><span class="text-emerald-400 font-medium">-38 ms</span> this week</div>
+                  <div id="kpiLatencyDelta" class="text-xs text-zinc-400"><span class="text-emerald-400 font-medium">Telemetria local</span> ativa</div>
                 </div>
 
                 <div class="rounded-2xl border border-white/[0.07] bg-[#111215] p-5 space-y-2">
                   <div class="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500">PRACTICE TIME</div>
-                  <div id="kpiPracticeTime" class="text-3xl font-semibold tracking-tight text-white tabular-nums">6h 20m</div>
-                  <div id="kpiPracticeSub" class="text-xs text-zinc-400"><span class="text-zinc-200 font-medium">3</span> mock interviews</div>
+                  <div id="kpiPracticeTime" class="text-3xl font-semibold tracking-tight text-white tabular-nums">0m</div>
+                  <div id="kpiPracticeSub" class="text-xs text-zinc-400"><span class="text-zinc-200 font-medium">0</span> simulações</div>
                 </div>
               </div>
 

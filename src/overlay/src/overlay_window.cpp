@@ -1638,22 +1638,57 @@ void OverlayWindow::Impl::on_click(int id) {
         case kMenuClick: menu_open = false; set_click_through(true); break;
         case kMenuHide: menu_open = false; toggle_hidden(); break;
         case kMenuConfig: menu_open = false; request_config(); break;
-        case kStripClear: strip.clear(); break;
-        case kPrev: go_prev(); break;
-        case kNext: go_next(); break;
-        case kAnsClear: clear_answers(); break;
-        case kAnsExpand: answer_expanded = !answer_expanded; break;
-        case kStyleConcise: selected_style = 0; invalidate(); break;
-        case kStyleDetailed: selected_style = 1; invalidate(); break;
-        case kStyleStar: selected_style = 2; invalidate(); break;
-        case kFollowUpRowBase:
-        case kFollowUpRowBase + 1: {
-            const char* fu_msg = id == kFollowUpRowBase
-                ? "How do you measure flakiness across 10,000+ daily integration tests?"
-                : "What's your strategy for introducing automated testing to legacy code?";
-            if (cb.on_chat) cb.on_chat(fu_msg);
+        case kStripClear:
+            strip.clear();
+            invalidate();
             break;
-        }
+        case kPrev:
+            go_prev();
+            break;
+        case kNext:
+            go_next();
+            break;
+        case kAnsClear:
+            clear_answers();
+            invalidate();
+            break;
+        case kAnsExpand:
+            answer_expanded = !answer_expanded;
+            invalidate();
+            break;
+        case kStyleConcise:
+            selected_style = 0;
+            if (cb.on_chat) cb.on_chat("Resuma a resposta de forma concisa e direta ao ponto.");
+            invalidate();
+            break;
+        case kStyleDetailed:
+            selected_style = 1;
+            if (cb.on_chat) cb.on_chat("Detalhe a resposta tecnicamente com foco em arquitetura e trade-offs.");
+            invalidate();
+            break;
+        case kStyleStar:
+            selected_style = 2;
+            if (cb.on_chat) cb.on_chat("Formule a resposta estritamente no formato STAR (Situação, Tarefa, Ação, Resultado).");
+            invalidate();
+            break;
+        case kChipPickBase:
+            if (cb.on_chat) cb.on_chat("Reforce a resposta anterior focando na estrutura STAR.");
+            break;
+        case kChipPickBase + 1:
+            if (cb.on_chat) cb.on_chat("Quais foram os impactos quantitativos e métricas mensuráveis desse resultado?");
+            break;
+        case kChipPickBase + 2:
+            if (cb.on_chat) cb.on_chat("Explique os principais trade-offs técnicos e arquiteturais considerados.");
+            break;
+        case kChipPickBase + 3:
+            if (cb.on_chat) cb.on_chat("Dê um exemplo prático de código ou implementação dessa solução.");
+            break;
+        case kFollowUpRowBase:
+            if (cb.on_chat) cb.on_chat("Como você mensurou as métricas de sucesso dessa entrega na prática?");
+            break;
+        case kFollowUpRowBase + 1:
+            if (cb.on_chat) cb.on_chat("Quais foram os principais desafios técnicos de concorrência ou escala?");
+            break;
         case kCopy: {
             if (history.empty()) break;
             const auto& sv = history[std::min(cursor, history.size() - 1)];
@@ -2310,6 +2345,9 @@ float OverlayWindow::Impl::draw_answer(float y) {
 
     SuggestionView* sv = history.empty() ? nullptr : &history[std::min(cursor, history.size() - 1)];
 
+    const auto& sys = lanes[static_cast<std::size_t>(AudioSource::Loopback)];
+    const auto& mic = lanes[static_cast<std::size_t>(AudioSource::Microphone)];
+
     const float card_h = 390.0f;
     const D2D1_RECT_F left_r = D2D1::RectF(L, top_y, L + left_w, top_y + card_h);
     const D2D1_RECT_F right_r = D2D1::RectF(right_x, top_y, R, top_y + card_h);
@@ -2318,49 +2356,48 @@ float OverlayWindow::Impl::draw_answer(float y) {
     // LEFT COLUMN: LIVE TRANSCRIPT
     // =========================================================================
     panel(left_r, rgba(15, 16, 19, 0.96f));
-    add_hit(left_r, kNone);
 
     // 1. Mini top-bar
     {
         const float cy = top_y + 18.0f;
         // Equalizer
-        const auto& sys = lanes[static_cast<std::size_t>(AudioSource::Loopback)];
         const bool rec = sys.enabled && !sys.paused;
         draw_pulse_bar(left_r.left + 12.0f, cy, sys.level, rec);
 
-        // Language pill: globe English chevron-down
+        // Language pill
         const float lang_x = left_r.left + 64.0f;
-        const D2D1_RECT_F lang_r = D2D1::RectF(lang_x, cy - 11.0f, lang_x + 85.0f, cy + 11.0f);
+        const D2D1_RECT_F lang_r = D2D1::RectF(lang_x, cy - 11.0f, lang_x + 92.0f, cy + 11.0f);
         fill_round(lang_r, 11.0f, rgba(255, 255, 255, 0.05f));
         stroke_round(lang_r, 11.0f, pal.border, 1.0f);
         icon("globe", lang_r.left + 10.0f, cy, 12.0f, pal.muted);
-        auto l_lang = layout(L"English", f_small.get(), 45.0f, 20.0f);
+        std::wstring cur_lang = L"Português";
+        auto l_lang = layout(cur_lang, f_small.get(), 55.0f, 20.0f);
         text_centered_v(l_lang.get(), lang_r.left + 18.0f, cy, pal.text);
         icon("chevron-down", lang_r.right - 8.0f, cy, 10.0f, pal.muted);
-        add_hit(lang_r, kNone, L"Transcription language");
+        add_hit(lang_r, kMenuConfig, L"Idioma de transcrição (Configurações)");
 
         // Clear button
         const float clr_x = left_r.right - 80.0f;
         const D2D1_RECT_F clr_r = D2D1::RectF(clr_x, cy - 11.0f, left_r.right - 28.0f, cy + 11.0f);
-        fill_round(clr_r, 11.0f, rgba(255, 255, 255, 0.04f));
+        fill_round(clr_r, 11.0f, button_fill(kStripClear, false));
         auto l_clr = layout(L"Clear", f_small.get(), 30.0f, 20.0f);
         text_centered_v(l_clr.get(), clr_r.left + 6.0f, cy, pal.muted);
         auto l_kclr = layout(L"⇧⌫", f_small.get(), 20.0f, 20.0f);
         text_centered_v(l_kclr.get(), clr_r.right - 18.0f, cy, pal.muted);
-        add_hit(clr_r, kStripClear, L"Clear transcript (Ctrl Alt Shift Backspace)");
+        add_hit(clr_r, kStripClear, L"Limpar transcrição (Ctrl Alt Shift Backspace)");
 
         // Collapse arrows icon
-        icon("minimize-2", left_r.right - 14.0f, cy, 12.0f, pal.muted);
+        icon_button(D2D1::RectF(left_r.right - 26.0f, cy - 11.0f, left_r.right - 8.0f, cy + 11.0f), kBtnCollapse, "minimize-2", L"Recolher");
     }
 
-    // 2. Subheader: LIVE TRANSCRIPT | 7 turns
+    // 2. Subheader: LIVE TRANSCRIPT | N turns
+    const auto chunks = strip.chunks(30);
     {
         const float sub_y = top_y + 44.0f;
         auto l_head = layout(L"LIVE TRANSCRIPT", f_small_bold.get(), 140.0f, 20.0f);
         text_centered_v(l_head.get(), left_r.left + 14.0f, sub_y, rgba(160, 160, 172, 1.0f));
 
-        const auto chunks = strip.chunks(30);
-        const std::wstring turns_str = chunks.empty() ? L"7 turns" : widen(std::to_string(chunks.size()) + " turns");
+        const std::wstring turns_str = chunks.empty() ? L"0 turns" : widen(std::to_string(chunks.size()) + " turns");
         auto l_turns = layout(turns_str, f_small.get(), 70.0f, 20.0f);
         text_centered_v(l_turns.get(), left_r.right - 14.0f - width_of(l_turns.get()), sub_y, pal.muted);
     }
@@ -2376,53 +2413,53 @@ float OverlayWindow::Impl::draw_answer(float y) {
         float ty = top_y + 64.0f;
         const float fw = feed_clip.right - feed_clip.left;
 
-        // Turn 1: Interviewer
-        {
-            auto l_spk = layout(L"Interviewer", f_small_bold.get(), 100.0f, 18.0f);
-            text_centered_v(l_spk.get(), feed_clip.left, ty + 8.0f, pal.text);
-            auto l_time = layout(L"02:41", f_small.get(), 50.0f, 18.0f);
-            text_centered_v(l_time.get(), feed_clip.left + width_of(l_spk.get()) + 8.0f, ty + 8.0f, pal.muted);
-            ty += 18.0f;
-
-            auto l_msg = line_layout(L"Can you walk me through a distributed systems failure you solved?", f_small.get(), fw);
-            text_centered_v(l_msg.get(), feed_clip.left, ty + 8.0f, pal.text_sub);
-            ty += height_of(l_msg.get()) + 14.0f;
+        if (chunks.empty()) {
+            auto l_w1 = layout(L"Aguardando áudio da chamada...", f_small_bold.get(), fw, 20.0f);
+            text_centered_v(l_w1.get(), feed_clip.left, ty + 10.0f, pal.text);
+            ty += 22.0f;
+            auto l_w2 = line_layout(L"O RealTimeAI transcreve a fala do entrevistador (áudio) e a sua (microfone) em tempo real.", f_small.get(), fw);
+            text_centered_v(l_w2.get(), feed_clip.left, ty + 6.0f, pal.muted);
+            ty += height_of(l_w2.get()) + 22.0f;
+        } else {
+            for (const auto& ch : chunks) {
+                if (ty > feed_clip.bottom - 74.0f) break;
+                const bool loopback = ch.source == AudioSource::Loopback;
+                const wchar_t* who = loopback ? L"Interviewer" : L"Você";
+                auto l_spk = layout(who, f_small_bold.get(), 100.0f, 18.0f);
+                text_centered_v(l_spk.get(), feed_clip.left, ty + 6.0f, loopback ? pal.text : pal.accent_soft);
+                if (ch.live) {
+                    dot(feed_clip.left + width_of(l_spk.get()) + 8.0f, ty + 6.0f, 2.5f, pal.green);
+                }
+                ty += 18.0f;
+                auto l_msg = line_layout(widen(ch.text), f_small.get(), fw);
+                text_centered_v(l_msg.get(), feed_clip.left, ty + 6.0f, pal.text_sub);
+                ty += height_of(l_msg.get()) + 10.0f;
+            }
         }
 
-        // Turn 2: You
-        {
-            auto l_spk = layout(L"You", f_small_bold.get(), 50.0f, 18.0f);
-            text_centered_v(l_spk.get(), feed_clip.left, ty + 8.0f, pal.accent_soft);
-            auto l_time = layout(L"03:05", f_small.get(), 50.0f, 18.0f);
-            text_centered_v(l_time.get(), feed_clip.left + width_of(l_spk.get()) + 8.0f, ty + 8.0f, pal.muted);
-            ty += 18.0f;
+        // Highlighted Card: Question detected
+        const float qbox_h = 60.0f;
+        const D2D1_RECT_F qbox = D2D1::RectF(feed_clip.left, ty, feed_clip.right, ty + qbox_h);
+        const bool has_q = sv && (!sv->trigger.empty() || !sv->understood.empty());
+        fill_round(qbox, 8.0f, has_q ? rgba(16, 185, 129, 0.08f) : rgba(255, 255, 255, 0.03f));
+        stroke_round(qbox, 8.0f, has_q ? rgba(16, 185, 129, 0.35f) : pal.border, 1.0f);
 
-            auto l_msg = line_layout(L"In our reconciliation pipeline at Nubank, we had race conditions during spikes...", f_small.get(), fw);
-            text_centered_v(l_msg.get(), feed_clip.left, ty + 8.0f, pal.text_sub);
-            ty += height_of(l_msg.get()) + 14.0f;
-        }
+        dot(qbox.left + 12.0f, qbox.top + 13.0f, 3.0f, has_q ? pal.green : pal.muted);
+        auto l_qbadge = layout(has_q ? L"Pergunta detectada" : L"Aguardando pergunta...", f_small_bold.get(), 160.0f, 20.0f);
+        text_centered_v(l_qbadge.get(), qbox.left + 20.0f, qbox.top + 13.0f, has_q ? pal.green : pal.muted);
 
-        // Highlighted Card: • Question detected
-        {
-            const float qbox_h = 64.0f;
-            const D2D1_RECT_F qbox = D2D1::RectF(feed_clip.left, ty, feed_clip.right, ty + qbox_h);
-            fill_round(qbox, 8.0f, rgba(16, 185, 129, 0.08f));
-            stroke_round(qbox, 8.0f, rgba(16, 185, 129, 0.35f), 1.0f);
+        std::wstring q_text = has_q
+            ? (sv->understood.empty() ? widen(sv->trigger) : widen(sv->understood))
+            : L"Pressione Answer (⌘ ↵) para responder à fala atual.";
+        auto l_qtxt = layout(q_text, f_small.get(), fw - 20.0f, 34.0f);
+        text_centered_v(l_qtxt.get(), qbox.left + 10.0f, qbox.top + 34.0f, has_q ? pal.text : pal.text_sub);
+        ty += qbox_h + 10.0f;
 
-            dot(qbox.left + 12.0f, qbox.top + 14.0f, 3.0f, pal.green);
-            auto l_qbadge = layout(L"Question detected", f_small_bold.get(), 140.0f, 20.0f);
-            text_centered_v(l_qbadge.get(), qbox.left + 20.0f, qbox.top + 14.0f, pal.green);
-
-            std::wstring q_text = (sv && !sv->trigger.empty()) ? widen(sv->trigger) : L"\"Why do you want to work for Brain Corp?\"";
-            auto l_qtxt = layout(q_text, f_small_bold.get(), fw - 20.0f, 36.0f);
-            text_centered_v(l_qtxt.get(), qbox.left + 10.0f, qbox.top + 38.0f, pal.text);
-            ty += qbox_h + 12.0f;
-        }
-
-        // Bottom transcribing indicator
-        dot(feed_clip.left + 6.0f, ty + 8.0f, 3.0f, pal.green);
-        auto l_trans = layout(L"transcribing...", f_small.get(), 100.0f, 18.0f);
-        text_centered_v(l_trans.get(), feed_clip.left + 14.0f, ty + 8.0f, pal.muted);
+        // Bottom listening / transcribing indicator
+        const bool active_audio = (sys.enabled && !sys.paused && sys.level > 0.02f) || (mic.enabled && !mic.paused && mic.level > 0.02f);
+        dot(feed_clip.left + 6.0f, ty + 8.0f, 3.0f, active_audio ? pal.green : pal.muted);
+        auto l_trans = layout(active_audio ? L"transcrevendo..." : L"ouvindo...", f_small.get(), 120.0f, 18.0f);
+        text_centered_v(l_trans.get(), feed_clip.left + 14.0f, ty + 8.0f, active_audio ? pal.text : pal.muted);
     }
     rt->PopAxisAlignedClip();
 
@@ -2439,14 +2476,13 @@ float OverlayWindow::Impl::draw_answer(float y) {
         const float edit_x = left_r.right - 14.0f - width_of(l_edit.get());
         const D2D1_RECT_F edit_r = D2D1::RectF(edit_x - 4.0f, foot_y - 10.0f, left_r.right - 10.0f, foot_y + 10.0f);
         text_centered_v(l_edit.get(), edit_x, foot_y, pal.accent_soft);
-        add_hit(edit_r, kMenuConfig, L"Edit session context and resume");
+        add_hit(edit_r, kMenuConfig, L"Editar contexto e currículo no Dashboard");
     }
 
     // =========================================================================
     // RIGHT COLUMN: QUESTION + SUGGESTED ANSWER
     // =========================================================================
     panel(right_r, rgba(17, 18, 22, 0.96f));
-    add_hit(right_r, kNone);
 
     // 1. Top Toolbar of Right Column
     {
@@ -2455,22 +2491,24 @@ float OverlayWindow::Impl::draw_answer(float y) {
 
         // Navigation prev / next
         const D2D1_RECT_F prev_r = D2D1::RectF(rx, cy - 11.0f, rx + 44.0f, cy + 11.0f);
-        fill_round(prev_r, 4.0f, rgba(255, 255, 255, 0.05f));
+        fill_round(prev_r, 4.0f, button_fill(kPrev, false));
         auto l_prev = layout(L"⌘ ←", f_small.get(), 40.0f, 18.0f);
         text_centered_v(l_prev.get(), rx + 6.0f, cy, cursor > 0 ? pal.text : pal.muted);
-        add_hit(prev_r, kPrev, L"Previous answer (Ctrl Alt ←)");
+        add_hit(prev_r, kPrev, L"Resposta anterior (Ctrl Alt ←)");
         rx += 50.0f;
 
-        const std::wstring count_str = sv ? widen(std::to_string(cursor + 1) + " / " + std::to_string(std::max<std::size_t>(history.size(), 4))) : L"2 / 4";
+        const std::wstring count_str = history.empty()
+            ? L"0 / 0"
+            : widen(std::to_string(cursor + 1) + " / " + std::to_string(history.size()));
         auto l_cnt = layout(count_str, f_small.get(), 40.0f, 18.0f);
         text_centered_v(l_cnt.get(), rx, cy, pal.muted);
         rx += 38.0f;
 
         const D2D1_RECT_F next_r = D2D1::RectF(rx, cy - 11.0f, rx + 44.0f, cy + 11.0f);
-        fill_round(next_r, 4.0f, rgba(255, 255, 255, 0.05f));
+        fill_round(next_r, 4.0f, button_fill(kNext, false));
         auto l_next = layout(L"⌘ →", f_small.get(), 40.0f, 18.0f);
         text_centered_v(l_next.get(), rx + 6.0f, cy, (sv && cursor + 1 < history.size()) ? pal.text : pal.muted);
-        add_hit(next_r, kNext, L"Next answer (Ctrl Alt →)");
+        add_hit(next_r, kNext, L"Próxima resposta (Ctrl Alt →)");
         rx += 60.0f;
 
         // Segmented Style Tabs: Concise | Detailed | STAR
@@ -2496,10 +2534,10 @@ float OverlayWindow::Impl::draw_answer(float y) {
         right_bx -= 30.0f;
 
         const D2D1_RECT_F clr_r = D2D1::RectF(right_bx - 60.0f, cy - 11.0f, right_bx, cy + 11.0f);
-        fill_round(clr_r, 5.0f, rgba(255, 255, 255, 0.04f));
+        fill_round(clr_r, 5.0f, button_fill(kAnsClear, false));
         auto l_c = layout(L"Clear ⌘ ⌫", f_small.get(), 58.0f, 18.0f);
         text_centered_v(l_c.get(), clr_r.left + 5.0f, cy, pal.muted);
-        add_hit(clr_r, kAnsClear, L"Clear answer");
+        add_hit(clr_r, kAnsClear, L"Limpar resposta atual");
     }
 
     // Divider
@@ -2513,20 +2551,23 @@ float OverlayWindow::Impl::draw_answer(float y) {
         auto l_qhdr = layout(L"QUESTION", f_small_bold.get(), 80.0f, 20.0f);
         text_centered_v(l_qhdr.get(), right_r.left + 14.0f, sec_y, pal.muted);
 
-        // Tag: Motivation
+        // Tag: Motivation / Tech / General
         const float tag_x = right_r.left + 14.0f + width_of(l_qhdr.get()) + 10.0f;
-        const D2D1_RECT_F tag_r = D2D1::RectF(tag_x, sec_y - 9.0f, tag_x + 65.0f, sec_y + 9.0f);
+        const D2D1_RECT_F tag_r = D2D1::RectF(tag_x, sec_y - 9.0f, tag_x + 70.0f, sec_y + 9.0f);
         fill_round(tag_r, 4.0f, rgba(255, 255, 255, 0.05f));
-        auto l_tag = layout(L"Motivation", f_small.get(), 60.0f, 18.0f);
+        const wchar_t* tag_lbl = sv ? (sv->reason == TriggerReason::Chat ? L"Chat" : (sv->reason == TriggerReason::FollowUp ? L"Follow-up" : L"Entrevista")) : L"Entrevista";
+        auto l_tag = layout(tag_lbl, f_small.get(), 65.0f, 18.0f);
         text_centered_v(l_tag.get(), tag_r.left + 6.0f, sec_y, pal.muted);
 
         // Copy button
         const D2D1_RECT_F copy_r = D2D1::RectF(right_r.right - 36.0f, sec_y - 10.0f, right_r.right - 14.0f, sec_y + 10.0f);
-        icon_button(copy_r, kCopy, "copy", L"Copy answer");
+        icon_button(copy_r, kCopy, "copy", L"Copiar resposta");
 
         sec_y += 18.0f;
         // Question text
-        std::wstring q_text = (sv && !sv->trigger.empty()) ? widen(sv->trigger) : L"Why do you want to work for Brain Corp?";
+        std::wstring q_text = (sv && !sv->trigger.empty())
+            ? widen(sv->trigger)
+            : (sv && !sv->understood.empty() ? widen(sv->understood) : L"Aguardando pergunta da entrevista...");
         auto l_qtitle = layout(q_text, f_body_bold.get(), right_w - 40.0f, 40.0f);
         text_centered_v(l_qtitle.get(), right_r.left + 14.0f, sec_y + 8.0f, pal.text);
         sec_y += height_of(l_qtitle.get()) + 14.0f;
@@ -2542,18 +2583,19 @@ float OverlayWindow::Impl::draw_answer(float y) {
         auto l_anshdr = layout(L"SUGGESTED ANSWER", f_small_bold.get(), 140.0f, 20.0f);
         text_centered_v(l_anshdr.get(), right_r.left + 14.0f, sec_y, pal.muted);
 
-        // Badge: • Ready
+        // Badge: • Ready / • Gerando / • Standby
         const float rdy_x = right_r.left + 14.0f + width_of(l_anshdr.get()) + 10.0f;
-        const D2D1_RECT_F rdy_r = D2D1::RectF(rdy_x, sec_y - 9.0f, rdy_x + 55.0f, sec_y + 9.0f);
-        fill_round(rdy_r, 4.0f, rgba(16, 185, 129, 0.12f));
-        stroke_round(rdy_r, 4.0f, rgba(16, 185, 129, 0.30f), 1.0f);
-        dot(rdy_r.left + 8.0f, sec_y, 2.5f, pal.green);
-        auto l_rdy = layout(L"Ready", f_small.get(), 40.0f, 18.0f);
-        text_centered_v(l_rdy.get(), rdy_r.left + 16.0f, sec_y, pal.green);
+        const D2D1_RECT_F rdy_r = D2D1::RectF(rdy_x, sec_y - 9.0f, rdy_x + 65.0f, sec_y + 9.0f);
+        const bool is_generating = sv && !sv->done;
+        const bool is_ready = sv && sv->done && !sv->body.empty();
+        fill_round(rdy_r, 4.0f, is_generating ? rgba(245, 158, 11, 0.12f) : (is_ready ? rgba(16, 185, 129, 0.12f) : rgba(255, 255, 255, 0.05f)));
+        stroke_round(rdy_r, 4.0f, is_generating ? rgba(245, 158, 11, 0.35f) : (is_ready ? rgba(16, 185, 129, 0.30f) : pal.border), 1.0f);
+        dot(rdy_r.left + 8.0f, sec_y, 2.5f, is_generating ? rgba(245, 158, 11, 1.0f) : (is_ready ? pal.green : pal.muted));
+        auto l_rdy = layout(is_generating ? L"Gerando" : (is_ready ? L"Ready" : L"Standby"), f_small.get(), 45.0f, 18.0f);
+        text_centered_v(l_rdy.get(), rdy_r.left + 16.0f, sec_y, is_generating ? rgba(245, 158, 11, 1.0f) : (is_ready ? pal.green : pal.muted));
 
         sec_y += 18.0f;
 
-        // If active live body exists, format it, otherwise render the canonical STAR answer from Image 5
         if (sv && !sv->body.empty()) {
             const auto formatted = format_suggestion(sv->body, !sv->done);
             for (const auto& fl : formatted) {
@@ -2564,27 +2606,18 @@ float OverlayWindow::Impl::draw_answer(float y) {
                 text_centered_v(l.get(), right_r.left + 18.0f + indent, sec_y + 7.0f, pal.text_sub);
                 sec_y += std::max(18.0f, height_of(l.get())) + 4.0f;
             }
+        } else if (sv && !sv->done) {
+            dot(right_r.left + 18.0f, sec_y + 7.0f, 2.5f, pal.green);
+            auto l_load = layout(L"Consultando base de conhecimento RAG e formulando resposta técnica...", f_small.get(), right_w - 30.0f, 24.0f);
+            text_centered_v(l_load.get(), right_r.left + 26.0f, sec_y + 7.0f, pal.text);
+            sec_y += 24.0f;
         } else {
-            struct StarBullet {
-                const wchar_t* lead;
-                const wchar_t* body;
-            };
-            const StarBullet default_bullets[] = {
-                {L"Situation: ", L"Led test automation & infrastructure for autonomous robot navigation suites."},
-                {L"Task: ", L"Eliminate 18% flaky tests and cut CI feedback cycles from 4h to 15m across 40 services."},
-                {L"Action: ", L"Architected hermetic simulation sandboxes with distributed Bazel caching and deterministic mocks."},
-                {L"Result: ", L"Cut flakiness to <0.1%, boosting engineering velocity while reducing cloud compute by 35%."}
-            };
-
-            for (int i = 0; i < 4; ++i) {
-                dot(right_r.left + 18.0f, sec_y + 7.0f, 2.5f, pal.green);
-                auto l_lead = layout(default_bullets[i].lead, f_small_bold.get(), 80.0f, 20.0f);
-                text_centered_v(l_lead.get(), right_r.left + 26.0f, sec_y + 7.0f, pal.text);
-                const float lw = width_of(l_lead.get());
-                auto l_bdy = line_layout(default_bullets[i].body, f_small.get(), right_w - 30.0f - lw);
-                text_centered_v(l_bdy.get(), right_r.left + 26.0f + lw, sec_y + 7.0f, pal.text_sub);
-                sec_y += 20.0f;
-            }
+            auto l_empty1 = layout(L"Nenhuma sugestão gerada no momento.", f_small_bold.get(), right_w - 30.0f, 20.0f);
+            text_centered_v(l_empty1.get(), right_r.left + 18.0f, sec_y + 7.0f, pal.text);
+            sec_y += 20.0f;
+            auto l_empty2 = line_layout(L"O copiloto transcreve a conversa e formula respostas com base no currículo ao detectar perguntas. Pressione Answer (⌘ ↵) ou envie uma dúvida no chat acima.", f_small.get(), right_w - 30.0f);
+            text_centered_v(l_empty2.get(), right_r.left + 18.0f, sec_y + 6.0f, pal.text_sub);
+            sec_y += height_of(l_empty2.get()) + 8.0f;
         }
         sec_y += 8.0f;
     }
@@ -2596,19 +2629,20 @@ float OverlayWindow::Impl::draw_answer(float y) {
         sec_y += 16.0f;
 
         const wchar_t* pills[] = {
-            L"Architecture at scale",
-            L"Autonomous robots",
-            L"Cross-functional leadership",
-            L"CI/CD resilience"
+            L"Estrutura STAR",
+            L"Impacto & Métricas",
+            L"Trade-offs Técnicos",
+            L"Exemplo Prático"
         };
         float px = right_r.left + 14.0f;
         for (int i = 0; i < 4; ++i) {
             auto lp = layout(pills[i], f_small.get(), 200.0f, 20.0f);
             const float pw = width_of(lp.get()) + 18.0f;
             const D2D1_RECT_F pr = D2D1::RectF(px, sec_y - 10.0f, px + pw, sec_y + 10.0f);
-            fill_round(pr, 10.0f, rgba(255, 255, 255, 0.05f));
-            stroke_round(pr, 10.0f, pal.border, 1.0f);
-            text_centered_v(lp.get(), px + 9.0f, sec_y, pal.text);
+            const bool hov = hover == (kChipPickBase + i);
+            fill_round(pr, 10.0f, hov ? rgba(255, 255, 255, 0.10f) : rgba(255, 255, 255, 0.05f));
+            stroke_round(pr, 10.0f, hov ? pal.accent_soft : pal.border, 1.0f);
+            text_centered_v(lp.get(), px + 9.0f, sec_y, hov ? pal.text : pal.text_sub);
             add_hit(pr, kChipPickBase + i, pills[i]);
             px += pw + 8.0f;
         }
@@ -2622,13 +2656,15 @@ float OverlayWindow::Impl::draw_answer(float y) {
         sec_y += 16.0f;
 
         const wchar_t* fus[] = {
-            L"↪  How do you measure flakiness across 10,000+ daily integration tests?",
-            L"↪  What's your strategy for introducing automated testing to legacy code?"
+            L"↪  Como você mensurou as métricas de sucesso dessa entrega?",
+            L"↪  Quais foram os principais desafios técnicos de concorrência ou escala?"
         };
         for (int i = 0; i < 2; ++i) {
             const D2D1_RECT_F fr = D2D1::RectF(right_r.left + 14.0f, sec_y - 8.0f, right_r.right - 14.0f, sec_y + 12.0f);
+            const bool hov = hover == (kFollowUpRowBase + i);
+            fill_round(fr, 4.0f, hov ? rgba(255, 255, 255, 0.04f) : rgba(0, 0, 0, 0.0f));
             auto lf = line_layout(fus[i], f_small.get(), right_w - 30.0f);
-            text_centered_v(lf.get(), fr.left, sec_y, pal.text_sub);
+            text_centered_v(lf.get(), fr.left + 4.0f, sec_y, hov ? pal.text : pal.text_sub);
             add_hit(fr, kFollowUpRowBase + i, fus[i]);
             sec_y += 20.0f;
         }
