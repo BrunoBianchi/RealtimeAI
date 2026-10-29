@@ -120,28 +120,42 @@ jobs:
           $version = (Get-Content package.json | ConvertFrom-Json).version
           $beta = "${{ inputs.channel }}" -eq "beta"
           $type = if ($beta) { "prerelease" } else { "release" }
-          if ($env:RELEASES_REPO) {
-            $owner, $name = $env:RELEASES_REPO.Split('/')
-            $env:GH_TOKEN = $env:RELEASES_TOKEN
-            npx electron-builder --win nsis --x64 --publish always `
-              "-c.publish.owner=$owner" "-c.publish.repo=$name" "-c.publish.releaseType=$type"
-          } else {
-            $owner, $name = "${{ github.repository }}".Split('/')
-            npx electron-builder --win nsis --x64 --publish never `
-              "-c.publish.owner=$owner" "-c.publish.repo=$name" "-c.publish.releaseType=$type"
-            $env:GH_TOKEN = $env:GITHUB_TOKEN
-            $assets = @(Get-ChildItem release -File | Where-Object { $_.Extension -in '.exe', '.yml', '.blockmap' } | ForEach-Object FullName)
-            gh release view "v$version" --repo "${{ github.repository }}" *> $null
-            if ($LASTEXITCODE -ne 0) {
-              # Betas: beta.yml pushed the tag. Stable: release-please already made the release.
-              $flags = @("v$version", "--repo", "${{ github.repository }}", "--verify-tag", "--title", "RealTimeAI $version", "--notes-file", "assets/release-notes.md")
-              if ($beta) { $flags += "--prerelease" }
-              gh release create @flags
-              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            }
-            gh release upload "v$version" @assets --repo "${{ github.repository }}" --clobber
-          }
+          $targetRepo = if ($env:RELEASES_REPO -and $env:RELEASES_TOKEN) { $env:RELEASES_REPO } else { "${{ github.repository }}" }
+          $owner, $name = $targetRepo.Split('/')
+
+          npx electron-builder --win nsis --x64 --publish never `
+            "-c.publish.owner=$owner" "-c.publish.repo=$name" "-c.publish.releaseType=$type"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          $assets = @(Get-ChildItem release -File | Where-Object { $_.Extension -in '.exe', '.yml', '.blockmap' } | ForEach-Object FullName)
+          if ($assets.Count -eq 0) {
+            echo "::error::No installer or update metadata (.exe, .yml, .blockmap) found in apps/dashboard/release"
+            exit 1
+          }
+
+          # 1. Always attach installer + electron-updater metadata (latest.yml, beta.yml, .blockmap) to this repository's release
+          $env:GH_TOKEN = $env:GITHUB_TOKEN
+          gh release view "v$version" --repo "${{ github.repository }}" *> $null
+          if ($LASTEXITCODE -ne 0) {
+            $flags = @("v$version", "--repo", "${{ github.repository }}", "--verify-tag", "--title", "RealTimeAI $version", "--notes-file", "assets/release-notes.md")
+            if ($beta) { $flags += "--prerelease" } else { $flags += "--latest" }
+            gh release create @flags
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          gh release upload "v$version" @assets --repo "${{ github.repository }}" --clobber
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          # 2. If a dedicated public RELEASES_REPO is configured with a token, mirror the release and update metadata there too
+          if ($env:RELEASES_REPO -and $env:RELEASES_TOKEN -and ($env:RELEASES_REPO -ne "${{ github.repository }}")) {
+            $env:GH_TOKEN = $env:RELEASES_TOKEN
+            gh release view "v$version" --repo "$env:RELEASES_REPO" *> $null
+            if ($LASTEXITCODE -ne 0) {
+              $rFlags = @("v$version", "--repo", "$env:RELEASES_REPO", "--title", "RealTimeAI $version", "--notes-file", "assets/release-notes.md")
+              if ($beta) { $rFlags += "--prerelease" } else { $rFlags += "--latest" }
+              gh release create @rFlags
+            }
+            gh release upload "v$version" @assets --repo "$env:RELEASES_REPO" --clobber
+          }
 
       - uses: actions/upload-artifact@v7
         with:

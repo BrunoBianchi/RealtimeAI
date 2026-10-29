@@ -155,12 +155,12 @@ function createUpdater(opts) {
     return check();
   }
 
-  function start(intervalMs = 4 * 60 * 60 * 1000) {
+  function start(intervalMs = 15 * 60 * 1000) {
     if (!load()) {
       publish({ status: 'disabled', error: disabledReason });
       return;
     }
-    setTimeout(() => { if (getAutoUpdate()) check(); }, 8000);
+    setTimeout(() => { if (getAutoUpdate()) check(); }, 5000);
     timer = setInterval(() => { if (getAutoUpdate()) check(); }, intervalMs);
     if (timer.unref) timer.unref();
   }

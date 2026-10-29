@@ -1,5 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
   compareVersions,
@@ -11,6 +14,7 @@ import {
   releaseNotes
 } from '../version.mjs';
 
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const c = (msg) => parseCommit(msg, 'abcdef1234');
 
 test('semver precedence, including pre-releases', () => {
@@ -94,3 +98,23 @@ test('local builds sort between the last release and the next one', () => {
   const later = localVersion({ current: '2.0.0', commits: [c('feat: a')], tags: ['v2.0.0'], date: new Date(2026, 9, 26, 15, 0) });
   assert.ok(compareVersions(later, v) > 0);
 });
+
+test('release.yml uses semantic-release and builds real-time update installer assets', () => {
+  const releaseYml = fs.readFileSync(path.join(ROOT, '.github/workflows/release.yml'), 'utf8');
+  const buildWinYml = fs.readFileSync(path.join(ROOT, '.github/workflows/build-windows.yml'), 'utf8');
+  const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+
+  assert.ok(releaseYml.includes('permissions: write-all'));
+  assert.ok(releaseYml.includes('uses: pnpm/action-setup@v4'));
+  assert.ok(releaseYml.includes('pnpm exec semantic-release'));
+  assert.ok(releaseYml.includes('uses: ./.github/workflows/build-windows.yml'));
+  assert.ok(releaseYml.includes('publish: true'));
+
+  assert.ok(buildWinYml.includes("'.exe', '.yml', '.blockmap'"));
+  assert.ok(buildWinYml.includes('gh release upload "v$version" @assets'));
+
+  assert.ok(pkg.devDependencies && pkg.devDependencies['semantic-release']);
+  assert.ok(pkg.release && Array.isArray(pkg.release.plugins));
+  assert.ok(pkg.release.plugins.includes('@semantic-release/github'));
+});
+

@@ -1,41 +1,73 @@
-# main: release-please keeps a "chore(release): vX.Y.Z" PR up to date with the
-# next version and CHANGELOG.md. Merging it tags the release and builds and
-# publishes the Windows installer.
+# Automatic semantic versioning + real-time update release pipeline.
+# On every push to `main`, semantic-release calculates the next semver from
+# Conventional Commits, tags `vX.Y.Z`, and creates the GitHub Release.
+# Then `installer` builds the C++ overlay + Electron NSIS installer and uploads
+# `RealTimeAI-Setup-X.Y.Z.exe`, `.blockmap`, `latest.yml`, and `beta.yml` to the
+# release so `electron-updater` updates installed apps in real time.
 name: Release
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+  workflow_dispatch:
 
-permissions:
-  contents: write
-  pull-requests: write
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions: write-all
 
 jobs:
-  release-please:
-    runs-on: ubuntu-24.04
+  release:
+    runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       version: ${{ steps.release.outputs.version }}
     steps:
-      # GitHub only lets Actions open PRs when "Allow GitHub Actions to create
-      # and approve pull requests" is on (Settings > Actions > General). A
-      # RELEASE_PLEASE_TOKEN secret (fine-grained PAT: Contents + Pull requests
-      # read/write on this repository) works even with it off, and also lets
-      # the release PR trigger CI, which PRs opened by GITHUB_TOKEN do not.
-      - id: release
-        uses: googleapis/release-please-action@v5
+      - uses: actions/checkout@v6
         with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
-          config-file: release-please-config.json
-          manifest-file: .release-please-manifest.json
+          fetch-depth: 0
+      - name: setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: setup node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 'lts/*'
+          cache: 'pnpm'
+      - name: install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: release
+        id: release
+        run: |
+          BEFORE_TAG=$(git tag --points-at HEAD | grep -E '^v[0-9]+\.' | head -n 1 || true)
+          pnpm exec semantic-release
+          git fetch --tags --force
+          AFTER_TAG=$(git tag --points-at HEAD | grep -E '^v[0-9]+\.' | head -n 1 || true)
+          if [ -n "$AFTER_TAG" ] && [ "$AFTER_TAG" != "$BEFORE_TAG" ]; then
+            VERSION="${AFTER_TAG#v}"
+            echo "release_created=true" >> "$GITHUB_OUTPUT"
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "### RealTimeAI v$VERSION" >> "$GITHUB_STEP_SUMMARY"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "$AFTER_TAG" ]; then
+            VERSION="${AFTER_TAG#v}"
+            echo "release_created=true" >> "$GITHUB_OUTPUT"
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          else
+            echo "release_created=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   installer:
-    needs: release-please
-    if: needs.release-please.outputs.release_created == 'true'
+    needs: release
+    if: needs.release.outputs.release_created == 'true'
     uses: ./.github/workflows/build-windows.yml
     with:
-      version: ${{ needs.release-please.outputs.version }}
+      version: ${{ needs.release.outputs.version }}
       channel: stable
       publish: true
     secrets: inherit
