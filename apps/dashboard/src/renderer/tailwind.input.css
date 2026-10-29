@@ -75,20 +75,20 @@
     --live: 347 77% 50%;
     --radius: 0.375rem;
 
-    /* Obsidian Copilot surfaces: the reference canvas ladder.
-       app-bg #0b0d11 · sidebar #0d1017 · card #14171e · hover #181c25 · surface #1a1e27 */
-    --app-bg: 220 21% 5.5%;
-    --app-sidebar: 222 28% 7.1%;
-    --app-card: 222 20% 9.8%;
-    --app-card-hover: 222 21% 12%;
-    --app-surface: 222 20% 12.7%;
-    --app-border: 223 21% 16.9%;
-    --app-border-light: 222 21% 22%;
-    --app-muted: 221 13% 50.6%;
-    --app-accent: 239 84% 66.7%;
+    /* RealTimeAI Executive surfaces: matte zinc-slate dark architecture.
+       app-bg #0c0d0e · sidebar #111215 · card #181a1f · hover #1d1f24 · surface #23262d */
+    --app-bg: 210 8% 5.1%;
+    --app-sidebar: 225 10.5% 7.5%;
+    --app-card: 223 12.7% 10.8%;
+    --app-card-hover: 223 10.8% 12.7%;
+    --app-surface: 222 12.5% 15.7%;
+    --app-border: 225 10% 15.5%;
+    --app-border-light: 225 10% 21%;
+    --app-muted: 240 4% 46%;
+    --app-accent: 160 67% 52%;
     --app-emerald: 160 84% 39.4%;
-    --app-input: 224 22% 9.6%;
-    --app-chip: 221 22% 14.1%;
+    --app-input: 225 10.5% 7.5%;
+    --app-chip: 223 10.8% 12.7%;
 
     color-scheme: dark;
   }
@@ -297,24 +297,24 @@
 
   /* Sidebar Nav Item - sleek & compact */
   .sh-nav-item {
-    @apply flex w-full items-center justify-between gap-1.5 rounded-lg px-2 py-1.5 text-[12px] font-medium leading-none text-app-muted transition-all hover:bg-app-card-hover hover:text-foreground cursor-pointer;
+    @apply flex w-full items-center justify-between gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-medium leading-none text-text-secondary transition-colors hover:bg-white/5 hover:text-text-primary cursor-pointer;
   }
   .sh-nav-item > div {
-    @apply flex min-w-0 items-center gap-2;
+    @apply flex min-w-0 items-center gap-2.5;
   }
   .sh-nav-item > div > span {
     @apply truncate;
   }
   .sh-nav-item.active {
-    @apply border border-app-border-light bg-app-surface font-semibold text-foreground shadow-sm;
+    @apply border border-border-muted bg-white/10 font-medium text-white;
   }
 
-  /* Sidebar nav counter (Sessões 4, Biblioteca 16, Histórico 140). */
+  /* Sidebar nav counter (Sessões 4, Biblioteca 16, Histórico 148). */
   .nav-count {
-    @apply shrink-0 font-mono text-[11px] leading-none text-app-muted;
+    @apply shrink-0 rounded bg-surface-container px-1.5 py-0.5 font-mono text-[10px] leading-none text-text-tertiary;
   }
   .sh-nav-item.active .nav-count {
-    @apply rounded border border-app-border/70 bg-app-bg/60 px-1.5 py-0.5 text-foreground;
+    @apply rounded border border-border-subtle bg-surface-container px-1.5 py-0.5 text-text-primary;
   }
 
   /* Sidebar Goal Item - compact & refined */

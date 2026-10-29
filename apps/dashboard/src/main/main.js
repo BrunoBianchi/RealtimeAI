@@ -2510,6 +2510,11 @@ function createWindow() {
         await wait(600);
         const imgDarkGoals = await mainWindow.webContents.capturePage();
         fs.writeFileSync(path.join(outDir, 'finalround_dark_goals.png'), imgDarkGoals.toPNG());
+
+        await mainWindow.webContents.executeJavaScript(`applyTheme('dark', 'dark'); switchView('settings');`);
+        await wait(600);
+        const imgDarkSettings = await mainWindow.webContents.capturePage();
+        fs.writeFileSync(path.join(outDir, 'finalround_dark_settings.png'), imgDarkSettings.toPNG());
       } catch (err) {
         console.error('Capture error:', err);
       } finally {

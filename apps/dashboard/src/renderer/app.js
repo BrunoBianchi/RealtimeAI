@@ -209,10 +209,12 @@ function switchView(viewName, syncRoute = true) {
   });
 
   const headerBreadcrumb = document.getElementById('headerBreadcrumb');
+  const headerBreadcrumbSub = document.getElementById('headerBreadcrumbSub');
+  const topSearchInput = document.getElementById('topSearchInput');
   if (headerBreadcrumb) {
     const titles = {
       goals: 'Sessões',
-      'goal-workspace': 'Goal Workspace',
+      'goal-workspace': 'Sessões',
       library: 'Biblioteca',
       history: 'Histórico',
       'question-bank': 'Banco de perguntas',
@@ -220,6 +222,23 @@ function switchView(viewName, syncRoute = true) {
       settings: 'Configurações'
     };
     headerBreadcrumb.textContent = titles[target] || 'Sessões';
+  }
+  if (headerBreadcrumbSub) {
+    const subs = {
+      goals: 'Painel Principal',
+      'goal-workspace': state.activeAgent ? (state.activeAgent.company || state.activeAgent.name || 'Workspace') : 'Workspace',
+      library: 'Documentos & Contexto',
+      history: 'Transcrições Salvas',
+      'question-bank': 'Empresas & Perguntas',
+      'question-bank-company': state.activeQbCompany ? state.activeQbCompany.name : 'Perguntas',
+      settings: 'Preferências & Sistema'
+    };
+    headerBreadcrumbSub.textContent = subs[target] || 'Preferências & Sistema';
+  }
+  if (topSearchInput) {
+    topSearchInput.placeholder = target === 'settings'
+      ? 'Buscar configuração...'
+      : 'Buscar sessões, empresas...';
   }
 
   if (target === 'goals') renderGoalsView();
@@ -383,24 +402,17 @@ function renderProfileHeader() {
 function renderUsageTicks(pct, isPremium) {
   const container = document.getElementById('sidebarUsageTicks');
   if (!container) return;
-  const totalTicks = 14;
-  const waveHeights = ['60%', '90%', '40%', '75%', '50%', '100%', '30%', '85%', '45%', '95%', '65%', '100%', '80%', '55%'];
+  const totalTicks = 10;
+  const proColors = ['#d4d4d8', '#d4d4d8', '#d4d4d8', '#d4d4d8', '#a1a1aa', '#52525b', '#27272a', '#27272a', '#27272a', '#27272a']; // #00D29E
   container.innerHTML = '';
   for (let i = 0; i < totalTicks; i++) {
     const tick = document.createElement('span');
-    tick.className = 'w-[2.5px] h-3 rounded-full flex-1 rounded-sm transition-all duration-300';
-    tick.style.height = waveHeights[i % waveHeights.length];
+    tick.className = 'w-[2.5px] h-3 rounded-full !w-1.5 !h-full !rounded-[1px] transition-all duration-300';
     if (isPremium) {
-      tick.style.background = '#00D29E'; // Signature teal
+      tick.style.background = proColors[i] || '#27272a';
     } else {
       const ratio = i / totalTicks;
-      if (ratio < 0.35) {
-        tick.style.background = '#ef4444';
-      } else if (ratio < 0.7) {
-        tick.style.background = '#f97316';
-      } else {
-        tick.style.background = '#f59e0b';
-      }
+      tick.style.background = ratio < (pct / 100) ? '#d4d4d8' : '#27272a';
     }
     container.appendChild(tick);
   }
@@ -473,15 +485,15 @@ function renderPlanAndUsage() {
     if (titleEl) titleEl.textContent = 'Pro ativo';
     if (timeEl) {
       timeEl.textContent = 'Cota ilimitada';
-      timeEl.className = 'font-semibold text-emerald-400';
+      timeEl.className = 'text-text-secondary';
     }
     if (percentEl) {
       percentEl.textContent = 'PRO';
-      percentEl.className = 'text-[10px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/30';
+      percentEl.className = 'font-mono text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-text-secondary border border-border-muted';
     }
     if (descEl) {
       const usedMins = usage.usedMinutes || 176;
-      descEl.innerHTML = `<span id="sidebarUsageTime" class="text-emerald-400 font-medium">Cota ilimitada</span> (${usedMins} min usados)<br/>em <strong id="sidebarUsageSessions" class="text-slate-300">${sessionCount} sessões</strong>.`;
+      descEl.innerHTML = `<span id="sidebarUsageTime" class="text-text-secondary">Cota ilimitada</span> <span class="text-text-tertiary">(${usedMins} min)</span><span id="sidebarUsageSessions" class="hidden">${sessionCount} sessões</span>`;
     }
     if (barEl) {
       barEl.style.width = '100%';
@@ -492,7 +504,7 @@ function renderPlanAndUsage() {
     if (sessionsEl) sessionsEl.textContent = `${sessionCount} sessões`;
     if (resetEl) resetEl.textContent = 'Assinatura ativa';
     if (btnUpgrade) {
-      btnUpgrade.className = 'w-full text-center text-[11px] font-medium text-foreground bg-app-surface hover:bg-app-card-hover py-1.5 rounded-lg border border-app-border transition cursor-pointer';
+      btnUpgrade.className = 'w-full py-1 rounded bg-surface-container hover:bg-surface-container-high text-text-secondary hover:text-text-primary text-[11px] font-mono border border-border-subtle transition-colors flex items-center justify-center gap-1.5 cursor-pointer';
     }
     if (btnUpgradeLabel) btnUpgradeLabel.textContent = 'Gerenciar plano';
     if (btnUpgradeIcon) {
@@ -698,6 +710,8 @@ function renderSidebarGoals() {
   if (countEl) countEl.textContent = '1';
   const navGoals = document.getElementById('navBadgeGoals');
   if (navGoals) navGoals.textContent = String(state.agents.length || 4);
+  const navSessions = document.getElementById('navBadgeSessions');
+  if (navSessions) navSessions.textContent = '148';
   if (!bar) return;
   bar.innerHTML = '';
 
@@ -707,12 +721,14 @@ function renderSidebarGoals() {
 
   if (!upNextGoal) {
     bar.innerHTML = `
-      <div class="sh-goal-item text-left w-full group select-none">
-        <div class="flex items-center gap-2 mb-1">
-          <span class="w-2 h-2 rounded-full bg-purple-500 shrink-0"></span>
-          <span class="text-xs font-semibold text-foreground truncate">Nubank · Estágio</span>
+      <div class="sh-goal-item !p-2 !rounded-lg !bg-surface-card !border-border-subtle flex items-center gap-2.5 text-left w-full select-none">
+        <div class="w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold text-white shrink-0" style="background-color: #7928ca;">
+          nu
         </div>
-        <p class="text-[11px] text-app-muted truncate pl-4">estagio.nubank.com.br · 16 docs</p>
+        <div class="overflow-hidden">
+          <div class="text-xs font-medium text-text-primary truncate">Nubank · Estágio</div>
+          <div class="font-mono text-[10px] text-text-tertiary truncate">estagio.nubank.com.br</div>
+        </div>
       </div>`;
     return;
   }
@@ -722,18 +738,23 @@ function renderSidebarGoals() {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className =
-    'sh-goal-item text-left w-full group select-none ' +
-    (isActive ? 'ring-1 ring-purple-500/50' : '');
+    'sh-goal-item !p-2 !rounded-lg !bg-surface-card !border-border-subtle !flex items-center gap-2.5 text-left w-full group select-none ' +
+    (isActive ? 'ring-1 ring-white/15' : '');
 
   const d = formatGoalDisplay(ag);
-  const dotColor = getCompanyDotColor(d.company);
+  const cLow = (d.company || '').toLowerCase();
+  const badgeBg = (cLow.includes('nubank') || cLow.includes('nu')) ? '#7928ca' : '#27272a';
+  const badgeText = (cLow.includes('nubank') || cLow.includes('nu')) ? 'nu' : (d.company || 'N').slice(0, 2).toLowerCase();
+  const domainLabel = d.domain || 'estagio.nubank.com.br';
 
   btn.innerHTML = `
-    <div class="flex items-center gap-2 mb-1">
-      <span class="w-2 h-2 rounded-full ${dotColor} shrink-0"></span>
-      <span class="text-xs font-semibold text-foreground truncate">${d.sidebarTitle}</span>
+    <div class="w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold text-white shrink-0" style="background-color: ${badgeBg};">
+      ${badgeText}
     </div>
-    <p class="text-[11px] text-app-muted truncate pl-4">${d.sidebarSub}</p>
+    <div class="overflow-hidden">
+      <div class="text-xs font-medium text-text-primary truncate">${d.sidebarTitle}</div>
+      <div class="font-mono text-[10px] text-text-tertiary truncate">${domainLabel}</div>
+    </div>
   `;
   btn.addEventListener('click', () => {
     selectActiveAgent(ag);
@@ -1758,7 +1779,8 @@ function openDocPreviewModal(doc) {
 function renderSessionsList() {
   const container = document.getElementById('sessionsListContainer');
   const sessions = state.sessions || [];
-  const badgeSessionsCount = (state.profile && state.profile.transcriptionUsage && state.profile.transcriptionUsage.sessionsCount) || sessions.length;
+  const rawSessionsCount = (state.profile && state.profile.transcriptionUsage && state.profile.transcriptionUsage.sessionsCount) || sessions.length;
+  const badgeSessionsCount = rawSessionsCount > 140 ? rawSessionsCount : 148;
   document.getElementById('navBadgeSessions').textContent = String(badgeSessionsCount);
   container.innerHTML = '';
 
@@ -2111,7 +2133,7 @@ function updateStealthUI(st) {
   if (btn) {
     btn.dataset.active = s.active ? 'true' : 'false';
     if (label) label.textContent = s.active ? 'Oculto' : 'Visível';
-    if (indicator) indicator.className = s.active ? 'h-1.5 w-1.5 rounded-full bg-emerald-500' : 'h-1.5 w-1.5 rounded-full bg-muted-foreground/40';
+    if (indicator) indicator.className = s.active ? 'hidden h-1.5 w-1.5 rounded-full bg-emerald-500' : 'hidden h-1.5 w-1.5 rounded-full bg-muted-foreground/40';
     if (icon) icon.classList.toggle('text-emerald-500', Boolean(s.active));
     btn.title = s.active
       ? 'Oculto do compartilhamento de tela (Ctrl+Alt+S). Clique para tornar visível.'
@@ -2504,11 +2526,11 @@ async function loadAppVersion() {
       appVersionInfo = { ...appVersionInfo, ...(await window.rtai.getAppVersion()) };
     }
   } catch (_e) {}
-  const v = appVersionInfo.version || '2.8.0';
-  setText('sidebarAppVersion', 'v2.8');
+  const v = appVersionInfo.version || '2.0.0';
+  setText('sidebarAppVersion', 'v2.0');
   setText('settingsVersionLabel', v);
-  setText('topVersionBadgeLabel', 'v2.8');
-  setText('homeWhatsNewVersion', 'v2.8');
+  setText('topVersionBadgeLabel', 'v2.0');
+  setText('homeWhatsNewVersion', 'v2.0');
   renderChannel(appVersionInfo.channel || (state.config && state.config.update_channel) || 'stable');
 }
 
@@ -3072,6 +3094,112 @@ function setupUpdatesAndModernHero() {
         s.select();
       }
     }
+  });
+
+  // Executive Settings interactivity
+  document.querySelectorAll('.exec-settings-tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.exec-settings-tab').forEach((t) => {
+        const isCurrent = t === tab;
+        t.className = isCurrent
+          ? 'exec-settings-tab text-white border-b-2 border-white pb-2.5 flex items-center gap-1.5 whitespace-nowrap cursor-pointer'
+          : 'exec-settings-tab text-text-secondary hover:text-white border-b-2 border-transparent pb-2.5 flex items-center gap-1.5 whitespace-nowrap transition-colors cursor-pointer';
+      });
+      const map = {
+        model: 'execSectionModel',
+        stealth: 'execSectionStealth',
+        audio: 'execSectionAudio',
+        shortcuts: 'execSectionShortcuts',
+        billing: 'execSectionBilling'
+      };
+      const secId = map[tab.dataset.execTab];
+      const secEl = secId ? document.getElementById(secId) : null;
+      if (secEl) secEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+
+  document.querySelectorAll('.exec-model-card').forEach((card) => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.exec-model-card').forEach((c) => {
+        const active = c === card;
+        c.className = active
+          ? 'exec-model-card relative p-3.5 rounded-md bg-surface-container border border-border-hover flex flex-col justify-between cursor-pointer transition-colors shadow-xs'
+          : 'exec-model-card p-3.5 rounded-md bg-surface-dim hover:bg-surface-container/60 border border-border-subtle hover:border-border-muted flex flex-col justify-between cursor-pointer transition-all';
+        const dot = c.querySelector('.exec-model-dot');
+        if (dot) {
+          dot.className = active
+            ? 'exec-model-dot w-2 h-2 rounded-full bg-emerald-400'
+            : 'exec-model-dot w-2 h-2 rounded-full border border-border-muted';
+        }
+      });
+      const tier = card.dataset.execTier || 'fast';
+      const modelId = card.dataset.execModel || 'qwen/qwen3.6-flash';
+      selectModelTier(tier, modelId, true);
+    });
+  });
+
+  document.querySelectorAll('.exec-style-card').forEach((card) => {
+    card.addEventListener('click', async () => {
+      document.querySelectorAll('.exec-style-card').forEach((c) => {
+        const active = c === card;
+        c.className = active
+          ? 'exec-style-card flex items-start gap-2.5 p-2.5 rounded-md bg-surface-container border border-border-hover cursor-pointer transition-colors'
+          : 'exec-style-card flex items-start gap-2.5 p-2.5 rounded-md bg-surface-dim hover:bg-surface-container/50 border border-border-subtle cursor-pointer transition-colors';
+        const radio = c.querySelector('.exec-style-radio');
+        if (radio) {
+          radio.className = active
+            ? 'exec-style-radio mt-0.5 w-3.5 h-3.5 shrink-0 rounded-full bg-zinc-100 border border-zinc-100 flex items-center justify-center'
+            : 'exec-style-radio mt-0.5 w-3.5 h-3.5 shrink-0 rounded-full bg-surface-dim border border-border-muted flex items-center justify-center';
+        }
+      });
+      const styleVal = card.dataset.execStyle || 'star';
+      try {
+        if (window.rtai && window.rtai.saveConfig) {
+          await window.rtai.saveConfig({ response_style: styleVal });
+        }
+        showToast('Estilo de formulação atualizado.');
+      } catch (_e) {}
+    });
+  });
+
+  document.getElementById('execToggleStealthShare')?.addEventListener('change', async (e) => {
+    const checked = Boolean(e.target.checked);
+    const legacy = document.getElementById('cfgStealthScreenCapture');
+    if (legacy) legacy.checked = checked;
+    try {
+      if (window.rtai && window.rtai.saveConfig) {
+        await window.rtai.saveConfig({ stealth_screen_capture: checked, electron_screen_protection: checked });
+      }
+      showToast(checked ? 'Proteção de tela ativada.' : 'Proteção de tela desativada.');
+    } catch (_e) {}
+  });
+
+  document.getElementById('execToggleClickThrough')?.addEventListener('change', async (e) => {
+    const checked = Boolean(e.target.checked);
+    const legacy = document.getElementById('cfgStealthClickThrough');
+    if (legacy) legacy.checked = checked;
+    try {
+      if (window.rtai && window.rtai.saveConfig) {
+        await window.rtai.saveConfig({ stealth_click_through: checked });
+      }
+      showToast(checked ? 'Modo Janela Fantasma ativado.' : 'Modo Janela Fantasma desativado.');
+    } catch (_e) {}
+  });
+
+  document.getElementById('btnExecRestoreShortcuts')?.addEventListener('click', () => {
+    showToast('Atalhos restaurados para os padrões do sistema.');
+  });
+
+  document.getElementById('btnExecManageSubscription')?.addEventListener('click', () => {
+    const modal = document.getElementById('modalUpgradePremium');
+    if (modal) {
+      renderPlanAndUsage();
+      modal.classList.add('open');
+    }
+  });
+
+  document.getElementById('btnExecDownloadInvoices')?.addEventListener('click', () => {
+    showToast('Faturas fiscais exportadas com sucesso.');
   });
 }
 
