@@ -1,0 +1,2063 @@
+{
+  "totalInterviews": 300,
+  "totalCompanies": 17,
+  "totalQuestions": 185,
+  "companies": [
+    {
+      "id": "nubank",
+      "name": "Nubank",
+      "domain": "nubank.com.br",
+      "logo": "data:image/svg+xml;utf8,%3Csvg%20viewBox%3D%220%200%20100%20100%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20class%3D%22w-full%20h-full%22%3E%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2220%22%20fill%3D%22%23820AD1%22%2F%3E%3Ctext%20x%3D%2250%22%20y%3D%2265%22%20font-family%3D%22system-ui%2C%20sans-serif%22%20font-weight%3D%22900%22%20font-size%3D%2244%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%22-2%22%3Enu%3C%2Ftext%3E%3C%2Fsvg%3E",
+      "monogram": "NU",
+      "interviewsReported": 140,
+      "questionsReported": 25,
+      "lastInterviewReported": "Today",
+      "categories": {
+        "Technical": 14,
+        "Domain knowledge": 2,
+        "Behavioral": 9
+      },
+      "subCategories": {
+        "Coding": 3,
+        "System design": 3
+      },
+      "unlocked": true,
+      "unlockedTop3": true,
+      "questions": [
+        {
+          "id": "nubank-1",
+          "text": "Como você lidou com um desafio técnico complexo no seu projeto recente na arquitetura?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 12,
+          "lastReported": "Today",
+          "locked": false
+        },
+        {
+          "id": "nubank-2",
+          "text": "Quais foram os principais desafios que você enfrentou durante a migração de microsserviços?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 11,
+          "lastReported": "Today",
+          "locked": false
+        },
+        {
+          "id": "nubank-3",
+          "text": "Como você lidava quando percebia que o sistema ou pipeline estava chegando perto de estourar os limites de recursos e memória?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 9,
+          "lastReported": "Today",
+          "locked": false
+        },
+        {
+          "id": "nubank-4",
+          "text": "Como você explicaria essa solução de engenharia para um stakeholder não técnico de negócios?",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 9,
+          "lastReported": "Yesterday",
+          "locked": false
+        },
+        {
+          "id": "nubank-5",
+          "text": "Qual foi a dificuldade mais desafiadora que você precisou enfrentar em equipe e como resolveu?",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 8,
+          "lastReported": "Yesterday",
+          "locked": false
+        },
+        {
+          "id": "nubank-6",
+          "text": "Como você lidou com alguma resistência técnica ou divergência de opinião sobre uma proposta de arquitetura?",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 8,
+          "lastReported": "2 days ago",
+          "locked": false
+        },
+        {
+          "id": "nubank-7",
+          "text": "Como você define critérios de priorização entre qualidade e tempo de entrega ao desenvolver um MVP?",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 7,
+          "lastReported": "2 days ago",
+          "locked": false
+        },
+        {
+          "id": "nubank-8",
+          "text": "Qual a última situação que você precisou lidar com conflito no time e como você conduziu a conversa?",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 7,
+          "lastReported": "3 days ago",
+          "locked": false
+        },
+        {
+          "id": "nubank-9",
+          "text": "Me conte como você lidou com uma situação onde os membros do time queriam ir pelo caminho X e você achava o caminho Y?",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 6,
+          "lastReported": "3 days ago",
+          "locked": false
+        },
+        {
+          "id": "nubank-10",
+          "text": "Deu um problema crítico em produção no Nubank. O que você faria passo a passo para investigar e mitigar?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 6,
+          "lastReported": "3 days ago",
+          "locked": false
+        },
+        {
+          "id": "nubank-11",
+          "text": "Como você utiliza testes automatizados de contrato, unidade e integração para garantir alta confiabilidade em deploys contínuos?",
+          "category": "Technical",
+          "subCategory": "Coding",
+          "interviewsCount": 5,
+          "lastReported": "4 days ago",
+          "locked": false
+        },
+        {
+          "id": "nubank-12",
+          "text": "Como você utiliza ferramentas de IA (Cursor, Claude Code) como acelerador mantendo total ownership do código e da arquitetura?",
+          "category": "Technical",
+          "subCategory": "Engineering Practice",
+          "interviewsCount": 5,
+          "lastReported": "4 days ago",
+          "locked": false
+        },
+        {
+          "id": "nubank-13",
+          "text": "Por que você gostaria de estagiar e construir sua trajetória na engenharia do Nubank?",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 5,
+          "lastReported": "5 days ago",
+          "locked": false
+        },
+        {
+          "id": "nubank-14",
+          "text": "O que você gostaria de trabalhar e quais desafios técnicos mais te atraem no ecossistema do Nubank?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 4,
+          "lastReported": "5 days ago",
+          "locked": false
+        },
+        {
+          "id": "nubank-15",
+          "text": "Como você projeta ledgers financeiros de alta disponibilidade com consistência estrita, imutabilidade e concorrência?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 4,
+          "lastReported": "5 days ago",
+          "locked": false
+        },
+        {
+          "id": "nubank-16",
+          "text": "Como você escolheu as tecnologias da sua stack (ex: Next.js, Node, Python, Redis) e quais trade-offs foram considerados?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 4,
+          "lastReported": "6 days ago",
+          "locked": false
+        },
+        {
+          "id": "nubank-17",
+          "text": "Considerando seus projetos com IA, como você diferencia o que foi sua tomada de decisão e arquitetura própria do código gerado?",
+          "category": "Technical",
+          "subCategory": "Engineering Practice",
+          "interviewsCount": 3,
+          "lastReported": "6 days ago",
+          "locked": false
+        },
+        {
+          "id": "nubank-18",
+          "text": "Qual qualidade sua você acredita que mais se destacará na cultura de autonomia e ownership do Nubank?",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 3,
+          "lastReported": "6 days ago",
+          "locked": false
+        },
+        {
+          "id": "nubank-19",
+          "text": "Como você estrutura a governança e segurança de microsserviços em nuvem com mTLS e autenticação OAuth2?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 3,
+          "lastReported": "7 days ago",
+          "locked": false
+        },
+        {
+          "id": "nubank-20",
+          "text": "Como você implementaria um algoritmo de cache distribuído com baixa latência e estratégia de invalidação consistente?",
+          "category": "Technical",
+          "subCategory": "Coding",
+          "interviewsCount": 3,
+          "lastReported": "7 days ago",
+          "locked": false
+        },
+        {
+          "id": "nubank-21",
+          "text": "Descreva como você implementaria rate limiting distribuído usando Redis e sliding window para proteger APIs de pagamento.",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 2,
+          "lastReported": "7 days ago",
+          "locked": false
+        },
+        {
+          "id": "nubank-22",
+          "text": "Quais métricas quantitativas de negócio e de produto você acompanhou após o deploy do seu software em produção?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 2,
+          "lastReported": "8 days ago",
+          "locked": false
+        },
+        {
+          "id": "nubank-23",
+          "text": "Como você aborda o refactoring de código legado para manter modularidade sem quebrar contratos de integração?",
+          "category": "Technical",
+          "subCategory": "Coding",
+          "interviewsCount": 2,
+          "lastReported": "8 days ago",
+          "locked": false
+        },
+        {
+          "id": "nubank-24",
+          "text": "Conte sobre uma situação em que você identificou uma oportunidade fora do seu escopo original e assumiu a liderança da entrega.",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 2,
+          "lastReported": "8 days ago",
+          "locked": false
+        },
+        {
+          "id": "nubank-25",
+          "text": "Como você aborda o aprendizado rápido de novas linguagens funcionais (ex: Clojure, Elixir) e paradigmas no onboarding?",
+          "category": "Technical",
+          "subCategory": "Engineering Practice",
+          "interviewsCount": 2,
+          "lastReported": "9 days ago",
+          "locked": false
+        }
+      ]
+    },
+    {
+      "id": "accenture",
+      "name": "Accenture",
+      "domain": "accenture.com",
+      "logo": "data:image/svg+xml;utf8,%3Csvg%20viewBox%3D%220%200%20100%20100%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20class%3D%22w-full%20h-full%22%3E%0A%20%20%20%20%3Cpath%20d%3D%22M15%2075L58%2050L15%2025L32%2015L90%2050L32%2085L15%2075Z%22%20fill%3D%22%23A100FF%22%2F%3E%0A%20%20%3C%2Fsvg%3E",
+      "monogram": "AC",
+      "interviewsReported": 10,
+      "questionsReported": 10,
+      "lastInterviewReported": "Today",
+      "categories": {
+        "Technical": 7,
+        "Domain knowledge": 1,
+        "Behavioral": 2
+      },
+      "subCategories": {
+        "Coding": 1,
+        "System design": 3
+      },
+      "unlocked": false,
+      "unlockedTop3": false,
+      "questions": [
+        {
+          "id": "acc-1",
+          "text": "Describe a time when you were under intense pressure. How did you handle trade-offs to get it through?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 55,
+          "lastReported": "5 days ago",
+          "locked": true
+        },
+        {
+          "id": "acc-2",
+          "text": "How do you handle schema migrations with zero downtime on high-throughput databases?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 53,
+          "lastReported": "2 days ago",
+          "locked": true
+        },
+        {
+          "id": "acc-3",
+          "text": "Walk me through how you design a rate limiter in a distributed architecture.",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 48,
+          "lastReported": "2 days ago",
+          "locked": true
+        },
+        {
+          "id": "acc-4",
+          "text": "Tell me about a technical dispute with a teammate. How did you resolve the conflict?",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 47,
+          "lastReported": "5 days ago",
+          "locked": true
+        },
+        {
+          "id": "acc-5",
+          "text": "How would you design a distributed cache invalidation strategy across multi-region clusters?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 47,
+          "lastReported": "5 days ago",
+          "locked": true
+        },
+        {
+          "id": "acc-6",
+          "text": "Describe a production outage you caused or debugged. What was the root cause and mitigation?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 44,
+          "lastReported": "4 days ago",
+          "locked": true
+        },
+        {
+          "id": "acc-7",
+          "text": "What trade-offs do you consider when choosing between relational and NoSQL storage?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 43,
+          "lastReported": "2 days ago",
+          "locked": true
+        },
+        {
+          "id": "acc-8",
+          "text": "How do you evaluate whether to build an internal tool versus buying a SaaS solution?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 40,
+          "lastReported": "4 days ago",
+          "locked": true
+        },
+        {
+          "id": "acc-9",
+          "text": "Describe how you approach performance tuning and profiling on slow asynchronous endpoints.",
+          "category": "Technical",
+          "subCategory": "Coding",
+          "interviewsCount": 39,
+          "lastReported": "2 days ago",
+          "locked": true
+        },
+        {
+          "id": "acc-10",
+          "text": "Tell me about a time you had to deliver a critical milestone with shifting requirements.",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 36,
+          "lastReported": "1 day ago",
+          "locked": true
+        }
+      ]
+    },
+    {
+      "id": "tcs",
+      "name": "Tata Consultancy Services",
+      "domain": "tcs.com",
+      "monogram": "TCS",
+      "interviewsReported": 10,
+      "questionsReported": 10,
+      "lastInterviewReported": "Yesterday",
+      "categories": {
+        "Technical": 6,
+        "Domain knowledge": 2,
+        "Behavioral": 2
+      },
+      "subCategories": {
+        "Coding": 2,
+        "System design": 2
+      },
+      "unlocked": false,
+      "unlockedTop3": false,
+      "questions": [
+        {
+          "id": "tcs-1",
+          "text": "Explain the internal workings of Java Garbage Collection and memory tuning in high-throughput enterprise systems.",
+          "category": "Technical",
+          "subCategory": "Coding",
+          "interviewsCount": 62,
+          "lastReported": "Yesterday",
+          "locked": true
+        },
+        {
+          "id": "tcs-2",
+          "text": "How would you design a distributed banking transaction system ensuring ACID compliance across microservices?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 58,
+          "lastReported": "2 days ago",
+          "locked": true
+        },
+        {
+          "id": "tcs-3",
+          "text": "Walk me through your approach to breaking down a monolithic enterprise legacy system into modular domain services.",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 54,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "tcs-4",
+          "text": "Describe a production outage that required immediate root-cause analysis and hot-patching under strict SLA.",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 51,
+          "lastReported": "2 days ago",
+          "locked": true
+        },
+        {
+          "id": "tcs-5",
+          "text": "What are the main concurrency pitfalls in multi-threaded programming and how do you prevent race conditions and deadlocks?",
+          "category": "Technical",
+          "subCategory": "Coding",
+          "interviewsCount": 48,
+          "lastReported": "4 days ago",
+          "locked": true
+        },
+        {
+          "id": "tcs-6",
+          "text": "How do you structure CI/CD pipelines with automated regression and security scanning for multi-tenant software?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 45,
+          "lastReported": "5 days ago",
+          "locked": true
+        },
+        {
+          "id": "tcs-7",
+          "text": "Tell me about a time you had to lead a cross-functional offshore/onshore team with tight project deadlines.",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 42,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "tcs-8",
+          "text": "What trade-offs do you consider when designing a read-heavy vs write-heavy database architecture?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 40,
+          "lastReported": "1 day ago",
+          "locked": true
+        },
+        {
+          "id": "tcs-9",
+          "text": "How do you measure business ROI when migrating on-premise datacenter workloads to hybrid public cloud?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 37,
+          "lastReported": "6 days ago",
+          "locked": true
+        },
+        {
+          "id": "tcs-10",
+          "text": "How do you handle API versioning and backward compatibility without breaking existing enterprise integrations?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 34,
+          "lastReported": "4 days ago",
+          "locked": true
+        }
+      ],
+      "logo": "data:image/svg+xml;utf8,%3Csvg%20viewBox%3D%220%200%20100%20100%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20class%3D%22w-full%20h-full%22%3E%0A%20%20%20%20%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2220%22%20fill%3D%22%23FFFFFF%22%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M20%2032C35%2024%2065%2024%2080%2032M20%2040C35%2032%2065%2032%2080%2040%22%20stroke%3D%22%23005B94%22%20stroke-width%3D%226%22%20stroke-linecap%3D%22round%22%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%2250%22%20y%3D%2270%22%20font-family%3D%22system-ui%2C%20-apple-system%2C%20sans-serif%22%20font-weight%3D%22900%22%20font-size%3D%2222%22%20fill%3D%22%23000000%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221%22%3ETATA%3C%2Ftext%3E%0A%20%20%3C%2Fsvg%3E"
+    },
+    {
+      "id": "infosys",
+      "name": "Infosys",
+      "domain": "infosys.com",
+      "monogram": "INF",
+      "interviewsReported": 10,
+      "questionsReported": 10,
+      "lastInterviewReported": "2 days ago",
+      "categories": {
+        "Technical": 6,
+        "Domain knowledge": 2,
+        "Behavioral": 2
+      },
+      "subCategories": {
+        "Coding": 1,
+        "System design": 3
+      },
+      "unlocked": false,
+      "unlockedTop3": false,
+      "questions": [
+        {
+          "id": "infosys-1",
+          "text": "How do you design an asynchronous notification platform handling millions of push notifications and SMS per second?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 57,
+          "lastReported": "Today",
+          "locked": true
+        },
+        {
+          "id": "infosys-2",
+          "text": "What are the core differences between optimistic and pessimistic locking in distributed databases?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 53,
+          "lastReported": "Yesterday",
+          "locked": true
+        },
+        {
+          "id": "infosys-3",
+          "text": "How do you design a RESTful or gRPC API that scales horizontally across Kubernetes clusters?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 50,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "infosys-4",
+          "text": "Tell me about a time you identified a critical flaw in a colleague's code review. How did you communicate your feedback constructively?",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 47,
+          "lastReported": "2 days ago",
+          "locked": true
+        },
+        {
+          "id": "infosys-5",
+          "text": "Explain the time and space complexity of sorting algorithms and when you would choose QuickSort vs MergeSort in production.",
+          "category": "Technical",
+          "subCategory": "Coding",
+          "interviewsCount": 44,
+          "lastReported": "4 days ago",
+          "locked": true
+        },
+        {
+          "id": "infosys-6",
+          "text": "How do you implement idempotency in distributed payment processing endpoints?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 41,
+          "lastReported": "1 day ago",
+          "locked": true
+        },
+        {
+          "id": "infosys-7",
+          "text": "Describe a situation where you had to quickly learn a new technology stack to deliver a high-stakes customer project.",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 39,
+          "lastReported": "5 days ago",
+          "locked": true
+        },
+        {
+          "id": "infosys-8",
+          "text": "How do you protect microservices from cascading failures using circuit breakers and bulkhead patterns?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 36,
+          "lastReported": "2 days ago",
+          "locked": true
+        },
+        {
+          "id": "infosys-9",
+          "text": "What strategies do you adopt for cloud finops and reducing monthly infrastructure bills without impacting performance?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 32,
+          "lastReported": "6 days ago",
+          "locked": true
+        },
+        {
+          "id": "infosys-10",
+          "text": "How do you align enterprise architecture roadmaps with business stakeholder expectations?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 28,
+          "lastReported": "3 days ago",
+          "locked": true
+        }
+      ],
+      "logo": "data:image/svg+xml;utf8,%3Csvg%20viewBox%3D%220%200%20100%20100%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20class%3D%22w-full%20h-full%22%3E%0A%20%20%20%20%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2220%22%20fill%3D%22%23FFFFFF%22%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%2250%22%20y%3D%2258%22%20font-family%3D%22'Trebuchet%20MS'%2C%20'Segoe%20UI'%2C%20sans-serif%22%20font-weight%3D%22bold%22%20font-size%3D%2220%22%20fill%3D%22%23007CC3%22%20text-anchor%3D%22middle%22%20font-style%3D%22italic%22%3EInfosys%3C%2Ftext%3E%0A%20%20%3C%2Fsvg%3E"
+    },
+    {
+      "id": "capgemini",
+      "name": "Capgemini",
+      "domain": "capgemini.com",
+      "monogram": "CAP",
+      "interviewsReported": 10,
+      "questionsReported": 10,
+      "lastInterviewReported": "Today",
+      "categories": {
+        "Technical": 6,
+        "Domain knowledge": 2,
+        "Behavioral": 2
+      },
+      "subCategories": {
+        "Coding": 1,
+        "System design": 3
+      },
+      "unlocked": false,
+      "unlockedTop3": false,
+      "questions": [
+        {
+          "id": "capgemini-1",
+          "text": "How would you implement eventual consistency across microservices using Apache Kafka and the Saga pattern?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 52,
+          "lastReported": "Today",
+          "locked": true
+        },
+        {
+          "id": "capgemini-2",
+          "text": "Describe how you troubleshoot memory leaks and high CPU utilization in Node.js or Java containerized applications.",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 48,
+          "lastReported": "2 days ago",
+          "locked": true
+        },
+        {
+          "id": "capgemini-3",
+          "text": "What architectural patterns do you recommend for decoupling legacy ERP backends from modern web frontends?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 45,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "capgemini-4",
+          "text": "Tell me about a time when you had to manage conflicting expectations between product owners and technical leadership.",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 43,
+          "lastReported": "1 day ago",
+          "locked": true
+        },
+        {
+          "id": "capgemini-5",
+          "text": "How do you implement secure OAuth2.0 and OpenID Connect authentication flows across single-page applications and mobile clients?",
+          "category": "Technical",
+          "subCategory": "Coding",
+          "interviewsCount": 40,
+          "lastReported": "4 days ago",
+          "locked": true
+        },
+        {
+          "id": "capgemini-6",
+          "text": "Explain how you design a multi-region active-active database replication topology with low replication lag.",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 38,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "capgemini-7",
+          "text": "Describe a situation where a tight deadline tempted the team to take on technical debt. How did you balance speed and quality?",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 35,
+          "lastReported": "5 days ago",
+          "locked": true
+        },
+        {
+          "id": "capgemini-8",
+          "text": "How do you implement automated end-to-end performance and chaos engineering testing using tools like k6 or Gremlin?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 31,
+          "lastReported": "2 days ago",
+          "locked": true
+        },
+        {
+          "id": "capgemini-9",
+          "text": "How do you evaluate whether GraphQL or REST is better suited for a large enterprise client mobile ecosystem?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 29,
+          "lastReported": "4 days ago",
+          "locked": true
+        },
+        {
+          "id": "capgemini-10",
+          "text": "What are the main security considerations when exposing public APIs to third-party financial aggregators?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 26,
+          "lastReported": "1 week ago",
+          "locked": true
+        }
+      ],
+      "logo": "data:image/svg+xml;utf8,%3Csvg%20viewBox%3D%220%200%20100%20100%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20class%3D%22w-full%20h-full%22%3E%0A%20%20%20%20%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2220%22%20fill%3D%22%23FFFFFF%22%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M50%2020C42%2032%2024%2044%2024%2058C24%2072%2040%2076%2046%2068L44%2080H56L54%2068C60%2076%2076%2072%2076%2058C76%2044%2058%2032%2050%2020Z%22%20fill%3D%22%230070AD%22%2F%3E%0A%20%20%3C%2Fsvg%3E"
+    },
+    {
+      "id": "deloitte",
+      "name": "Deloitte",
+      "domain": "deloitte.com",
+      "monogram": "DEL",
+      "interviewsReported": 10,
+      "questionsReported": 10,
+      "lastInterviewReported": "Yesterday",
+      "categories": {
+        "Technical": 6,
+        "Domain knowledge": 2,
+        "Behavioral": 2
+      },
+      "subCategories": {
+        "Coding": 1,
+        "System design": 2
+      },
+      "unlocked": false,
+      "unlockedTop3": false,
+      "questions": [
+        {
+          "id": "deloitte-1",
+          "text": "How do you design an enterprise data lake and real-time streaming analytics pipeline for global audit compliance?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 56,
+          "lastReported": "Today",
+          "locked": true
+        },
+        {
+          "id": "deloitte-2",
+          "text": "Walk me through your methodology for evaluating legacy software risk and prioritizing technical remediation.",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 51,
+          "lastReported": "Yesterday",
+          "locked": true
+        },
+        {
+          "id": "deloitte-3",
+          "text": "How do you architect zero-trust network security and role-based access control (RBAC) across multi-cloud environments?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 49,
+          "lastReported": "2 days ago",
+          "locked": true
+        },
+        {
+          "id": "deloitte-4",
+          "text": "Tell me about a time you had to deliver executive presentation of complex technical findings to non-technical C-level executives.",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 46,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "deloitte-5",
+          "text": "How do you design a high-throughput transaction ledger with cryptographic auditability and tamper-evident logging?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 42,
+          "lastReported": "4 days ago",
+          "locked": true
+        },
+        {
+          "id": "deloitte-6",
+          "text": "What are the trade-offs between monolithic database sharding vs migrating to distributed SQL like CockroachDB or Spanner?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 39,
+          "lastReported": "1 day ago",
+          "locked": true
+        },
+        {
+          "id": "deloitte-7",
+          "text": "Describe a situation where project milestones slipped due to vendor dependencies. How did you mitigate impact?",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 37,
+          "lastReported": "5 days ago",
+          "locked": true
+        },
+        {
+          "id": "deloitte-8",
+          "text": "How do you implement automated secrets management, key rotation, and encryption-at-rest across distributed microservices?",
+          "category": "Technical",
+          "subCategory": "Coding",
+          "interviewsCount": 34,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "deloitte-9",
+          "text": "How do you design AI/ML inference pipelines that balance latency, throughput, and GPU infrastructure costs?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 31,
+          "lastReported": "4 days ago",
+          "locked": true
+        },
+        {
+          "id": "deloitte-10",
+          "text": "What strategies ensure zero data loss during cloud database failovers in Tier-1 banking applications?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 28,
+          "lastReported": "2 days ago",
+          "locked": true
+        }
+      ],
+      "logo": "data:image/svg+xml;utf8,%3Csvg%20viewBox%3D%220%200%20100%20100%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20class%3D%22w-full%20h-full%22%3E%0A%20%20%20%20%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2220%22%20fill%3D%22%23000000%22%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%2244%22%20y%3D%2266%22%20font-family%3D%22system-ui%2C%20sans-serif%22%20font-weight%3D%22900%22%20font-size%3D%2244%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3ED%3C%2Ftext%3E%0A%20%20%20%20%3Ccircle%20cx%3D%2268%22%20cy%3D%2262%22%20r%3D%225%22%20fill%3D%22%2386BC25%22%2F%3E%0A%20%20%3C%2Fsvg%3E"
+    },
+    {
+      "id": "hcltech",
+      "name": "HCLTech",
+      "domain": "hcltech.com",
+      "monogram": "HCL",
+      "interviewsReported": 10,
+      "questionsReported": 10,
+      "lastInterviewReported": "3 days ago",
+      "categories": {
+        "Technical": 6,
+        "Domain knowledge": 2,
+        "Behavioral": 2
+      },
+      "subCategories": {
+        "Coding": 1,
+        "System design": 3
+      },
+      "unlocked": false,
+      "unlockedTop3": false,
+      "questions": [
+        {
+          "id": "hcltech-1",
+          "text": "How do you design a fault-tolerant microservices architecture with automated failover on AWS or Azure?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 42,
+          "lastReported": "2 days ago",
+          "locked": true
+        },
+        {
+          "id": "hcltech-2",
+          "text": "Describe a complex database migration where you achieved zero downtime while refactoring the relational schema.",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 39,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "hcltech-3",
+          "text": "How do you implement distributed caching and prevent cache stampede in high-concurrency systems?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 38,
+          "lastReported": "4 days ago",
+          "locked": true
+        },
+        {
+          "id": "hcltech-4",
+          "text": "Tell me about a time when a client changed project scope halfway through a delivery sprint. How did you handle trade-offs?",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 36,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "hcltech-5",
+          "text": "What is your strategy for optimizing slow PostgreSQL or MySQL queries with complex joins and millions of rows?",
+          "category": "Technical",
+          "subCategory": "Coding",
+          "interviewsCount": 35,
+          "lastReported": "5 days ago",
+          "locked": true
+        },
+        {
+          "id": "hcltech-6",
+          "text": "Explain how you design an event-driven telemetry pipeline using Kafka, RabbitMQ, or AWS EventBridge.",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 32,
+          "lastReported": "1 day ago",
+          "locked": true
+        },
+        {
+          "id": "hcltech-7",
+          "text": "How do you ensure GDPR, HIPAA, and SOC2 compliance across enterprise cloud infrastructure?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 30,
+          "lastReported": "5 days ago",
+          "locked": true
+        },
+        {
+          "id": "hcltech-8",
+          "text": "Tell me about a situation where you had a strong technical disagreement with a solutions architect. How did you proceed?",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 29,
+          "lastReported": "4 days ago",
+          "locked": true
+        },
+        {
+          "id": "hcltech-9",
+          "text": "How would you rate limit incoming API requests per client tenant to prevent noisy neighbor problems?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 27,
+          "lastReported": "6 days ago",
+          "locked": true
+        },
+        {
+          "id": "hcltech-10",
+          "text": "How do you evaluate Total Cost of Ownership (TCO) when choosing between serverless and containerized microservices?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 24,
+          "lastReported": "1 week ago",
+          "locked": true
+        }
+      ],
+      "logo": "data:image/svg+xml;utf8,%3Csvg%20viewBox%3D%220%200%20100%20100%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20class%3D%22w-full%20h-full%22%3E%0A%20%20%20%20%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2220%22%20fill%3D%22%232E1A8E%22%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%2250%22%20y%3D%2258%22%20font-family%3D%22system-ui%2C%20sans-serif%22%20font-weight%3D%22800%22%20font-size%3D%2216%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%3EHCLTech%3C%2Ftext%3E%0A%20%20%3C%2Fsvg%3E"
+    },
+    {
+      "id": "wipro",
+      "name": "Wipro Limited",
+      "domain": "wipro.com",
+      "monogram": "WIP",
+      "interviewsReported": 10,
+      "questionsReported": 10,
+      "lastInterviewReported": "Today",
+      "categories": {
+        "Technical": 6,
+        "Domain knowledge": 2,
+        "Behavioral": 2
+      },
+      "subCategories": {
+        "Coding": 1,
+        "System design": 3
+      },
+      "unlocked": false,
+      "unlockedTop3": false,
+      "questions": [
+        {
+          "id": "wipro-1",
+          "text": "How do you design a real-time IoT device data ingestion pipeline capable of processing 500,000 events/second?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 49,
+          "lastReported": "Today",
+          "locked": true
+        },
+        {
+          "id": "wipro-2",
+          "text": "Explain how you structure a microservices architecture using domain-driven design (DDD) and bounded contexts.",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 45,
+          "lastReported": "2 days ago",
+          "locked": true
+        },
+        {
+          "id": "wipro-3",
+          "text": "What is your approach to handling distributed tracing and distributed logging across hundreds of container pods?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 42,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "wipro-4",
+          "text": "Tell me about a time you had to handle an escalations meeting with an unhappy enterprise customer. What was the outcome?",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 40,
+          "lastReported": "1 day ago",
+          "locked": true
+        },
+        {
+          "id": "wipro-5",
+          "text": "Explain the principles of SOLID design and demonstrate how they prevent code fragility in large codebases.",
+          "category": "Technical",
+          "subCategory": "Coding",
+          "interviewsCount": 38,
+          "lastReported": "4 days ago",
+          "locked": true
+        },
+        {
+          "id": "wipro-6",
+          "text": "How do you implement blue-green and canary deployments in Kubernetes with automatic rollback on error spike?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 35,
+          "lastReported": "2 days ago",
+          "locked": true
+        },
+        {
+          "id": "wipro-7",
+          "text": "Describe a time when you coached a team member who was struggling with complex architectural requirements.",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 33,
+          "lastReported": "5 days ago",
+          "locked": true
+        },
+        {
+          "id": "wipro-8",
+          "text": "How do you design schema-less document storage in MongoDB or DynamoDB while preserving query performance and indexes?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 30,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "wipro-9",
+          "text": "What are the main KPIs you use to track software reliability and developer engineering velocity (e.g. DORA metrics)?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 28,
+          "lastReported": "6 days ago",
+          "locked": true
+        },
+        {
+          "id": "wipro-10",
+          "text": "How do you architect resilient payment gateways that seamlessly fallback to secondary acquirers upon timeout?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 25,
+          "lastReported": "4 days ago",
+          "locked": true
+        }
+      ],
+      "logo": "data:image/svg+xml;utf8,%3Csvg%20viewBox%3D%220%200%20100%20100%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20class%3D%22w-full%20h-full%22%3E%0A%20%20%20%20%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2220%22%20fill%3D%22%23FFFFFF%22%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2210%22%20fill%3D%22%234B286D%22%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%2250%22%20cy%3D%2230%22%20r%3D%224.5%22%20fill%3D%22%23C41230%22%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%2266%22%20cy%3D%2236%22%20r%3D%224.5%22%20fill%3D%22%23F36F21%22%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%2270%22%20cy%3D%2250%22%20r%3D%224.5%22%20fill%3D%22%230079C1%22%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%2266%22%20cy%3D%2264%22%20r%3D%224.5%22%20fill%3D%22%23008850%22%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%2250%22%20cy%3D%2270%22%20r%3D%224.5%22%20fill%3D%22%2378BE20%22%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%2234%22%20cy%3D%2264%22%20r%3D%224.5%22%20fill%3D%22%23FFC72C%22%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%2230%22%20cy%3D%2250%22%20r%3D%224.5%22%20fill%3D%22%23E40046%22%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%2234%22%20cy%3D%2236%22%20r%3D%224.5%22%20fill%3D%22%23742183%22%2F%3E%0A%20%20%3C%2Fsvg%3E"
+    },
+    {
+      "id": "cognizant",
+      "name": "Cognizant",
+      "domain": "cognizant.com",
+      "monogram": "COG",
+      "interviewsReported": 10,
+      "questionsReported": 10,
+      "lastInterviewReported": "Yesterday",
+      "categories": {
+        "Technical": 6,
+        "Domain knowledge": 2,
+        "Behavioral": 2
+      },
+      "subCategories": {
+        "Coding": 2,
+        "System design": 2
+      },
+      "unlocked": false,
+      "unlockedTop3": false,
+      "questions": [
+        {
+          "id": "cognizant-1",
+          "text": "How would you architect a modern digital healthcare portal compliant with HIPAA regulations and FHIR standards?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 46,
+          "lastReported": "Yesterday",
+          "locked": true
+        },
+        {
+          "id": "cognizant-2",
+          "text": "Explain how you optimize frontend bundle sizes and web vital metrics (LCP, FID, CLS) in large React/Next.js apps.",
+          "category": "Technical",
+          "subCategory": "Coding",
+          "interviewsCount": 43,
+          "lastReported": "Today",
+          "locked": true
+        },
+        {
+          "id": "cognizant-3",
+          "text": "How do you design resilient event consumers that handle duplicate messages and out-of-order delivery gracefully?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 40,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "cognizant-4",
+          "text": "Tell me about a time when you spearheaded a migration from legacy on-prem infrastructure to cloud native services.",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 38,
+          "lastReported": "2 days ago",
+          "locked": true
+        },
+        {
+          "id": "cognizant-5",
+          "text": "What are the trade-offs between server-side rendering (SSR), static site generation (SSG), and client-side rendering (CSR)?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 36,
+          "lastReported": "4 days ago",
+          "locked": true
+        },
+        {
+          "id": "cognizant-6",
+          "text": "How do you design a multi-tenant SaaS authorization system with tenant isolation at the database layer?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 33,
+          "lastReported": "1 day ago",
+          "locked": true
+        },
+        {
+          "id": "cognizant-7",
+          "text": "Describe a situation where a production bug affected customer billing. How did you triage and remediate the issue?",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 31,
+          "lastReported": "5 days ago",
+          "locked": true
+        },
+        {
+          "id": "cognizant-8",
+          "text": "How do you write clean unit and integration tests that mock external dependencies without making tests brittle?",
+          "category": "Technical",
+          "subCategory": "Coding",
+          "interviewsCount": 29,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "cognizant-9",
+          "text": "What strategies do you employ for API rate-limiting and quota enforcement across B2B enterprise tiers?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 26,
+          "lastReported": "6 days ago",
+          "locked": true
+        },
+        {
+          "id": "cognizant-10",
+          "text": "How do you evaluate and implement automated regression testing in continuous deployment environments?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 23,
+          "lastReported": "4 days ago",
+          "locked": true
+        }
+      ],
+      "logo": "data:image/svg+xml;utf8,%3Csvg%20viewBox%3D%220%200%20100%20100%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20class%3D%22w-full%20h-full%22%3E%0A%20%20%20%20%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2220%22%20fill%3D%22%23FFFFFF%22%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M50%2020L75%2035V65L50%2080L25%2065V35L50%2020Z%22%20fill%3D%22%230033A0%22%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M50%2035L65%2044V60L50%2068L35%2060V44L50%2035Z%22%20fill%3D%22%2300A3E0%22%2F%3E%0A%20%20%3C%2Fsvg%3E"
+    },
+    {
+      "id": "ltimindtree",
+      "name": "LTIMindtree",
+      "domain": "ltimindtree.com",
+      "monogram": "LTI",
+      "interviewsReported": 10,
+      "questionsReported": 10,
+      "lastInterviewReported": "4 days ago",
+      "categories": {
+        "Technical": 6,
+        "Domain knowledge": 2,
+        "Behavioral": 2
+      },
+      "subCategories": {
+        "Coding": 1,
+        "System design": 2
+      },
+      "unlocked": false,
+      "unlockedTop3": false,
+      "questions": [
+        {
+          "id": "ltimindtree-1",
+          "text": "How would you architect a globally distributed caching system with low latency and consistency guarantees?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 45,
+          "lastReported": "2 days ago",
+          "locked": true
+        },
+        {
+          "id": "ltimindtree-2",
+          "text": "Describe a time when you led a critical technical refactoring without disrupting ongoing business operations.",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 40,
+          "lastReported": "Yesterday",
+          "locked": true
+        },
+        {
+          "id": "ltimindtree-3",
+          "text": "How do you manage database connections, pooling, and slow query bottlenecks under high concurrent loads?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 36,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "ltimindtree-4",
+          "text": "What is your approach to breaking down monoliths into resilient, decoupled microservices?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 33,
+          "lastReported": "Today",
+          "locked": true
+        },
+        {
+          "id": "ltimindtree-5",
+          "text": "Explain how you design an idempotent payment processing API to prevent duplicate charges upon network retries.",
+          "category": "Technical",
+          "subCategory": "Coding",
+          "interviewsCount": 30,
+          "lastReported": "4 days ago",
+          "locked": true
+        },
+        {
+          "id": "ltimindtree-6",
+          "text": "Tell me about a time you had to mentor an underperforming engineer and helped them achieve their project goals.",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 32,
+          "lastReported": "5 days ago",
+          "locked": true
+        },
+        {
+          "id": "ltimindtree-7",
+          "text": "How do you balance technical debt against urgent feature requests from business stakeholders?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 29,
+          "lastReported": "1 day ago",
+          "locked": true
+        },
+        {
+          "id": "ltimindtree-8",
+          "text": "What security practices do you implement for zero-trust cloud infrastructure and secrets management?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 26,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "ltimindtree-9",
+          "text": "How do you implement comprehensive observability, distributed tracing, and automated alerting in Kubernetes?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 22,
+          "lastReported": "6 days ago",
+          "locked": true
+        },
+        {
+          "id": "ltimindtree-10",
+          "text": "How do you evaluate vendor SaaS products versus in-house engineering solutions for enterprise clients?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 18,
+          "lastReported": "4 days ago",
+          "locked": true
+        }
+      ],
+      "logo": "data:image/svg+xml;utf8,%3Csvg%20viewBox%3D%220%200%20100%20100%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20class%3D%22w-full%20h-full%22%3E%0A%20%20%20%20%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2220%22%20fill%3D%22%23E2231A%22%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%2250%22%20y%3D%2260%22%20font-family%3D%22system-ui%2C%20sans-serif%22%20font-weight%3D%22900%22%20font-size%3D%2225%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221%22%3ELTM%3C%2Ftext%3E%0A%20%20%3C%2Fsvg%3E"
+    },
+    {
+      "id": "ey",
+      "name": "EY",
+      "domain": "ey.com",
+      "monogram": "EY",
+      "interviewsReported": 10,
+      "questionsReported": 10,
+      "lastInterviewReported": "2 days ago",
+      "categories": {
+        "Technical": 6,
+        "Domain knowledge": 2,
+        "Behavioral": 2
+      },
+      "subCategories": {
+        "Coding": 1,
+        "System design": 2
+      },
+      "unlocked": false,
+      "unlockedTop3": false,
+      "questions": [
+        {
+          "id": "ey-1",
+          "text": "How would you architect a globally distributed caching system with low latency and consistency guarantees?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 45,
+          "lastReported": "2 days ago",
+          "locked": true
+        },
+        {
+          "id": "ey-2",
+          "text": "Describe a time when you led a critical technical refactoring without disrupting ongoing business operations.",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 40,
+          "lastReported": "Yesterday",
+          "locked": true
+        },
+        {
+          "id": "ey-3",
+          "text": "How do you manage database connections, pooling, and slow query bottlenecks under high concurrent loads?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 36,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "ey-4",
+          "text": "What is your approach to breaking down monoliths into resilient, decoupled microservices?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 33,
+          "lastReported": "Today",
+          "locked": true
+        },
+        {
+          "id": "ey-5",
+          "text": "Explain how you design an idempotent payment processing API to prevent duplicate charges upon network retries.",
+          "category": "Technical",
+          "subCategory": "Coding",
+          "interviewsCount": 30,
+          "lastReported": "4 days ago",
+          "locked": true
+        },
+        {
+          "id": "ey-6",
+          "text": "Tell me about a time you had to mentor an underperforming engineer and helped them achieve their project goals.",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 32,
+          "lastReported": "5 days ago",
+          "locked": true
+        },
+        {
+          "id": "ey-7",
+          "text": "How do you balance technical debt against urgent feature requests from business stakeholders?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 29,
+          "lastReported": "1 day ago",
+          "locked": true
+        },
+        {
+          "id": "ey-8",
+          "text": "What security practices do you implement for zero-trust cloud infrastructure and secrets management?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 26,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "ey-9",
+          "text": "How do you implement comprehensive observability, distributed tracing, and automated alerting in Kubernetes?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 22,
+          "lastReported": "6 days ago",
+          "locked": true
+        },
+        {
+          "id": "ey-10",
+          "text": "How do you evaluate vendor SaaS products versus in-house engineering solutions for enterprise clients?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 18,
+          "lastReported": "4 days ago",
+          "locked": true
+        }
+      ],
+      "logo": "data:image/svg+xml;utf8,%3Csvg%20viewBox%3D%220%200%20100%20100%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20class%3D%22w-full%20h-full%22%3E%0A%20%20%20%20%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2220%22%20fill%3D%22%232E2E38%22%2F%3E%0A%20%20%20%20%3Cpolygon%20points%3D%2250%2C15%2090%2C30%2085%2C38%2045%2C23%22%20fill%3D%22%23FFE600%22%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%2250%22%20y%3D%2268%22%20font-family%3D%22system-ui%2C%20sans-serif%22%20font-weight%3D%22900%22%20font-size%3D%2234%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%22-1%22%3EEY%3C%2Ftext%3E%0A%20%20%3C%2Fsvg%3E"
+    },
+    {
+      "id": "mphasis",
+      "name": "Mphasis",
+      "domain": "mphasis.com",
+      "monogram": "MPH",
+      "interviewsReported": 10,
+      "questionsReported": 10,
+      "lastInterviewReported": "3 days ago",
+      "categories": {
+        "Technical": 6,
+        "Domain knowledge": 2,
+        "Behavioral": 2
+      },
+      "subCategories": {
+        "Coding": 1,
+        "System design": 2
+      },
+      "unlocked": false,
+      "unlockedTop3": false,
+      "questions": [
+        {
+          "id": "mphasis-1",
+          "text": "How would you architect a globally distributed caching system with low latency and consistency guarantees?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 45,
+          "lastReported": "2 days ago",
+          "locked": true
+        },
+        {
+          "id": "mphasis-2",
+          "text": "Describe a time when you led a critical technical refactoring without disrupting ongoing business operations.",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 40,
+          "lastReported": "Yesterday",
+          "locked": true
+        },
+        {
+          "id": "mphasis-3",
+          "text": "How do you manage database connections, pooling, and slow query bottlenecks under high concurrent loads?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 36,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "mphasis-4",
+          "text": "What is your approach to breaking down monoliths into resilient, decoupled microservices?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 33,
+          "lastReported": "Today",
+          "locked": true
+        },
+        {
+          "id": "mphasis-5",
+          "text": "Explain how you design an idempotent payment processing API to prevent duplicate charges upon network retries.",
+          "category": "Technical",
+          "subCategory": "Coding",
+          "interviewsCount": 30,
+          "lastReported": "4 days ago",
+          "locked": true
+        },
+        {
+          "id": "mphasis-6",
+          "text": "Tell me about a time you had to mentor an underperforming engineer and helped them achieve their project goals.",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 32,
+          "lastReported": "5 days ago",
+          "locked": true
+        },
+        {
+          "id": "mphasis-7",
+          "text": "How do you balance technical debt against urgent feature requests from business stakeholders?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 29,
+          "lastReported": "1 day ago",
+          "locked": true
+        },
+        {
+          "id": "mphasis-8",
+          "text": "What security practices do you implement for zero-trust cloud infrastructure and secrets management?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 26,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "mphasis-9",
+          "text": "How do you implement comprehensive observability, distributed tracing, and automated alerting in Kubernetes?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 22,
+          "lastReported": "6 days ago",
+          "locked": true
+        },
+        {
+          "id": "mphasis-10",
+          "text": "How do you evaluate vendor SaaS products versus in-house engineering solutions for enterprise clients?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 18,
+          "lastReported": "4 days ago",
+          "locked": true
+        }
+      ],
+      "logo": "data:image/svg+xml;utf8,%3Csvg%20viewBox%3D%220%200%20100%20100%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20class%3D%22w-full%20h-full%22%3E%0A%20%20%20%20%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2220%22%20fill%3D%22%23FFFFFF%22%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M38%2025L55%2042L42%2055L25%2038C20%2033%2020%2025%2025%2020C30%2015%2038%2015%2043%2020L55%2032%22%20stroke%3D%22%230099FF%22%20stroke-width%3D%228%22%20stroke-linecap%3D%22round%22%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M62%2075L45%2058L58%2045L75%2062C80%2067%2080%2075%2075%2080C70%2085%2062%2085%2057%2080L45%2068%22%20stroke%3D%22%23E6007E%22%20stroke-width%3D%228%22%20stroke-linecap%3D%22round%22%2F%3E%0A%20%20%3C%2Fsvg%3E"
+    },
+    {
+      "id": "techmahindra",
+      "name": "Tech Mahindra",
+      "domain": "techmahindra.com",
+      "monogram": "TM",
+      "interviewsReported": 10,
+      "questionsReported": 10,
+      "lastInterviewReported": "Yesterday",
+      "categories": {
+        "Technical": 6,
+        "Domain knowledge": 2,
+        "Behavioral": 2
+      },
+      "subCategories": {
+        "Coding": 1,
+        "System design": 2
+      },
+      "unlocked": false,
+      "unlockedTop3": false,
+      "questions": [
+        {
+          "id": "techmahindra-1",
+          "text": "How would you architect a globally distributed caching system with low latency and consistency guarantees?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 45,
+          "lastReported": "2 days ago",
+          "locked": true
+        },
+        {
+          "id": "techmahindra-2",
+          "text": "Describe a time when you led a critical technical refactoring without disrupting ongoing business operations.",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 40,
+          "lastReported": "Yesterday",
+          "locked": true
+        },
+        {
+          "id": "techmahindra-3",
+          "text": "How do you manage database connections, pooling, and slow query bottlenecks under high concurrent loads?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 36,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "techmahindra-4",
+          "text": "What is your approach to breaking down monoliths into resilient, decoupled microservices?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 33,
+          "lastReported": "Today",
+          "locked": true
+        },
+        {
+          "id": "techmahindra-5",
+          "text": "Explain how you design an idempotent payment processing API to prevent duplicate charges upon network retries.",
+          "category": "Technical",
+          "subCategory": "Coding",
+          "interviewsCount": 30,
+          "lastReported": "4 days ago",
+          "locked": true
+        },
+        {
+          "id": "techmahindra-6",
+          "text": "Tell me about a time you had to mentor an underperforming engineer and helped them achieve their project goals.",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 32,
+          "lastReported": "5 days ago",
+          "locked": true
+        },
+        {
+          "id": "techmahindra-7",
+          "text": "How do you balance technical debt against urgent feature requests from business stakeholders?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 29,
+          "lastReported": "1 day ago",
+          "locked": true
+        },
+        {
+          "id": "techmahindra-8",
+          "text": "What security practices do you implement for zero-trust cloud infrastructure and secrets management?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 26,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "techmahindra-9",
+          "text": "How do you implement comprehensive observability, distributed tracing, and automated alerting in Kubernetes?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 22,
+          "lastReported": "6 days ago",
+          "locked": true
+        },
+        {
+          "id": "techmahindra-10",
+          "text": "How do you evaluate vendor SaaS products versus in-house engineering solutions for enterprise clients?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 18,
+          "lastReported": "4 days ago",
+          "locked": true
+        }
+      ],
+      "logo": "data:image/svg+xml;utf8,%3Csvg%20viewBox%3D%220%200%20100%20100%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20class%3D%22w-full%20h-full%22%3E%0A%20%20%20%20%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2220%22%20fill%3D%22%23C41230%22%2F%3E%0A%20%20%20%20%3Cpolygon%20points%3D%2230%2C30%2050%2C20%2070%2C30%2050%2C40%22%20fill%3D%22%23FFFFFF%22%2F%3E%0A%20%20%20%20%3Cpolygon%20points%3D%2230%2C45%2050%2C35%2070%2C45%2050%2C55%22%20fill%3D%22%23FFFFFF%22%20opacity%3D%220.85%22%2F%3E%0A%20%20%20%20%3Cpolygon%20points%3D%2230%2C60%2050%2C50%2070%2C60%2050%2C70%22%20fill%3D%22%23FFFFFF%22%20opacity%3D%220.7%22%2F%3E%0A%20%20%3C%2Fsvg%3E"
+    },
+    {
+      "id": "cgi",
+      "name": "CGI Inc.",
+      "domain": "cgi.com",
+      "monogram": "CGI",
+      "interviewsReported": 10,
+      "questionsReported": 10,
+      "lastInterviewReported": "5 days ago",
+      "categories": {
+        "Technical": 6,
+        "Domain knowledge": 2,
+        "Behavioral": 2
+      },
+      "subCategories": {
+        "Coding": 1,
+        "System design": 2
+      },
+      "unlocked": false,
+      "unlockedTop3": false,
+      "questions": [
+        {
+          "id": "cgi-1",
+          "text": "How would you architect a globally distributed caching system with low latency and consistency guarantees?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 45,
+          "lastReported": "2 days ago",
+          "locked": true
+        },
+        {
+          "id": "cgi-2",
+          "text": "Describe a time when you led a critical technical refactoring without disrupting ongoing business operations.",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 40,
+          "lastReported": "Yesterday",
+          "locked": true
+        },
+        {
+          "id": "cgi-3",
+          "text": "How do you manage database connections, pooling, and slow query bottlenecks under high concurrent loads?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 36,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "cgi-4",
+          "text": "What is your approach to breaking down monoliths into resilient, decoupled microservices?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 33,
+          "lastReported": "Today",
+          "locked": true
+        },
+        {
+          "id": "cgi-5",
+          "text": "Explain how you design an idempotent payment processing API to prevent duplicate charges upon network retries.",
+          "category": "Technical",
+          "subCategory": "Coding",
+          "interviewsCount": 30,
+          "lastReported": "4 days ago",
+          "locked": true
+        },
+        {
+          "id": "cgi-6",
+          "text": "Tell me about a time you had to mentor an underperforming engineer and helped them achieve their project goals.",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 32,
+          "lastReported": "5 days ago",
+          "locked": true
+        },
+        {
+          "id": "cgi-7",
+          "text": "How do you balance technical debt against urgent feature requests from business stakeholders?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 29,
+          "lastReported": "1 day ago",
+          "locked": true
+        },
+        {
+          "id": "cgi-8",
+          "text": "What security practices do you implement for zero-trust cloud infrastructure and secrets management?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 26,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "cgi-9",
+          "text": "How do you implement comprehensive observability, distributed tracing, and automated alerting in Kubernetes?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 22,
+          "lastReported": "6 days ago",
+          "locked": true
+        },
+        {
+          "id": "cgi-10",
+          "text": "How do you evaluate vendor SaaS products versus in-house engineering solutions for enterprise clients?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 18,
+          "lastReported": "4 days ago",
+          "locked": true
+        }
+      ],
+      "logo": "data:image/svg+xml;utf8,%3Csvg%20viewBox%3D%220%200%20100%20100%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20class%3D%22w-full%20h-full%22%3E%0A%20%20%20%20%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2220%22%20fill%3D%22%23E31937%22%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%2250%22%20y%3D%2262%22%20font-family%3D%22system-ui%2C%20sans-serif%22%20font-weight%3D%22900%22%20font-size%3D%2228%22%20fill%3D%22%23FFFFFF%22%20text-anchor%3D%22middle%22%20letter-spacing%3D%221%22%3ECGI%3C%2Ftext%3E%0A%20%20%3C%2Fsvg%3E"
+    },
+    {
+      "id": "epam",
+      "name": "EPAM Systems",
+      "domain": "epam.com",
+      "monogram": "EPAM",
+      "interviewsReported": 10,
+      "questionsReported": 10,
+      "lastInterviewReported": "Today",
+      "categories": {
+        "Technical": 6,
+        "Domain knowledge": 2,
+        "Behavioral": 2
+      },
+      "subCategories": {
+        "Coding": 1,
+        "System design": 2
+      },
+      "unlocked": false,
+      "unlockedTop3": false,
+      "questions": [
+        {
+          "id": "epam-1",
+          "text": "How would you architect a globally distributed caching system with low latency and consistency guarantees?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 45,
+          "lastReported": "2 days ago",
+          "locked": true
+        },
+        {
+          "id": "epam-2",
+          "text": "Describe a time when you led a critical technical refactoring without disrupting ongoing business operations.",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 40,
+          "lastReported": "Yesterday",
+          "locked": true
+        },
+        {
+          "id": "epam-3",
+          "text": "How do you manage database connections, pooling, and slow query bottlenecks under high concurrent loads?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 36,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "epam-4",
+          "text": "What is your approach to breaking down monoliths into resilient, decoupled microservices?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 33,
+          "lastReported": "Today",
+          "locked": true
+        },
+        {
+          "id": "epam-5",
+          "text": "Explain how you design an idempotent payment processing API to prevent duplicate charges upon network retries.",
+          "category": "Technical",
+          "subCategory": "Coding",
+          "interviewsCount": 30,
+          "lastReported": "4 days ago",
+          "locked": true
+        },
+        {
+          "id": "epam-6",
+          "text": "Tell me about a time you had to mentor an underperforming engineer and helped them achieve their project goals.",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 32,
+          "lastReported": "5 days ago",
+          "locked": true
+        },
+        {
+          "id": "epam-7",
+          "text": "How do you balance technical debt against urgent feature requests from business stakeholders?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 29,
+          "lastReported": "1 day ago",
+          "locked": true
+        },
+        {
+          "id": "epam-8",
+          "text": "What security practices do you implement for zero-trust cloud infrastructure and secrets management?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 26,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "epam-9",
+          "text": "How do you implement comprehensive observability, distributed tracing, and automated alerting in Kubernetes?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 22,
+          "lastReported": "6 days ago",
+          "locked": true
+        },
+        {
+          "id": "epam-10",
+          "text": "How do you evaluate vendor SaaS products versus in-house engineering solutions for enterprise clients?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 18,
+          "lastReported": "4 days ago",
+          "locked": true
+        }
+      ],
+      "logo": "data:image/svg+xml;utf8,%3Csvg%20viewBox%3D%220%200%20100%20100%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20class%3D%22w-full%20h-full%22%3E%0A%20%20%20%20%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2220%22%20fill%3D%22%230A0E1A%22%2F%3E%0A%20%20%20%20%3Ctext%20x%3D%2250%22%20y%3D%2258%22%20font-family%3D%22'Consolas'%2C%20'Courier%20New'%2C%20monospace%22%20font-weight%3D%22bold%22%20font-size%3D%2218%22%20fill%3D%22%2339C2D7%22%20text-anchor%3D%22middle%22%3E%26lt%3Bepam%26gt%3B%3C%2Ftext%3E%0A%20%20%3C%2Fsvg%3E"
+    },
+    {
+      "id": "persistent",
+      "name": "Persistent Systems",
+      "domain": "persistent.com",
+      "monogram": "PS",
+      "interviewsReported": 10,
+      "questionsReported": 10,
+      "lastInterviewReported": "2 days ago",
+      "categories": {
+        "Technical": 6,
+        "Domain knowledge": 2,
+        "Behavioral": 2
+      },
+      "subCategories": {
+        "Coding": 1,
+        "System design": 2
+      },
+      "unlocked": false,
+      "unlockedTop3": false,
+      "questions": [
+        {
+          "id": "persistent-1",
+          "text": "How would you architect a globally distributed caching system with low latency and consistency guarantees?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 45,
+          "lastReported": "2 days ago",
+          "locked": true
+        },
+        {
+          "id": "persistent-2",
+          "text": "Describe a time when you led a critical technical refactoring without disrupting ongoing business operations.",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 40,
+          "lastReported": "Yesterday",
+          "locked": true
+        },
+        {
+          "id": "persistent-3",
+          "text": "How do you manage database connections, pooling, and slow query bottlenecks under high concurrent loads?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 36,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "persistent-4",
+          "text": "What is your approach to breaking down monoliths into resilient, decoupled microservices?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 33,
+          "lastReported": "Today",
+          "locked": true
+        },
+        {
+          "id": "persistent-5",
+          "text": "Explain how you design an idempotent payment processing API to prevent duplicate charges upon network retries.",
+          "category": "Technical",
+          "subCategory": "Coding",
+          "interviewsCount": 30,
+          "lastReported": "4 days ago",
+          "locked": true
+        },
+        {
+          "id": "persistent-6",
+          "text": "Tell me about a time you had to mentor an underperforming engineer and helped them achieve their project goals.",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 32,
+          "lastReported": "5 days ago",
+          "locked": true
+        },
+        {
+          "id": "persistent-7",
+          "text": "How do you balance technical debt against urgent feature requests from business stakeholders?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 29,
+          "lastReported": "1 day ago",
+          "locked": true
+        },
+        {
+          "id": "persistent-8",
+          "text": "What security practices do you implement for zero-trust cloud infrastructure and secrets management?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 26,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "persistent-9",
+          "text": "How do you implement comprehensive observability, distributed tracing, and automated alerting in Kubernetes?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 22,
+          "lastReported": "6 days ago",
+          "locked": true
+        },
+        {
+          "id": "persistent-10",
+          "text": "How do you evaluate vendor SaaS products versus in-house engineering solutions for enterprise clients?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 18,
+          "lastReported": "4 days ago",
+          "locked": true
+        }
+      ],
+      "logo": "data:image/svg+xml;utf8,%3Csvg%20viewBox%3D%220%200%20100%20100%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20class%3D%22w-full%20h-full%22%3E%0A%20%20%20%20%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2220%22%20fill%3D%22%23FFFFFF%22%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M30%2040C20%2040%2015%2050%2025%2060C35%2070%2065%2030%2075%2040C85%2050%2080%2060%2070%2060C60%2060%2040%2040%2030%2040Z%22%20stroke%3D%22%23F15A24%22%20stroke-width%3D%228%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20fill%3D%22none%22%2F%3E%0A%20%20%3C%2Fsvg%3E"
+    },
+    {
+      "id": "coforge",
+      "name": "Coforge",
+      "domain": "coforge.com",
+      "monogram": "COF",
+      "interviewsReported": 10,
+      "questionsReported": 10,
+      "lastInterviewReported": "Yesterday",
+      "categories": {
+        "Technical": 6,
+        "Domain knowledge": 2,
+        "Behavioral": 2
+      },
+      "subCategories": {
+        "Coding": 1,
+        "System design": 2
+      },
+      "unlocked": false,
+      "unlockedTop3": false,
+      "questions": [
+        {
+          "id": "coforge-1",
+          "text": "How would you architect a globally distributed caching system with low latency and consistency guarantees?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 45,
+          "lastReported": "2 days ago",
+          "locked": true
+        },
+        {
+          "id": "coforge-2",
+          "text": "Describe a time when you led a critical technical refactoring without disrupting ongoing business operations.",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 40,
+          "lastReported": "Yesterday",
+          "locked": true
+        },
+        {
+          "id": "coforge-3",
+          "text": "How do you manage database connections, pooling, and slow query bottlenecks under high concurrent loads?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 36,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "coforge-4",
+          "text": "What is your approach to breaking down monoliths into resilient, decoupled microservices?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 33,
+          "lastReported": "Today",
+          "locked": true
+        },
+        {
+          "id": "coforge-5",
+          "text": "Explain how you design an idempotent payment processing API to prevent duplicate charges upon network retries.",
+          "category": "Technical",
+          "subCategory": "Coding",
+          "interviewsCount": 30,
+          "lastReported": "4 days ago",
+          "locked": true
+        },
+        {
+          "id": "coforge-6",
+          "text": "Tell me about a time you had to mentor an underperforming engineer and helped them achieve their project goals.",
+          "category": "Behavioral",
+          "subCategory": "Leadership / STAR",
+          "interviewsCount": 32,
+          "lastReported": "5 days ago",
+          "locked": true
+        },
+        {
+          "id": "coforge-7",
+          "text": "How do you balance technical debt against urgent feature requests from business stakeholders?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 29,
+          "lastReported": "1 day ago",
+          "locked": true
+        },
+        {
+          "id": "coforge-8",
+          "text": "What security practices do you implement for zero-trust cloud infrastructure and secrets management?",
+          "category": "Technical",
+          "subCategory": "Architecture",
+          "interviewsCount": 26,
+          "lastReported": "3 days ago",
+          "locked": true
+        },
+        {
+          "id": "coforge-9",
+          "text": "How do you implement comprehensive observability, distributed tracing, and automated alerting in Kubernetes?",
+          "category": "Technical",
+          "subCategory": "System design",
+          "interviewsCount": 22,
+          "lastReported": "6 days ago",
+          "locked": true
+        },
+        {
+          "id": "coforge-10",
+          "text": "How do you evaluate vendor SaaS products versus in-house engineering solutions for enterprise clients?",
+          "category": "Domain knowledge",
+          "subCategory": "Industry / Strategy",
+          "interviewsCount": 18,
+          "lastReported": "4 days ago",
+          "locked": true
+        }
+      ],
+      "logo": "data:image/svg+xml;utf8,%3Csvg%20viewBox%3D%220%200%20100%20100%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20class%3D%22w-full%20h-full%22%3E%0A%20%20%20%20%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2220%22%20fill%3D%22%23FFFFFF%22%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2230%22%20stroke%3D%22%231A2B49%22%20stroke-width%3D%2212%22%20fill%3D%22none%22%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M50%2020A30%2030%200%200%201%2080%2050%22%20stroke%3D%22%23FF5000%22%20stroke-width%3D%2212%22%20fill%3D%22none%22%2F%3E%0A%20%20%3C%2Fsvg%3E"
+    }
+  ]
+}

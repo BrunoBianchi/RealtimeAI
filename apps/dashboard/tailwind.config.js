@@ -54,6 +54,26 @@ module.exports = {
         live: {
           DEFAULT: 'hsl(var(--live))',
           foreground: '#ffffff'
+        },
+        // Obsidian Copilot surfaces. Every value comes from a CSS variable so the
+        // same class works in the light and dark themes (see tailwind.input.css).
+        app: {
+          bg: 'hsl(var(--app-bg))',
+          card: 'hsl(var(--app-card))',
+          'card-hover': 'hsl(var(--app-card-hover))',
+          surface: 'hsl(var(--app-surface))',
+          border: 'hsl(var(--app-border))',
+          'border-light': 'hsl(var(--app-border-light))',
+          muted: 'hsl(var(--app-muted))',
+          accent: 'hsl(var(--app-accent))',
+          emerald: 'hsl(var(--app-emerald))',
+          sidebar: 'hsl(var(--app-sidebar))',
+          input: 'hsl(var(--app-input))',
+          chip: 'hsl(var(--app-chip))',
+          nubank: '#820ad1',
+          ifood: '#ea1d2c',
+          itau: '#ec7000',
+          meli: '#ffe600'
         }
       },
       borderRadius: {

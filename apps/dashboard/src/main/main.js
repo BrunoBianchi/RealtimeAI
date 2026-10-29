@@ -17,6 +17,8 @@ const { MeetingDetector, APP_NAMES } = require('./meeting_detector');
 const { createMeetingPopup } = require('./meeting_popup');
 const { createFlagStore } = require('./feature_flags');
 const { createUpdater } = require('./updater');
+const jevEngine = require('./jev_engine');
+const companyLogoService = require('./company_logo_service');
 
 // apps/dashboard (or the app.asar root once packaged) and the repository root.
 const APP_ROOT = path.resolve(__dirname, '..', '..');
@@ -40,7 +42,12 @@ const gotSingleInstanceLock = process.argv.includes('--capture-screenshots') ||
 if (!gotSingleInstanceLock) {
   app.quit();
 } else {
-  app.on('second-instance', () => showMainWindow());
+  app.on('second-instance', () => {
+    if (!app.isPackaged && mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.reloadIgnoringCache();
+    }
+    showMainWindow();
+  });
 }
 
 // The registry probe spawns `reg.exe` (tens of ms, blocking the main
@@ -66,11 +73,12 @@ function probeWindowsDarkTheme() {
 
 function getThemeState(prefOverride) {
   const profile = loadUserProfile();
-  const preference = prefOverride || profile.themePreference || 'system';
+  const preference = prefOverride || profile.themePreference || 'dark';
   const windowsDark = isWindowsDarkTheme();
-  let resolved = windowsDark ? 'dark' : 'light';
-  if (preference === 'dark') resolved = 'dark';
-  else if (preference === 'light') resolved = 'light';
+  let resolved = 'dark';
+  if (preference === 'light') resolved = 'light';
+  else if (preference === 'dark') resolved = 'dark';
+  else if (preference === 'system') resolved = windowsDark ? 'dark' : 'light';
   return {
     preference,
     resolved,
@@ -265,6 +273,8 @@ function readConfigIni() {
     update_channel: (sistema.update_channel || sistema.canal || 'stable') === 'beta' ? 'beta' : 'stable',
     process_disguise: stealth.process_disguise || (stealth.electron_disguise === 'sim' ? 'settings' : 'none'),
     interface_opacity: parseFloat(stealth.interface_opacity || stealth.electron_opacity || '1.0'),
+    share_anonymized_questions: (stealth.share_anonymized_questions ?? stealth.contribuir_perguntas ?? 'sim') !== 'nao' &&
+                                (stealth.share_anonymized_questions ?? stealth.contribuir_perguntas ?? 'sim') !== 'false',
     calendar_ics_url: agenda.google_ics_url || '',
     calendar_oauth_token: agenda.google_oauth_token || ''
   };
@@ -331,6 +341,7 @@ function writeConfigIni(updates) {
   const updateChannel = (updates.update_channel ?? current.update_channel) === 'beta' ? 'beta' : 'stable';
   const processDisguise = updates.process_disguise ?? current.process_disguise ?? 'none';
   const interfaceOpacity = String(updates.interface_opacity ?? current.interface_opacity ?? '1.0');
+  const shareAnonymizedQuestions = (updates.share_anonymized_questions ?? current.share_anonymized_questions) ? 'sim' : 'nao';
   const calendarIcsUrl = updates.calendar_ics_url ?? current.calendar_ics_url;
   const calendarOauth = updates.calendar_oauth_token ?? current.calendar_oauth_token;
 
@@ -413,6 +424,7 @@ function writeConfigIni(updates) {
     `electron_opacity = ${electronOpacity}`,
     `process_disguise = ${processDisguise}`,
     `interface_opacity = ${interfaceOpacity}`,
+    `share_anonymized_questions = ${shareAnonymizedQuestions}`,
     '',
     '[sistema]',
     `auto_update = ${autoUpdate}`,
@@ -730,7 +742,7 @@ function loadAllAgents() {
     try {
       const fullPath = path.join(agentsDir, file);
       const stat = fs.statSync(fullPath);
-      const data = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+      const data = JSON.parse(fs.readFileSync(fullPath, 'utf8').replace(/^\uFEFF/, ''));
       data.id = data.id || path.basename(file, '.json');
       data.company_research = data.company_research || data.company_dossier || '';
       data.company_dossier = data.company_research;
@@ -794,13 +806,13 @@ function loadAllAgents() {
         String(ag.mini_compact || '').includes('Nintendo Switch'))
     ) {
       const cleanTako = [
-        '=== DOSSIÊ DA EMPRESA (TAKO · https://tako.ai/pt/) · SÍNTESE SOL 6.1 (MEDIUM) ===',
-        '• O QUE A TAKO FAZ & PRODUTO:',
-        '  - A Tako é uma plataforma de IA para RH e Folha de Pagamento ("A IA que opera o ciclo completo de RH, da admissão ao desligamento"), liderada pelo CEO Fernando Gadotti.',
-        '  - Opera dois produtos integrados na mesma infraestrutura: Tako Payroll & People Ops (folha de pagamento, férias, rescisões, admissão digital, eSocial e benefícios) e Tako Recruiter (recrutamento e seleção com agentes de IA).',
-        '  - Métricas de excelência operacional: NPS +94, Zero churn e certificação SOC 2 Tipo 1.',
-        '• CULTURA, VALORES & FIT CULTURAL:',
-        '  - Engenharia pragmática orientada a agentes de IA aplicados a operações reais de RH e Folha, foco em confiabilidade, automação ponta a ponta e zero retrabalho.'
+        '=== COMPANY DOSSIER (TAKO · https://tako.ai/) · SYNTHESIS SOL 6.1 (MEDIUM) ===',
+        '• WHAT TAKO DOES & PRODUCT:',
+        '  - Tako is an AI platform for HR and Payroll ("The AI that runs the complete HR lifecycle from hiring to offboarding"), led by CEO Fernando Gadotti.',
+        '  - Operates two integrated products: Tako Payroll & People Ops and Tako Recruiter (AI agents for hiring).',
+        '  - Operational metrics: NPS +94, Zero churn, and SOC 2 Type 1 certification.',
+        '• CULTURE & VALUES:',
+        '  - Pragmatic engineering focused on real-world AI agent operations, reliability, end-to-end automation, and zero busywork.'
       ].join('\n');
       ag.company_research = cleanTako;
       ag.company_dossier = cleanTako;
@@ -945,55 +957,102 @@ function cancelInterviewNotification(goalId) {
   }
 }
 
-async function generateSessionDebrief({ sessionId, goalId, agentId }) {
+async function generateSessionDebrief({ sessionId, goalId, agentId, transcript: providedTranscript }) {
   const targetId = goalId || agentId;
   const agents = loadAllAgents();
   const goal = agents.find((a) => a.id === targetId) || agents[0];
   if (!goal) return { ok: false, error: 'Goal not found' };
 
-  let transcript = '';
-  if (sessionId) {
-    const fullPath = path.join(getAppDataDir(), 'sessions', `${sessionId}.jsonl`);
-    if (fs.existsSync(fullPath)) {
-      try {
-        transcript = fs.readFileSync(fullPath, 'utf8');
-      } catch (_e) {}
+  let transcript = (providedTranscript && typeof providedTranscript === 'string') ? providedTranscript.trim() : '';
+
+  if (!transcript && sessionId) {
+    const sessionsDir = path.join(getAppDataDir(), 'sessions');
+    const safeSessionId = path.basename(String(sessionId));
+    const candidates = [
+      path.join(sessionsDir, safeSessionId),
+      path.join(sessionsDir, `${safeSessionId}.md`),
+      path.join(sessionsDir, `${safeSessionId}.jsonl`)
+    ];
+    for (const p of candidates) {
+      if (fs.existsSync(p)) {
+        try {
+          const content = fs.readFileSync(p, 'utf8');
+          if (content && content.trim().length > 0) {
+            transcript = content;
+            break;
+          }
+        } catch (_e) {}
+      }
     }
   }
 
   const company = goal.company || 'the company';
   const role = goal.role || 'the role';
 
-  const defaultStrengths = [
-    `Solid technical stance when defending architecture decisions for ${role} at ${company}.`,
-    `Clear first-person walkthrough of past projects with ownership, in STAR.`,
-    `Strong grasp of fundamentals and precise communication.`
-  ];
+  // Extract substantive questions asked in this session via JEV
+  let extractedQuestions = [];
+  if (transcript) {
+    try {
+      extractedQuestions = jevEngine.extractQuestionsFromTranscript(transcript);
+    } catch (_e) {}
+  }
 
-  const defaultImprovements = [
-    `State the verdict sooner (lead with the answer) before giving context.`,
-    `Bring up metrics and trade-offs on your own to strengthen the answer.`,
-    `Avoid over-detailing secondary technologies before reaching the result.`
-  ];
+  // Real analysis of candidate responses and interview content from actual transcript
+  const lower = transcript.toLowerCase();
+  const dynamicStrengths = [];
+  const dynamicImprovements = [];
 
-  const newStrength = defaultStrengths[Math.floor(Math.random() * defaultStrengths.length)];
-  const newImprove = defaultImprovements[Math.floor(Math.random() * defaultImprovements.length)];
+  // 1. Metric-driven quantitative communication
+  if (/\b\d+\s*%/i.test(lower) || /\b\d+\s*(?:ms|milliseconds|seconds|minutes|hours|users|req\/s|rps|million|thousand|tb|gb)\b/i.test(lower)) {
+    dynamicStrengths.push(`Solid quantitative stance: supported engineering decisions with concrete metrics and data points.`);
+  } else {
+    dynamicImprovements.push(`Bring up concrete metrics (latency, throughput, scale numbers) proactively to substantiate answers.`);
+  }
+
+  // 2. STAR / Personal ownership delivery
+  if (/(?:in my previous|in my last|when i|i designed|i built|i led|i resolved|my responsibility|minha responsabilidade|eu liderei|desenvolvi|implementei)\b/i.test(lower)) {
+    dynamicStrengths.push(`Clear first-person walkthrough of past projects with strong personal ownership and STAR structure.`);
+  } else {
+    dynamicImprovements.push(`Lead with strong first-person ownership ("I decided", "I engineered") rather than collective team summaries.`);
+  }
+
+  // 3. Leading with verdict / trade-offs
+  if (/(?:the trade-off|tradeoff|verdict|in summary|ultimately|trade-offs|conclusão|o resultado foi)\b/i.test(lower)) {
+    dynamicStrengths.push(`Direct executive communication: highlighted trade-offs and stated the verdict before expanding context.`);
+  } else {
+    dynamicImprovements.push(`State the architectural verdict sooner (lead with the answer) before diving into deep technical details.`);
+  }
+
+  // 4. Technical depth on specific domains
+  if (extractedQuestions.length > 0) {
+    const categories = [...new Set(extractedQuestions.map((q) => q.subCategory || q.category))].join(', ');
+    dynamicStrengths.push(`Addressed ${extractedQuestions.length} substantive ${extractedQuestions.length === 1 ? 'question' : 'questions'} across ${categories} for ${role}.`);
+  } else {
+    dynamicStrengths.push(`Maintained structured technical fundamentals and precise communication for ${role} at ${company}.`);
+  }
+
+  const newStrength = dynamicStrengths[0] || `Clear technical stance for ${role} at ${company}.`;
+  const newImprove = dynamicImprovements[0] || `Bring up metrics and trade-offs on your own to strengthen the answer.`;
 
   if (!goal.goal_memory) goal.goal_memory = { strengths: [], improve: [] };
   if (!Array.isArray(goal.goal_memory.strengths)) goal.goal_memory.strengths = [];
   if (!Array.isArray(goal.goal_memory.improve)) goal.goal_memory.improve = [];
 
-  if (!goal.goal_memory.strengths.includes(newStrength)) {
-    goal.goal_memory.strengths.unshift(newStrength);
+  for (const s of dynamicStrengths) {
+    if (!goal.goal_memory.strengths.includes(s)) {
+      goal.goal_memory.strengths.unshift(s);
+    }
   }
-  if (!goal.goal_memory.improve.includes(newImprove)) {
-    goal.goal_memory.improve.unshift(newImprove);
+  for (const imp of dynamicImprovements) {
+    if (!goal.goal_memory.improve.includes(imp)) {
+      goal.goal_memory.improve.unshift(imp);
+    }
   }
 
   goal.goal_memory.strengths = goal.goal_memory.strengths.slice(0, 5);
   goal.goal_memory.improve = goal.goal_memory.improve.slice(0, 5);
 
-  goal.next_focus = `Focus on: ${newImprove}`;
+  goal.next_focus = `Focus on: ${goal.goal_memory.improve[0] || newImprove}`;
 
   if (!goal.checklist_state) goal.checklist_state = {};
   goal.checklist_state.practice_run = true;
@@ -1001,15 +1060,33 @@ async function generateSessionDebrief({ sessionId, goalId, agentId }) {
 
   const saved = saveAgentToDisk(goal);
 
+  // Real JEV Question Extraction & Question Bank Ingestion
+  const cfg = readConfigIni();
+  let jevExtraction = null;
+  if (cfg.share_anonymized_questions !== false && transcript) {
+    try {
+      jevExtraction = await jevEngine.ingestSessionQuestions(getAppDataDir(), transcript, goal.company || '');
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('rtai:question-bank-updated', jevExtraction);
+      }
+    } catch (err) {
+      console.warn('JEV Question Analysis error:', err);
+    }
+  }
+
   return {
     ok: true,
     debrief: {
       session_id: sessionId || `session-${Date.now()}`,
       created_at: Date.now(),
-      summary: `Debrief done for ${goal.name}: strengths and priority focus areas identified.`,
+      summary: extractedQuestions.length > 0
+        ? `Debrief completed for ${goal.name}: ${extractedQuestions.length} substantive questions analyzed.`
+        : `Debrief completed for ${goal.name}: strengths and priority focus areas identified.`,
       strengths: goal.goal_memory.strengths,
       improve: goal.goal_memory.improve,
-      next_focus: goal.next_focus
+      next_focus: goal.next_focus,
+      questions: extractedQuestions.map((q) => q.text),
+      jevExtraction
     },
     goal: saved,
     agent: saved,
@@ -1073,7 +1150,7 @@ function saveAgentToDisk(agent) {
 
   const normalized = {
     id,
-    name: (agent.name || `${agent.company || 'Sessão'} — ${agent.role || 'Entrevista'}`).trim(),
+    name: (agent.name || `${agent.company || 'Session'} — ${agent.role || 'Interview'}`).trim(),
     session_type: agent.session_type || 'interview',
     company: (agent.company || '').trim(),
     role: (agent.role || '').trim(),
@@ -1548,6 +1625,35 @@ function parseIcsEvents(icsText) {
 }
 
 // ---------------------------------------------------------------------------
+// Knowledge Base Keywords Extractor (for RAG Adherence)
+// ---------------------------------------------------------------------------
+function getKnowledgeBaseKeywords() {
+  const agentsDir = path.join(getAppDataDir(), 'agents');
+  const keywords = new Set();
+  if (!fs.existsSync(agentsDir)) return keywords;
+  try {
+    const files = fs.readdirSync(agentsDir).filter((f) => f.endsWith('.json'));
+    for (const f of files) {
+      const data = JSON.parse(fs.readFileSync(path.join(agentsDir, f), 'utf8'));
+      if (Array.isArray(data.documents)) {
+        for (const doc of data.documents) {
+          const raw = ((doc.title || '') + ' ' + (doc.content || '') + ' ' + (doc.summary || '')).toLowerCase();
+          const clean = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          const tokens = clean.match(/[a-z]{3,}/g) || [];
+          tokens.forEach((t) => keywords.add(t));
+        }
+      }
+      if (data.company_research) {
+        const clean = String(data.company_research).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const tokens = clean.match(/[a-z]{3,}/g) || [];
+        tokens.forEach((t) => keywords.add(t));
+      }
+    }
+  } catch (_e) {}
+  return keywords;
+}
+
+// ---------------------------------------------------------------------------
 // Past Sessions Reader
 // ---------------------------------------------------------------------------
 function loadPastSessions() {
@@ -1556,16 +1662,63 @@ function loadPastSessions() {
   const files = fs.readdirSync(sessionsDir);
   const mdFiles = files.filter((f) => f.endsWith('.md'));
   const sessions = [];
+  const docKeywords = getKnowledgeBaseKeywords();
+
   for (const mdFile of mdFiles) {
     try {
       const fullPath = path.join(sessionsDir, mdFile);
       const stat = fs.statSync(fullPath);
       const content = fs.readFileSync(fullPath, 'utf8');
       const preview = content.slice(0, 600);
-      const qMatches = (content.match(/Question:\s*"[^"]+"/gi) || []).length;
-      const aMatches = (content.match(/>\s*\*\*Suggestion/gi) || []).length;
-      const lats = [...content.matchAll(/1st token in ([0-9.]+) s/gi)].map((m) => parseFloat(m[1]) * 1000);
+
+      // Support English ('Question: "..."'), Portuguese ('Pergunta: "..."'), chat inputs ('Chat: "..."'), and JEV extracted questions
+      const qMatches = (content.match(/(?:Question|Pergunta|Chat):\s*"[^"]+"/gi) || []).length;
+      let totalSessionQuestions = qMatches;
+      try {
+        const extracted = jevEngine.extractQuestionsFromTranscript(content);
+        if (extracted && extracted.length > totalSessionQuestions) {
+          totalSessionQuestions = extracted.length;
+        }
+      } catch (_e) {}
+      // Support English ('Suggestion') and Portuguese ('Sugestão')
+      const aMatches = (content.match(/>\s*\*\*(?:Suggestion|Sugestão)/gi) || []).length;
+
+      // Parse first token latency across both languages and comma/dot decimal formats
+      const lats = [...content.matchAll(/(?:1st token in|1º token em)\s*([0-9.,]+)\s*s/gi)]
+        .map((m) => parseFloat(m[1].replace(',', '.')) * 1000)
+        .filter((n) => !isNaN(n) && n > 0 && n < 60000);
       const avgLat = lats.length > 0 ? Math.round(lats.reduce((a, b) => a + b, 0) / lats.length) : null;
+
+      // Parse audio duration in seconds
+      let durSec = 0;
+      const durMatch = content.match(/(?:Duração|Duration):\s*([0-9]+):([0-9]+)/i);
+      if (durMatch) {
+        durSec = parseInt(durMatch[1], 10) * 60 + parseInt(durMatch[2], 10);
+      } else {
+        const durMatchSec = content.match(/(?:Duração|Duration):\s*([0-9]+)\s*s/i);
+        if (durMatchSec) durSec = parseInt(durMatchSec[1], 10);
+      }
+
+      const words = (content.match(/\b\w+\b/g) || []).length;
+
+      // Grounding adherence against indexed knowledge base
+      let groundedInSession = 0;
+      if (aMatches > 0 && docKeywords.size > 0) {
+        const cleanContent = content.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const tokens = cleanContent.match(/[a-z]{3,}/g) || [];
+        let hits = 0;
+        for (const t of tokens) {
+          if (docKeywords.has(t)) hits++;
+        }
+        if (hits >= 10) {
+          groundedInSession = aMatches;
+        } else {
+          groundedInSession = Math.round(aMatches * (hits / 10));
+        }
+      } else if (aMatches > 0) {
+        groundedInSession = aMatches;
+      }
+
       sessions.push({
         id: path.basename(mdFile, '.md'),
         fileName: mdFile,
@@ -1573,34 +1726,70 @@ function loadPastSessions() {
         updatedAt: stat.mtimeMs,
         sizeKb: Math.max(1, Math.round(stat.size / 1024)),
         preview: preview.replace(/\r?\n/g, ' ').slice(0, 220),
-        questionsCount: qMatches,
+        questionsCount: totalSessionQuestions,
         answersCount: aMatches,
-        avgLatencyMs: avgLat
+        groundedAnswersCount: groundedInSession,
+        avgLatencyMs: avgLat,
+        durationSeconds: durSec,
+        wordsCount: words
       });
     } catch (_e) {}
   }
   sessions.sort((a, b) => b.updatedAt - a.updatedAt);
-  return sessions.slice(0, 30);
+  return sessions;
 }
 
 // ---------------------------------------------------------------------------
 // User Profile Persistence
 // ---------------------------------------------------------------------------
-function loadUserProfile() {
+function loadUserProfile(cachedSessions) {
   const p = path.join(getAppDataDir(), 'dashboard_profile.json');
+  let data = null;
   if (fs.existsSync(p)) {
     try {
-      return JSON.parse(fs.readFileSync(p, 'utf8'));
+      data = JSON.parse(fs.readFileSync(p, 'utf8').replace(/^\uFEFF/, ''));
     } catch (_e) {}
   }
-  return {
-    name: 'Bruno',
-    email: 'bruno@realtimeai.dev',
-    headline: 'Senior Software Engineer',
-    seniority: 'Senior / Staff',
-    linkedin: 'linkedin.com/in/bruno',
-    loggedIn: true
-  };
+  if (!data) {
+    data = {
+      name: 'Bruno',
+      email: 'bruno@realtimeai.dev',
+      headline: 'Senior Software Engineer',
+      seniority: 'Senior / Staff',
+      linkedin: 'linkedin.com/in/bruno',
+      themePreference: 'dark',
+      loggedIn: true
+    };
+  }
+  if (!data.themePreference) data.themePreference = 'dark';
+  if (!data.plan) data.plan = 'free';
+
+  // Compute real transcription statistics from actual session files
+  const sessions = cachedSessions || loadPastSessions();
+  let totalDurSec = 0;
+  let totalWords = 0;
+  for (const s of sessions) {
+    totalDurSec += (s.durationSeconds || 0);
+    totalWords += (s.wordsCount || 0);
+  }
+  const realUsedMinutes = Math.max(1, Math.round(totalDurSec / 60));
+
+  if (!data.transcriptionUsage) {
+    data.transcriptionUsage = {
+      usedMinutes: realUsedMinutes,
+      limitMinutes: 60,
+      sessionsCount: sessions.length,
+      wordsCount: totalWords
+    };
+  } else {
+    data.transcriptionUsage.usedMinutes = data.transcriptionUsage.usedMinutes || realUsedMinutes;
+    data.transcriptionUsage.sessionsCount = data.transcriptionUsage.sessionsCount || sessions.length;
+    data.transcriptionUsage.wordsCount = data.transcriptionUsage.wordsCount || totalWords;
+    if (typeof data.transcriptionUsage.limitMinutes !== 'number') {
+      data.transcriptionUsage.limitMinutes = 60;
+    }
+  }
+  return data;
 }
 
 function saveUserProfile(profile) {
@@ -1751,12 +1940,33 @@ function launchOverlay({ agent, demo = false, configOverrides = {} }) {
           } else if (msg.type === 'open_settings') {
             // The HUD's Config button: one settings screen, the dashboard's.
             showSettingsWindow(msg.section || 'general');
-          } else if (msg.type === 'summary' && mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('rtai:summary', {
-              ok: Boolean(msg.ok),
-              text: msg.text || '',
-              export_path: msg.export_path || ''
-            });
+          } else if (msg.type === 'summary') {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('rtai:summary', {
+                ok: Boolean(msg.ok),
+                text: msg.text || '',
+                export_path: msg.export_path || ''
+              });
+            }
+            const cfg = readConfigIni();
+            if (cfg.share_anonymized_questions !== false && msg.export_path) {
+              try {
+                if (fs.existsSync(msg.export_path)) {
+                  const t = fs.readFileSync(msg.export_path, 'utf8');
+                  if (t) {
+                    const currentGoal = overlayAgentId ? loadAllAgents().find((a) => a.id === overlayAgentId) : null;
+                    const compFallback = (currentGoal && currentGoal.company) || '';
+                    jevEngine.ingestSessionQuestions(getAppDataDir(), t, compFallback).then((extraction) => {
+                      if (mainWindow && !mainWindow.isDestroyed()) {
+                        mainWindow.webContents.send('rtai:question-bank-updated', extraction);
+                      }
+                    }).catch((err) => console.warn('Auto JEV question extraction error:', err));
+                  }
+                }
+              } catch (err) {
+                console.warn('Auto JEV question read error:', err);
+              }
+            }
           }
         } catch (_e) {
           // non-JSON line, ignore
@@ -1977,9 +2187,9 @@ function applyElectronStealthMode(overrides = {}) {
     try {
       if (typeof mainWindow.setTitle === 'function') {
         let title = 'RealTimeAI — Copilot Studio';
-        if (activeDisguise === 'settings') title = 'Configurações do Sistema';
-        else if (activeDisguise === 'cmd') title = 'Prompt de Comando';
-        else if (activeDisguise === 'taskmgr') title = 'Gerenciador de Tarefas';
+        if (activeDisguise === 'settings') title = 'Settings';
+        else if (activeDisguise === 'cmd') title = 'Command Prompt';
+        else if (activeDisguise === 'taskmgr') title = 'Task Manager';
         mainWindow.setTitle(title);
       }
     } catch (e) {
@@ -2011,21 +2221,21 @@ function registerStealthShortcuts() {
     globalShortcut.unregister('CommandOrControl+Alt+S');
     globalShortcut.unregister('CommandOrControl+Shift+H');
 
-    // 1. Alternar Modo Stealth
+    // 1. Toggle Stealth Mode
     globalShortcut.register('CommandOrControl+Alt+S', () => {
       const cfg = readConfigIni();
       const nextActive = !Boolean(cfg.electron_stealth);
       writeConfigIni({ electron_stealth: nextActive });
       applyElectronStealthMode({ electron_stealth: nextActive });
       notify(
-        nextActive ? '🛡️ Modo Stealth Ativado' : 'Modo Stealth Desativado',
+        nextActive ? '🛡️ Stealth Mode Enabled' : 'Stealth Mode Disabled',
         nextActive
-          ? 'Dashboard invisível em compartilhamentos de tela (Zoom, Meet, Teams, OBS).'
-          : 'Dashboard visível normalmente.'
+          ? 'Dashboard cloaked in screen shares (Zoom, Meet, Teams, OBS).'
+          : 'Dashboard visible normally.'
       );
     });
 
-    // 2. Boss Key / Botão do Pânico (Ocultar/Exibir rapidamente)
+    // 2. Boss Key / Panic Button (Quick hide/show)
     globalShortcut.register('CommandOrControl+Shift+H', () => {
       toggleMainWindowVisibility();
     });
@@ -2345,7 +2555,7 @@ app.whenReady().then(() => {
     const config = readConfigIni();
     const agents = loadAllAgents();
     const sessions = loadPastSessions();
-    const profile = loadUserProfile();
+    const profile = loadUserProfile(sessions);
     const themeState = getThemeState(profile.themePreference);
     return {
       appDataDir: getAppDataDir(),
@@ -2718,6 +2928,39 @@ app.whenReady().then(() => {
     return generateSessionDebrief(payload || {});
   });
 
+  ipcMain.handle('rtai:get-question-bank', async () => {
+    return jevEngine.loadQuestionBank(getAppDataDir());
+  });
+
+  ipcMain.handle('rtai:get-company-questions', async (_ev, companyId) => {
+    const bank = jevEngine.loadQuestionBank(getAppDataDir());
+    const comp = bank.companies.find(
+      (c) => c.id === companyId || c.name.toLowerCase() === String(companyId).toLowerCase()
+    );
+    return comp || null;
+  });
+
+  ipcMain.handle('rtai:unlock-company-questions', async (_ev, { companyId, previewOnly }) => {
+    return jevEngine.unlockCompany(getAppDataDir(), companyId, previewOnly);
+  });
+
+  ipcMain.handle('rtai:set-question-sharing', async (_ev, enabled) => {
+    writeConfigIni({ share_anonymized_questions: Boolean(enabled) });
+    return { ok: true, share_anonymized_questions: Boolean(enabled) };
+  });
+
+  ipcMain.handle('rtai:trigger-jev-analysis', async (_ev, { transcript, companyName }) => {
+    return jevEngine.ingestSessionQuestions(getAppDataDir(), transcript, companyName);
+  });
+
+  ipcMain.handle('rtai:detect-company', async (_ev, { transcript, fallbackName }) => {
+    return jevEngine.detectCompanyFromTranscript(transcript, fallbackName);
+  });
+
+  ipcMain.handle('rtai:fetch-company-logo', async (_ev, { companyName, domain }) => {
+    return companyLogoService.resolveAndCacheCompanyLogo(getAppDataDir(), companyName, domain);
+  });
+
   ipcMain.handle('rtai:save-checklist', async (_ev, { goalId, state }) => {
     const agents = loadAllAgents();
     const goal = agents.find((a) => a.id === goalId);
@@ -2881,9 +3124,9 @@ app.whenReady().then(() => {
     const valid = ['none', 'settings', 'cmd', 'taskmgr'].includes(disguise) ? disguise : 'none';
     writeConfigIni({ process_disguise: valid });
     let title = 'RealTimeAI — Copilot Studio';
-    if (valid === 'settings') title = 'Configurações do Sistema';
-    else if (valid === 'cmd') title = 'Prompt de Comando';
-    else if (valid === 'taskmgr') title = 'Gerenciador de Tarefas';
+    if (valid === 'settings') title = 'Settings';
+    else if (valid === 'cmd') title = 'Command Prompt';
+    else if (valid === 'taskmgr') title = 'Task Manager';
     if (mainWindow && !mainWindow.isDestroyed()) {
       try { mainWindow.setTitle(title); } catch (_e) {}
     }
@@ -2935,6 +3178,8 @@ if (process.env.RTAI_TEST_EXPORTS === '1') {
   module.exports = {
     saveAgentToDisk,
     loadAllAgents,
+    generateSessionDebrief,
+    loadPastSessions,
     extractDocumentContent,
     extractTextFromDocx,
     isCandidateDocument,

@@ -4,6 +4,7 @@ rem Builds the native overlay (Release, hybrid RAG on) and runs the core tests.
 rem   scripts\windows\build.bat              configure + build + core tests
 rem   scripts\windows\build.bat --lean       no ONNX Runtime (BM25 only, energy VAD)
 rem   scripts\windows\build.bat --no-pause   do not wait at the end (used by other scripts)
+rem   scripts\windows\build.bat --skip-tests skip running core_tests.exe for fast dev loop
 rem   set RTAI_VERSION=2.1.0-local.1         version baked into rtai_app.exe (default: dev)
 rem Log: build\build.log. The first run downloads GoogleTest and ONNX Runtime.
 rem Exit code 0 = build OK (test failures are reported but do not fail it).
@@ -13,11 +14,13 @@ chcp 65001 >nul
 cd /d "%~dp0..\.."
 set "PRESET=windows-release"
 set "PAUSE_AT_END=1"
+set "SKIP_TESTS="
 if defined CI set "PAUSE_AT_END="
 :args
 if "%~1"=="" goto :args_done
 if /I "%~1"=="--lean" set "PRESET=windows-lean"
 if /I "%~1"=="--no-pause" set "PAUSE_AT_END="
+if /I "%~1"=="--skip-tests" set "SKIP_TESTS=1"
 shift
 goto :args
 :args_done
@@ -45,9 +48,14 @@ echo [configure] >> "%LOG%"
 cmake --preset %PRESET% "-DRTAI_VERSION_STRING=%RTAI_VERSION%" >> "%LOG%" 2>&1 || goto :failed
 echo [build] >> "%LOG%"
 cmake --build --preset %PRESET% >> "%LOG%" 2>&1 || goto :failed
+if defined SKIP_TESTS (
+    echo [tests] skipped (--skip-tests) >> "%LOG%"
+    goto :after_tests
+)
 echo [tests] >> "%LOG%"
 build\bin\Release\core_tests.exe --gtest_brief=1 >> "%LOG%" 2>&1
 if errorlevel 1 (echo TESTS FAILED >> "%LOG%" & echo Tests FAILED, see build\build.log) else (echo TESTS PASSED >> "%LOG%")
+:after_tests
 echo BUILD OK >> "%LOG%"
 for /f "delims=" %%v in ('build\bin\Release\rtai_app.exe --version') do echo Build OK: build\bin\Release\rtai_app.exe (%%v)
 set "RC=0"

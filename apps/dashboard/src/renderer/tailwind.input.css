@@ -29,6 +29,22 @@
     --sidebar-accent: 240 5% 93%;
     --live: 347 77% 50%;
     --radius: 0.375rem;
+
+    /* Obsidian Copilot surfaces (light theme counterparts of the dark palette).
+       Ladder: app-bg < app-sidebar < app-card < app-card-hover < app-surface. */
+    --app-bg: 240 20% 99%;
+    --app-sidebar: 240 15% 98%;
+    --app-card: 0 0% 100%;
+    --app-card-hover: 240 5% 96%;
+    --app-surface: 240 5% 95%;
+    --app-border: 240 6% 91%;
+    --app-border-light: 240 6% 86%;
+    --app-muted: 221 14% 40%;
+    --app-accent: 221 83% 53%;
+    --app-emerald: 160 84% 39%;
+    --app-input: 240 6% 97%;
+    --app-chip: 240 5% 93%;
+
     color-scheme: light;
   }
 
@@ -58,6 +74,22 @@
     --sidebar-accent: 240 5% 12.5%;
     --live: 347 77% 50%;
     --radius: 0.375rem;
+
+    /* Obsidian Copilot surfaces: the reference canvas ladder.
+       app-bg #0b0d11 · sidebar #0d1017 · card #14171e · hover #181c25 · surface #1a1e27 */
+    --app-bg: 220 21% 5.5%;
+    --app-sidebar: 222 28% 7.1%;
+    --app-card: 222 20% 9.8%;
+    --app-card-hover: 222 21% 12%;
+    --app-surface: 222 20% 12.7%;
+    --app-border: 223 21% 16.9%;
+    --app-border-light: 222 21% 22%;
+    --app-muted: 221 13% 50.6%;
+    --app-accent: 239 84% 66.7%;
+    --app-emerald: 160 84% 39.4%;
+    --app-input: 224 22% 9.6%;
+    --app-chip: 221 22% 14.1%;
+
     color-scheme: dark;
   }
 
@@ -126,7 +158,7 @@
     @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-[13px] font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 cursor-pointer active:scale-[0.99];
   }
   .sh-btn-primary {
-    @apply sh-btn bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 font-medium;
+    @apply sh-btn bg-white text-slate-900 hover:bg-slate-100 px-4 py-2 font-semibold shadow-sm;
   }
   /* High-emphasis neutral button (one per screen). */
   .sh-btn-solid {
@@ -140,7 +172,7 @@
     @apply sh-btn bg-secondary text-secondary-foreground hover:bg-accent px-4 py-2 border border-border;
   }
   .sh-btn-outline {
-    @apply sh-btn bg-transparent text-foreground hover:bg-accent border border-border px-3 py-1.5 text-xs;
+    @apply sh-btn bg-app-surface text-foreground hover:bg-app-card-hover border border-app-border px-3 py-1.5 text-xs;
   }
   .sh-btn-dashed {
     @apply sh-btn bg-transparent text-foreground hover:bg-accent border border-dashed border-input hover:border-foreground/40 rounded-full px-3.5 py-1.5 text-xs;
@@ -209,25 +241,43 @@
 
   /* Switch (paired with a preceding input.peer.sr-only) */
   .sh-switch {
-    @apply relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border border-border bg-muted transition-colors;
+    @apply relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border border-app-border bg-app-surface transition-colors;
   }
   .sh-switch::after {
     content: '';
     @apply absolute left-[2px] h-3.5 w-3.5 rounded-full bg-foreground/60 shadow-sm transition-transform duration-150;
   }
   .peer:checked + .sh-switch {
-    @apply border-primary bg-primary;
+    @apply border-white bg-white;
   }
   .peer:checked + .sh-switch::after {
-    @apply translate-x-4 bg-primary-foreground;
+    @apply translate-x-4 bg-slate-900;
   }
   .peer:focus-visible + .sh-switch {
     @apply ring-2 ring-ring/50 ring-offset-1 ring-offset-background;
   }
 
+  /* Switch Orange (Images 3 & 4) */
+  .sh-switch-orange {
+    @apply relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border border-border/80 bg-muted/80 transition-colors;
+  }
+  .sh-switch-orange::after {
+    content: '';
+    @apply absolute left-[2px] h-3.5 w-3.5 rounded-full bg-foreground/60 shadow-sm transition-transform duration-150;
+  }
+  .peer:checked + .sh-switch-orange {
+    @apply border-[#F97316] bg-[#F97316];
+  }
+  .peer:checked + .sh-switch-orange::after {
+    @apply translate-x-4 bg-white;
+  }
+  .peer:focus-visible + .sh-switch-orange {
+    @apply ring-2 ring-[#F97316]/50 ring-offset-1 ring-offset-background;
+  }
+
   /* Inputs & Textareas */
   .sh-input {
-    @apply flex h-10 w-full rounded-lg border border-input bg-background/70 px-3.5 py-2 text-[13.5px] text-foreground transition-all placeholder:text-muted-foreground/60 hover:border-foreground/25 focus-visible:bg-card focus-visible:border-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/15;
+    @apply flex h-10 w-full rounded-lg border border-app-border bg-app-input px-3.5 py-2 text-[13.5px] text-foreground transition-all placeholder:text-app-muted/70 hover:border-app-border-light focus-visible:bg-app-card focus-visible:border-app-border-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/15;
   }
   .sh-textarea {
     @apply flex w-full rounded-lg border border-input bg-background/70 px-3.5 py-2.5 text-[13.5px] leading-relaxed text-foreground transition-all placeholder:text-muted-foreground/60 hover:border-foreground/25 focus-visible:bg-card focus-visible:border-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/15 resize-y;
@@ -245,20 +295,101 @@
     @apply rounded-xl border border-border/70 bg-card text-card-foreground;
   }
 
-  /* Sidebar Nav Item */
+  /* Sidebar Nav Item - sleek & compact */
   .sh-nav-item {
-    @apply flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-foreground cursor-pointer;
+    @apply flex w-full items-center justify-between gap-1.5 rounded-lg px-2 py-1.5 text-[12px] font-medium leading-none text-app-muted transition-all hover:bg-app-card-hover hover:text-foreground cursor-pointer;
+  }
+  .sh-nav-item > div {
+    @apply flex min-w-0 items-center gap-2;
+  }
+  .sh-nav-item > div > span {
+    @apply truncate;
   }
   .sh-nav-item.active {
-    @apply bg-sidebar-accent text-foreground font-semibold;
+    @apply border border-app-border-light bg-app-surface font-semibold text-foreground shadow-sm;
   }
 
-  /* Sidebar Goal Item */
+  /* Sidebar nav counter (Sessões 4, Biblioteca 16, Histórico 140). */
+  .nav-count {
+    @apply shrink-0 font-mono text-[11px] leading-none text-app-muted;
+  }
+  .sh-nav-item.active .nav-count {
+    @apply rounded border border-app-border/70 bg-app-bg/60 px-1.5 py-0.5 text-foreground;
+  }
+
+  /* Sidebar Goal Item - compact & refined */
   .sh-goal-item {
-    @apply flex w-full items-center justify-between gap-2.5 rounded-lg px-3 py-2 text-left transition-all hover:bg-sidebar-accent cursor-pointer border border-transparent;
+    @apply block w-full rounded-lg border border-app-border bg-app-card/60 px-2.5 py-1.5 text-left transition-all hover:border-app-border-light hover:bg-app-card-hover cursor-pointer;
   }
   .sh-goal-item.active {
-    @apply bg-sidebar-accent border-transparent;
+    @apply border-primary/30 bg-app-surface text-foreground shadow-sm;
+  }
+
+  /* Question Bank Tabs & Pills */
+  .qb-cat-tab {
+    @apply pb-2 px-1 text-xs font-medium text-muted-foreground border-b-2 border-transparent transition-all cursor-pointer hover:text-foreground;
+  }
+  .qb-cat-tab.active {
+    @apply text-foreground font-semibold border-foreground;
+  }
+  .qb-subcat-pill {
+    @apply rounded-full border border-border/70 bg-card/60 px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-all cursor-pointer hover:bg-accent hover:text-foreground;
+  }
+  .qb-subcat-pill.active {
+    @apply bg-foreground text-background font-semibold border-foreground;
+  }
+
+  /* ---- Obsidian Copilot page primitives -------------------------------
+     One skeleton shared by every view: shell → header → panels → footer.
+     Keeps the 24px/12px type scale, the 28px section rhythm and the
+     #14171e / #222734 hairline panels of the reference design. */
+  .page-shell {
+    @apply mx-auto w-full max-w-7xl space-y-7;
+  }
+  .page-header {
+    @apply flex flex-wrap items-start justify-between gap-4;
+  }
+  .page-title {
+    @apply text-2xl font-bold tracking-[-0.025em] text-foreground;
+  }
+  .page-subtitle {
+    @apply mt-1 max-w-2xl text-xs leading-relaxed text-app-muted;
+  }
+  .page-eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-wider text-app-muted;
+  }
+  .page-actions {
+    @apply flex items-center gap-2;
+  }
+  .page-footer {
+    @apply flex items-center justify-between border-t border-app-border pt-6 text-[11px] text-app-muted;
+  }
+  .page-footer-group {
+    @apply flex items-center gap-1.5;
+  }
+
+  /* Grouped list shell: one card, internally divided rows (no per-row cards). */
+  .panel {
+    @apply divide-y divide-app-border overflow-hidden rounded-xl border border-app-border bg-app-card;
+  }
+  .panel-row {
+    @apply flex items-center justify-between gap-4 px-4 py-3.5 transition-colors hover:bg-app-card-hover;
+  }
+  .panel-head {
+    @apply flex items-center justify-between gap-3 px-4 py-3;
+  }
+
+  /* 6px progress track with a flat fill, as used in the session rows. */
+  .metric-track {
+    @apply h-1.5 w-full overflow-hidden rounded-full bg-app-surface;
+  }
+  .metric-track > i {
+    @apply block h-full rounded-full bg-foreground transition-[width] duration-300;
+  }
+
+  /* Muted requirement / category tag. */
+  .chip-muted {
+    @apply inline-flex items-center gap-1.5 rounded-md border border-app-border bg-app-chip px-2.5 py-1 text-xs text-foreground;
   }
 
   /* ---- Minimal primitives (2026 redesign) ---------------------------- */
@@ -272,7 +403,7 @@
     @apply text-[11px] font-medium text-muted-foreground;
   }
   .tile {
-    @apply relative flex min-h-[148px] flex-col rounded-xl border border-border/70 bg-card p-4 transition-colors;
+    @apply relative flex min-h-[110px] flex-col justify-between rounded-xl border border-border/70 bg-card/70 p-3.5 transition-all hover:bg-card hover:border-foreground/20 hover:shadow-sm;
   }
   button.tile {
     @apply cursor-pointer hover:border-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50;
@@ -281,7 +412,7 @@
     @apply text-xs font-medium text-muted-foreground;
   }
   .tile-action {
-    @apply mt-auto inline-flex items-center gap-1 pt-4 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground cursor-pointer;
+    @apply mt-auto inline-flex items-center gap-1 pt-2 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground cursor-pointer;
   }
   button.tile:hover .tile-action {
     @apply text-foreground;
@@ -309,6 +440,9 @@
   }
   .theme-icon.active-theme {
     @apply bg-card text-foreground shadow-sm;
+  }
+  .theme-pref-btn.active-theme:not(.theme-icon) {
+    @apply border-primary ring-1 ring-primary bg-primary/[0.04];
   }
   .update-chip {
     @apply inline-flex h-8 items-center gap-1.5 rounded-md px-2 font-mono text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground cursor-pointer;
@@ -342,10 +476,6 @@
   /* Feature flags: elements gated by data-flag stay hidden until enabled. */
   [data-flag][data-flag-off="true"] {
     display: none !important;
-  }
-  /* The header Go live duplicates the Home primary action. */
-  body[data-view="goals"] #btnTopGoLive {
-    display: none;
   }
 
   /* Settings Subnav Item (Image 2 & 3) */

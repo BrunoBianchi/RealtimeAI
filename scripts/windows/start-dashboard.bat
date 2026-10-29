@@ -8,5 +8,8 @@ if not exist "%APP%\node_modules\electron\dist\electron.exe" (
     pause
     exit /b 1
 )
+rem Close any stale tray/background dashboard instance so changes always load fresh.
+taskkill /F /IM electron.exe /IM RealTimeAI.exe >nul 2>&1
 cd /d "%APP%"
+call npm run -s build:css >nul 2>&1
 start "" "%APP%\node_modules\electron\dist\electron.exe" "%APP%" %*

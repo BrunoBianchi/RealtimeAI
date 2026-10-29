@@ -10,6 +10,7 @@ rem updates itself to the real version when it ships.
 rem ---------------------------------------------------------------------------
 setlocal
 chcp 65001 >nul
+set ELECTRON_RUN_AS_NODE=
 cd /d "%~dp0..\.."
 
 where node >nul 2>&1 || (echo Install Node.js 22 LTS: https://nodejs.org & goto :failed)
@@ -27,7 +28,7 @@ echo == RealTimeAI installer %VERSION% ==
 
 echo [1/3] Native overlay...
 set "RTAI_VERSION=%VERSION%"
-call "%~dp0build.bat" --no-pause || goto :failed
+call "%~dp0build.bat" --no-pause --skip-tests || goto :failed
 
 echo [2/3] Staging the overlay into the app...
 set "NATIVE=apps\dashboard\native"

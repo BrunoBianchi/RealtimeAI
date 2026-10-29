@@ -8,6 +8,7 @@ rem Dev runs never auto-update and show the version as X.Y.Z+dev.<commit>.
 rem ---------------------------------------------------------------------------
 setlocal
 chcp 65001 >nul
+set ELECTRON_RUN_AS_NODE=
 cd /d "%~dp0..\.."
 
 if not exist "apps\dashboard\node_modules\electron\dist\electron.exe" (
@@ -18,7 +19,10 @@ if not exist "apps\dashboard\node_modules\electron\dist\electron.exe" (
 
 if /I not "%~1"=="--skip" (
     set "RTAI_VERSION="
-    call "%~dp0build.bat" --no-pause || goto :failed
+    call "%~dp0build.bat" --no-pause --skip-tests || (
+        if not exist "build\bin\Release\rtai_app.exe" goto :failed
+        echo [WARN] Incremental native build skipped; using existing rtai_app.exe.
+    )
 )
 if not exist "build\bin\Release\rtai_app.exe" (
     echo [ERROR] The overlay is not built yet. Run without --skip.

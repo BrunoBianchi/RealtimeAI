@@ -8,7 +8,12 @@ rem Use headphones so the microphone does not pick up the other side.
 rem ---------------------------------------------------------------------------
 setlocal
 chcp 65001 >nul
+set ELECTRON_RUN_AS_NODE=
 cd /d "%~dp0..\.."
+if exist "apps\dashboard\node_modules\electron\dist\electron.exe" (
+    echo == Starting RealTimeAI Dashboard ==
+    call "%~dp0start-dashboard.bat"
+)
 set "EXE=build\bin\Release\rtai_app.exe"
 if not exist "%EXE%" (
     echo [ERROR] %EXE% not found. Build it first: scripts\windows\build.bat

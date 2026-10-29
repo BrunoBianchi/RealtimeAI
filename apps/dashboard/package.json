@@ -8,7 +8,7 @@
   },
   "main": "src/main/main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "node -e \"delete process.env.ELECTRON_RUN_AS_NODE; require('child_process').spawn(require('electron'), ['.', ...process.argv.slice(1)], {stdio:'inherit'}).on('exit', c => process.exit(c || 0))\" --",
     "build:css": "tailwindcss -i ./src/renderer/tailwind.input.css -o ./src/renderer/styles.css --minify",
     "test": "node --test \"tests/**/*.test.js\"",
     "flags:validate": "node ../../scripts/validate-flags.mjs",

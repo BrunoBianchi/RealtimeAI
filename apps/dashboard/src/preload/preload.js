@@ -131,5 +131,18 @@ contextBridge.exposeInMainWorld('rtai', {
     const handler = (_event, snap) => cb(snap);
     ipcRenderer.on('rtai:flags-changed', handler);
     return () => ipcRenderer.removeListener('rtai:flags-changed', handler);
+  },
+  // Question Bank & JEV Community Analysis
+  getQuestionBank: () => ipcRenderer.invoke('rtai:get-question-bank'),
+  getCompanyQuestions: (companyId) => ipcRenderer.invoke('rtai:get-company-questions', companyId),
+  unlockCompanyQuestions: (companyId, previewOnly) => ipcRenderer.invoke('rtai:unlock-company-questions', { companyId, previewOnly }),
+  setQuestionSharing: (enabled) => ipcRenderer.invoke('rtai:set-question-sharing', enabled),
+  triggerJevAnalysis: (payload) => ipcRenderer.invoke('rtai:trigger-jev-analysis', payload),
+  detectCompany: (transcript, fallbackName) => ipcRenderer.invoke('rtai:detect-company', { transcript, fallbackName }),
+  fetchCompanyLogo: (companyName, domain) => ipcRenderer.invoke('rtai:fetch-company-logo', { companyName, domain }),
+  onQuestionBankUpdated: (cb) => {
+    const handler = (_event, res) => cb(res);
+    ipcRenderer.on('rtai:question-bank-updated', handler);
+    return () => ipcRenderer.removeListener('rtai:question-bank-updated', handler);
   }
 });
