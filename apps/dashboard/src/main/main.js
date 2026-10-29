@@ -245,6 +245,8 @@ function readConfigIni() {
     mic_enabled: (audio.microfone ?? 'sim') !== 'nao' && (audio.microfone ?? 'sim') !== 'false',
     loopback_enabled: (audio.sistema ?? audio.audio_sistema ?? audio.loopback ?? 'sim') !== 'nao' &&
                       (audio.sistema ?? audio.audio_sistema ?? audio.loopback ?? 'sim') !== 'false',
+    noise_cancellation: (audio.cancelamento_ruido ?? audio.noise_cancellation ?? 'sim') !== 'nao' &&
+                        (audio.cancelamento_ruido ?? audio.noise_cancellation ?? 'sim') !== 'false',
     vad: audio.vad || 'silero',
     energy_threshold: parseFloat(audio.limiar_energia || '0.015'),
     save_sessions: (sessao.salvar ?? 'sim') !== 'nao' && (sessao.salvar ?? 'sim') !== 'false',
@@ -320,8 +322,9 @@ function writeConfigIni(updates) {
   const keywords = updates.keywords ?? current.keywords;
   const micEnabled = (updates.mic_enabled ?? current.mic_enabled) ? 'sim' : 'nao';
   const loopbackEnabled = (updates.loopback_enabled ?? current.loopback_enabled) ? 'sim' : 'nao';
-  const audioInputDevice = updates.audio_input_device ?? current.audio_input_device ?? 'default';
-  const audioOutputDevice = updates.audio_output_device ?? current.audio_output_device ?? 'default';
+  const audioInputDevice = updates.audio_input_device ?? updates.input_device ?? current.audio_input_device ?? 'default';
+  const audioOutputDevice = updates.audio_output_device ?? updates.output_device ?? current.audio_output_device ?? 'default';
+  const noiseCancellation = (updates.noise_cancellation ?? updates.cancelamento_ruido ?? current.noise_cancellation) ? 'sim' : 'nao';
   const vad = updates.vad ?? current.vad;
   const energyThreshold = updates.energy_threshold ?? current.energy_threshold;
   const saveSessions = (updates.save_sessions ?? current.save_sessions) ? 'sim' : 'nao';
@@ -394,6 +397,8 @@ function writeConfigIni(updates) {
     `dispositivo_entrada = ${audioInputDevice}`,
     `output_device = ${audioOutputDevice}`,
     `dispositivo_saida = ${audioOutputDevice}`,
+    `cancelamento_ruido = ${noiseCancellation}`,
+    `noise_cancellation = ${noiseCancellation}`,
     `vad = ${vad}`,
     `limiar_energia = ${energyThreshold}`,
     '',

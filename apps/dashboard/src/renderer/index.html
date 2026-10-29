@@ -1656,9 +1656,7 @@
                     <div class="space-y-1.5">
                       <label for="execSelectMic" class="text-[11px] font-mono text-text-secondary block">Microfone (Candidato)</label>
                       <select id="execSelectMic" class="w-full bg-surface-dim border border-border-subtle rounded-md py-1.5 px-2.5 text-xs text-text-primary focus:outline-none focus:border-border-muted cursor-pointer">
-                        <option selected>Razer Seiren Mini (USB Audio Device)</option>
-                        <option>Microfone Interno (Realtek Audio)</option>
-                        <option>Headset WH-1000XM4 (Bluetooth)</option>
+                        <option value="default" selected>Padrão do Sistema</option>
                       </select>
                     </div>
 
@@ -1666,8 +1664,7 @@
                     <div class="space-y-1.5">
                       <label for="execSelectLoopback" class="text-[11px] font-mono text-text-secondary block">Loopback (Entrevistador)</label>
                       <select id="execSelectLoopback" class="w-full bg-surface-dim border border-border-subtle rounded-md py-1.5 px-2.5 text-xs text-text-primary focus:outline-none focus:border-border-muted cursor-pointer">
-                        <option selected>Alto-falantes / Fones (Loopback Stereo)</option>
-                        <option>VB-Audio Virtual Cable</option>
+                        <option value="default" selected>Padrão do Sistema (Loopback Stereo)</option>
                       </select>
                     </div>
 
@@ -1675,29 +1672,29 @@
                     <div class="p-3 rounded-md bg-surface-dim border border-border-subtle space-y-2">
                       <div class="flex items-center justify-between text-xs font-mono">
                         <span class="text-text-secondary flex items-center gap-1.5 text-[11px]">
-                          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                          <span id="execVuIndicatorDot" class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                           Sensibilidade VU
                         </span>
-                        <span class="text-text-primary font-medium text-[11px]">-18 dB</span>
+                        <span id="execVuDbLabel" class="text-text-primary font-medium text-[11px]">-- dB</span>
                       </div>
                       <!-- Subdued Clean VU Bar -->
-                      <div class="h-2 w-full bg-surface-container rounded overflow-hidden flex gap-0.5 p-0.5">
-                        <div class="h-full bg-zinc-300 rounded-[1px] w-full"></div>
-                        <div class="h-full bg-zinc-300 rounded-[1px] w-full"></div>
-                        <div class="h-full bg-zinc-300 rounded-[1px] w-full"></div>
-                        <div class="h-full bg-zinc-300 rounded-[1px] w-full"></div>
-                        <div class="h-full bg-zinc-300 rounded-[1px] w-full"></div>
-                        <div class="h-full bg-zinc-400 rounded-[1px] w-full"></div>
-                        <div class="h-full bg-zinc-400 rounded-[1px] w-full"></div>
-                        <div class="h-full bg-zinc-400 rounded-[1px] w-full"></div>
-                        <div class="h-full bg-zinc-500 rounded-[1px] w-full"></div>
-                        <div class="h-full bg-zinc-500 rounded-[1px] w-full"></div>
-                        <div class="h-full bg-zinc-600 rounded-[1px] w-full"></div>
-                        <div class="h-full bg-zinc-700 rounded-[1px] w-full"></div>
-                        <div class="h-full bg-zinc-800 rounded-[1px] w-full"></div>
-                        <div class="h-full bg-zinc-800 rounded-[1px] w-full"></div>
-                        <div class="h-full bg-zinc-800 rounded-[1px] w-full"></div>
-                        <div class="h-full bg-zinc-800 rounded-[1px] w-full"></div>
+                      <div id="execVuBarContainer" class="h-2 w-full bg-surface-container rounded overflow-hidden flex gap-0.5 p-0.5" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                        <div class="exec-vu-seg h-full bg-zinc-800 rounded-[1px] w-full transition-colors duration-75"></div>
+                        <div class="exec-vu-seg h-full bg-zinc-800 rounded-[1px] w-full transition-colors duration-75"></div>
+                        <div class="exec-vu-seg h-full bg-zinc-800 rounded-[1px] w-full transition-colors duration-75"></div>
+                        <div class="exec-vu-seg h-full bg-zinc-800 rounded-[1px] w-full transition-colors duration-75"></div>
+                        <div class="exec-vu-seg h-full bg-zinc-800 rounded-[1px] w-full transition-colors duration-75"></div>
+                        <div class="exec-vu-seg h-full bg-zinc-800 rounded-[1px] w-full transition-colors duration-75"></div>
+                        <div class="exec-vu-seg h-full bg-zinc-800 rounded-[1px] w-full transition-colors duration-75"></div>
+                        <div class="exec-vu-seg h-full bg-zinc-800 rounded-[1px] w-full transition-colors duration-75"></div>
+                        <div class="exec-vu-seg h-full bg-zinc-800 rounded-[1px] w-full transition-colors duration-75"></div>
+                        <div class="exec-vu-seg h-full bg-zinc-800 rounded-[1px] w-full transition-colors duration-75"></div>
+                        <div class="exec-vu-seg h-full bg-zinc-800 rounded-[1px] w-full transition-colors duration-75"></div>
+                        <div class="exec-vu-seg h-full bg-zinc-800 rounded-[1px] w-full transition-colors duration-75"></div>
+                        <div class="exec-vu-seg h-full bg-zinc-800 rounded-[1px] w-full transition-colors duration-75"></div>
+                        <div class="exec-vu-seg h-full bg-zinc-800 rounded-[1px] w-full transition-colors duration-75"></div>
+                        <div class="exec-vu-seg h-full bg-zinc-800 rounded-[1px] w-full transition-colors duration-75"></div>
+                        <div class="exec-vu-seg h-full bg-zinc-800 rounded-[1px] w-full transition-colors duration-75"></div>
                       </div>
                     </div>
 
@@ -1735,20 +1732,20 @@
                       <div>
                         <div class="flex items-center justify-between mb-1 text-xs">
                           <span class="text-text-secondary">Consumo em Tempo Real</span>
-                          <span class="font-mono text-text-primary text-[11px] font-medium">176 / ∞ min</span>
+                          <span id="execBillingUsageLabel" class="font-mono text-text-primary text-[11px] font-medium">176 / ∞ min</span>
                         </div>
                         <div class="h-1.5 w-full bg-surface-container rounded-full overflow-hidden">
-                          <div class="h-full bg-zinc-300 rounded-full w-2/5"></div>
+                          <div id="execBillingProgressBar" class="h-full bg-zinc-300 rounded-full w-2/5"></div>
                         </div>
                       </div>
                       <div class="pt-2 border-t border-border-subtle space-y-1.5 text-xs">
                         <div class="flex justify-between text-text-secondary">
                           <span>Próxima renovação:</span>
-                          <span class="text-text-primary font-mono text-[11px]">14 Dez 2025</span>
+                          <span id="execBillingRenewalDate" class="text-text-primary font-mono text-[11px]">14 Dez 2025</span>
                         </div>
                         <div class="flex justify-between text-text-secondary">
                           <span>Método de pagamento:</span>
-                          <span class="text-text-primary font-mono text-[11px] flex items-center gap-1">
+                          <span id="execBillingPaymentMethod" class="text-text-primary font-mono text-[11px] flex items-center gap-1">
                             <svg class="w-3.5 h-3.5 text-text-secondary" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                               <rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/>
                             </svg>
@@ -1757,7 +1754,7 @@
                         </div>
                         <div class="flex justify-between text-text-secondary">
                           <span>Total de sessões:</span>
-                          <span class="text-text-primary font-mono text-[11px]">140 executadas</span>
+                          <span id="execBillingTotalSessions" class="text-text-primary font-mono text-[11px]">140 executadas</span>
                         </div>
                       </div>
                     </div>
@@ -2681,9 +2678,7 @@
                         <label for="selectInputDevice" class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">INPUT DEVICE</label>
                         <div class="relative">
                           <select id="selectInputDevice" class="sh-input cursor-pointer appearance-none pr-9 text-xs font-medium">
-                            <option value="default">Default Microphone</option>
-                            <option value="mic-builtin">Microfone (Realtek High Definition Audio)</option>
-                            <option value="mic-headset">Headset Microphone</option>
+                            <option value="default" selected>Padrão do Sistema</option>
                           </select>
                           <svg viewBox="0 0 24 24" class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
                         </div>
@@ -2694,9 +2689,7 @@
                         <label for="selectOutputDevice" class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">OUTPUT DEVICE</label>
                         <div class="relative">
                           <select id="selectOutputDevice" class="sh-input cursor-pointer appearance-none pr-9 text-xs font-medium">
-                            <option value="default">Speakers (Realtek(R) Audio)</option>
-                            <option value="output-headphones">Headphones (High Definition Audio Device)</option>
-                            <option value="output-system">System Default Output</option>
+                            <option value="default" selected>Padrão do Sistema (Loopback Stereo)</option>
                           </select>
                           <svg viewBox="0 0 24 24" class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
                         </div>

@@ -254,11 +254,15 @@ function switchView(viewName, syncRoute = true) {
   if (target === 'question-bank') renderQuestionBankHome();
   if (target === 'question-bank-company') renderQuestionBankCompany();
 
-  if (target !== 'settings' || state.currentSettingsTab !== 'speech') {
+  if (target === 'settings') {
+    populateAudioDevices().then(() => {
+      const execMic = document.getElementById('execSelectMic');
+      const inSel = document.getElementById('selectInputDevice');
+      const micDev = (execMic && execMic.value) || (inSel && inSel.value) || (state.config && state.config.audio_input_device) || 'default';
+      startLiveInputMeter(micDev);
+    });
+  } else {
     stopLiveInputMeter();
-  } else if (target === 'settings' && state.currentSettingsTab === 'speech') {
-    const inSel = document.getElementById('selectInputDevice');
-    startLiveInputMeter(inSel ? inSel.value : null);
   }
 
   if (syncRoute && window.router && !window.router.isNavigating) {
@@ -308,13 +312,13 @@ function switchSettingsTab(tabName, syncRoute = true) {
     pane.classList.toggle('active', pane.id === `subpane-${tabName}`);
   });
   if (tabName === 'calendar') gcalOnOpen();
-  if (tabName === 'speech') {
+  if (state.currentView === 'settings') {
     populateAudioDevices().then(() => {
+      const execMic = document.getElementById('execSelectMic');
       const inSel = document.getElementById('selectInputDevice');
-      startLiveInputMeter(inSel ? inSel.value : null);
+      const micDev = (execMic && execMic.value) || (inSel && inSel.value) || (state.config && state.config.audio_input_device) || 'default';
+      startLiveInputMeter(micDev);
     });
-  } else {
-    stopLiveInputMeter();
   }
 
   if (syncRoute && window.router && !window.router.isNavigating && state.currentView === 'settings') {
@@ -646,6 +650,25 @@ function renderPlanAndUsage() {
       btnActionUpgrade.className = 'w-full flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 via-amber-600 to-orange-500 px-4 py-2.5 text-xs font-semibold text-white shadow-md hover:brightness-105 active:scale-[0.99] transition-all cursor-pointer';
     }
     if (btnActionLabel) btnActionLabel.textContent = 'Upgrade Now';
+  }
+
+  // Executive Settings Plano Pro Card
+  const execUsageLabel = document.getElementById('execBillingUsageLabel');
+  const execProgressBar = document.getElementById('execBillingProgressBar');
+  const execTotalSessions = document.getElementById('execBillingTotalSessions');
+
+  if (execUsageLabel) {
+    const usedM = usage.usedMinutes || 176;
+    execUsageLabel.textContent = isPremium ? `${usedM} / ∞ min` : `${usedM} / ${usage.limitMinutes || 60} min`;
+  }
+  if (execProgressBar) {
+    const usedM = usage.usedMinutes || 176;
+    const limitM = usage.limitMinutes || 60;
+    const pct = isPremium ? Math.min(100, Math.round((usedM / 600) * 100)) : Math.min(100, Math.round((usedM / limitM) * 100));
+    execProgressBar.style.width = `${Math.max(10, pct)}%`;
+  }
+  if (execTotalSessions) {
+    execTotalSessions.textContent = `${sessionCount} executadas`;
   }
 }
 
@@ -2910,6 +2933,59 @@ function populateSettingsForm(cfg) {
     outputDevSel.value = cfg.audio_output_device;
   }
 
+  // Executive Settings sync
+  const execMic = document.getElementById('execSelectMic');
+  if (execMic && (cfg.audio_input_device || cfg.input_device)) {
+    execMic.value = cfg.audio_input_device || cfg.input_device;
+  }
+  const execLoopback = document.getElementById('execSelectLoopback');
+  if (execLoopback && (cfg.audio_output_device || cfg.output_device)) {
+    execLoopback.value = cfg.audio_output_device || cfg.output_device;
+  }
+  const execNoise = document.getElementById('execToggleNoiseCancel');
+  if (execNoise) {
+    execNoise.checked = Boolean(cfg.noise_cancellation ?? true);
+  }
+  const execStealth = document.getElementById('execToggleStealthShare');
+  if (execStealth) {
+    execStealth.checked = Boolean(cfg.stealth_screen_capture ?? true);
+  }
+  const execGhost = document.getElementById('execToggleClickThrough');
+  if (execGhost) {
+    execGhost.checked = Boolean(cfg.stealth_click_through ?? false);
+  }
+
+  // Model cards in Executive Settings
+  const curModel = cfg.model || 'qwen/qwen3.6-flash';
+  document.querySelectorAll('.exec-model-card').forEach((card) => {
+    const cardModel = card.dataset.execModel;
+    const isAct = cardModel === curModel || (card.dataset.execTier && getTierForModel(curModel) === card.dataset.execTier);
+    card.className = isAct
+      ? 'exec-model-card relative p-3.5 rounded-md bg-surface-container border border-border-hover flex flex-col justify-between cursor-pointer transition-colors shadow-xs'
+      : 'exec-model-card p-3.5 rounded-md bg-surface-dim hover:bg-surface-container/60 border border-border-subtle hover:border-border-muted flex flex-col justify-between cursor-pointer transition-all';
+    const dot = card.querySelector('.exec-model-dot');
+    if (dot) {
+      dot.className = isAct
+        ? 'exec-model-dot w-2 h-2 rounded-full bg-emerald-400'
+        : 'exec-model-dot w-2 h-2 rounded-full border border-border-muted';
+    }
+  });
+
+  // Response style cards in Executive Settings
+  const curStyle = String(cfg.response_style || 'star').toLowerCase();
+  document.querySelectorAll('.exec-style-card').forEach((card) => {
+    const isAct = (card.dataset.execStyle || '').toLowerCase() === curStyle;
+    card.className = isAct
+      ? 'exec-style-card flex items-start gap-2.5 p-2.5 rounded-md bg-surface-container border border-border-hover cursor-pointer transition-colors'
+      : 'exec-style-card flex items-start gap-2.5 p-2.5 rounded-md bg-surface-dim hover:bg-surface-container/50 border border-border-subtle cursor-pointer transition-colors';
+    const radio = card.querySelector('.exec-style-radio');
+    if (radio) {
+      radio.className = isAct
+        ? 'exec-style-radio mt-0.5 w-3.5 h-3.5 shrink-0 rounded-full bg-zinc-100 border border-zinc-100 flex items-center justify-center'
+        : 'exec-style-radio mt-0.5 w-3.5 h-3.5 shrink-0 rounded-full bg-surface-dim border border-border-muted flex items-center justify-center';
+    }
+  });
+
   // Google Calendar Meeting Detect sync (Images 3 & 4)
   const calDetectIn = document.getElementById('cfgCalendarDetectMeetings');
   const meetDetectIn = document.getElementById('cfgMeetingDetect');
@@ -4475,8 +4551,11 @@ async function startLiveInputMeter(deviceId) {
 
   const inMeter = document.getElementById('meterInputLevel');
   const inVal = document.getElementById('inputLevelValue');
-  if (!inMeter && !inVal) return;
+  const vuContainer = document.getElementById('execVuBarContainer');
+  const vuDbLabel = document.getElementById('execVuDbLabel');
+  const vuDot = document.getElementById('execVuIndicatorDot');
 
+  if (!inMeter && !inVal && !vuContainer && !vuDbLabel) return;
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
 
   try {
@@ -4501,34 +4580,70 @@ async function startLiveInputMeter(deviceId) {
     const source = liveInputAudioContext.createMediaStreamSource(stream);
     const analyser = liveInputAudioContext.createAnalyser();
     analyser.fftSize = 256;
-    analyser.smoothingTimeConstant = 0.3;
+    analyser.smoothingTimeConstant = 0.35;
     source.connect(analyser);
 
-    const bufferLength = analyser.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
+    const bufferLength = analyser.fftSize;
+    const timeData = new Uint8Array(bufferLength);
+    const freqData = new Uint8Array(analyser.frequencyBinCount);
 
     function tick() {
       if (!liveInputAudioStream || !liveInputAudioContext || liveInputAudioContext.state === 'closed') {
         return;
       }
 
-      analyser.getByteFrequencyData(dataArray);
+      analyser.getByteTimeDomainData(timeData);
+      analyser.getByteFrequencyData(freqData);
 
-      let sum = 0;
+      let sumSquares = 0;
       for (let i = 0; i < bufferLength; i++) {
-        sum += dataArray[i];
+        const norm = (timeData[i] - 128) / 128;
+        sumSquares += norm * norm;
       }
-      const avg = sum / bufferLength;
+      const rms = Math.sqrt(sumSquares / bufferLength);
 
-      let pct = 0;
       let db = -60;
-      if (avg > 1) {
-        pct = Math.min(100, Math.round((avg / 80) * 100));
-        db = Math.round(-60 + (avg / 255) * 60);
+      let pct = 0;
+      if (rms > 0.0005) {
+        db = Math.max(-60, Math.min(0, Math.round(20 * Math.log10(rms))));
+        pct = Math.max(0, Math.min(100, Math.round(((db + 55) / 55) * 100)));
+      }
+
+      if (vuDbLabel) {
+        vuDbLabel.textContent = db > -55 ? `${db} dB` : '-- dB';
+      }
+
+      if (vuContainer) {
+        const segs = vuContainer.querySelectorAll('.exec-vu-seg');
+        const totalSegs = segs.length || 16;
+        const activeBars = pct <= 0 ? 0 : Math.max(1, Math.min(totalSegs, Math.round((pct / 100) * totalSegs)));
+
+        segs.forEach((seg, idx) => {
+          if (idx < activeBars) {
+            if (idx < Math.round(totalSegs * 0.65)) {
+              seg.className = 'exec-vu-seg h-full bg-emerald-400 rounded-[1px] w-full transition-colors duration-75';
+            } else if (idx < Math.round(totalSegs * 0.85)) {
+              seg.className = 'exec-vu-seg h-full bg-emerald-300 rounded-[1px] w-full transition-colors duration-75';
+            } else {
+              seg.className = 'exec-vu-seg h-full bg-emerald-200 rounded-[1px] w-full transition-colors duration-75';
+            }
+          } else {
+            seg.className = 'exec-vu-seg h-full bg-zinc-800 rounded-[1px] w-full transition-colors duration-75';
+          }
+        });
+        vuContainer.setAttribute('aria-valuenow', String(pct));
+      }
+
+      if (vuDot) {
+        if (db > -42) {
+          vuDot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.9)]';
+        } else {
+          vuDot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500/30';
+        }
       }
 
       if (inMeter) inMeter.style.width = `${pct}%`;
-      if (inVal) inVal.textContent = avg > 1 ? `${db} dB` : '-60 dB';
+      if (inVal) inVal.textContent = db > -55 ? `${db} dB` : '-60 dB';
 
       liveInputAudioAnimId = requestAnimationFrame(tick);
     }
@@ -4538,6 +4653,12 @@ async function startLiveInputMeter(deviceId) {
     console.warn('Could not start live input meter:', err);
     if (inMeter) inMeter.style.width = '0%';
     if (inVal) inVal.textContent = '-60 dB';
+    if (vuDbLabel) vuDbLabel.textContent = '-- dB';
+    if (vuContainer) {
+      vuContainer.querySelectorAll('.exec-vu-seg').forEach((seg) => {
+        seg.className = 'exec-vu-seg h-full bg-zinc-800 rounded-[1px] w-full transition-colors duration-75';
+      });
+    }
   }
 }
 
@@ -4560,36 +4681,98 @@ function stopLiveInputMeter() {
   const inVal = document.getElementById('inputLevelValue');
   if (inMeter) inMeter.style.width = '0%';
   if (inVal) inVal.textContent = '-60 dB';
+
+  const vuDbLabel = document.getElementById('execVuDbLabel');
+  const vuContainer = document.getElementById('execVuBarContainer');
+  const vuDot = document.getElementById('execVuIndicatorDot');
+  if (vuDbLabel) vuDbLabel.textContent = '-- dB';
+  if (vuContainer) {
+    vuContainer.querySelectorAll('.exec-vu-seg').forEach((seg) => {
+      seg.className = 'exec-vu-seg h-full bg-zinc-800 rounded-[1px] w-full transition-colors duration-75';
+    });
+  }
+  if (vuDot) vuDot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500/30';
 }
 
 async function populateAudioDevices() {
   if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
   try {
+    try {
+      const probeList = await navigator.mediaDevices.enumerateDevices();
+      const hasLabels = probeList.some((d) => Boolean(d.label));
+      if (!hasLabels && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((t) => t.stop());
+      }
+    } catch (_permErr) {}
+
     const inSelect = document.getElementById('selectInputDevice');
     const outSelect = document.getElementById('selectOutputDevice');
+    const execMic = document.getElementById('execSelectMic');
+    const execLoopback = document.getElementById('execSelectLoopback');
+
     const devices = await navigator.mediaDevices.enumerateDevices();
     const inputs = devices.filter((d) => d.kind === 'audioinput');
     const outputs = devices.filter((d) => d.kind === 'audiooutput');
 
-    if (inSelect && inputs.length > 0) {
-      const savedIn = (state.config && state.config.audio_input_device) || inSelect.value || 'default';
-      inSelect.innerHTML = inputs.map((d, i) =>
-        `<option value="${d.deviceId || 'default'}">${d.label || `Microphone ${i + 1}`}</option>`
-      ).join('');
+    const savedIn = (state.config && (state.config.audio_input_device || state.config.input_device)) || 'default';
+    const savedOut = (state.config && (state.config.audio_output_device || state.config.output_device)) || 'default';
+
+    const formatName = (label, fallback) => {
+      if (!label) return fallback;
+      return label.replace(/\s*\([0-9a-fA-F]{4}:[0-9a-fA-F]{4}\)/g, '').trim();
+    };
+
+    const inputOptionsHtml = [
+      `<option value="default">Padrão do Sistema${inputs[0]?.label ? ` (${formatName(inputs[0].label, 'Microfone')})` : ''}</option>`,
+      ...inputs
+        .filter((d) => d.deviceId && d.deviceId !== 'default')
+        .map((d, i) => `<option value="${d.deviceId}">${escapeHtml(formatName(d.label, `Microfone ${i + 1}`))}</option>`)
+    ].join('');
+
+    const outputOptionsHtml = [
+      `<option value="default">Padrão do Sistema (Loopback Stereo)${outputs[0]?.label ? ` (${formatName(outputs[0].label, 'Alto-falantes')})` : ''}</option>`,
+      ...outputs
+        .filter((d) => d.deviceId && d.deviceId !== 'default')
+        .map((d, i) => `<option value="${d.deviceId}">${escapeHtml(formatName(d.label, `Alto-falantes / Fones ${i + 1}`))}</option>`)
+    ].join('');
+
+    if (execMic) {
+      execMic.innerHTML = inputOptionsHtml;
+      if ([...execMic.options].some((o) => o.value === savedIn)) {
+        execMic.value = savedIn;
+      }
+    }
+    if (inSelect) {
+      inSelect.innerHTML = inputOptionsHtml;
       if ([...inSelect.options].some((o) => o.value === savedIn)) {
         inSelect.value = savedIn;
       }
     }
-    if (outSelect && outputs.length > 0) {
-      const savedOut = (state.config && state.config.audio_output_device) || outSelect.value || 'default';
-      outSelect.innerHTML = outputs.map((d, i) =>
-        `<option value="${d.deviceId || 'default'}">${d.label || `Speaker / Headphone ${i + 1}`}</option>`
-      ).join('');
+
+    if (execLoopback) {
+      execLoopback.innerHTML = outputOptionsHtml;
+      if ([...execLoopback.options].some((o) => o.value === savedOut)) {
+        execLoopback.value = savedOut;
+      }
+    }
+    if (outSelect) {
+      outSelect.innerHTML = outputOptionsHtml;
       if ([...outSelect.options].some((o) => o.value === savedOut)) {
         outSelect.value = savedOut;
       }
     }
-  } catch (_) {}
+
+    const micLabel = document.getElementById('homeMicDeviceLabel');
+    if (micLabel) {
+      const activeMicName = (execMic && execMic.selectedIndex >= 0 && execMic.options[execMic.selectedIndex]?.textContent) ||
+                            (inSelect && inSelect.selectedIndex >= 0 && inSelect.options[inSelect.selectedIndex]?.textContent) ||
+                            'Default Microphone';
+      micLabel.textContent = `You • ${activeMicName}`;
+    }
+  } catch (err) {
+    console.warn('Could not enumerate audio devices:', err);
+  }
 }
 
 function setupAiProvidersAndAudio() {
@@ -4696,24 +4879,66 @@ function setupAiProvidersAndAudio() {
     }
   });
 
-  document.getElementById('selectInputDevice')?.addEventListener('change', async (e) => {
+  // Microfone (Executive Settings & Legacy)
+  const onMicChanged = async (val, label) => {
+    const inSel = document.getElementById('selectInputDevice');
+    const execMic = document.getElementById('execSelectMic');
+    if (inSel && inSel.value !== val) inSel.value = val;
+    if (execMic && execMic.value !== val) execMic.value = val;
     try {
-      const res = await window.rtai.saveConfig({ audio_input_device: e.target.value });
+      const res = await window.rtai.saveConfig({ audio_input_device: val, input_device: val });
       if (res && res.config) state.config = res.config;
-      showToast(`Microphone input: ${e.target.selectedOptions[0]?.textContent || e.target.value}`);
-      startLiveInputMeter(e.target.value);
+      const displayLabel = label || val;
+      showToast(`Microfone selecionado: ${displayLabel}`);
+      startLiveInputMeter(val);
+      const micLabel = document.getElementById('homeMicDeviceLabel');
+      if (micLabel) micLabel.textContent = `You • ${displayLabel}`;
     } catch (err) {
       console.error('Failed to save input device:', err);
     }
+  };
+
+  document.getElementById('execSelectMic')?.addEventListener('change', (e) => {
+    onMicChanged(e.target.value, e.target.selectedOptions[0]?.textContent);
   });
 
-  document.getElementById('selectOutputDevice')?.addEventListener('change', async (e) => {
+  document.getElementById('selectInputDevice')?.addEventListener('change', (e) => {
+    onMicChanged(e.target.value, e.target.selectedOptions[0]?.textContent);
+  });
+
+  // Loopback / Output (Executive Settings & Legacy)
+  const onOutputChanged = async (val, label) => {
+    const outSel = document.getElementById('selectOutputDevice');
+    const execLoop = document.getElementById('execSelectLoopback');
+    if (outSel && outSel.value !== val) outSel.value = val;
+    if (execLoop && execLoop.value !== val) execLoop.value = val;
     try {
-      const res = await window.rtai.saveConfig({ audio_output_device: e.target.value });
+      const res = await window.rtai.saveConfig({ audio_output_device: val, output_device: val });
       if (res && res.config) state.config = res.config;
-      showToast(`Audio output: ${e.target.selectedOptions[0]?.textContent || e.target.value}`);
+      const displayLabel = label || val;
+      showToast(`Dispositivo de saída: ${displayLabel}`);
     } catch (err) {
       console.error('Failed to save output device:', err);
+    }
+  };
+
+  document.getElementById('execSelectLoopback')?.addEventListener('change', (e) => {
+    onOutputChanged(e.target.value, e.target.selectedOptions[0]?.textContent);
+  });
+
+  document.getElementById('selectOutputDevice')?.addEventListener('change', (e) => {
+    onOutputChanged(e.target.value, e.target.selectedOptions[0]?.textContent);
+  });
+
+  // Noise cancellation toggle
+  document.getElementById('execToggleNoiseCancel')?.addEventListener('change', async (e) => {
+    const checked = Boolean(e.target.checked);
+    try {
+      const res = await window.rtai.saveConfig({ noise_cancellation: checked, cancelamento_ruido: checked });
+      if (res && res.config) state.config = res.config;
+      showToast(checked ? 'Cancelamento de ruído ativado.' : 'Cancelamento de ruído desativado.');
+    } catch (err) {
+      console.error('Failed to save noise cancellation:', err);
     }
   });
 
