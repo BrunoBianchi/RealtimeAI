@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(RealTimeAI
-    VERSION 2.0.0 # x-release-please-version
+    VERSION 2.1.0 # x-release-please-version
     DESCRIPTION "Real-time meeting copilot - native C++ audio, resilient STT, LLM suggestions, overlay"
     HOMEPAGE_URL "https://github.com/BrunoBianchi/RealtimeAI"
     LANGUAGES CXX)
