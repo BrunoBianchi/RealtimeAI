@@ -25,7 +25,7 @@
 // Glanceable HUD constants (Req 1)
 // The reference HUD is a wide, glanceable card. Keep enough room for the
 // action bar labels while still allowing a compact layout on small displays.
-constexpr float kHudW = 860.0f;
+constexpr float kHudW = 960.0f;
 constexpr float kMinW = 420.0f;
 constexpr float kMaxW = 1100.0f;
 constexpr float kAnchorTopMinDIP = 8.0f;

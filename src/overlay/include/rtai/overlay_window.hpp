@@ -1,4 +1,4 @@
-﻿// Floating HUD (Win32 + Direct2D/DirectWrite, per-pixel-alpha layered window).
+// Floating HUD (Win32 + Direct2D/DirectWrite, per-pixel-alpha layered window).
 //
 // Layout (top to bottom, each a rounded panel, transparent gaps between):
 //   * control bar: capture toggles (system audio, mic) with recording dots
@@ -56,7 +56,7 @@ struct OverlayOptions {
     bool system_audio_enabled{true};
     bool auto_answer_on{true};
     bool transcription_only_on{false};
-    float width_dip{860.0f};
+    float width_dip{960.0f};
     float max_height_fraction{0.6f}; // answer area cap, fraction of the monitor work area
     // Accent palette (Req 3.6): true -> key terms highlighted in rgb(10,132,255);
     // false -> monochrome palette, key terms in full-opacity white.

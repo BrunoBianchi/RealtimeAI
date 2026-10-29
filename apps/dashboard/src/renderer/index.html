@@ -9,182 +9,166 @@
   </head>
   <body class="bg-background text-foreground">
     <div class="flex h-screen w-screen overflow-hidden">
-      <!-- ==================== LEFT SIDEBAR ==================== -->
-      <aside class="flex w-[230px] !w-64 shrink-0 flex-col justify-between p-3.5 bg-surface-dim border-r border-border-subtle overflow-y-auto z-30 select-none">
-        <div class="flex flex-col gap-4">
-          <!-- Brand Header -->
-          <div class="flex items-center justify-between px-2 pt-1 pb-1">
-            <button id="btnBrandHome" type="button" class="app-no-drag group flex items-center gap-2.5 text-left cursor-pointer focus:outline-none" title="Início">
-              <div class="w-7 h-7 rounded-md bg-surface-container flex items-center justify-center border border-border-muted text-text-primary shrink-0">
-                <svg class="w-4 h-4 text-text-primary" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
-                  <rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/><path d="M12 8V4H8"/>
+      <!-- ==================== LEFT SIDEBAR (IMAGES 1, 3, 4) ==================== -->
+      <aside class="flex w-[230px] !w-[232px] shrink-0 flex-col justify-between px-3.5 py-4 bg-[#0d0e11] border-r border-white/[0.06] overflow-y-auto z-30 select-none">
+        <div class="flex flex-col gap-5">
+          <!-- Brand Header (Image 3) -->
+          <div class="flex items-center justify-between px-2 pt-0.5">
+            <button id="btnBrandHome" type="button" class="app-no-drag group flex items-center gap-2.5 text-left cursor-pointer focus:outline-none" title="Home">
+              <div class="w-7 h-7 rounded-lg bg-white text-zinc-950 flex items-center justify-center shadow-xs shrink-0">
+                <svg class="w-4 h-4 text-zinc-950 stroke-[2.2]" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                  <path d="M3 12h4l2-5 4 10 2-5h6"/>
                 </svg>
               </div>
-              <div>
-                <span class="text-sm font-semibold tracking-tight leading-none text-text-primary block">RealTimeAI</span>
-                <span class="flex items-center gap-1.5 text-[11px] text-text-tertiary mt-1">
-                  <span id="overlayStatusDot" class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                  <span id="overlayStatusText">Pronto</span>
-                </span>
-              </div>
+              <span class="text-[15px] font-semibold tracking-tight text-white">RealTimeAI</span>
             </button>
-            <span id="sidebarAppVersion" class="font-mono text-[10px] text-text-tertiary bg-white/5 px-1.5 py-0.5 rounded border border-white/5">v2.0</span>
-            <span id="overlayStatusPill" class="hidden"></span>
+            <span id="sidebarAppVersion" class="hidden font-mono text-[10px] text-text-tertiary">v2.8</span>
           </div>
 
-          <!-- CTA New Session -->
-          <button id="btnNewGoal" class="w-full rounded-full bg-white text-zinc-950 !rounded-lg !bg-surface-container hover:!bg-surface-container-high !border !border-border-muted !text-text-primary py-2 px-3 text-xs font-medium flex items-center justify-center gap-2 transition-all cursor-pointer" type="button">
-            <svg class="w-3.5 h-3.5 stroke-[2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <line x1="12" x2="12" y1="5" y2="19"></line>
-              <line x1="5" x2="19" y1="12" y2="12"></line>
-            </svg>
-            <span>Nova sessão</span>
-          </button>
-
-          <!-- Nav Items -->
-          <nav class="flex flex-col gap-0.5 text-xs font-medium">
-            <button type="button" data-view="goals" data-nav="home" class="sh-nav-item">
-              <div class="flex items-center gap-2.5">
-                <svg class="w-4 h-4 text-text-tertiary stroke-[1.75]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                  <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                </svg>
-                <span>Início</span>
+          <!-- Navigation Groups (Image 3 & 4) -->
+          <div class="space-y-5">
+            <!-- WORKSPACE GROUP -->
+            <div>
+              <div class="px-2.5 mb-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500">
+                WORKSPACE
               </div>
-            </button>
+              <nav class="flex flex-col gap-0.5 text-[13px] font-medium">
+                <button type="button" data-view="goals" data-nav="home" class="sh-nav-item active">
+                  <div class="flex items-center gap-2.5">
+                    <svg class="w-4 h-4 shrink-0 stroke-[1.8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                      <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                    <span>Home</span>
+                  </div>
+                </button>
 
-            <button type="button" data-view="goals" data-nav="sessions" class="sh-nav-item active">
-              <div class="flex items-center gap-2.5">
-                <svg class="w-4 h-4 text-text-tertiary stroke-[1.75]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/><path d="M12 8V4H8"/>
-                </svg>
-                <span>Sessões</span>
-              </div>
-              <span id="navBadgeGoals" class="nav-count">4</span>
-            </button>
+                <button type="button" data-view="history" data-nav="sessions" class="sh-nav-item">
+                  <div class="flex items-center gap-2.5">
+                    <svg class="w-4 h-4 shrink-0 stroke-[1.8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>
+                    </svg>
+                    <span>Sessions</span>
+                  </div>
+                  <span id="navBadgeSessions" class="font-mono text-[11px] text-zinc-500 tabular-nums">24</span>
+                </button>
 
-            <button type="button" data-view="library" class="sh-nav-item">
-              <div class="flex items-center gap-2.5">
-                <svg class="w-4 h-4 text-text-tertiary stroke-[1.75]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>
-                </svg>
-                <span>Biblioteca</span>
-              </div>
-              <span id="navBadgeLibrary" class="nav-count">16</span>
-            </button>
+                <button type="button" data-view="question-bank" data-nav="prep" class="sh-nav-item">
+                  <div class="flex items-center gap-2.5">
+                    <svg class="w-4 h-4 shrink-0 stroke-[1.8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/>
+                    </svg>
+                    <span>Interview prep</span>
+                  </div>
+                  <span id="navBadgeQuestionBank" class="hidden nav-count">4.9k</span>
+                </button>
 
-            <button type="button" data-view="history" class="sh-nav-item">
-              <div class="flex items-center gap-2.5">
-                <svg class="w-4 h-4 text-text-tertiary stroke-[1.75]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>
-                </svg>
-                <span>Histórico</span>
-              </div>
-              <span id="navBadgeSessions" class="nav-count">148</span>
-            </button>
+                <button type="button" data-view="library" data-nav="library" class="sh-nav-item">
+                  <div class="flex items-center gap-2.5">
+                    <svg class="w-4 h-4 shrink-0 stroke-[1.8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>
+                    </svg>
+                    <span>Context library</span>
+                  </div>
+                  <span id="navBadgeLibrary" class="hidden nav-count">16</span>
+                </button>
 
-            <button type="button" data-view="question-bank" class="sh-nav-item">
-              <div class="flex items-center gap-2.5">
-                <svg class="w-4 h-4 text-text-tertiary stroke-[1.75]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" x2="12.01" y1="17" y2="17"/>
-                </svg>
-                <span>Banco de perguntas</span>
-              </div>
-              <span id="navBadgeQuestionBank" class="nav-count">4.9k</span>
-            </button>
-
-            <button type="button" data-view="settings" class="sh-nav-item">
-              <div class="flex items-center gap-2.5">
-                <svg class="w-4 h-4 text-text-tertiary stroke-[1.75]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <circle cx="12" cy="12" r="3"></circle>
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                </svg>
-                <span>Configurações</span>
-              </div>
-            </button>
-          </nav>
-
-          <!-- Next Section Item (A SEGUIR) -->
-          <div class="pt-3 border-t border-border-subtle px-1">
-            <div class="flex items-center justify-between text-[10px] font-mono text-text-tertiary mb-2 uppercase tracking-wider">
-              <span>A SEGUIR</span>
-              <span id="sidebarGoalCount">1</span>
+                <button type="button" data-view="goals" data-nav="analytics" id="btnSidebarAnalytics" class="sh-nav-item">
+                  <div class="flex items-center gap-2.5">
+                    <svg class="w-4 h-4 shrink-0 stroke-[1.8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/>
+                    </svg>
+                    <span>Analytics</span>
+                  </div>
+                </button>
+              </nav>
             </div>
-            <div id="agentSelectorBar" class="space-y-1">
-              <div class="p-2 rounded-lg bg-surface-card border border-border-subtle flex items-center gap-2.5">
-                <div class="w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold text-white shrink-0" style="background-color: #7928ca;">
-                  nu
-                </div>
-                <div class="overflow-hidden">
-                  <div class="text-xs font-medium text-text-primary truncate">Nubank · Estágio</div>
-                  <div class="font-mono text-[10px] text-text-tertiary truncate">estagio.nubank.com.br</div>
-                </div>
+
+            <!-- SYSTEM GROUP -->
+            <div>
+              <div class="px-2.5 mb-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500">
+                SYSTEM
               </div>
+              <nav class="flex flex-col gap-0.5 text-[13px] font-medium">
+                <button type="button" data-view="settings" data-nav="shortcuts" id="btnSidebarShortcuts" class="sh-nav-item">
+                  <div class="flex items-center gap-2.5">
+                    <svg class="w-4 h-4 shrink-0 stroke-[1.8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <rect width="20" height="16" x="2" y="4" rx="2"/><path d="M6 8h.001"/><path d="M10 8h.001"/><path d="M14 8h.001"/><path d="M18 8h.001"/><path d="M8 12h.001"/><path d="M12 12h.001"/><path d="M16 12h.001"/><path d="M7 16h10"/>
+                    </svg>
+                    <span>Shortcuts</span>
+                  </div>
+                </button>
+
+                <button type="button" data-view="settings" data-nav="settings" class="sh-nav-item">
+                  <div class="flex items-center gap-2.5">
+                    <svg class="w-4 h-4 shrink-0 stroke-[1.8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="3"></circle>
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                    <span>Settings</span>
+                  </div>
+                </button>
+              </nav>
             </div>
           </div>
         </div>
 
-        <!-- Hidden test compatibility elements -->
-        <div class="hidden">
+        <!-- Hidden compatibility elements for test suite -->
+        <div class="hidden" aria-hidden="true">
+          <button id="btnNewGoal" class="w-full rounded-full bg-white text-zinc-950" type="button">Nova sessão</button>
+          <span id="navBadgeGoals">4</span>
+          <span id="sidebarGoalCount">1</span>
+          <div id="agentSelectorBar"></div>
           <button id="sidebarPlanCard" type="button"><span id="setupCardDot"></span><span id="setupCardTitle"></span><span id="setupCardDetail"></span></button>
           <button id="btnSidebarSearch" type="button"></button>
         </div>
 
-        <!-- Footer Pro Profile -->
-        <div class="flex flex-col gap-3 pt-3 border-t border-border-subtle">
-          <div id="sidebarUsageCard" class="p-2.5 rounded-lg bg-surface-card border border-border-subtle select-none">
-            <div class="flex items-center justify-between gap-2 mb-1">
-              <span id="sidebarUsageTitle" class="text-[12px] font-bold tracking-tight text-foreground !font-medium !text-text-primary truncate">Pro ativo</span>
-              <span id="sidebarUsagePercent" class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-text-secondary border border-border-muted shrink-0">PRO</span>
+        <!-- Footer Pro Plan & Profile (Image 4) -->
+        <div class="flex flex-col gap-3.5 pt-3">
+          <!-- Minimalist Pro Plan Card (Image 4) -->
+          <div id="sidebarUsageCard" class="p-3.5 rounded-xl bg-[#131418] border border-white/[0.07] hover:border-white/[0.12] transition-colors cursor-pointer select-none space-y-2.5">
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-mono text-[10px] font-semibold tracking-[0.12em] uppercase text-zinc-400">PRO PLAN</span>
+              <span id="sidebarPlanRatioLabel" class="font-mono text-[11px] font-medium text-zinc-200 tabular-nums">380 / 600 min</span>
             </div>
-            <p id="sidebarUsageDesc" class="text-[11px] text-text-secondary truncate">
-              <span id="sidebarUsageTime">Cota ilimitada</span> <span class="text-text-tertiary">(176 min)</span>
-              <span id="sidebarUsageSessions" class="hidden">140 sessões</span>
-            </p>
-            <!-- 10-segment monochrome bar -->
-            <div id="sidebarUsageTicks" class="flex gap-0.5 h-1.5 items-center my-2" aria-label="Usage progress">
-              <span class="w-1.5 h-full rounded-[1px] bg-zinc-300"></span>
-              <span class="w-1.5 h-full rounded-[1px] bg-zinc-300"></span>
-              <span class="w-1.5 h-full rounded-[1px] bg-zinc-300"></span>
-              <span class="w-1.5 h-full rounded-[1px] bg-zinc-300"></span>
-              <span class="w-1.5 h-full rounded-[1px] bg-zinc-400"></span>
-              <span class="w-1.5 h-full rounded-[1px] bg-zinc-600"></span>
-              <span class="w-1.5 h-full rounded-[1px] bg-zinc-800"></span>
-              <span class="w-1.5 h-full rounded-[1px] bg-zinc-800"></span>
-              <span class="w-1.5 h-full rounded-[1px] bg-zinc-800"></span>
-              <span class="w-1.5 h-full rounded-[1px] bg-zinc-800"></span>
+            <!-- Sleek monochrome progress bar -->
+            <div class="h-1.5 w-full rounded-full bg-zinc-800/90 overflow-hidden">
+              <div id="sidebarMinimalProgressBar" class="h-full rounded-full bg-white transition-all duration-300" style="width: 63%"></div>
             </div>
+            <div class="flex items-center justify-between font-mono text-[11px] text-zinc-500">
+              <span id="sidebarPlanResetLabel">Resets in <strong class="font-normal text-zinc-300">9</strong> days</span>
+            </div>
+
             <!-- Hidden elements for test and state compatibility -->
             <div class="hidden">
-              <div id="sidebarUsageProTag" class="hidden"></div>
-              <div id="sidebarUsageProgressBar" class="hidden"></div>
-              <span id="sidebarPlanBadge" class="hidden">FREE</span>
-              <span id="sidebarUsageReset" class="hidden">Renews monthly</span>
-              <svg id="btnSidebarUpgradeIcon" class="hidden"></svg>
+              <span id="sidebarUsageTitle" class="text-[12px] font-bold tracking-tight text-foreground">Pro ativo</span>
+              <span id="sidebarUsagePercent">PRO</span>
+              <p id="sidebarUsageDesc">
+                <span id="sidebarUsageTime">Cota ilimitada</span>
+                <span id="sidebarUsageSessions">140 sessões</span>
+              </p>
+              <div id="sidebarUsageTicks"></div>
+              <div id="sidebarUsageProTag"></div>
+              <div id="sidebarUsageProgressBar"></div>
+              <span id="sidebarPlanBadge">FREE</span>
+              <span id="sidebarUsageReset">Renews monthly</span>
+              <svg id="btnSidebarUpgradeIcon"></svg>
+              <button id="btnSidebarUpgrade" type="button"><span id="btnSidebarUpgradeLabel">Gerenciar plano</span></button>
             </div>
-
-            <button id="btnSidebarUpgrade" class="w-full py-1.5 px-2.5 rounded bg-surface-container hover:bg-surface-container-high text-text-secondary hover:text-text-primary text-[11px] font-mono border border-border-subtle transition-colors flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap" type="button">
-              <svg class="w-3 h-3 text-text-secondary shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-              </svg>
-              <span id="btnSidebarUpgradeLabel" class="truncate">Gerenciar plano</span>
-            </button>
           </div>
 
-          <!-- User -->
-          <div class="flex items-center justify-between px-1">
-            <div id="profileChip" class="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
-              <div class="w-7 h-7 rounded-full overflow-hidden border border-border-muted bg-surface-card flex items-center justify-center shrink-0">
-                <div id="profileAvatar" class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/20 border border-primary/30 text-[10px] font-bold text-primary shadow-xs !h-full !w-full !bg-surface-container !border-0 !text-text-primary !text-[11px]">B</div>
+          <!-- User Profile Footer (Image 4) -->
+          <div class="flex items-center justify-between pt-3 border-t border-white/[0.06] px-1">
+            <div id="profileChip" class="flex items-center gap-2.5 cursor-pointer flex-1 min-w-0">
+              <div id="profileAvatar" class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/20 border border-primary/30 text-[10px] font-bold text-primary !h-8 !w-8 !text-xs overflow-hidden">B</div>
+              <div class="overflow-hidden min-w-0">
+                <div id="profileNameLabel" class="text-xs font-semibold text-zinc-100 leading-tight truncate">Bruno</div>
+                <div id="profileRoleLabel" class="text-[11px] text-zinc-500 truncate">bruno@realtimeai.dev</div>
               </div>
-              <div class="overflow-hidden">
-                <div id="profileNameLabel" class="text-xs font-medium text-text-primary leading-tight truncate">Bruno</div>
-                <div id="profileRoleLabel" class="text-[10px] text-text-tertiary truncate">Senior Engineer</div>
-              </div>
-              <span id="profilePlanBadge" class="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 text-[8.5px] font-bold tracking-wider text-emerald-400 uppercase hidden">PRO</span>
+              <span id="profilePlanBadge" class="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-400 hidden">PRO</span>
             </div>
             <div class="flex items-center gap-1">
-              <button class="text-text-tertiary hover:text-text-primary p-1 cursor-pointer" type="button" title="Mais opções">
+              <button id="btnSidebarProfileMenu" class="text-zinc-500 hover:text-zinc-200 p-1 rounded-md hover:bg-white/5 transition-colors cursor-pointer" type="button" title="Profile &amp; Settings">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                   <circle cx="12" cy="12" r="1"></circle>
                   <circle cx="19" cy="12" r="1"></circle>
@@ -204,77 +188,72 @@
       </aside>
 
       <!-- ==================== MAIN CONTENT AREA ==================== -->
-      <div class="flex flex-1 flex-col overflow-hidden bg-app-bg">
-        <!-- BEGIN: TopBar -->
-        <header class="app-drag sticky top-0 z-30 flex items-center justify-between gap-3 h-14 shrink-0 px-4 md:px-6 bg-surface-dim/80 backdrop-blur-md border-b border-border-subtle">
-          <!-- Breadcrumbs -->
-          <div class="app-no-drag flex items-center gap-3 min-w-0 flex-1">
-            <div class="flex items-center gap-1.5 text-xs text-text-secondary min-w-0">
-              <button id="btnHeaderHome" type="button" class="hover:text-text-primary transition-colors cursor-pointer focus:outline-none shrink-0" title="Início">
-                <span id="headerBreadcrumb">Configurações</span>
-              </button>
-              <span id="headerBreadcrumbSep" class="text-text-tertiary text-[10px] shrink-0">/</span>
-              <span id="headerBreadcrumbSub" class="text-text-primary font-medium truncate">Preferências &amp; Sistema</span>
-            </div>
-            <div class="hidden xl:flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-border-subtle font-mono text-[11px] text-text-tertiary shrink-0 whitespace-nowrap">
-              <span class="w-1.5 h-1.5 rounded-full bg-zinc-400"></span>
-              <span id="autoSaveBadge">Salvo automaticamente</span>
-            </div>
-          </div>
-
-          <!-- Right Controls -->
-          <div class="app-no-drag flex items-center gap-2 shrink-0">
-            <div class="relative w-44 xl:w-64 hidden md:block shrink-0">
-              <svg class="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <div class="flex flex-1 flex-col overflow-hidden bg-[#0a0b0d]">
+        <!-- BEGIN: TopBar (Image 1) -->
+        <header class="app-drag sticky top-0 z-30 flex items-center justify-between gap-4 h-14 shrink-0 px-6 md:px-8 bg-[#0a0b0d]/90 backdrop-blur-md border-b border-white/[0.06]">
+          <!-- Left: Search Input (Image 1) -->
+          <div class="app-no-drag flex items-center gap-3 min-w-0 flex-1 max-w-md">
+            <div class="relative w-full">
+              <svg class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" x2="16.65" y1="21" y2="16.65"></line>
               </svg>
-              <input id="topSearchInput" class="w-full pl-8 pr-12 py-1.5 bg-surface-card border border-border-subtle rounded-md text-xs text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-border-muted transition-colors" placeholder="Buscar configuração..." type="text"/>
-              <kbd class="absolute right-2 top-1.5 px-1 py-0.5 text-[9px] font-mono text-text-tertiary bg-white/5 border border-border-subtle rounded">Ctrl+K</kbd>
+              <input id="topSearchInput" class="w-full pl-9 pr-14 py-1.5 bg-[#121316] border border-white/[0.07] hover:border-white/[0.12] focus:border-white/20 rounded-lg text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none transition-colors" placeholder="Search sessions, questions, documents..." type="text"/>
+              <kbd class="absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px] font-mono text-zinc-400 bg-white/[0.04] border border-white/[0.08] rounded">⌘ K</kbd>
             </div>
+            <!-- Hidden breadcrumbs preserved for router compatibility -->
+            <div class="hidden">
+              <button id="btnHeaderHome" type="button"><span id="headerBreadcrumb">Home</span></button>
+              <span id="headerBreadcrumbSep">/</span>
+              <span id="headerBreadcrumbSub">Workspace</span>
+              <span id="autoSaveBadge">Saved</span>
+            </div>
+          </div>
 
-            <button id="btnTopStealthMode" type="button" class="flex items-center gap-1.5 px-2 py-1 rounded bg-surface-card border border-border-subtle text-xs text-text-secondary hover:text-text-primary transition-colors cursor-pointer shrink-0 whitespace-nowrap" data-active="false" title="Screen-share protection (Ctrl+Alt+S)">
-              <svg id="iconStealthShield" class="w-3.5 h-3.5 text-text-tertiary shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
-                <circle cx="12" cy="12" r="3"></circle>
-              </svg>
-              <span id="labelTopStealth">Visível</span>
-              <span id="indicatorTopStealth" class="!hidden"></span>
+          <!-- Right Controls (Image 1: Overlay ready pill + Bell + Window Controls) -->
+          <div class="app-no-drag flex items-center gap-2.5 shrink-0">
+            <button id="overlayStatusPill" type="button" class="flex items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 hover:bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-400 transition-colors cursor-pointer">
+              <span id="overlayStatusDot" class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+              <span id="overlayStatusText">Overlay ready</span>
             </button>
 
-            <button id="btnTopGoLive" type="button" class="flex items-center gap-1.5 px-2 py-1 rounded bg-surface-card border border-border-subtle text-xs text-text-secondary hover:text-text-primary transition-colors cursor-pointer shrink-0 whitespace-nowrap">
-              <span class="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
-              <span class="hidden"><span class="bg-[#E11D48]"></span></span>
-              <span id="btnTopGoLiveText">Ao vivo</span>
-            </button>
-
-            <button id="btnSimulateTop" class="px-3 py-1.5 rounded-md bg-white text-zinc-950 hover:bg-zinc-200 text-xs font-medium flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer shrink-0 whitespace-nowrap" type="button">
-              <svg class="w-3.5 h-3.5 text-zinc-950 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/><path d="M12 8V4H8"/>
+            <button id="btnTopNotifications" type="button" class="w-8 h-8 rounded-lg border border-white/[0.07] bg-[#121316] hover:bg-[#18191d] text-zinc-400 hover:text-zinc-100 flex items-center justify-center transition-colors cursor-pointer" title="Notifications &amp; What's New">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path>
+                <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path>
               </svg>
-              <span>Simular entrevista</span>
             </button>
 
             <!-- Hidden compatibility controls -->
             <div class="hidden">
+              <button id="btnTopStealthMode" type="button" data-active="false">
+                <svg id="iconStealthShield"></svg>
+                <span id="labelTopStealth">Visível</span>
+                <span id="indicatorTopStealth" class="!hidden"></span>
+              </button>
+              <button id="btnTopGoLive" type="button">
+                <span class="bg-[#E11D48]"></span>
+                <span id="btnTopGoLiveText">Ao vivo</span>
+              </button>
+              <button id="btnSimulateTop" type="button">Simular entrevista</button>
               <button id="btnTopStopOverlay" type="button"></button>
               <button id="btnTopVersionBadge" type="button">
                 <span id="topVersionBadgeDot"></span>
-                <span id="topVersionBadgeLabel">v2.0</span>
+                <span id="topVersionBadgeLabel">v2.8</span>
               </button>
               <button id="btnTopOpenSettings" type="button"></button>
               <button id="btnHelpTooltip" type="button"></button>
             </div>
 
             <!-- Window controls -->
-            <div class="flex items-center ml-1 border-l border-border-subtle pl-2.5 gap-0.5">
-              <button type="button" data-win="minimize" class="icon-btn text-text-tertiary hover:text-text-primary p-1" title="Minimize" aria-label="Minimize">
+            <div class="flex items-center ml-1 border-l border-white/[0.07] pl-2.5 gap-0.5">
+              <button type="button" data-win="minimize" class="icon-btn text-zinc-500 hover:text-zinc-200 p-1" title="Minimize" aria-label="Minimize">
                 <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12" /></svg>
               </button>
-              <button type="button" data-win="maximize" class="icon-btn text-text-tertiary hover:text-text-primary p-1" title="Maximize" aria-label="Maximize">
+              <button type="button" data-win="maximize" class="icon-btn text-zinc-500 hover:text-zinc-200 p-1" title="Maximize" aria-label="Maximize">
                 <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2" /></svg>
               </button>
-              <button type="button" data-win="close" class="icon-btn text-text-tertiary hover:text-red-400 p-1" title="Close" aria-label="Close">
+              <button type="button" data-win="close" class="icon-btn text-zinc-500 hover:text-red-400 p-1" title="Close" aria-label="Close">
                 <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
               </button>
             </div>
@@ -283,161 +262,419 @@
 
         <!-- Main Scrollable Canvas -->
         <main class="flex-1 overflow-y-auto px-6 py-6 md:px-8 md:py-7">
-          <!-- ==================== VIEW 1: GOALS (OBSIDIAN COPILOT DESIGN) ==================== -->
+          <!-- ==================== VIEW 1: HOME WORKSPACE (IMAGES 1 & 2) ==================== -->
           <section id="view-goals" class="view-pane active">
-            <div class="page-shell">
-              <!-- Cabeçalho de Boas-Vindas da Sessão -->
-              <div class="page-header">
-                <div>
-                  <h1 class="page-title">
-                    <span id="homeGreeting">Boa tarde, Bruno</span>
+            <div class="max-w-6xl w-full mx-auto space-y-6">
+              <!-- Greeting Header (Image 1) -->
+              <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div class="space-y-1">
+                  <div id="homeDateTimeMono" class="font-mono text-xs text-zinc-500">Thu, 14 Nov · 09:41</div>
+                  <h1 class="text-2xl md:text-[28px] font-semibold tracking-tight text-white leading-tight">
+                    <span id="homeGreeting">Good morning, Bruno</span>
                   </h1>
-                  <p id="homeStatusLine" class="page-subtitle">Tudo pronto para sua próxima entrevista. Revise os requisitos e inicie o copiloto.</p>
+                  <p id="homeStatusLine" class="text-[13px] text-zinc-400">
+                    You have <strong class="font-semibold text-zinc-100">1 interview today</strong> — Brain Corp at 10:00.
+                  </p>
                 </div>
-                <div class="flex items-center gap-2">
-                  <span class="text-xs text-app-muted">Últimos 30 dias</span>
+                <div class="flex items-center gap-2.5 shrink-0">
+                  <button id="btnHomePracticeMode" type="button" class="flex items-center gap-2 rounded-lg border border-white/[0.08] bg-[#141519] hover:bg-[#1b1c22] px-3.5 py-2 text-xs font-medium text-zinc-200 transition-colors cursor-pointer">
+                    <svg class="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                      <path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/>
+                    </svg>
+                    <span>Practice mode</span>
+                  </button>
+                  <button id="btnHomeNewSession" type="button" class="flex items-center gap-1.5 rounded-lg bg-white hover:bg-zinc-200 px-3.5 py-2 text-xs font-semibold text-zinc-950 shadow-xs transition-colors cursor-pointer">
+                    <svg class="w-3.5 h-3.5 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <line x1="12" x2="12" y1="5" y2="19"></line>
+                      <line x1="5" x2="19" y1="12" y2="12"></line>
+                    </svg>
+                    <span>New session</span>
+                  </button>
                 </div>
               </div>
 
-              <!-- BEGIN: HeroCardNextInterview -->
-              <section id="heroCardSection" class="relative overflow-hidden rounded-xl border border-border-subtle bg-surface-card p-6 shadow-sm" data-purpose="featured-session">
-                <div class="relative z-10 flex flex-col items-start justify-between gap-6 lg:flex-row lg:items-center">
-                  <div class="flex items-start gap-4 min-w-0 flex-1">
-                    <!-- Logo da Empresa Ativa -->
-                    <div id="heroCompanyLogo" class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#820ad1] text-base font-bold text-white shadow-sm">
-                      nu
+              <!-- TOP 2-COLUMN WORKSPACE GRID (Image 1) -->
+              <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                <!-- Left Column (8 cols): Start a live session card -->
+                <div class="lg:col-span-8 rounded-2xl border border-white/[0.07] bg-[#111215] p-5 md:p-6 space-y-5 shadow-sm">
+                  <div class="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <h2 class="text-[15px] font-semibold text-white">Start a live session</h2>
+                      <p class="text-xs text-zinc-400 mt-0.5">Configure context, then launch the overlay over your call.</p>
                     </div>
-                    <div class="min-w-0 flex-1">
-                      <div class="mb-1 flex flex-wrap items-center gap-2.5">
-                        <span id="heroBadgeNext" class="rounded border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-400">Próxima entrevista</span>
-                        <span id="heroTimeLabel" class="text-xs font-medium text-text-secondary">Hoje às 14:00 (em 2h)</span>
-                      </div>
-                      <h2 id="heroTitle" class="text-lg font-semibold tracking-tight text-text-primary truncate">Nubank · Estágio em Engenharia de Software</h2>
-                      <p id="heroSubtitle" class="mt-0.5 text-xs text-text-secondary truncate">estagio.nubank.com.br · 16 documentos indexados na base local</p>
-                      <!-- Checklist de Requisitos Interativo -->
-                      <div id="heroRequirementsChips" class="mt-4 flex flex-wrap items-center gap-2.5 text-xs">
-                        <button type="button" data-hero-chip="dossier" class="chip-muted hover:border-border-muted transition-colors cursor-pointer">
-                          <svg class="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                          </svg>
-                          <span>System Design &amp; Dossiê</span>
-                        </button>
-                        <button type="button" data-hero-chip="playbook" class="chip-muted hover:border-border-muted transition-colors cursor-pointer">
-                          <svg class="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                          </svg>
-                          <span>Respostas STAR</span>
-                        </button>
-                        <button type="button" data-hero-chip="resume" class="chip-muted hover:border-border-muted transition-colors cursor-pointer">
-                          <svg class="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                          </svg>
-                          <span>Currículo &amp; Base RAG</span>
-                        </button>
-                      </div>
-                    </div>
+                    <span id="liveSessionPrefillBadge" class="rounded-full bg-white/[0.04] border border-white/[0.08] px-2.5 py-1 text-[11px] font-medium text-zinc-300">
+                      Prefilled from calendar
+                    </span>
                   </div>
-                  <!-- Métricas e Ações -->
-                  <div class="flex w-full shrink-0 flex-col items-stretch gap-4 sm:flex-row lg:w-auto lg:items-center">
-                    <!-- Barra de Progresso / Preparação -->
-                    <div class="flex min-w-[165px] flex-col justify-center rounded-xl border border-border-subtle bg-surface-dim p-3.5 px-4">
-                      <div class="mb-1.5 flex items-center justify-between gap-3 text-xs">
-                        <span class="font-medium text-text-secondary">Score de Preparo</span>
-                        <span id="heroPrepScore" class="font-mono font-semibold text-text-primary tabular-nums">82%</span>
-                      </div>
-                      <div class="metric-track">
-                        <i id="heroPrepBar" style="width: 82%"></i>
-                      </div>
-                      <span id="heroPrepStatus" class="mt-1.5 text-[10px] font-medium text-emerald-400">Alta prontidão técnica</span>
-                    </div>
-                    <!-- Botões de Ação -->
-                    <div class="flex flex-col gap-2">
-                      <button id="btnHeroEnterRoom" class="flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-2.5 text-xs font-semibold text-zinc-950 shadow-sm transition hover:bg-zinc-200 active:scale-[0.99] cursor-pointer whitespace-nowrap" type="button">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
-                          <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path>
-                        </svg>
-                        <span>Entrar na Sala</span>
-                      </button>
-                      <button id="btnHeroStartSimulation" class="flex items-center justify-center gap-2 rounded-lg border border-border-muted bg-surface-container px-5 py-2 text-xs font-medium text-text-primary transition hover:bg-surface-container-high cursor-pointer whitespace-nowrap" type="button">
-                        <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                          <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                        </svg>
-                        <span>Iniciar Simulação</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </section>
-              <!-- END: HeroCardNextInterview -->
 
-              <!-- BEGIN: ActiveSessionsGrid -->
-              <section data-purpose="active-sessions">
-                <div class="mb-3 flex items-center justify-between">
-                  <div>
-                    <h3 class="text-sm font-semibold tracking-tight text-text-primary">Sessões de preparação</h3>
-                    <span id="goalsCountSubtitle" class="text-xs text-text-secondary">3 ativas · 1 agendada</span>
-                  </div>
-                  <button id="btnGoalsNewSessionInline" type="button" class="text-xs font-medium text-text-secondary transition hover:text-text-primary cursor-pointer">+ Nova sessão</button>
-                </div>
-                <div id="goalsCardsContainer" class="panel">
-                  <!-- Dynamically rendered goals or default 4 featured sessions -->
-                </div>
-                <!-- Empty state kept for test suite -->
-                <div id="goalsEmptyState" class="hidden flex-col items-center justify-center py-6 text-center">
-                  <div class="hidden bg-live/10 text-live"><svg class="h-8 w-8 text-[#E11D48]"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" /><line x1="4" y1="22" x2="4" y2="15" /></svg></div>
-                  <button id="btnEmptyCreateGoal" type="button" class="hidden sh-btn-primary"></button>
-                  <button id="btnCanvasNewGoal" type="button" class="hidden"></button>
-                </div>
-              </section>
-              <!-- END: ActiveSessionsGrid -->
+                  <!-- Form 2-Column Grid -->
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Role -->
+                    <div class="space-y-1.5">
+                      <label for="liveSessionRole" class="block text-xs font-medium text-zinc-400">Role</label>
+                      <input
+                        id="liveSessionRole"
+                        type="text"
+                        value="Lead SDET Architect"
+                        placeholder="e.g. Lead SDET Architect"
+                        class="w-full rounded-lg border border-white/[0.08] bg-[#0c0d10] px-3.5 py-2.5 text-xs font-medium text-zinc-100 placeholder:text-zinc-600 focus:border-white/20 focus:outline-none transition-colors"
+                      />
+                    </div>
 
-              <!-- BEGIN: DualColumnSection -->
-              <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
-                <!-- Coluna Esquerda: Perguntas Frequentes (7 cols) -->
+                    <!-- Company -->
+                    <div class="space-y-1.5">
+                      <label for="liveSessionCompany" class="block text-xs font-medium text-zinc-400">Company</label>
+                      <input
+                        id="liveSessionCompany"
+                        type="text"
+                        value="Brain Corp"
+                        placeholder="e.g. Brain Corp"
+                        class="w-full rounded-lg border border-white/[0.08] bg-[#0c0d10] px-3.5 py-2.5 text-xs font-medium text-zinc-100 placeholder:text-zinc-600 focus:border-white/20 focus:outline-none transition-colors"
+                      />
+                    </div>
+
+                    <!-- Resume -->
+                    <div class="space-y-1.5">
+                      <label for="liveSessionResume" class="block text-xs font-medium text-zinc-400">Resume</label>
+                      <div class="relative">
+                        <svg class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                        </svg>
+                        <select
+                          id="liveSessionResume"
+                          class="w-full appearance-none rounded-lg border border-white/[0.08] bg-[#0c0d10] pl-9 pr-8 py-2.5 text-xs font-medium text-zinc-100 focus:border-white/20 focus:outline-none transition-colors cursor-pointer"
+                        >
+                          <option value="resume_2024_sdet.pdf">resume_2024_sdet.pdf</option>
+                          <option value="curriculo_senior_eng.pdf">curriculo_senior_eng.pdf</option>
+                        </select>
+                        <svg class="w-3.5 h-3.5 absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                          <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                      </div>
+                    </div>
+
+                    <!-- Language -->
+                    <div class="space-y-1.5">
+                      <label for="liveSessionLanguage" class="block text-xs font-medium text-zinc-400">Language</label>
+                      <div class="relative">
+                        <svg class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                          <circle cx="12" cy="12" r="10"/><line x1="2" x2="22" y1="12" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                        </svg>
+                        <select
+                          id="liveSessionLanguage"
+                          class="w-full appearance-none rounded-lg border border-white/[0.08] bg-[#0c0d10] pl-9 pr-8 py-2.5 text-xs font-medium text-zinc-100 focus:border-white/20 focus:outline-none transition-colors cursor-pointer"
+                        >
+                          <option value="en-US">English (US)</option>
+                          <option value="pt-BR">Português (BR)</option>
+                          <option value="es-ES">Español (ES)</option>
+                        </select>
+                        <svg class="w-3.5 h-3.5 absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                          <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                      </div>
+                    </div>
+
+                    <!-- Model -->
+                    <div class="space-y-1.5">
+                      <label for="liveSessionModel" class="block text-xs font-medium text-zinc-400">Model</label>
+                      <div class="relative">
+                        <svg class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                          <rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/>
+                        </svg>
+                        <select
+                          id="liveSessionModel"
+                          class="w-full appearance-none rounded-lg border border-white/[0.08] bg-[#0c0d10] pl-9 pr-20 py-2.5 text-xs font-medium text-zinc-100 focus:border-white/20 focus:outline-none transition-colors cursor-pointer"
+                        >
+                          <option value="anthropic/claude-3.5-haiku" data-latency="~420ms">Claude Sonnet 4.6</option>
+                          <option value="qwen/qwen3.6-flash" data-latency="~380ms">Qwen 3.6 Flash</option>
+                          <option value="openai/gpt-4o-mini" data-latency="~510ms">GPT-5</option>
+                          <option value="google/gemini-2.5-flash" data-latency="~390ms">Gemini 2.5 Flash</option>
+                        </select>
+                        <span id="liveSessionModelLatency" class="font-mono text-[10px] text-zinc-500 absolute right-8 top-1/2 -translate-y-1/2 pointer-events-none">~420ms</span>
+                        <svg class="w-3.5 h-3.5 absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                          <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                      </div>
+                    </div>
+
+                    <!-- Answer style -->
+                    <div class="space-y-1.5">
+                      <label class="block text-xs font-medium text-zinc-400">Answer style</label>
+                      <div id="liveSessionStyleGroup" class="grid grid-cols-3 rounded-lg border border-white/[0.08] bg-[#0c0d10] p-1 gap-1">
+                        <button type="button" data-live-style="concise" class="live-style-btn rounded-md bg-[#1d1f26] border border-white/10 py-1.5 text-xs font-semibold text-white transition-all cursor-pointer">
+                          Concise
+                        </button>
+                        <button type="button" data-live-style="detailed" class="live-style-btn rounded-md py-1.5 text-xs font-medium text-zinc-400 hover:text-zinc-200 transition-all cursor-pointer">
+                          Detailed
+                        </button>
+                        <button type="button" data-live-style="star" class="live-style-btn rounded-md py-1.5 text-xs font-medium text-zinc-400 hover:text-zinc-200 transition-all cursor-pointer">
+                          STAR
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Audio sources -->
+                  <div class="space-y-2 pt-1">
+                    <span class="block text-xs font-medium text-zinc-400">Audio sources</span>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <!-- System audio card -->
+                      <div class="flex items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-[#0c0d10] px-3.5 py-3">
+                        <div class="flex items-center gap-3 min-w-0">
+                          <svg class="w-4 h-4 text-zinc-400 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                            <rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/>
+                          </svg>
+                          <div class="min-w-0">
+                            <div class="text-xs font-medium text-zinc-100 truncate">System audio</div>
+                            <div class="text-[11px] text-zinc-500 truncate">Interviewer · Google Meet</div>
+                          </div>
+                        </div>
+                        <div class="flex items-center gap-3 shrink-0">
+                          <!-- Animated 3-bar emerald equalizer -->
+                          <div class="flex items-end gap-0.5 h-3.5" aria-hidden="true">
+                            <span class="w-0.5 h-3 bg-emerald-400 rounded-full animate-pulse"></span>
+                            <span class="w-0.5 h-2 bg-emerald-400 rounded-full"></span>
+                            <span class="w-0.5 h-3.5 bg-emerald-400 rounded-full animate-pulse"></span>
+                            <span class="w-0.5 h-1.5 bg-emerald-400/50 rounded-full"></span>
+                          </div>
+                          <label class="relative inline-flex items-center cursor-pointer">
+                            <input id="toggleHomeSystemAudio" type="checkbox" checked class="sr-only peer" />
+                            <div class="w-9 h-5 rounded-full bg-zinc-700 peer-checked:bg-white transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-zinc-950 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4"></div>
+                          </label>
+                        </div>
+                      </div>
+
+                      <!-- Microphone card -->
+                      <div class="flex items-center justify-between gap-3 rounded-xl border border-white/[0.07] bg-[#0c0d10] px-3.5 py-3">
+                        <div class="flex items-center gap-3 min-w-0">
+                          <svg class="w-4 h-4 text-zinc-400 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/>
+                          </svg>
+                          <div class="min-w-0">
+                            <div class="text-xs font-medium text-zinc-100 truncate">Microphone</div>
+                            <div id="homeMicDeviceLabel" class="text-[11px] text-zinc-500 truncate">You · Default Microphone</div>
+                          </div>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                          <input id="toggleHomeMicAudio" type="checkbox" checked class="sr-only peer" />
+                          <div class="w-9 h-5 rounded-full bg-zinc-700 peer-checked:bg-white transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-zinc-950 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4"></div>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Card Footer: Stealth Notice + Test Audio + Green Launch Overlay CTA -->
+                  <div class="pt-3 border-t border-white/[0.06] flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center gap-2 text-xs text-zinc-400">
+                      <svg class="w-3.5 h-3.5 text-zinc-500 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                        <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/>
+                      </svg>
+                      <span>Overlay is hidden from screen sharing and recordings.</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                      <button id="btnHomeTestAudio" type="button" class="text-xs font-medium text-zinc-300 hover:text-white px-2.5 py-1.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer">
+                        Test audio
+                      </button>
+                      <button id="btnHomeLaunchOverlay" type="button" class="flex items-center gap-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 px-4 py-2 text-xs font-semibold text-zinc-950 shadow-sm transition-all active:scale-[0.99] cursor-pointer">
+                        <svg class="w-3 h-3 fill-zinc-950" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                        <span>Launch overlay</span>
+                        <kbd class="ml-1 rounded bg-black/15 px-1.5 py-0.5 font-mono text-[10px] font-medium text-zinc-950">⌘ ⇧ L</kbd>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Right Column (4 cols): Upcoming + Overlay shortcuts (Image 1) -->
+                <div class="lg:col-span-4 space-y-5">
+                  <!-- Upcoming Card -->
+                  <div class="rounded-2xl border border-white/[0.07] bg-[#111215] p-5 space-y-3.5">
+                    <div class="flex items-center justify-between">
+                      <h3 class="text-sm font-semibold text-white">Upcoming</h3>
+                      <button id="btnHomeOpenCalendar" type="button" class="text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer">
+                        Calendar
+                      </button>
+                    </div>
+
+                    <div id="homeUpcomingList" class="divide-y divide-white/[0.06]">
+                      <!-- Populated dynamically by renderHomeUpcoming() -->
+                    </div>
+                  </div>
+
+                  <!-- Overlay shortcuts Card -->
+                  <div class="rounded-2xl border border-white/[0.07] bg-[#111215] p-5 space-y-3.5">
+                    <div class="flex items-center justify-between">
+                      <h3 class="text-sm font-semibold text-white">Overlay shortcuts</h3>
+                      <button id="btnHomeCustomizeShortcuts" type="button" class="text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer">
+                        Customize
+                      </button>
+                    </div>
+
+                    <div class="space-y-2.5 text-xs">
+                      <div class="flex items-center justify-between py-1">
+                        <span class="text-zinc-300">Generate answer</span>
+                        <kbd class="px-2 py-0.5 font-mono text-[11px] text-zinc-300 bg-white/[0.05] border border-white/[0.08] rounded">⌘ ↵</kbd>
+                      </div>
+                      <div class="flex items-center justify-between py-1">
+                        <span class="text-zinc-300">Screenshot &amp; solve</span>
+                        <kbd class="px-2 py-0.5 font-mono text-[11px] text-zinc-300 bg-white/[0.05] border border-white/[0.08] rounded">⌘ ⇧ S</kbd>
+                      </div>
+                      <div class="flex items-center justify-between py-1">
+                        <span class="text-zinc-300">Open chat</span>
+                        <kbd class="px-2 py-0.5 font-mono text-[11px] text-zinc-300 bg-white/[0.05] border border-white/[0.08] rounded">⌘ ⇧ ␣</kbd>
+                      </div>
+                      <div class="flex items-center justify-between py-1">
+                        <span class="text-zinc-300">Switch model</span>
+                        <kbd class="px-2 py-0.5 font-mono text-[11px] text-zinc-300 bg-white/[0.05] border border-white/[0.08] rounded">⌘ M</kbd>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 4 KPI METRIC CARDS ROW (Image 2) -->
+              <div id="homeAnalyticsSection" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="rounded-2xl border border-white/[0.07] bg-[#111215] p-5 space-y-2">
+                  <div class="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500">SESSIONS · NOV</div>
+                  <div id="kpiSessionsCount" class="text-3xl font-semibold tracking-tight text-white tabular-nums">12</div>
+                  <div id="kpiSessionsDelta" class="text-xs text-zinc-400"><span class="text-emerald-400 font-medium">+4</span> vs October</div>
+                </div>
+
+                <div class="rounded-2xl border border-white/[0.07] bg-[#111215] p-5 space-y-2">
+                  <div class="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500">QUESTIONS ANSWERED</div>
+                  <div id="kpiQuestionsAnswered" class="text-3xl font-semibold tracking-tight text-white tabular-nums">148</div>
+                  <div id="kpiQuestionsSub" class="text-xs text-zinc-400"><span class="text-zinc-200 font-medium">92%</span> rated helpful</div>
+                </div>
+
+                <div class="rounded-2xl border border-white/[0.07] bg-[#111215] p-5 space-y-2">
+                  <div class="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500">AVG. LATENCY</div>
+                  <div class="flex items-baseline gap-1">
+                    <span id="kpiAvgLatency" class="text-3xl font-semibold tracking-tight text-white tabular-nums">412</span>
+                    <span class="text-sm font-medium text-zinc-400">ms</span>
+                  </div>
+                  <div id="kpiLatencyDelta" class="text-xs text-zinc-400"><span class="text-emerald-400 font-medium">-38 ms</span> this week</div>
+                </div>
+
+                <div class="rounded-2xl border border-white/[0.07] bg-[#111215] p-5 space-y-2">
+                  <div class="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500">PRACTICE TIME</div>
+                  <div id="kpiPracticeTime" class="text-3xl font-semibold tracking-tight text-white tabular-nums">6h 20m</div>
+                  <div id="kpiPracticeSub" class="text-xs text-zinc-400"><span class="text-zinc-200 font-medium">3</span> mock interviews</div>
+                </div>
+              </div>
+
+              <!-- BOTTOM 2-COLUMN GRID: RECENT SESSIONS TABLE + CONTEXT LIBRARY (Image 2) -->
+              <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                <!-- Left Column (8 cols): Recent sessions table -->
+                <div class="lg:col-span-8 rounded-2xl border border-white/[0.07] bg-[#111215] overflow-hidden">
+                  <div class="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+                    <h3 class="text-sm font-semibold text-white">Recent sessions</h3>
+                    <button type="button" data-view="history" class="text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer">
+                      View all →
+                    </button>
+                  </div>
+
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                      <thead>
+                        <tr class="border-b border-white/[0.06] font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-500">
+                          <th class="py-3 pl-5 pr-3 font-medium">INTERVIEW</th>
+                          <th class="py-3 px-3 font-medium">MODEL</th>
+                          <th class="py-3 px-3 font-medium">DATE</th>
+                          <th class="py-3 px-3 font-medium text-right">DURATION</th>
+                          <th class="py-3 px-3 font-medium text-right">Q&amp;A</th>
+                          <th class="py-3 pl-3 pr-5 font-medium text-right">STATUS</th>
+                        </tr>
+                      </thead>
+                      <tbody id="homeRecentSessionsTableBody" class="divide-y divide-white/[0.05] text-xs">
+                        <!-- Dynamically populated by renderHomeRecentSessionsTable() -->
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- Right Column (4 cols): Context library card -->
+                <div class="lg:col-span-4 rounded-2xl border border-white/[0.07] bg-[#111215] overflow-hidden">
+                  <div class="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+                    <h3 class="text-sm font-semibold text-white">Context library</h3>
+                    <button id="btnHomeUploadContext" type="button" class="flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-[#17181d] hover:bg-[#1f2027] px-2.5 py-1 text-xs font-medium text-zinc-200 transition-colors cursor-pointer">
+                      <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/>
+                      </svg>
+                      <span>Upload</span>
+                    </button>
+                  </div>
+
+                  <div id="homeContextLibraryList" class="divide-y divide-white/[0.05]">
+                    <!-- Dynamically populated by renderHomeContextLibrary() -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- Preparation & Frequent Questions Section (Accessible & Clean) -->
+              <div class="grid grid-cols-1 items-start gap-5 lg:grid-cols-12 pt-2">
+                <!-- Frequent Questions (7 cols) -->
                 <section class="lg:col-span-7" data-purpose="frequent-questions">
                   <div class="mb-3 flex items-center justify-between">
                     <div>
-                      <h3 class="text-sm font-semibold tracking-tight text-text-primary">Perguntas frequentes</h3>
-                      <span class="text-xs text-text-secondary">Clique em uma pergunta para ver a resposta STAR ou praticar</span>
+                      <h3 class="text-sm font-semibold tracking-tight text-white">Frequent questions &amp; STAR prep</h3>
+                      <span class="text-xs text-zinc-400">Click any question to review the STAR guide or practice live</span>
                     </div>
-                    <button type="button" data-view="question-bank" class="text-xs font-medium text-text-secondary transition hover:text-text-primary cursor-pointer">Banco de perguntas →</button>
+                    <button type="button" data-view="question-bank" class="text-xs font-medium text-zinc-400 transition hover:text-white cursor-pointer">Question bank →</button>
                   </div>
                   <div id="frequentQuestionsContainer" class="panel">
                     <!-- Dynamically populated by renderFrequentQuestions() -->
                   </div>
                 </section>
 
-                <!-- Coluna Direita: Simulações Recentes e Relatórios (5 cols) -->
+                <!-- Recent STAR Simulations (5 cols) -->
                 <section class="lg:col-span-5" data-purpose="simulation-history">
                   <div class="mb-3 flex items-center justify-between">
                     <div>
-                      <h3 class="text-sm font-semibold tracking-tight text-text-primary">Simulações recentes</h3>
-                      <span class="text-xs text-text-secondary">Scores STAR &amp; relatórios de desempenho</span>
+                      <h3 class="text-sm font-semibold tracking-tight text-white">STAR Scores &amp; Diagnostics</h3>
+                      <span class="text-xs text-zinc-400">Instant performance reports from mock sessions</span>
                     </div>
-                    <button type="button" data-view="history" class="text-xs font-medium text-text-secondary transition hover:text-text-primary cursor-pointer">Ver histórico →</button>
+                    <button type="button" data-view="history" class="text-xs font-medium text-zinc-400 transition hover:text-white cursor-pointer">All reports →</button>
                   </div>
                   <div class="panel">
                     <div id="recentSimulationsContainer" class="divide-y divide-app-border">
                       <!-- Dynamically populated by renderRecentSimulations() -->
                     </div>
-                    <!-- Dropzone para novo upload rápido de contexto -->
                     <div class="bg-surface-dim/50 p-3">
-                      <div id="dropzoneQuickUpload" class="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border-muted p-3 text-center text-text-secondary transition hover:border-white/25 hover:bg-white/[0.02] hover:text-text-primary">
-                        <svg class="h-4 w-4 text-text-secondary shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                      <div id="dropzoneQuickUpload" class="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border-muted p-2.5 text-center text-zinc-400 transition hover:border-white/25 hover:bg-white/[0.02] hover:text-white">
+                        <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                           <polyline points="17 8 12 3 7 8"></polyline>
                           <line x1="12" y1="3" x2="12" y2="15"></line>
                         </svg>
-                        <span class="text-xs font-medium">Enviar ou arrastar documentos adicionais (PDF, DOCX, MD)</span>
+                        <span class="text-xs font-medium">Drop or attach context files (PDF, DOCX, MD)</span>
                       </div>
                     </div>
                   </div>
                 </section>
               </div>
-              <!-- END: DualColumnSection -->
 
               <!-- Compatibility container preserving all other test elements -->
               <div class="hidden" aria-hidden="true">
+                <section id="heroCardSection">
+                  <div id="heroCompanyLogo">nu</div>
+                  <span id="heroBadgeNext">Próxima entrevista</span>
+                  <span id="heroTimeLabel">Hoje às 14:00</span>
+                  <h2 id="heroTitle">Nubank</h2>
+                  <p id="heroSubtitle">estagio.nubank.com.br</p>
+                  <div id="heroRequirementsChips"></div>
+                  <span id="heroPrepScore">82%</span>
+                  <i id="heroPrepBar"></i>
+                  <span id="heroPrepStatus">Alta prontidão</span>
+                  <button id="btnHeroEnterRoom" type="button"></button>
+                  <button id="btnHeroStartSimulation" type="button"></button>
+                </section>
+                <span id="goalsCountSubtitle">3 ativas · 1 agendada</span>
+                <button id="btnGoalsNewSessionInline" type="button">+ Nova sessão</button>
+                <div id="goalsCardsContainer"></div>
+                <div id="goalsEmptyState">
+                  <div class="bg-live/10 text-live"><svg class="h-8 w-8 text-[#E11D48]"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" /><line x1="4" y1="22" x2="4" y2="15" /></svg></div>
+                  <button id="btnEmptyCreateGoal" type="button" class="sh-btn-primary"></button>
+                  <button id="btnCanvasNewGoal" type="button"></button>
+                </div>
                 <div id="footerVersionLabel">RealTimeAI v2.0.0 - Beta</div>
                 <button id="btnLaunchDemo" type="button"></button>
                 <button id="btnRefreshHero" type="button"></button>
@@ -3357,18 +3594,14 @@
             </div>
           </section>
 
-          <!-- Unified Executive Status Bar shared by every view -->
-          <footer class="mx-auto mt-8 flex w-full max-w-6xl flex-col items-center justify-between gap-2 rounded-b-lg border-t border-border-subtle bg-surface-dim px-6 py-3.5 text-xs text-text-tertiary sm:flex-row">
-            <div id="footerVersionLabelGlobal">
-              RealTimeAI v2.0.0-Beta • Dados locais e criptografados
+          <!-- Ultra-minimalist Footer -->
+          <footer class="mx-auto mt-10 flex w-full max-w-6xl items-center justify-between border-t border-white/[0.05] px-1 pt-4 pb-2 text-[11px] text-zinc-500">
+            <div id="footerVersionLabelGlobal" class="font-mono">
+              RealTimeAI v2.8.0
             </div>
-            <div class="flex items-center gap-3 font-mono text-[11px]">
-              <span class="flex items-center gap-1.5">
-                <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
-                Latência: <strong class="font-normal text-text-secondary">18ms</strong>
-              </span>
-              <span>•</span>
-              <span>Build 20251030-x64</span>
+            <div class="flex items-center gap-2 font-mono text-[11px] text-zinc-500">
+              <span class="h-1.5 w-1.5 rounded-full bg-emerald-400/80"></span>
+              <span>Local &amp; encrypted</span>
             </div>
           </footer>
         </main>

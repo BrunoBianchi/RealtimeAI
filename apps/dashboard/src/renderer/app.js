@@ -335,15 +335,31 @@ function renderOverlayStatusPill() {
   const text = document.getElementById('overlayStatusText');
   const dot = document.getElementById('overlayStatusDot');
   const stopBtn = document.getElementById('btnTopStopOverlay');
-  if (state.overlayStatus && state.overlayStatus.running) {
-    const modeLabel = state.overlayStatus.mode === 'demo' ? 'Demo' : 'Live';
+  const pill = document.getElementById('overlayStatusPill');
+  const running = Boolean(state.overlayStatus && state.overlayStatus.running);
+  if (running) {
+    const modeLabel = state.overlayStatus.mode === 'demo' ? 'Practice running' : 'Overlay live';
     if (text) text.textContent = modeLabel;
-    if (dot) dot.className = 'h-2 w-2 rounded-full bg-[#E11D48] animate-pulse';
+    if (dot) dot.className = 'w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse';
+    if (pill) {
+      pill.className = 'flex items-center gap-2 rounded-full border border-red-500/25 bg-red-500/10 hover:bg-red-500/15 px-3 py-1 text-xs font-medium text-red-300 transition-colors cursor-pointer';
+      pill.title = 'Click to close the overlay';
+    }
     if (stopBtn) stopBtn.style.display = 'inline-flex';
   } else {
-    if (text) text.textContent = 'Pronto';
-    if (dot) dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse';
+    if (text) text.textContent = 'Overlay ready';
+    if (dot) dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-400';
+    if (pill) {
+      pill.className = 'flex items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 hover:bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-400 transition-colors cursor-pointer';
+      pill.title = 'Click to launch the overlay';
+    }
     if (stopBtn) stopBtn.style.display = 'none';
+  }
+  const launchBtn = document.getElementById('btnHomeLaunchOverlay');
+  if (launchBtn) {
+    const label = launchBtn.querySelector('span');
+    if (label) label.textContent = running ? 'Stop overlay' : 'Launch overlay';
+    launchBtn.dataset.running = running ? 'true' : 'false';
   }
 }
 
@@ -2468,7 +2484,7 @@ window.selectActiveAgent = selectActiveAgent;
 // ----------------------------------------------------
 // LAUNCH OVERLAY (LIVE / DEMO)
 // ----------------------------------------------------
-async function handleLaunchOverlay(demoMode) {
+async function handleLaunchOverlay(demoMode, extra = {}) {
   let targetAgent = state.activeAgent;
   if (!targetAgent && state.agents.length > 0) {
     targetAgent = state.agents[0];
@@ -2487,8 +2503,12 @@ async function handleLaunchOverlay(demoMode) {
     // shapes the answers, never what Deepgram listens for.
     language: document.getElementById('selectDefaultLanguage')?.value || (state.config && state.config.language) || 'pt-BR',
     auto_suggest: document.getElementById('cfgDefaultAutoSuggest')?.checked ?? true,
-    save_sessions: document.getElementById('cfgDefaultSaveSessions')?.checked ?? true
+    save_sessions: document.getElementById('cfgDefaultSaveSessions')?.checked ?? true,
+    ...(extra.configOverrides || {})
   };
+  if (extra.agentPatch) {
+    targetAgent = { ...targetAgent, ...extra.agentPatch };
+  }
 
   try {
     const res = await window.rtai.startOverlay({
@@ -3177,9 +3197,504 @@ async function loadFlags() {
 // HOME: greeting, model, next interview
 // ----------------------------------------------------
 function renderHomeGreeting() {
-  const first = String((state.profile && state.profile.name) || 'Bruno').trim().split(/\s+/)[0];
-  setText('homeGreeting', `Boa tarde, ${first || 'Bruno'}`);
-  setText('homeStatusLine', 'Tudo pronto para sua próxima entrevista. Revise os requisitos e inicie o copiloto.');
+  const first = String((state.profile && state.profile.name) || 'Bruno').trim().split(/\s+/)[0] || 'Bruno';
+  const now = new Date();
+  const h = now.getHours();
+  const part = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  setText('homeGreeting', `${part}, ${first}`);
+
+  const dtEl = document.getElementById('homeDateTimeMono');
+  if (dtEl) {
+    const wd = now.toLocaleDateString('en-US', { weekday: 'short' });
+    const dm = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+    const tm = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    dtEl.textContent = `${wd}, ${dm} · ${tm}`;
+  }
+
+  const statusEl = document.getElementById('homeStatusLine');
+  if (statusEl) {
+    const esc = homeEscape;
+    const items = getHomeUpcomingItems();
+    const todays = items.filter((it) => it.isToday);
+    if (todays.length > 0) {
+      const n = todays.length;
+      statusEl.innerHTML = `You have <strong class="font-semibold text-zinc-100">${n} interview${n > 1 ? 's' : ''} today</strong> — ${esc(todays[0].company)} at ${esc(todays[0].time)}.`;
+    } else if (items.length > 0 && !items[0].isDemo) {
+      statusEl.innerHTML = `Next up: <strong class="font-semibold text-zinc-100">${esc(items[0].company)}</strong> · ${esc(items[0].dayLabel)} ${esc(items[0].time)}.`;
+    } else {
+      statusEl.textContent = 'No interviews today. A great moment to practice.';
+    }
+  }
+}
+
+// ----------------------------------------------------
+// HOME WORKSPACE (Start a live session, Upcoming, Recent, Context)
+// ----------------------------------------------------
+function homeEscape(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+const HOME_MODEL_LATENCY = [
+  [/flash-lite|lite/i, '~300ms'],
+  [/flash|haiku|mini|fast/i, '~380ms'],
+  [/sonnet|gpt-4o|gemini-2\.5-pro/i, '~420ms'],
+  [/opus|gpt-5|o3|o1/i, '~650ms']
+];
+
+function homeLatencyFor(modelId, fallback) {
+  for (const [re, lat] of HOME_MODEL_LATENCY) if (re.test(String(modelId || ''))) return lat;
+  return fallback || '~450ms';
+}
+
+function getHomeUpcomingItems() {
+  const items = [];
+  const now = new Date();
+  const startOf = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  for (const ag of state.agents || []) {
+    const date = ag.next_interview_date || (ag.next_interview && ag.next_interview.date) || '';
+    if (!date) continue;
+    const time = ag.next_interview_time || (ag.next_interview && ag.next_interview.time) || '';
+    const when = new Date(`${date}T${/^\d{1,2}:\d{2}$/.test(time) ? time.padStart(5, '0') : '09:00'}:00`);
+    if (Number.isNaN(when.getTime()) || when < new Date(now.getTime() - 2 * 3600 * 1000)) continue;
+    const days = Math.round((startOf(when) - startOf(now)) / 86400000);
+    const d = formatGoalDisplay(ag);
+    const score = computeGoalReadinessScore(ag);
+    const minsLeft = Math.round((when - now) / 60000);
+    let badge = { text: score >= 75 ? 'Ready' : `Prep ${Math.max(1, Math.round(score / 20))}/5`, tone: score >= 75 ? 'ok' : 'muted' };
+    if (days === 0 && minsLeft > 0 && minsLeft < 180) badge = { text: `${minsLeft}m`, tone: 'live' };
+    items.push({
+      ag,
+      when,
+      isToday: days === 0,
+      time: time ? when.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '—',
+      dayLabel: days === 0 ? 'today' : days === 1 ? 'tmrw' : when.toLocaleDateString('en-US', { weekday: 'short' }).toLowerCase(),
+      company: d.company || ag.company || ag.name || 'Interview',
+      kind: ag.interview_type || ag.stage || 'Interview',
+      role: d.role || ag.role || '',
+      meta: `${d.role || ag.role || 'Role'} · ${d.docCount} docs`,
+      badge,
+      isDemo: false
+    });
+  }
+  items.sort((a, b) => a.when - b.when);
+  if (items.length > 0) return items.slice(0, 4);
+
+  // Sample agenda when the calendar is still empty (matches the reference layout).
+  return [
+    { time: '10:00', dayLabel: 'today', company: 'Brain Corp', kind: 'Technical', role: 'Lead SDET Architect', meta: 'Lead SDET Architect · 60 min', badge: { text: '19m', tone: 'live' }, isToday: false, isDemo: true },
+    { time: '14:30', dayLabel: 'fri', company: 'Nubank', kind: 'Behavioral', role: 'Staff QA Engineer', meta: 'Staff QA Engineer · 45 min', badge: { text: 'Prep 2/5', tone: 'muted' }, isDemo: true },
+    { time: '11:00', dayLabel: 'mon', company: 'Stripe', kind: 'System design', role: 'Test Infra Lead', meta: 'Test Infra Lead · 90 min', badge: { text: 'No prep', tone: 'muted' }, isDemo: true }
+  ];
+}
+
+function prefillLiveSession(item) {
+  const roleEl = document.getElementById('liveSessionRole');
+  const compEl = document.getElementById('liveSessionCompany');
+  if (roleEl) roleEl.value = item.role || '';
+  if (compEl) compEl.value = item.company || '';
+  const badge = document.getElementById('liveSessionPrefillBadge');
+  if (badge) {
+    badge.textContent = item.isDemo ? 'Prefilled from calendar' : `Prefilled · ${item.company}`;
+    badge.classList.remove('hidden');
+  }
+  if (item.ag) selectActiveAgent(item.ag);
+}
+
+function renderHomeUpcoming() {
+  const list = document.getElementById('homeUpcomingList');
+  if (!list) return;
+  const esc = homeEscape;
+  const items = getHomeUpcomingItems();
+  list.innerHTML = '';
+  items.forEach((it) => {
+    const tone = it.badge.tone === 'live'
+      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+      : it.badge.tone === 'ok'
+        ? 'border-white/10 bg-white/[0.04] text-zinc-200'
+        : 'border-white/[0.08] bg-white/[0.03] text-zinc-400';
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'w-full flex items-center gap-3 py-3 text-left group cursor-pointer first:pt-1 last:pb-1';
+    row.innerHTML = `
+      <div class="w-11 shrink-0 text-center">
+        <div class="font-mono text-[13px] font-semibold text-zinc-100 tabular-nums">${esc(it.time)}</div>
+        <div class="font-mono text-[10px] text-zinc-500">${esc(it.dayLabel)}</div>
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="truncate text-xs font-medium text-zinc-100 group-hover:text-white">${esc(it.company)} · ${esc(it.kind)}</div>
+        <div class="truncate text-[11px] text-zinc-500">${esc(it.meta)}</div>
+      </div>
+      <span class="shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium ${tone}">${it.badge.tone === 'live' ? '● ' : ''}${esc(it.badge.text)}</span>`;
+    row.addEventListener('click', () => {
+      prefillLiveSession(it);
+      showToast(`Session prefilled: ${it.company}`);
+    });
+    list.appendChild(row);
+  });
+}
+
+function getHomeRecentSessions() {
+  const sessions = (state.sessions || []).slice().sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+  if (sessions.length > 0) {
+    return sessions.slice(0, 5).map((s, idx) => {
+      const m = computeSessionStarScore(s, idx);
+      let dateLabel = '—';
+      if (s.updatedAt) {
+        const d = new Date(s.updatedAt);
+        if (!Number.isNaN(d.getTime())) dateLabel = d.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
+      }
+      const qa = (typeof s.questionsCount === 'number' ? s.questionsCount : 0) || (typeof s.answersCount === 'number' ? s.answersCount : 0);
+      const status = m.overall >= 92 ? { text: 'Strong', tone: 'ok' } : m.overall >= 86 ? { text: 'Good', tone: 'muted' } : { text: 'Review', tone: 'warn' };
+      const parts = String(m.title).split('·').map((p) => p.trim());
+      return {
+        raw: s,
+        idx,
+        title: parts[0] || m.title,
+        sub: parts.slice(1).join(' · ') || `Score ${m.overall}%`,
+        model: String(s.model || (state.config && state.config.model) || '—').split('/').pop(),
+        date: dateLabel,
+        duration: m.durationLabel,
+        qa: String(qa || '—'),
+        status
+      };
+    });
+  }
+  return [
+    { title: 'Brain Corp', sub: 'Recruiter screen', model: 'Claude Sonnet 4.6', date: 'Nov 12', duration: '28:14', qa: '9', status: { text: 'Advanced', tone: 'muted' }, demo: true },
+    { title: 'Mercado Livre', sub: 'Technical · Live coding', model: 'GPT-5', date: 'Nov 08', duration: '54:02', qa: '17', status: { text: 'Awaiting', tone: 'muted' }, demo: true },
+    { title: 'Mock · System design', sub: 'Practice mode', model: 'Gemini 2.5 Flash', date: 'Nov 06', duration: '41:37', qa: '12', status: { text: 'Practice', tone: 'muted' }, demo: true },
+    { title: 'iFood', sub: 'Hiring manager', model: 'Claude Sonnet 4.6', date: 'Nov 03', duration: '36:50', qa: '11', status: { text: 'Offer', tone: 'ok' }, demo: true }
+  ];
+}
+
+function renderHomeRecentSessionsTable() {
+  const body = document.getElementById('homeRecentSessionsTableBody');
+  if (!body) return;
+  const esc = homeEscape;
+  body.innerHTML = '';
+  getHomeRecentSessions().forEach((r, i) => {
+    const tone = r.status.tone === 'ok'
+      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+      : r.status.tone === 'warn'
+        ? 'border-amber-500/30 bg-amber-500/10 text-amber-400'
+        : 'border-white/[0.08] bg-white/[0.04] text-zinc-300';
+    const tr = document.createElement('tr');
+    tr.className = 'hover:bg-white/[0.02] transition-colors cursor-pointer';
+    tr.innerHTML = `
+      <td class="py-3 pl-5 pr-3">
+        <div class="font-medium text-zinc-100 truncate max-w-[220px]">${esc(r.title)}</div>
+        <div class="text-[11px] text-zinc-500 truncate max-w-[220px]">${esc(r.sub)}</div>
+      </td>
+      <td class="py-3 px-3 text-zinc-300 whitespace-nowrap">${esc(r.model)}</td>
+      <td class="py-3 px-3 font-mono text-zinc-400 whitespace-nowrap">${esc(r.date)}</td>
+      <td class="py-3 px-3 font-mono text-zinc-400 text-right tabular-nums">${esc(r.duration)}</td>
+      <td class="py-3 px-3 font-mono text-zinc-400 text-right tabular-nums">${esc(r.qa)}</td>
+      <td class="py-3 pl-3 pr-5 text-right"><span class="inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${tone}">${r.status.tone === 'ok' ? '● ' : ''}${esc(r.status.text)}</span></td>`;
+    tr.addEventListener('click', () => {
+      if (r.raw) {
+        openSessionReportModal(r.raw, r.idx);
+      } else {
+        openSessionReportModal({ id: `demo-${i}`, title: `${r.title} · ${r.sub}`, dateLabel: r.date, durationLabel: r.duration }, i);
+      }
+    });
+    body.appendChild(tr);
+  });
+}
+
+function renderHomeContextLibrary() {
+  const list = document.getElementById('homeContextLibraryList');
+  if (!list) return;
+  const esc = homeEscape;
+  const docs = getAllLibraryDocs();
+  const icons = {
+    resume: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>',
+    job: '<rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
+    notes: '<path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/>',
+    stories: '<path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>'
+  };
+  let rows;
+  if (docs.length > 0) {
+    rows = docs.slice(0, 5).map((doc) => {
+      const tag = cleanDocTag(doc);
+      const name = doc.title || doc.name || String(doc.path || 'Document').split(/[\\/]/).pop();
+      const size = doc.sizeKb ? `${doc.sizeKb} KB` : (doc.size ? `${Math.max(1, Math.round(doc.size / 1024))} KB` : '');
+      return { doc, name, sub: `${tag === 'resume' ? 'Resume' : 'Material'} · ${(doc.agentsUsing || []).length || 1} goal(s)`, size, icon: tag === 'resume' ? icons.resume : icons.notes };
+    });
+  } else {
+    rows = [
+      { name: 'resume_2024_sdet.pdf', sub: 'Resume · default', size: '2.1 MB', icon: icons.resume },
+      { name: 'Brain Corp — Lead SDET', sub: 'Job description', size: '4 KB', icon: icons.job },
+      { name: 'Brain Corp — Company notes', sub: 'Notes · auto-researched', size: '12 KB', icon: icons.notes },
+      { name: 'STAR stories', sub: '8 stories · behavioral', size: '9 KB', icon: icons.stories }
+    ];
+  }
+  list.innerHTML = '';
+  rows.forEach((r) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'w-full flex items-center gap-3 px-5 py-3 text-left hover:bg-white/[0.02] transition-colors cursor-pointer';
+    btn.innerHTML = `
+      <div class="w-8 h-8 shrink-0 rounded-lg border border-white/[0.07] bg-white/[0.03] flex items-center justify-center text-zinc-400">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">${r.icon}</svg>
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="truncate text-xs font-medium text-zinc-100">${esc(r.name)}</div>
+        <div class="truncate text-[11px] text-zinc-500">${esc(r.sub)}</div>
+      </div>
+      <span class="shrink-0 font-mono text-[10px] text-zinc-500">${esc(r.size)}</span>`;
+    btn.addEventListener('click', () => {
+      if (r.doc) openDocPreviewModal(r.doc);
+      else switchView('library');
+    });
+    list.appendChild(btn);
+  });
+}
+
+function renderHomeLiveSessionCard() {
+  const cfg = state.config || {};
+
+  // Resume options from library
+  const resumeSel = document.getElementById('liveSessionResume');
+  if (resumeSel) {
+    const resumes = getAllLibraryDocs().filter((d) => cleanDocTag(d) === 'resume');
+    if (resumes.length > 0) {
+      const prev = resumeSel.value;
+      resumeSel.innerHTML = '';
+      resumes.forEach((d) => {
+        const opt = document.createElement('option');
+        const name = d.title || d.name || String(d.path || 'resume').split(/[\\/]/).pop();
+        opt.value = d.path || name;
+        opt.textContent = name;
+        resumeSel.appendChild(opt);
+      });
+      if (prev && Array.from(resumeSel.options).some((o) => o.value === prev)) resumeSel.value = prev;
+    }
+  }
+
+  // Model options mirrored from Settings
+  const modelSel = document.getElementById('liveSessionModel');
+  const srcModel = document.getElementById('selectDefaultModel');
+  if (modelSel && srcModel && srcModel.options.length > 0 && modelSel.dataset.synced !== 'true') {
+    modelSel.innerHTML = '';
+    Array.from(srcModel.options).forEach((o) => {
+      const opt = document.createElement('option');
+      opt.value = o.value;
+      opt.textContent = String(o.textContent || o.value).split('(')[0].trim();
+      opt.dataset.latency = homeLatencyFor(o.value);
+      modelSel.appendChild(opt);
+    });
+    modelSel.dataset.synced = 'true';
+  }
+  if (modelSel && cfg.model && Array.from(modelSel.options).some((o) => o.value === cfg.model)) {
+    modelSel.value = cfg.model;
+  }
+  updateHomeModelLatency();
+
+  // Language
+  const langSel = document.getElementById('liveSessionLanguage');
+  if (langSel && cfg.language && Array.from(langSel.options).some((o) => o.value === cfg.language)) {
+    langSel.value = cfg.language;
+  }
+
+  // Answer style
+  const style = String(cfg.response_style || 'concise').toLowerCase();
+  setHomeAnswerStyle(['concise', 'detailed', 'star'].includes(style) ? style : 'concise', false);
+
+  // Audio toggles
+  const sys = document.getElementById('toggleHomeSystemAudio');
+  const mic = document.getElementById('toggleHomeMicAudio');
+  if (sys && typeof cfg.loopback_enabled === 'boolean') sys.checked = cfg.loopback_enabled;
+  if (mic && typeof cfg.mic_enabled === 'boolean') mic.checked = cfg.mic_enabled;
+  const micLabel = document.getElementById('homeMicDeviceLabel');
+  if (micLabel) {
+    const inSel = document.getElementById('selectInputDevice');
+    const dev = inSel && inSel.selectedIndex >= 0 ? inSel.options[inSel.selectedIndex]?.textContent : '';
+    micLabel.textContent = `You · ${dev || 'Default microphone'}`;
+  }
+
+  // Prefill from the next real interview the first time
+  const roleEl = document.getElementById('liveSessionRole');
+  if (roleEl && roleEl.dataset.userEdited !== 'true') {
+    const upcoming = getHomeUpcomingItems();
+    if (upcoming.length > 0 && !upcoming[0].isDemo) prefillLiveSession(upcoming[0]);
+  }
+}
+
+function updateHomeModelLatency() {
+  const modelSel = document.getElementById('liveSessionModel');
+  const latEl = document.getElementById('liveSessionModelLatency');
+  if (!modelSel || !latEl) return;
+  const opt = modelSel.options[modelSel.selectedIndex];
+  latEl.textContent = (opt && opt.dataset.latency) || homeLatencyFor(modelSel.value);
+}
+
+function setHomeAnswerStyle(style, persist = true) {
+  document.querySelectorAll('.live-style-btn').forEach((b) => {
+    const active = b.dataset.liveStyle === style;
+    b.className = active
+      ? 'live-style-btn rounded-md bg-[#1d1f26] border border-white/10 py-1.5 text-xs font-semibold text-white transition-all cursor-pointer'
+      : 'live-style-btn rounded-md border border-transparent py-1.5 text-xs font-medium text-zinc-400 hover:text-zinc-200 transition-all cursor-pointer';
+    b.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+  if (persist && window.rtai && window.rtai.saveConfig) {
+    window.rtai.saveConfig({ response_style: style }).then((res) => {
+      if (res && res.config) state.config = res.config;
+    }).catch(() => {});
+  }
+}
+
+function renderHomeKpis() {
+  const sessions = state.sessions || [];
+  if (sessions.length === 0) return;
+  const now = new Date();
+  const thisMonth = sessions.filter((s) => {
+    const d = new Date(s.updatedAt || 0);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+  const lastMonth = sessions.filter((s) => {
+    const d = new Date(s.updatedAt || 0);
+    const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    return d.getMonth() === lm.getMonth() && d.getFullYear() === lm.getFullYear();
+  });
+  let answered = 0;
+  let lat = 0;
+  let latN = 0;
+  let minutes = 0;
+  sessions.forEach((s, i) => {
+    answered += typeof s.answersCount === 'number' ? s.answersCount : (typeof s.questionsCount === 'number' ? s.questionsCount : 0);
+    if (typeof s.avgLatencyMs === 'number' && s.avgLatencyMs > 0) { lat += s.avgLatencyMs; latN++; }
+    minutes += parseInt(computeSessionStarScore(s, i).durationLabel, 10) || 0;
+  });
+  const monthName = now.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+  const kpiLabel = document.querySelector('#homeAnalyticsSection .font-mono');
+  if (kpiLabel) kpiLabel.textContent = `SESSIONS · ${monthName}`;
+  setText('kpiSessionsCount', String(thisMonth.length || sessions.length));
+  const delta = thisMonth.length - lastMonth.length;
+  const deltaEl = document.getElementById('kpiSessionsDelta');
+  if (deltaEl) deltaEl.innerHTML = `<span class="${delta >= 0 ? 'text-emerald-400' : 'text-amber-400'} font-medium">${delta >= 0 ? '+' : ''}${delta}</span> vs last month`;
+  setText('kpiQuestionsAnswered', String(answered));
+  if (latN > 0) setText('kpiAvgLatency', String(Math.round(lat / latN)));
+  setText('kpiPracticeTime', minutes >= 60 ? `${Math.floor(minutes / 60)}h ${minutes % 60}m` : `${minutes}m`);
+  const practiceSub = document.getElementById('kpiPracticeSub');
+  if (practiceSub) practiceSub.innerHTML = `<span class="text-zinc-200 font-medium">${sessions.length}</span> saved sessions`;
+}
+
+let homeWorkspaceWired = false;
+function wireHomeWorkspace() {
+  if (homeWorkspaceWired) return;
+  homeWorkspaceWired = true;
+
+  ['liveSessionRole', 'liveSessionCompany'].forEach((id) => {
+    document.getElementById(id)?.addEventListener('input', (e) => {
+      e.target.dataset.userEdited = 'true';
+      const roleEl = document.getElementById('liveSessionRole');
+      if (roleEl) roleEl.dataset.userEdited = 'true';
+      document.getElementById('liveSessionPrefillBadge')?.classList.add('hidden');
+    });
+  });
+
+  document.getElementById('liveSessionModel')?.addEventListener('change', async (e) => {
+    updateHomeModelLatency();
+    try {
+      const res = await window.rtai.saveConfig({ model: e.target.value });
+      if (res && res.config) state.config = res.config;
+      const src = document.getElementById('selectDefaultModel');
+      if (src) src.value = e.target.value;
+      showToast(`Model: ${e.target.selectedOptions[0]?.textContent || e.target.value}`);
+    } catch (_e) {}
+  });
+
+  document.getElementById('liveSessionLanguage')?.addEventListener('change', async (e) => {
+    try {
+      const res = await window.rtai.saveConfig({ language: e.target.value });
+      if (res && res.config) state.config = res.config;
+    } catch (_e) {}
+  });
+
+  document.querySelectorAll('.live-style-btn').forEach((b) => {
+    b.addEventListener('click', () => setHomeAnswerStyle(b.dataset.liveStyle || 'concise'));
+  });
+
+  const bindAudio = (id, key, label) => {
+    document.getElementById(id)?.addEventListener('change', async (e) => {
+      try {
+        const res = await window.rtai.saveConfig({ [key]: e.target.checked });
+        if (res && res.config) state.config = res.config;
+        showToast(`${label} ${e.target.checked ? 'on' : 'off'}`);
+      } catch (_e) {}
+    });
+  };
+  bindAudio('toggleHomeSystemAudio', 'loopback_enabled', 'System audio');
+  bindAudio('toggleHomeMicAudio', 'mic_enabled', 'Microphone');
+
+  document.getElementById('btnHomeTestAudio')?.addEventListener('click', async () => {
+    try {
+      if (window.rtai && window.rtai.testSound) await window.rtai.testSound();
+      showToast('Playing test sound…');
+    } catch (_e) {
+      showToast('Audio test unavailable.');
+    }
+  });
+
+  const launchFromHome = async (demo) => {
+    if (!demo && state.overlayStatus && state.overlayStatus.running) {
+      try { await window.rtai.stopOverlay(); } catch (_e) {}
+      showToast('Overlay closed.');
+      return;
+    }
+    const role = document.getElementById('liveSessionRole')?.value.trim();
+    const company = document.getElementById('liveSessionCompany')?.value.trim();
+    const model = document.getElementById('liveSessionModel')?.value;
+    const language = document.getElementById('liveSessionLanguage')?.value;
+    const agentPatch = {};
+    if (role) agentPatch.role = role;
+    if (company) agentPatch.company = company;
+    const configOverrides = {};
+    if (model) configOverrides.model = model;
+    if (language) configOverrides.language = language;
+    const active = document.querySelector('.live-style-btn[aria-pressed="true"]');
+    if (active) configOverrides.response_style = active.dataset.liveStyle;
+    configOverrides.mic_enabled = Boolean(document.getElementById('toggleHomeMicAudio')?.checked);
+    configOverrides.loopback_enabled = Boolean(document.getElementById('toggleHomeSystemAudio')?.checked);
+    await handleLaunchOverlay(demo, { agentPatch, configOverrides });
+  };
+  document.getElementById('btnHomeLaunchOverlay')?.addEventListener('click', () => launchFromHome(false));
+  document.getElementById('btnHomePracticeMode')?.addEventListener('click', () => launchFromHome(true));
+  document.getElementById('overlayStatusPill')?.addEventListener('click', () => launchFromHome(false));
+  document.getElementById('btnHomeNewSession')?.addEventListener('click', () => openGoalModal(null));
+  document.getElementById('btnHomeUploadContext')?.addEventListener('click', () => switchView('library'));
+  document.getElementById('btnHomeOpenCalendar')?.addEventListener('click', () => {
+    switchView('settings');
+    switchSettingsTab('calendar');
+  });
+  document.getElementById('btnHomeCustomizeShortcuts')?.addEventListener('click', () => {
+    switchView('settings');
+    switchSettingsTab('shortcuts');
+  });
+  document.getElementById('btnSidebarShortcuts')?.addEventListener('click', () => {
+    setTimeout(() => switchSettingsTab('shortcuts'), 0);
+  });
+  document.getElementById('btnSidebarAnalytics')?.addEventListener('click', () => {
+    setTimeout(() => document.getElementById('homeAnalyticsSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+  });
+  document.getElementById('btnSidebarProfileMenu')?.addEventListener('click', () => {
+    switchView('settings');
+    switchSettingsTab('billing');
+  });
+  document.querySelectorAll('#view-goals [data-view]').forEach((btn) => {
+    btn.addEventListener('click', () => switchView(btn.dataset.view));
+  });
+
+  // Global shortcut: Ctrl/Cmd + Shift + L launches the overlay
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && String(e.key).toLowerCase() === 'l') {
+      e.preventDefault();
+      launchFromHome(false);
+    }
+  });
+
+  // Keep the clock & greeting fresh
+  setInterval(renderHomeGreeting, 30000);
 }
 
 function renderHomeModel() {
@@ -3301,6 +3816,16 @@ function renderHome() {
   renderHomeModel();
   renderHomeNextInterview();
   renderHomeMetrics();
+  try {
+    wireHomeWorkspace();
+    renderHomeLiveSessionCard();
+    renderHomeUpcoming();
+    renderHomeKpis();
+    renderHomeRecentSessionsTable();
+    renderHomeContextLibrary();
+  } catch (err) {
+    console.error('Home workspace render failed:', err);
+  }
 
   // Smart minimalist decluttering: If user already has active goals or history sessions,
   // hide the onboarding checklist by default so the screen stays clean and Goals are immediately visible!
