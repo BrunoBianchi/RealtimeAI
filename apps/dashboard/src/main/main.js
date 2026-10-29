@@ -1754,7 +1754,7 @@ function loadUserProfile(cachedSessions) {
     data = {
       name: 'Bruno',
       email: 'bruno@realtimeai.dev',
-      headline: 'Senior Software Engineer',
+      headline: 'Senior Engineer',
       seniority: 'Senior / Staff',
       linkedin: 'linkedin.com/in/bruno',
       themePreference: 'dark',
@@ -1762,7 +1762,7 @@ function loadUserProfile(cachedSessions) {
     };
   }
   if (!data.themePreference) data.themePreference = 'dark';
-  if (!data.plan) data.plan = 'free';
+  if (!data.plan) data.plan = 'premium';
 
   // Compute real transcription statistics from actual session files
   const sessions = cachedSessions || loadPastSessions();
@@ -2475,7 +2475,7 @@ function createWindow() {
     loadPromise.then(async () => {
       try {
         const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-        await wait(1200);
+        await wait(2400);
 
         // 1. Capture Light Mode (Final Round AI Views)
         await mainWindow.webContents.executeJavaScript(`applyTheme('light', 'light'); switchView('goals');`);

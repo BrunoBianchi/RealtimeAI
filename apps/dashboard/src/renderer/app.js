@@ -489,7 +489,7 @@ function renderPlanAndUsage() {
     }
     if (percentEl) {
       percentEl.textContent = 'PRO';
-      percentEl.className = 'font-mono text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-text-secondary border border-border-muted';
+      percentEl.className = 'font-mono text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-text-secondary border border-border-muted shrink-0';
     }
     if (descEl) {
       const usedMins = usage.usedMinutes || 176;
@@ -504,7 +504,7 @@ function renderPlanAndUsage() {
     if (sessionsEl) sessionsEl.textContent = `${sessionCount} sessões`;
     if (resetEl) resetEl.textContent = 'Assinatura ativa';
     if (btnUpgrade) {
-      btnUpgrade.className = 'w-full py-1 rounded bg-surface-container hover:bg-surface-container-high text-text-secondary hover:text-text-primary text-[11px] font-mono border border-border-subtle transition-colors flex items-center justify-center gap-1.5 cursor-pointer';
+      btnUpgrade.className = 'w-full py-1.5 px-2.5 rounded bg-surface-container hover:bg-surface-container-high text-text-secondary hover:text-text-primary text-[11px] font-mono border border-border-subtle transition-colors flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap';
     }
     if (btnUpgradeLabel) btnUpgradeLabel.textContent = 'Gerenciar plano';
     if (btnUpgradeIcon) {
@@ -554,18 +554,18 @@ function renderPlanAndUsage() {
     const pct = Math.min(100, Math.round((used / limit) * 100));
 
     if (titleEl) {
-      titleEl.textContent = pct >= 80 ? 'Almost Full!' : (pct >= 40 ? 'Almost There!' : 'Audio Transcribed');
+      titleEl.textContent = pct >= 80 ? 'Cota quase cheia' : (pct >= 40 ? 'Uso mensal' : 'Transcrição ativa');
     }
     if (timeEl) {
       timeEl.textContent = `${used} / ${limit} min`;
-      timeEl.className = 'tabular-nums font-semibold text-foreground';
+      timeEl.className = 'tabular-nums font-medium text-text-primary';
     }
     if (percentEl) {
       percentEl.textContent = `${pct}%`;
-      percentEl.className = 'inline-flex items-center justify-center rounded-full bg-gradient-to-r from-red-500 to-orange-500 text-white px-2 py-0.5 text-[9.5px] font-bold shadow-xs tabular-nums';
+      percentEl.className = 'font-mono text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-text-secondary border border-border-muted shrink-0 tabular-nums';
     }
     if (descEl) {
-      descEl.innerHTML = `<span id="sidebarUsageTime" class="font-semibold text-foreground">${used} of ${limit} min</span> used in this billing cycle.`;
+      descEl.innerHTML = `<span id="sidebarUsageTime" class="font-medium text-text-primary">${used} de ${limit} min</span> <span class="text-text-tertiary">neste ciclo</span><span id="sidebarUsageSessions" class="hidden">${sessionCount} sessões</span>`;
     }
     if (barEl) {
       barEl.style.width = `${pct}%`;
@@ -578,7 +578,7 @@ function renderPlanAndUsage() {
     if (sessionsEl) sessionsEl.textContent = `${sessionCount} sessions`;
     if (resetEl) resetEl.textContent = 'Renews monthly';
     if (btnUpgrade) {
-      btnUpgrade.className = 'w-full rounded-xl bg-secondary/80 hover:bg-secondary text-foreground py-2 px-2.5 text-center text-[11.5px] font-semibold transition-all cursor-pointer border border-border/40 shadow-2xs';
+      btnUpgrade.className = 'w-full py-1.5 px-2.5 rounded bg-surface-container hover:bg-surface-container-high text-text-secondary hover:text-text-primary text-[11px] font-mono border border-border-subtle transition-colors flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap';
     }
     if (btnUpgradeLabel) btnUpgradeLabel.textContent = 'Upgrade to Pro';
     if (btnUpgradeIcon) {
@@ -586,7 +586,7 @@ function renderPlanAndUsage() {
       btnUpgradeIcon.innerHTML = '';
     }
     if (profileBadge) {
-      profileBadge.className = 'text-[8.5px] font-bold px-1 py-0.2 rounded-full bg-muted text-muted-foreground uppercase tracking-wider';
+      profileBadge.className = 'text-[8.5px] font-bold px-1 py-0.2 rounded-full bg-muted text-muted-foreground uppercase tracking-wider hidden';
       profileBadge.textContent = 'FREE';
     }
 
@@ -832,32 +832,32 @@ function renderGoalsView() {
     container.innerHTML = `
       <!-- Item 1: Nubank -->
       <div class="panel-row gap-4 cursor-pointer" data-featured="nubank">
-        <div class="flex items-center gap-3.5 min-w-[260px]">
+        <div class="flex items-center gap-3.5 min-w-0 flex-1">
           <div class="w-9 h-9 rounded-lg bg-[#820ad1] flex items-center justify-center text-white font-bold text-xs shrink-0">
             nu
           </div>
-          <div class="truncate">
+          <div class="truncate min-w-0">
             <h4 class="text-xs font-bold text-foreground truncate">Estágio em Engenharia</h4>
             <p class="text-[11px] text-app-muted truncate">Nubank</p>
           </div>
         </div>
-        <div class="text-xs text-app-muted font-medium hidden sm:block">
+        <div class="text-xs text-app-muted font-medium hidden sm:block shrink-0">
           30 out · 14:00
         </div>
-        <div class="flex items-center gap-1 text-xs text-app-muted hidden md:flex">
+        <div class="flex items-center gap-1 text-xs text-app-muted hidden md:flex shrink-0">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
             <polyline points="14 2 14 8 20 8"></polyline>
           </svg>
           <span>16 docs</span>
         </div>
-        <div class="flex items-center gap-3 w-40">
+        <div class="flex items-center gap-3 w-28 sm:w-40 shrink-0">
           <div class="metric-track flex-1">
             <div class="block h-full rounded-full bg-foreground transition-[width] duration-300" style="width: 82%"></div>
           </div>
           <span class="text-xs font-mono font-medium text-foreground shrink-0">82%</span>
         </div>
-        <button class="text-app-muted hover:text-foreground p-1" type="button">
+        <button class="text-app-muted hover:text-foreground p-1 shrink-0" type="button">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <polyline points="9 18 15 12 9 6"></polyline>
           </svg>
@@ -866,35 +866,35 @@ function renderGoalsView() {
 
       <!-- Item 2: iFood -->
       <div class="panel-row gap-4 cursor-pointer" data-featured="ifood">
-        <div class="flex items-center gap-3.5 min-w-[260px]">
+        <div class="flex items-center gap-3.5 min-w-0 flex-1">
           <div class="w-9 h-9 rounded-lg bg-[#ea1d2c] flex items-center justify-center text-white font-bold text-xs shrink-0">
             <svg class="w-4 h-4 fill-white" viewBox="0 0 24 24">
               <path d="M11 2a1 1 0 0 0-1 1v7.586l-2.293-2.293a1 1 0 0 0-1.414 1.414l4 4A1 1 0 0 0 11 14h2a1 1 0 0 0 .707-.293l4-4a1 1 0 0 0-1.414-1.414L14 10.586V3a1 1 0 0 0-1-1h-2z"></path>
               <path d="M4 19a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1H4v1z"></path>
             </svg>
           </div>
-          <div class="truncate">
+          <div class="truncate min-w-0">
             <h4 class="text-xs font-bold text-foreground truncate">Backend Pleno · Go</h4>
             <p class="text-[11px] text-app-muted truncate">iFood</p>
           </div>
         </div>
-        <div class="text-xs text-app-muted font-medium hidden sm:block">
+        <div class="text-xs text-app-muted font-medium hidden sm:block shrink-0">
           Sem data
         </div>
-        <div class="flex items-center gap-1 text-xs text-app-muted hidden md:flex">
+        <div class="flex items-center gap-1 text-xs text-app-muted hidden md:flex shrink-0">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
             <polyline points="14 2 14 8 20 8"></polyline>
           </svg>
           <span>7 docs</span>
         </div>
-        <div class="flex items-center gap-3 w-40">
+        <div class="flex items-center gap-3 w-28 sm:w-40 shrink-0">
           <div class="metric-track flex-1">
             <div class="block h-full rounded-full bg-foreground transition-[width] duration-300" style="width: 54%"></div>
           </div>
           <span class="text-xs font-mono font-medium text-foreground shrink-0">54%</span>
         </div>
-        <button class="text-app-muted hover:text-foreground p-1" type="button">
+        <button class="text-app-muted hover:text-foreground p-1 shrink-0" type="button">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <polyline points="9 18 15 12 9 6"></polyline>
           </svg>
@@ -903,32 +903,32 @@ function renderGoalsView() {
 
       <!-- Item 3: Itaú Unibanco -->
       <div class="panel-row gap-4 cursor-pointer" data-featured="itau">
-        <div class="flex items-center gap-3.5 min-w-[260px]">
+        <div class="flex items-center gap-3.5 min-w-0 flex-1">
           <div class="w-9 h-9 rounded-lg bg-[#ec7000] flex items-center justify-center text-white font-bold text-[11px] shrink-0 tracking-tighter">
             Itaú
           </div>
-          <div class="truncate">
+          <div class="truncate min-w-0">
             <h4 class="text-xs font-bold text-foreground truncate">Analista de Dados Sr.</h4>
             <p class="text-[11px] text-app-muted truncate">Itaú Unibanco</p>
           </div>
         </div>
-        <div class="text-xs text-app-muted font-medium hidden sm:block">
+        <div class="text-xs text-app-muted font-medium hidden sm:block shrink-0">
           12 nov · 10:30
         </div>
-        <div class="flex items-center gap-1 text-xs text-app-muted hidden md:flex">
+        <div class="flex items-center gap-1 text-xs text-app-muted hidden md:flex shrink-0">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
             <polyline points="14 2 14 8 20 8"></polyline>
           </svg>
           <span>4 docs</span>
         </div>
-        <div class="flex items-center gap-3 w-40">
+        <div class="flex items-center gap-3 w-28 sm:w-40 shrink-0">
           <div class="metric-track flex-1">
             <div class="block h-full rounded-full bg-foreground transition-[width] duration-300" style="width: 31%"></div>
           </div>
           <span class="text-xs font-mono font-medium text-foreground shrink-0">31%</span>
         </div>
-        <button class="text-app-muted hover:text-foreground p-1" type="button">
+        <button class="text-app-muted hover:text-foreground p-1 shrink-0" type="button">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <polyline points="9 18 15 12 9 6"></polyline>
           </svg>
@@ -937,32 +937,32 @@ function renderGoalsView() {
 
       <!-- Item 4: Mercado Livre -->
       <div class="panel-row gap-4 cursor-pointer" data-featured="meli">
-        <div class="flex items-center gap-3.5 min-w-[260px]">
+        <div class="flex items-center gap-3.5 min-w-0 flex-1">
           <div class="w-9 h-9 rounded-lg bg-yellow-400 flex items-center justify-center text-slate-900 font-black text-xs shrink-0">
             meli
           </div>
-          <div class="truncate">
+          <div class="truncate min-w-0">
             <h4 class="text-xs font-bold text-foreground truncate">Tech Lead · Java & Arquitetura</h4>
             <p class="text-[11px] text-app-muted truncate">Mercado Livre</p>
           </div>
         </div>
-        <div class="text-xs text-app-muted font-medium hidden sm:block">
+        <div class="text-xs text-app-muted font-medium hidden sm:block shrink-0">
           18 nov · 16:00
         </div>
-        <div class="flex items-center gap-1 text-xs text-app-muted hidden md:flex">
+        <div class="flex items-center gap-1 text-xs text-app-muted hidden md:flex shrink-0">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
             <polyline points="14 2 14 8 20 8"></polyline>
           </svg>
           <span>12 docs</span>
         </div>
-        <div class="flex items-center gap-3 w-40">
+        <div class="flex items-center gap-3 w-28 sm:w-40 shrink-0">
           <div class="metric-track flex-1">
             <div class="block h-full rounded-full bg-foreground transition-[width] duration-300" style="width: 75%"></div>
           </div>
           <span class="text-xs font-mono font-medium text-foreground shrink-0">75%</span>
         </div>
-        <button class="text-app-muted hover:text-foreground p-1" type="button">
+        <button class="text-app-muted hover:text-foreground p-1 shrink-0" type="button">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <polyline points="9 18 15 12 9 6"></polyline>
           </svg>
@@ -1054,26 +1054,26 @@ function renderGoalsView() {
     }
 
     card.innerHTML = `
-      <div class="flex items-center gap-3.5 min-w-[260px]">
+      <div class="flex items-center gap-3.5 min-w-0 flex-1">
         <div class="w-9 h-9 rounded-lg ${logoBg} flex items-center justify-center text-white font-bold text-xs shrink-0">
           ${logoHtml}
         </div>
-        <div class="truncate">
+        <div class="truncate min-w-0">
           <h4 class="text-xs font-bold text-foreground truncate">${esc(rowTitle)}</h4>
           <p class="text-[11px] text-app-muted truncate">${esc(cleanCompany)}</p>
         </div>
       </div>
-      <div class="text-xs text-app-muted font-medium hidden sm:block">
+      <div class="text-xs text-app-muted font-medium hidden sm:block shrink-0">
         ${esc(dateText)}
       </div>
-      <div class="flex items-center gap-1 text-xs text-app-muted hidden md:flex">
+      <div class="flex items-center gap-1 text-xs text-app-muted hidden md:flex shrink-0">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
           <polyline points="14 2 14 8 20 8"></polyline>
         </svg>
         <span>${docCount} docs</span>
       </div>
-      <div class="flex items-center gap-3 w-40">
+      <div class="flex items-center gap-3 w-28 sm:w-40 shrink-0">
         <div class="metric-track flex-1">
           <div class="block h-full rounded-full bg-foreground transition-[width] duration-300" style="width: ${progressPct}%"></div>
         </div>
