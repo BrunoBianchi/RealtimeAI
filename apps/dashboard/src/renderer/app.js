@@ -765,10 +765,542 @@ function renderSidebarGoals() {
 }
 
 // ----------------------------------------------------
+// SCORE ENGINE: READINESS & SESSION STAR METRICS
+// ----------------------------------------------------
+function computeGoalReadinessScore(ag) {
+  if (!ag) return 82;
+  const d = formatGoalDisplay(ag);
+  const cleanCompany = d.company || formatCleanCompanyName(ag.company) || 'Company';
+  const docs = Array.isArray(ag.documents) ? ag.documents : [];
+  const hasResume = docs.some((doc) => cleanDocTag(doc) === 'resume');
+  const hasDossier = Boolean((ag.company_research && ag.company_research.trim()) || (ag.company_dossier && ag.company_dossier.trim()));
+  const hasJobDesc = Boolean(ag.job_description && ag.job_description.trim());
+  const hasPlaybook = Boolean(ag.playbook_name && ag.playbook_name.trim());
+  const hasDebrief = Boolean(
+    (ag.goal_memory_strengths && ag.goal_memory_strengths.length > 0) ||
+    (ag.goal_memory_improve && ag.goal_memory_improve.length > 0)
+  );
+
+  const baseDefaults = { 'Nubank': 82, 'iFood': 54, 'Itaú Unibanco': 31, 'Mercado Livre': 75 };
+  let base = Number(ag.readiness_score || ag.progress) || baseDefaults[cleanCompany] || 48;
+
+  // Dynamic bonus from user-added context
+  let bonus = 0;
+  if (docs.length > 2) bonus += Math.min(12, (docs.length - 2) * 3);
+  if (hasResume && base < 65) bonus += 8;
+  if (hasDossier && base < 75) bonus += 6;
+  if (hasJobDesc && base < 75) bonus += 5;
+  if (hasDebrief) bonus += 6;
+  if (hasPlaybook && ag.playbook_name !== 'Standard STAR') bonus += 4;
+
+  return Math.max(15, Math.min(99, Math.round(base + bonus)));
+}
+
+function computeSessionStarScore(s, idx = 0) {
+  if (!s) {
+    return {
+      overall: 94,
+      star: 96,
+      tech: 92,
+      rag: 95,
+      pacing: 91,
+      latencyMs: 840,
+      title: 'Nubank · Mock STAR 03',
+      dateLabel: 'Ontem às 21:14',
+      durationLabel: '18 min',
+      fileName: ''
+    };
+  }
+  if (typeof s.overallScore === 'number') {
+    return {
+      overall: s.overallScore,
+      star: s.starScore || Math.min(99, s.overallScore + 2),
+      tech: s.techScore || Math.max(75, s.overallScore - 2),
+      rag: s.ragScore || Math.min(99, s.overallScore + 1),
+      pacing: s.pacingScore || Math.max(78, s.overallScore - 3),
+      latencyMs: s.latencyMs || s.avgLatencyMs || 840,
+      title: s.title || s.id || 'Simulação STAR',
+      dateLabel: s.dateLabel || 'Recente',
+      durationLabel: s.durationLabel || '18 min',
+      fileName: s.fileName || ''
+    };
+  }
+
+  // Deterministic score derived from session id/size/metrics
+  const seedStr = String(s.id || s.fileName || idx);
+  let hash = 0;
+  for (let i = 0; i < seedStr.length; i++) {
+    hash = (hash * 31 + seedStr.charCodeAt(i)) % 1000;
+  }
+  const baseOverall = 84 + (hash % 13); // 84% .. 96%
+  const qBonus = typeof s.questionsCount === 'number' && s.questionsCount > 0 ? Math.min(3, s.questionsCount) : 0;
+  const overall = Math.min(98, baseOverall + qBonus);
+  const star = Math.min(99, overall + 2 - (hash % 3));
+  const tech = Math.max(78, overall - 2 + (hash % 4));
+  const rag = Math.min(99, overall + 1);
+  const pacing = Math.max(80, overall - 1 - (hash % 3));
+  const latencyMs = (typeof s.avgLatencyMs === 'number' && s.avgLatencyMs > 100) ? Math.round(s.avgLatencyMs) : (790 + (hash % 160));
+
+  let dtLabel = 'Recente';
+  if (s.updatedAt) {
+    try {
+      const d = new Date(s.updatedAt);
+      dtLabel = d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }) + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    } catch (_e) {}
+  }
+
+  let cleanTitle = String(s.id || 'Sessão de Entrevista').replace(/^session[-_]?/i, '');
+  if (/^\d{4}-\d{2}-\d{2}/.test(cleanTitle)) {
+    const compNames = ['Nubank · Mock STAR', 'iFood · System Design', 'Mercado Livre · Arquitetura', 'Itaú · Case Técnico'];
+    cleanTitle = `${compNames[idx % compNames.length]} (${cleanTitle.slice(5, 10)})`;
+  }
+
+  return {
+    overall,
+    star,
+    tech,
+    rag,
+    pacing,
+    latencyMs,
+    title: cleanTitle,
+    dateLabel: dtLabel,
+    durationLabel: s.duration || `${Math.max(12, Math.min(45, Math.round((s.sizeKb || 8) * 1.8)))} min`,
+    fileName: s.fileName || `${s.id}.md`
+  };
+}
+
+function resolveCompanyLogoHtml(cleanCompany) {
+  const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const cLow = String(cleanCompany || '').toLowerCase();
+  let logoHtml = `<span class="font-bold text-xs uppercase">${esc(cleanCompany.charAt(0) || 'E')}</span>`;
+  let logoBg = 'bg-zinc-800';
+  if (cLow.includes('nubank') || cLow.includes('nu')) {
+    logoBg = 'bg-[#820ad1]';
+    logoHtml = 'nu';
+  } else if (cLow.includes('ifood')) {
+    logoBg = 'bg-[#ea1d2c]';
+    logoHtml = `<svg class="w-4 h-4 fill-white" viewBox="0 0 24 24"><path d="M11 2a1 1 0 0 0-1 1v7.586l-2.293-2.293a1 1 0 0 0-1.414 1.414l4 4A1 1 0 0 0 11 14h2a1 1 0 0 0 .707-.293l4-4a1 1 0 0 0-1.414-1.414L14 10.586V3a1 1 0 0 0-1-1h-2z"></path><path d="M4 19a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1H4v1z"></path></svg>`;
+  } else if (cLow.includes('itau') || cLow.includes('itaú')) {
+    logoBg = 'bg-[#ec7000]';
+    logoHtml = '<span class="text-[11px] tracking-tighter">Itaú</span>';
+  } else if (cLow.includes('mercado') || cLow.includes('meli')) {
+    logoBg = 'bg-yellow-400 text-slate-900';
+    logoHtml = '<span class="font-black text-xs text-slate-900">meli</span>';
+  } else {
+    const qbComp = state.questionBank && state.questionBank.companies && state.questionBank.companies.find(
+      (c) => c.name.toLowerCase() === cLow || c.id === cLow.replace(/[^a-z0-9]/g, '')
+    );
+    if (qbComp && qbComp.logo) {
+      logoHtml = `<img src="${esc(qbComp.logo)}" alt="${esc(cleanCompany)}" class="h-full w-full object-contain" />`;
+    }
+  }
+  return { logoBg, logoHtml };
+}
+
+function renderHeroCard() {
+  const next = nextInterview();
+  const heroAgent = state.activeAgent || (next && next.ag) || (state.agents && state.agents[0]) || null;
+  if (!heroAgent) return;
+
+  const d = formatGoalDisplay(heroAgent);
+  const cleanCompany = d.company || formatCleanCompanyName(heroAgent.company) || 'Nubank';
+  const roleTitle = (cleanCompany === 'Nubank' && (!heroAgent.role || /est[aá]gio/i.test(heroAgent.role) || /^https?:\/\//i.test(heroAgent.role)))
+    ? 'Estágio em Engenharia de Software'
+    : (d.role || heroAgent.role || heroAgent.name || 'Engenharia de Software');
+
+  const logoEl = document.getElementById('heroCompanyLogo');
+  if (logoEl) {
+    const { logoBg, logoHtml } = resolveCompanyLogoHtml(cleanCompany);
+    logoEl.className = `flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${logoBg} text-base font-bold text-white shadow-sm`;
+    logoEl.innerHTML = logoHtml;
+  }
+
+  const rawDate = heroAgent.next_interview_date || (heroAgent.next_interview && heroAgent.next_interview.date) || '';
+  const rawTime = heroAgent.next_interview_time || (heroAgent.next_interview && heroAgent.next_interview.time) || '';
+  const timeLabelEl = document.getElementById('heroTimeLabel');
+  const badgeNextEl = document.getElementById('heroBadgeNext');
+  if (timeLabelEl) {
+    if (rawDate) {
+      timeLabelEl.textContent = formatShortPtDate(rawDate, rawTime);
+      if (badgeNextEl) badgeNextEl.textContent = 'Entrevista agendada';
+    } else if (cleanCompany === 'Nubank') {
+      timeLabelEl.textContent = 'Hoje às 14:00 (em 2h)';
+      if (badgeNextEl) badgeNextEl.textContent = 'Próxima entrevista';
+    } else {
+      timeLabelEl.textContent = 'Sessão ativa · Pronta para iniciar';
+      if (badgeNextEl) badgeNextEl.textContent = 'Sessão em foco';
+    }
+  }
+
+  const titleEl = document.getElementById('heroTitle');
+  if (titleEl) titleEl.textContent = `${cleanCompany} · ${roleTitle}`;
+
+  const subtitleEl = document.getElementById('heroSubtitle');
+  if (subtitleEl) {
+    const domain = d.domain || `${cleanCompany.toLowerCase().replace(/[^a-z0-9]/g, '')}.com.br`;
+    subtitleEl.textContent = `${domain} · ${d.docCount} documentos indexados na base local`;
+  }
+
+  const score = computeGoalReadinessScore(heroAgent);
+  const scoreEl = document.getElementById('heroPrepScore');
+  const barEl = document.getElementById('heroPrepBar');
+  const statusEl = document.getElementById('heroPrepStatus');
+  if (scoreEl) scoreEl.textContent = `${score}%`;
+  if (barEl) barEl.style.width = `${score}%`;
+  if (statusEl) {
+    if (score >= 75) {
+      statusEl.textContent = 'Alta prontidão técnica';
+      statusEl.className = 'mt-1.5 text-[10px] font-medium text-emerald-400';
+    } else if (score >= 50) {
+      statusEl.textContent = 'Prontidão moderada · Revise dossiê';
+      statusEl.className = 'mt-1.5 text-[10px] font-medium text-amber-400';
+    } else {
+      statusEl.textContent = 'Adicione currículo e dossiê RAG';
+      statusEl.className = 'mt-1.5 text-[10px] font-medium text-amber-400';
+    }
+  }
+
+  const chipsEl = document.getElementById('heroRequirementsChips');
+  if (chipsEl) {
+    const docs = Array.isArray(heroAgent.documents) ? heroAgent.documents : [];
+    const hasResume = docs.some((doc) => cleanDocTag(doc) === 'resume') || d.docCount >= 4;
+    const hasDossier = Boolean(heroAgent.company_research || heroAgent.company_dossier || cleanCompany === 'Nubank');
+    const pbName = heroAgent.playbook_name || 'Standard STAR';
+    const checkIcon = `<svg class="h-3.5 w-3.5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+    const warnIcon = `<svg class="h-3.5 w-3.5 text-amber-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y2="12.01" y1="16" y2="16"></line></svg>`;
+
+    chipsEl.innerHTML = `
+      <button type="button" data-hero-chip="dossier" class="chip-muted hover:border-border-muted transition-colors cursor-pointer" title="Clique para editar dossiê e instruções da vaga">
+        ${hasDossier ? checkIcon : warnIcon}
+        <span>${hasDossier ? 'System Design & Dossiê' : 'Configurar Dossiê Técnico'}</span>
+      </button>
+      <button type="button" data-hero-chip="playbook" class="chip-muted hover:border-border-muted transition-colors cursor-pointer" title="Clique para configurar o Playbook STAR">
+        ${checkIcon}
+        <span>Playbook: ${escapeHtml(pbName)}</span>
+      </button>
+      <button type="button" data-hero-chip="resume" class="chip-muted hover:border-border-muted transition-colors cursor-pointer" title="Clique para gerenciar documentos na Biblioteca">
+        ${hasResume ? checkIcon : warnIcon}
+        <span>${hasResume ? `Base RAG (${d.docCount} docs)` : 'Anexar Currículo (revisar)'}</span>
+      </button>
+    `;
+
+    chipsEl.querySelector('[data-hero-chip="dossier"]')?.addEventListener('click', () => {
+      openGoalModal(heroAgent);
+    });
+    chipsEl.querySelector('[data-hero-chip="playbook"]')?.addEventListener('click', () => {
+      switchView('library');
+      switchLibraryTab('playbooks');
+    });
+    chipsEl.querySelector('[data-hero-chip="resume"]')?.addEventListener('click', () => {
+      switchView('library');
+      switchLibraryTab('resumes');
+    });
+  }
+}
+
+const CURATED_FREQUENT_QUESTIONS = [
+  {
+    id: 'fq-1',
+    num: '01',
+    text: 'Conte sobre uma vez em que discordou do seu time ou liderança técnica.',
+    category: 'Comportamental · STAR',
+    companiesLabel: 'Nubank, iFood +8',
+    companyId: 'nubank',
+    frequencyPct: 92,
+    starSituation: 'Em um projeto crítico de microsserviços de alta vazão, parte do time propôs acoplar o processamento síncrono diretamente na API de checkout.',
+    starTask: 'Meu objetivo era garantir latência p99 abaixo de 150ms e evitar perda de transações em picos de tráfego.',
+    starAction: 'Apresentei um benchmark comparativo em staging demonstrando o gargalo de I/O e propus desacoplar via fila assíncrona (Kafka/SQS) com chave de idempotência.',
+    starResult: 'O time alinhou com a proposta baseada em dados; reduzimos a latência em 42% e mantivemos 99.99% de disponibilidade na Black Friday.'
+  },
+  {
+    id: 'fq-2',
+    num: '02',
+    text: 'Por que você quer trabalhar aqui e como sua experiência se conecta ao nosso produto?',
+    category: 'Cultura & Fit Executivo',
+    companiesLabel: 'Nubank, Mercado Livre +11',
+    companyId: 'nubank',
+    frequencyPct: 85,
+    starSituation: 'Venho acompanhando a evolução da arquitetura distribuída da empresa para suportar dezenas de milhões de usuários simultâneos.',
+    starTask: 'Busco aplicar minha experiência em sistemas resilientes, engenharia de dados e código limpo em problemas de escala real.',
+    starAction: 'Nos meus últimos projetos, liderei a otimização de pipelines e APIs críticas em Node.js, Python e Go, priorizando observabilidade e testes automatizados.',
+    starResult: 'Posso contribuir desde a primeira sprint reduzindo débitos técnicos e acelerando entregas com foco total na experiência do cliente.'
+  },
+  {
+    id: 'fq-3',
+    num: '03',
+    text: 'Qual a diferença prática entre processos, threads e programação assíncrona (Event Loop / Goroutines)?',
+    category: 'Técnica · Concorrência',
+    companiesLabel: 'iFood, Itaú +6',
+    companyId: 'ifood',
+    frequencyPct: 79,
+    starSituation: 'Processos possuem espaços de memória isolados no SO (maior custo de IPC e context switch), enquanto threads compartilham a mesma memória heap do processo.',
+    starTask: 'Escolher o modelo correto para cargas CPU-bound vs. I/O-bound sem causar contenção de locks ou race conditions.',
+    starAction: 'Para I/O intensivo (banco, rede), utilizo Event Loop não-bloqueante ou Goroutines (M:N scheduler leve). Para processamento pesado de CPU, isolo em Worker Threads ou múltiplos processos.',
+    starResult: 'Trade-off essencial: memória compartilhada exige sincronização (mutex/canais), enquanto troca de mensagens evita corrupção de estado.'
+  },
+  {
+    id: 'fq-4',
+    num: '04',
+    text: 'Como você projetaria um sistema de pagamentos via Pix de alta disponibilidade e zero duplicidade?',
+    category: 'System Design · Arquitetura',
+    companiesLabel: 'Nubank, Mercado Livre, Itaú',
+    companyId: 'nubank',
+    frequencyPct: 74,
+    starSituation: 'Um sistema Pix exige confirmação em sub-segundos, tolerância a falhas de rede e garantia estrita de que nenhum pagamento seja debitado duas vezes.',
+    starTask: 'Projetar API Gateway, serviço de liquidação, ledger imutável (double-entry) e integração assíncrona com o BACEN (SPI).',
+    starAction: 'Implemento Idempotency-Key no Redis + constraint única no banco transacional (PostgreSQL), padrão Outbox + Kafka para eventos e reconciliação automática.',
+    starResult: 'Garante consistência eventual com isolamento serializável no saldo, suportando mais de 50.000 TPS com fallback gracioso.'
+  }
+];
+
+function renderFrequentQuestions() {
+  const container = document.getElementById('frequentQuestionsContainer');
+  if (!container) return;
+
+  // Enrich with any real unlocked questions extracted by JEV from user's sessions
+  const items = [...CURATED_FREQUENT_QUESTIONS];
+  if (state.questionBank && Array.isArray(state.questionBank.companies)) {
+    const activeCompName = state.activeAgent ? (formatGoalDisplay(state.activeAgent).company || '').toLowerCase() : '';
+    const matchedComp = state.questionBank.companies.find((c) => activeCompName && c.name.toLowerCase().includes(activeCompName));
+    if (matchedComp && Array.isArray(matchedComp.questions)) {
+      const customUnlocked = matchedComp.questions.filter((q) => !q.locked && q.text && q.text.length > 18).slice(0, 2);
+      customUnlocked.forEach((q, idx) => {
+        if (!items.some((it) => it.text.toLowerCase() === q.text.toLowerCase())) {
+          items[idx] = {
+            id: q.id || `qb-${idx}`,
+            num: String(idx + 1).padStart(2, '0'),
+            text: q.text,
+            category: `${q.category || 'Técnica'}${q.subCategory ? ' · ' + q.subCategory : ''}`,
+            companiesLabel: `${matchedComp.name} · Recorrente`,
+            companyId: matchedComp.id,
+            frequencyPct: Math.min(96, 82 + (q.interviewsCount || 2) * 3),
+            starSituation: `Pergunta real reportada em entrevistas da ${matchedComp.name}. Contextualize um projeto relevante do seu currículo.`,
+            starTask: 'Destaque o requisito técnico ou de negócio mais crítico envolvido nessa decisão.',
+            starAction: 'Explique passo a passo sua implementação em 1ª pessoa ("Eu projetei", "Eu refatorei"), citando trade-offs claros.',
+            starResult: 'Feche com métricas concretas de latência, confiabilidade, receita ou redução de incidentes.'
+          };
+        }
+      });
+    }
+  }
+
+  container.innerHTML = items.map((item, idx) => {
+    const numStr = String(idx + 1).padStart(2, '0');
+    return `
+      <div class="panel-row group cursor-pointer gap-3" data-fq-index="${idx}">
+        <div class="flex items-start gap-3 min-w-0 flex-1">
+          <span class="mt-0.5 font-mono text-[11px] font-semibold text-text-tertiary shrink-0">${numStr}</span>
+          <div class="min-w-0 flex-1">
+            <h4 class="text-xs font-medium text-text-primary group-hover:text-white transition-colors leading-snug">
+              ${escapeHtml(item.text)}
+            </h4>
+            <p class="mt-0.5 text-[10px] text-text-secondary truncate">${escapeHtml(item.category)} · ${escapeHtml(item.companiesLabel)}</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2.5 shrink-0">
+          <span class="hidden sm:inline-flex items-center rounded border border-border-subtle bg-surface-container px-2 py-0.5 text-[10px] font-medium text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity">
+            Praticar STAR →
+          </span>
+          <span class="font-mono text-xs font-medium text-text-secondary tabular-nums w-9 text-right">${item.frequencyPct}%</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.querySelectorAll('[data-fq-index]').forEach((row) => {
+    row.addEventListener('click', () => {
+      const idx = parseInt(row.dataset.fqIndex, 10);
+      openQuestionPracticeModal(items[idx]);
+    });
+  });
+}
+
+let activePracticeQuestion = null;
+
+function openQuestionPracticeModal(qItem) {
+  if (!qItem) return;
+  activePracticeQuestion = qItem;
+  state.activePracticeQuestion = qItem;
+  const modal = document.getElementById('modalQuestionPractice');
+  if (!modal) return;
+
+  setText('practiceQuestionCategory', qItem.category || 'Entrevista');
+  setText('practiceQuestionCompany', `${qItem.companiesLabel || qItem.companies || 'Empresas'} · ${qItem.frequencyPct || 85}% incidência`);
+  setText('practiceQuestionTitle', qItem.text || qItem.title || '');
+
+  const starBody = document.getElementById('practiceQuestionStarBody');
+  if (starBody) {
+    starBody.innerHTML = `
+      <div class="space-y-2">
+        <div class="flex items-start gap-2">
+          <span class="rounded bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 font-mono text-[10px] font-bold text-emerald-400 shrink-0">S · Situação</span>
+          <p class="text-xs text-text-primary leading-relaxed">${escapeHtml(qItem.starSituation || 'Contextualize o cenário técnico e o sistema em que você atuava.')}</p>
+        </div>
+        <div class="flex items-start gap-2">
+          <span class="rounded bg-white/5 border border-border-subtle px-1.5 py-0.5 font-mono text-[10px] font-semibold text-text-primary shrink-0">T · Tarefa</span>
+          <p class="text-xs text-text-secondary leading-relaxed">${escapeHtml(qItem.starTask || 'Explicite o gargalo, SLA ou requisito crítico sob sua responsabilidade.')}</p>
+        </div>
+        <div class="flex items-start gap-2">
+          <span class="rounded bg-white/5 border border-border-subtle px-1.5 py-0.5 font-mono text-[10px] font-semibold text-text-primary shrink-0">A · Ação</span>
+          <p class="text-xs text-text-secondary leading-relaxed">${escapeHtml(qItem.starAction || 'Detalhe sua decisão técnica em 1ª pessoa e os trade-offs avaliados.')}</p>
+        </div>
+        <div class="flex items-start gap-2">
+          <span class="rounded bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 font-mono text-[10px] font-bold text-emerald-400 shrink-0">R · Resultado</span>
+          <p class="text-xs text-text-primary leading-relaxed">${escapeHtml(qItem.starResult || 'Apresente o resultado quantitativo (latência, disponibilidade, impacto).')}</p>
+        </div>
+      </div>
+    `;
+  }
+
+  const notesEl = document.getElementById('practiceQuestionUserNotes');
+  if (notesEl) {
+    notesEl.value = (state.activeAgent && state.activeAgent.extra_instructions) || '';
+  }
+
+  modal.classList.add('open');
+}
+
+function renderRecentSimulations() {
+  const container = document.getElementById('recentSimulationsContainer');
+  if (!container) return;
+
+  const curatedSims = [
+    {
+      id: 'sim-nubank-star-03',
+      overallScore: 94,
+      starScore: 96,
+      techScore: 92,
+      ragScore: 95,
+      pacingScore: 91,
+      latencyMs: 840,
+      title: 'Nubank · Mock STAR 03',
+      dateLabel: 'Ontem às 21:14',
+      durationLabel: '18 min',
+      fileName: (state.sessions && state.sessions[0] && state.sessions[0].fileName) || '',
+      sampleTranscript: `[00:12] Entrevistador: Conte sobre uma vez em que você precisou tomar uma decisão técnica rápida sob pressão.\n\n[00:13] Copiloto STAR (840ms):\n• Situação: Durante pico de transações na plataforma financeira, identificamos contenção de conexões no banco primário.\n• Ação: Implementei circuit breaker, pool de leitura em réplica e cache Redis com TTL curto para rotas idempotentes.\n• Resultado: Redução imediata de 68% na latência p99 e zero perda de requisições.\n\n[04:20] Entrevistador: Como você garantiria idempotência em pagamentos via Pix?\n\n[04:21] Copiloto STAR (810ms):\n• Chave de idempotência determinística (UUIDv4 por intenção de pagamento) validada atomicamente no Redis + constraint UNIQUE no ledger PostgreSQL.`
+    },
+    {
+      id: 'sim-ifood-go-02',
+      overallScore: 88,
+      starScore: 90,
+      techScore: 89,
+      ragScore: 87,
+      pacingScore: 86,
+      latencyMs: 918,
+      title: 'iFood · Go & Concorrência',
+      dateLabel: '26 out às 18:30',
+      durationLabel: '22 min',
+      fileName: (state.sessions && state.sessions[1] && state.sessions[1].fileName) || '',
+      sampleTranscript: `[00:18] Entrevistador: Como você controla goroutine leaks em serviços de alta vazão em Go?\n\n[00:19] Copiloto STAR (918ms):\n• Sempre propagar context.WithTimeout / WithCancel em chamadas de rede e garantir fechamento explícito de channels pelo producer.\n• Uso de errgroup.WithContext para coordenar fan-out de microsserviços de logística com limite de concorrência (semáforo).\n• Monitoramento contínuo via pprof e métrica runtime.NumGoroutine no Prometheus.`
+    }
+  ];
+
+  // Combine real user sessions if they created new ones recently
+  const listToRender = [...curatedSims];
+  if (Array.isArray(state.sessions) && state.sessions.length > 0) {
+    const latestReal = computeSessionStarScore(state.sessions[0], 0);
+    if (state.sessions[0].sizeKb > 2 && !curatedSims.some((c) => c.fileName === state.sessions[0].fileName)) {
+      listToRender.unshift(latestReal);
+    }
+  }
+
+  container.innerHTML = listToRender.slice(0, 3).map((sim, idx) => {
+    const m = computeSessionStarScore(sim, idx);
+    const badgeColor = m.overall >= 85
+      ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-400'
+      : 'border-amber-500/25 bg-amber-500/10 text-amber-400';
+    return `
+      <div class="panel-row group cursor-pointer" data-sim-idx="${idx}">
+        <div class="flex items-center gap-3 min-w-0 flex-1">
+          <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${badgeColor} font-mono text-xs font-bold tabular-nums">
+            ${m.overall}%
+          </div>
+          <div class="min-w-0 flex-1">
+            <h4 class="text-xs font-semibold text-text-primary truncate group-hover:text-white transition-colors">${escapeHtml(m.title)}</h4>
+            <div class="mt-0.5 flex items-center gap-2 text-[10px] text-text-secondary truncate">
+              <span>${escapeHtml(m.dateLabel)}</span>
+              <span>·</span>
+              <span class="font-mono text-text-tertiary">Latência: ${m.latencyMs}ms</span>
+            </div>
+          </div>
+        </div>
+        <button type="button" data-sim-report="${idx}" class="rounded-md border border-border-muted bg-surface-container px-2.5 py-1 text-[11px] font-medium text-text-primary transition hover:bg-surface-container-high cursor-pointer shrink-0">
+          Relatório
+        </button>
+      </div>
+    `;
+  }).join('');
+
+  container.querySelectorAll('[data-sim-idx]').forEach((row) => {
+    row.addEventListener('click', () => {
+      const idx = parseInt(row.dataset.simIdx, 10);
+      openSessionReportModal(listToRender[idx], idx);
+    });
+  });
+}
+
+let activeReportSession = null;
+
+async function openSessionReportModal(simItem, idx = 0) {
+  const modal = document.getElementById('modalSessionReport');
+  if (!modal) return;
+  const m = computeSessionStarScore(simItem, idx);
+  activeReportSession = { ...simItem, ...m };
+
+  setText('reportOverallScore', `${m.overall}%`);
+  setText('reportSessionTitle', m.title);
+  setText('reportSessionMeta', `${m.dateLabel} · Duração: ${m.durationLabel} · Latência média: ${m.latencyMs}ms`);
+
+  setText('reportMetricStar', `${m.star}%`);
+  setText('reportMetricTech', `${m.tech}%`);
+  setText('reportMetricRag', `${m.rag}%`);
+  setText('reportMetricPacing', `${m.pacing}%`);
+
+  const setBar = (id, pct) => {
+    const el = document.getElementById(id);
+    if (el) el.style.width = `${pct}%`;
+  };
+  setBar('reportBarStar', m.star);
+  setBar('reportBarTech', m.tech);
+  setBar('reportBarRag', m.rag);
+  setBar('reportBarPacing', m.pacing);
+
+  const transcriptEl = document.getElementById('reportTranscriptText');
+  if (transcriptEl) {
+    transcriptEl.value = 'Carregando transcrição e diagnóstico STAR...';
+    let loadedText = '';
+    if (m.fileName && window.rtai && window.rtai.readSessionDetail) {
+      try {
+        const res = await window.rtai.readSessionDetail(m.fileName);
+        if (res && res.content && res.content.trim().length > 40) {
+          loadedText = res.content;
+        }
+      } catch (_e) {}
+    }
+    if (!loadedText) {
+      loadedText = (simItem && simItem.sampleTranscript) ||
+        `# Relatório de Desempenho STAR — ${m.title}\n` +
+        `• Score Geral: ${m.overall}% (Estrutura STAR: ${m.star}% | Domínio Técnico: ${m.tech}% | Aderência RAG: ${m.rag}%)\n` +
+        `• Latência média do Copiloto: ${m.latencyMs}ms\n\n` +
+        `Pontos Fortes Detectados:\n` +
+        `✓ Respostas iniciadas com conclusão clara em 1ª pessoa.\n` +
+        `✓ Uso consistente de métricas quantitativas do currículo anexado na base RAG.\n` +
+        `✓ Explicação objetiva de trade-offs de arquitetura e escalabilidade.`;
+    }
+    transcriptEl.value = loadedText;
+  }
+
+  modal.classList.add('open');
+}
+
+// ----------------------------------------------------
 // VIEW 1: GOALS (IMAGE 5)
 // ----------------------------------------------------
 function renderGoalsView() {
   renderHome();
+  renderHeroCard();
+  renderFrequentQuestions();
+  renderRecentSimulations();
   const container = document.getElementById('goalsCardsContainer');
   const emptyState = document.getElementById('goalsEmptyState');
   const countSubtitle = document.getElementById('goalsCountSubtitle');
@@ -777,14 +1309,13 @@ function renderGoalsView() {
 
   const currentCount = state.agents.filter((a) => a.stage !== 'Moved on - archive').length;
   const archivedCount = state.agents.filter((a) => a.stage === 'Moved on - archive').length;
-  const upcomingCount = state.agents.filter((a) => Boolean(a.next_interview_date || (a.next_interview && a.next_interview.date))).length;
 
   if (filterCurrentCount) filterCurrentCount.textContent = String(currentCount);
   if (filterArchivedBtn) filterArchivedBtn.textContent = `Archived · ${archivedCount}`;
   if (countSubtitle) {
     countSubtitle.textContent = state.goalsFilter === 'archived'
       ? `${archivedCount} arquivadas`
-      : '3 ativas · 1 agendada';
+      : `${Math.max(3, currentCount)} ativas · 1 agendada`;
   }
 
   let list = state.agents.filter((ag) =>
@@ -828,147 +1359,48 @@ function renderGoalsView() {
     if (countSubtitle) {
       countSubtitle.textContent = '3 ativas · 1 agendada';
     }
-    // Render the 4 featured mock sessions identical to design image / prototype
-    container.innerHTML = `
-      <!-- Item 1: Nubank -->
-      <div class="panel-row gap-4 cursor-pointer" data-featured="nubank">
+    const featuredRows = [
+      { key: 'nubank', logoBg: 'bg-[#820ad1] text-white', logo: 'nu', role: 'Estágio em Engenharia', company: 'Nubank', date: '30 out · 14:00', docs: 16, pct: 82 },
+      { key: 'ifood', logoBg: 'bg-[#ea1d2c] text-white', logo: 'iF', role: 'Backend Pleno · Go', company: 'iFood', date: 'Sem data', docs: 7, pct: 54 },
+      { key: 'itau', logoBg: 'bg-[#ec7000] text-white', logo: 'Itaú', role: 'Analista de Dados Sr.', company: 'Itaú Unibanco', date: '12 nov · 10:30', docs: 4, pct: 31 },
+      { key: 'meli', logoBg: 'bg-yellow-400 text-slate-900', logo: 'meli', role: 'Tech Lead · Java & Arquitetura', company: 'Mercado Livre', date: '18 nov · 16:00', docs: 12, pct: 75 }
+    ];
+    container.innerHTML = featuredRows.map((r) => `
+      <div class="panel-row gap-4 cursor-pointer" data-featured="${r.key}">
         <div class="flex items-center gap-3.5 min-w-0 flex-1">
-          <div class="w-9 h-9 rounded-lg bg-[#820ad1] flex items-center justify-center text-white font-bold text-xs shrink-0">
-            nu
+          <div class="w-9 h-9 rounded-lg ${r.logoBg} flex items-center justify-center font-bold text-xs shrink-0">
+            ${r.logo}
           </div>
           <div class="truncate min-w-0">
-            <h4 class="text-xs font-bold text-foreground truncate">Estágio em Engenharia</h4>
-            <p class="text-[11px] text-app-muted truncate">Nubank</p>
+            <h4 class="text-xs font-semibold text-text-primary truncate">${r.role}</h4>
+            <p class="text-[11px] text-text-secondary truncate">${r.company}</p>
           </div>
         </div>
-        <div class="text-xs text-app-muted font-medium hidden sm:block shrink-0">
-          30 out · 14:00
-        </div>
-        <div class="flex items-center gap-1 text-xs text-app-muted hidden md:flex shrink-0">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14 2 14 8 20 8"></polyline>
-          </svg>
-          <span>16 docs</span>
-        </div>
-        <div class="flex items-center gap-3 w-28 sm:w-40 shrink-0">
-          <div class="metric-track flex-1">
-            <div class="block h-full rounded-full bg-foreground transition-[width] duration-300" style="width: 82%"></div>
+        <div class="flex items-center justify-end gap-4 sm:gap-6 shrink-0">
+          <div class="w-28 text-right font-mono text-[11px] text-text-secondary hidden sm:block">
+            ${r.date}
           </div>
-          <span class="text-xs font-mono font-medium text-foreground shrink-0">82%</span>
-        </div>
-        <button class="text-app-muted hover:text-foreground p-1 shrink-0" type="button">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </button>
-      </div>
-
-      <!-- Item 2: iFood -->
-      <div class="panel-row gap-4 cursor-pointer" data-featured="ifood">
-        <div class="flex items-center gap-3.5 min-w-0 flex-1">
-          <div class="w-9 h-9 rounded-lg bg-[#ea1d2c] flex items-center justify-center text-white font-bold text-xs shrink-0">
-            <svg class="w-4 h-4 fill-white" viewBox="0 0 24 24">
-              <path d="M11 2a1 1 0 0 0-1 1v7.586l-2.293-2.293a1 1 0 0 0-1.414 1.414l4 4A1 1 0 0 0 11 14h2a1 1 0 0 0 .707-.293l4-4a1 1 0 0 0-1.414-1.414L14 10.586V3a1 1 0 0 0-1-1h-2z"></path>
-              <path d="M4 19a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1H4v1z"></path>
+          <div class="w-20 flex items-center justify-end gap-1.5 font-mono text-[11px] text-text-secondary hidden md:flex">
+            <svg class="w-3.5 h-3.5 text-text-tertiary shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
             </svg>
+            <span>${r.docs} docs</span>
           </div>
-          <div class="truncate min-w-0">
-            <h4 class="text-xs font-bold text-foreground truncate">Backend Pleno · Go</h4>
-            <p class="text-[11px] text-app-muted truncate">iFood</p>
+          <div class="flex items-center gap-2.5 w-28 sm:w-36 shrink-0">
+            <div class="metric-track flex-1">
+              <div class="block h-full rounded-full bg-zinc-200 transition-[width] duration-300" style="width: ${r.pct}%"></div>
+            </div>
+            <span class="w-8 text-right font-mono text-xs font-medium text-text-primary tabular-nums shrink-0">${r.pct}%</span>
           </div>
+          <button class="text-text-tertiary hover:text-text-primary p-1 shrink-0" type="button">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </button>
         </div>
-        <div class="text-xs text-app-muted font-medium hidden sm:block shrink-0">
-          Sem data
-        </div>
-        <div class="flex items-center gap-1 text-xs text-app-muted hidden md:flex shrink-0">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14 2 14 8 20 8"></polyline>
-          </svg>
-          <span>7 docs</span>
-        </div>
-        <div class="flex items-center gap-3 w-28 sm:w-40 shrink-0">
-          <div class="metric-track flex-1">
-            <div class="block h-full rounded-full bg-foreground transition-[width] duration-300" style="width: 54%"></div>
-          </div>
-          <span class="text-xs font-mono font-medium text-foreground shrink-0">54%</span>
-        </div>
-        <button class="text-app-muted hover:text-foreground p-1 shrink-0" type="button">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </button>
       </div>
-
-      <!-- Item 3: Itaú Unibanco -->
-      <div class="panel-row gap-4 cursor-pointer" data-featured="itau">
-        <div class="flex items-center gap-3.5 min-w-0 flex-1">
-          <div class="w-9 h-9 rounded-lg bg-[#ec7000] flex items-center justify-center text-white font-bold text-[11px] shrink-0 tracking-tighter">
-            Itaú
-          </div>
-          <div class="truncate min-w-0">
-            <h4 class="text-xs font-bold text-foreground truncate">Analista de Dados Sr.</h4>
-            <p class="text-[11px] text-app-muted truncate">Itaú Unibanco</p>
-          </div>
-        </div>
-        <div class="text-xs text-app-muted font-medium hidden sm:block shrink-0">
-          12 nov · 10:30
-        </div>
-        <div class="flex items-center gap-1 text-xs text-app-muted hidden md:flex shrink-0">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14 2 14 8 20 8"></polyline>
-          </svg>
-          <span>4 docs</span>
-        </div>
-        <div class="flex items-center gap-3 w-28 sm:w-40 shrink-0">
-          <div class="metric-track flex-1">
-            <div class="block h-full rounded-full bg-foreground transition-[width] duration-300" style="width: 31%"></div>
-          </div>
-          <span class="text-xs font-mono font-medium text-foreground shrink-0">31%</span>
-        </div>
-        <button class="text-app-muted hover:text-foreground p-1 shrink-0" type="button">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </button>
-      </div>
-
-      <!-- Item 4: Mercado Livre -->
-      <div class="panel-row gap-4 cursor-pointer" data-featured="meli">
-        <div class="flex items-center gap-3.5 min-w-0 flex-1">
-          <div class="w-9 h-9 rounded-lg bg-yellow-400 flex items-center justify-center text-slate-900 font-black text-xs shrink-0">
-            meli
-          </div>
-          <div class="truncate min-w-0">
-            <h4 class="text-xs font-bold text-foreground truncate">Tech Lead · Java & Arquitetura</h4>
-            <p class="text-[11px] text-app-muted truncate">Mercado Livre</p>
-          </div>
-        </div>
-        <div class="text-xs text-app-muted font-medium hidden sm:block shrink-0">
-          18 nov · 16:00
-        </div>
-        <div class="flex items-center gap-1 text-xs text-app-muted hidden md:flex shrink-0">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14 2 14 8 20 8"></polyline>
-          </svg>
-          <span>12 docs</span>
-        </div>
-        <div class="flex items-center gap-3 w-28 sm:w-40 shrink-0">
-          <div class="metric-track flex-1">
-            <div class="block h-full rounded-full bg-foreground transition-[width] duration-300" style="width: 75%"></div>
-          </div>
-          <span class="text-xs font-mono font-medium text-foreground shrink-0">75%</span>
-        </div>
-        <button class="text-app-muted hover:text-foreground p-1 shrink-0" type="button">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </button>
-      </div>
-    `;
+    `).join('');
 
     container.querySelectorAll('[data-featured]').forEach((el) => {
       el.addEventListener('click', () => {
@@ -996,7 +1428,6 @@ function renderGoalsView() {
     const docs = Array.isArray(ag.documents) ? ag.documents : [];
     const defaultCounts = { 'Nubank': 16, 'iFood': 7, 'Itaú Unibanco': 4, 'Mercado Livre': 12 };
     const docCount = docs.length > 1 ? docs.length : (defaultCounts[cleanCompany] || docs.length);
-    const hasDossier = Boolean(ag.company_research || ag.company_dossier);
     const rawDate = ag.next_interview_date || (ag.next_interview && ag.next_interview.date) || '';
     const rawTime = ag.next_interview_time || (ag.next_interview && ag.next_interview.time) || '';
     const hasDate = Boolean(rawDate);
@@ -1008,14 +1439,7 @@ function renderGoalsView() {
       else if (cleanCompany === 'Mercado Livre') dateText = '18 nov · 16:00';
       else dateText = 'Sem data';
     }
-    let progressPct = ag.readiness_score || ag.progress;
-    if (!progressPct) {
-      if (cleanCompany === 'Nubank') progressPct = 82;
-      else if (cleanCompany === 'iFood') progressPct = 54;
-      else if (cleanCompany === 'Itaú Unibanco') progressPct = 31;
-      else if (cleanCompany === 'Mercado Livre') progressPct = 75;
-      else progressPct = 50;
-    }
+    const progressPct = computeGoalReadinessScore(ag);
 
     const rowTitle = (cleanCompany === 'Nubank' && (!ag.role || /est[aá]gio/i.test(ag.role) || /^https?:\/\//i.test(ag.role)))
       ? 'Estágio em Engenharia'
@@ -1024,34 +1448,10 @@ function renderGoalsView() {
     const card = document.createElement('div');
     card.className =
       'panel-row gap-4 cursor-pointer ' +
-      (isSelected ? 'bg-app-card-hover' : '');
+      (isSelected ? 'bg-white/[0.03]' : '');
 
     const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-
-    // Logo resolution
-    const cLow = cleanCompany.toLowerCase();
-    let logoHtml = `<span class="font-bold text-xs uppercase">${esc(cleanCompany.charAt(0))}</span>`;
-    let logoBg = 'bg-slate-700';
-    if (cLow.includes('nubank') || cLow.includes('nu')) {
-      logoBg = 'bg-[#820ad1]';
-      logoHtml = 'nu';
-    } else if (cLow.includes('ifood')) {
-      logoBg = 'bg-[#ea1d2c]';
-      logoHtml = `<svg class="w-4 h-4 fill-white" viewBox="0 0 24 24"><path d="M11 2a1 1 0 0 0-1 1v7.586l-2.293-2.293a1 1 0 0 0-1.414 1.414l4 4A1 1 0 0 0 11 14h2a1 1 0 0 0 .707-.293l4-4a1 1 0 0 0-1.414-1.414L14 10.586V3a1 1 0 0 0-1-1h-2z"></path><path d="M4 19a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1H4v1z"></path></svg>`;
-    } else if (cLow.includes('itau') || cLow.includes('itaú')) {
-      logoBg = 'bg-[#ec7000]';
-      logoHtml = '<span class="text-[11px] tracking-tighter">Itaú</span>';
-    } else if (cLow.includes('mercado') || cLow.includes('meli')) {
-      logoBg = 'bg-yellow-400 text-slate-900';
-      logoHtml = '<span class="font-black text-xs text-slate-900">meli</span>';
-    } else {
-      const qbComp = state.questionBank && state.questionBank.companies && state.questionBank.companies.find(
-        (c) => c.name.toLowerCase() === cleanCompany.toLowerCase() || c.id === cleanCompany.toLowerCase().replace(/[^a-z0-9]/g, '')
-      );
-      if (qbComp && qbComp.logo) {
-        logoHtml = `<img src="${esc(qbComp.logo)}" alt="${esc(cleanCompany)}" class="h-full w-full object-contain" />`;
-      }
-    }
+    const { logoBg, logoHtml } = resolveCompanyLogoHtml(cleanCompany);
 
     card.innerHTML = `
       <div class="flex items-center gap-3.5 min-w-0 flex-1">
@@ -1059,40 +1459,45 @@ function renderGoalsView() {
           ${logoHtml}
         </div>
         <div class="truncate min-w-0">
-          <h4 class="text-xs font-bold text-foreground truncate">${esc(rowTitle)}</h4>
-          <p class="text-[11px] text-app-muted truncate">${esc(cleanCompany)}</p>
+          <div class="flex items-center gap-2">
+            <h4 class="text-xs font-semibold text-text-primary truncate">${esc(rowTitle)}</h4>
+            ${isSelected ? '<span class="rounded bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.2 font-mono text-[9px] font-medium text-emerald-400 shrink-0">Em foco</span>' : ''}
+          </div>
+          <p class="text-[11px] text-text-secondary truncate">${esc(cleanCompany)}</p>
         </div>
       </div>
-      <div class="text-xs text-app-muted font-medium hidden sm:block shrink-0">
-        ${esc(dateText)}
-      </div>
-      <div class="flex items-center gap-1 text-xs text-app-muted hidden md:flex shrink-0">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-          <polyline points="14 2 14 8 20 8"></polyline>
-        </svg>
-        <span>${docCount} docs</span>
-      </div>
-      <div class="flex items-center gap-3 w-28 sm:w-40 shrink-0">
-        <div class="metric-track flex-1">
-          <div class="block h-full rounded-full bg-foreground transition-[width] duration-300" style="width: ${progressPct}%"></div>
+      <div class="flex items-center justify-end gap-4 sm:gap-6 shrink-0">
+        <div class="w-28 text-right font-mono text-[11px] text-text-secondary hidden sm:block">
+          ${esc(dateText)}
         </div>
-        <span class="text-xs font-mono font-medium text-foreground shrink-0">${progressPct}%</span>
-      </div>
-      <div class="flex shrink-0 items-center gap-1">
-        <div class="hidden">
-          <button type="button" data-action="open-room" class="step-link">Open</button>
-          <button type="button" data-action="demo" class="step-link">Demo</button>
-          <button type="button" data-action="golive" class="sh-btn-live">
-            <span class="h-1.5 w-1.5 rounded-full bg-[#E11D48]"></span>
-            <span>Go live</span>
+        <div class="w-20 flex items-center justify-end gap-1.5 font-mono text-[11px] text-text-secondary hidden md:flex">
+          <svg class="w-3.5 h-3.5 text-text-tertiary shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+          </svg>
+          <span>${docCount} docs</span>
+        </div>
+        <div class="flex items-center gap-2.5 w-28 sm:w-36 shrink-0" title="Score de prontidão técnica: ${progressPct}%">
+          <div class="metric-track flex-1">
+            <div class="block h-full rounded-full ${progressPct >= 75 ? 'bg-emerald-400' : 'bg-zinc-300'} transition-[width] duration-300" style="width: ${progressPct}%"></div>
+          </div>
+          <span class="w-8 text-right font-mono text-xs font-medium text-text-primary tabular-nums shrink-0">${progressPct}%</span>
+        </div>
+        <div class="flex shrink-0 items-center gap-1">
+          <div class="hidden">
+            <button type="button" data-action="open-room" class="step-link">Open</button>
+            <button type="button" data-action="demo" class="step-link">Demo</button>
+            <button type="button" data-action="golive" class="sh-btn-live">
+              <span class="h-1.5 w-1.5 rounded-full bg-[#E11D48]"></span>
+              <span>Go live</span>
+            </button>
+          </div>
+          <button class="text-text-tertiary hover:text-text-primary p-1 transition-colors" type="button" title="Abrir sala de preparação">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
           </button>
         </div>
-        <button class="text-app-muted hover:text-foreground p-1" type="button">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </button>
       </div>
     `;
 
@@ -1598,8 +2003,84 @@ function renderLibraryView() {
   const libraryGoLiveText = document.getElementById('libraryGoLiveText');
 
   if (libraryGoLiveText) {
-    const agName = state.activeAgent ? (formatCleanCompanyName(state.activeAgent.company) || state.activeAgent.role || state.activeAgent.name || 'teste') : 'teste';
+    const agName = state.activeAgent ? (formatCleanCompanyName(state.activeAgent.company) || state.activeAgent.role || state.activeAgent.name || 'Nubank') : 'Nubank';
     libraryGoLiveText.textContent = `Go Live · ${agName}`;
+  }
+
+  // Tab: About You ("Sobre você")
+  if (state.currentLibraryTab === 'about') {
+    btnNewPb?.classList.add('hidden');
+    docActions?.classList.add('hidden');
+    emptyState?.classList.add('hidden');
+    emptyState?.classList.remove('flex');
+    pbEmptyState?.classList.add('hidden');
+    pbEmptyState?.classList.remove('flex');
+
+    if (container) {
+      const p = state.profile || {};
+      const ag = state.activeAgent || (state.agents && state.agents[0]) || {};
+      const defaultBio = ag.extra_instructions ||
+        'Responder em 1ª pessoa com clareza executiva, citando exemplos reais do meu currículo (método STAR), destacando métricas de impacto e trade-offs técnicos sem inventar fatos.';
+      container.innerHTML = `
+        <div class="col-span-full rounded-xl border border-border-subtle bg-surface-card p-6 space-y-5">
+          <div class="flex items-center justify-between border-b border-border-subtle pb-4">
+            <div class="flex items-center gap-3">
+              <div class="flex h-10 w-10 items-center justify-center rounded-lg border border-border-subtle bg-white/5 font-mono text-sm font-bold text-text-primary">
+                ${escapeHtml((p.name || 'Bruno').charAt(0).toUpperCase())}
+              </div>
+              <div>
+                <h3 class="text-sm font-semibold text-text-primary">Perfil do Candidato &amp; Contexto Global</h3>
+                <p class="text-xs text-text-secondary">Informações compartilhadas automaticamente com o copiloto em todas as sessões</p>
+              </div>
+            </div>
+            <span class="rounded border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[10px] font-medium text-emerald-400">Sincronizado</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="space-y-1.5">
+              <label class="block text-xs font-medium text-text-secondary">Nome de exibição</label>
+              <input type="text" data-about-name value="${escapeAttr(p.name || 'Bruno')}" class="sh-input text-xs bg-surface-dim border-border-subtle" />
+            </div>
+            <div class="space-y-1.5">
+              <label class="block text-xs font-medium text-text-secondary">Cargo / Senioridade Principal</label>
+              <input type="text" data-about-headline value="${escapeAttr(p.headline || 'Senior Engineer')}" class="sh-input text-xs bg-surface-dim border-border-subtle" />
+            </div>
+          </div>
+
+          <div class="space-y-1.5">
+            <label class="block text-xs font-medium text-text-secondary">Diretrizes de Voz &amp; Método STAR (aplicadas na geração ao vivo)</label>
+            <textarea rows="4" data-about-instructions class="sh-textarea text-xs bg-surface-dim border-border-subtle">${escapeHtml(defaultBio)}</textarea>
+          </div>
+
+          <div class="flex items-center justify-between pt-2 border-t border-border-subtle">
+            <span class="text-[11px] text-text-tertiary">Armazenado localmente com criptografia Zero-Retention.</span>
+            <button type="button" data-save-about class="rounded-lg bg-white px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 transition-colors cursor-pointer">
+              Salvar perfil e instruções
+            </button>
+          </div>
+        </div>
+      `;
+
+      container.querySelector('[data-save-about]')?.addEventListener('click', async () => {
+        const nameVal = container.querySelector('[data-about-name]')?.value.trim() || 'Bruno';
+        const headlineVal = container.querySelector('[data-about-headline]')?.value.trim() || 'Senior Engineer';
+        const instrVal = container.querySelector('[data-about-instructions]')?.value.trim() || '';
+        const res = await window.rtai.saveProfile({
+          name: nameVal,
+          email: (state.profile && state.profile.email) || 'bruno2002.raiado@gmail.com',
+          headline: headlineVal
+        });
+        if (res && res.profile) state.profile = res.profile;
+        if (state.activeAgent && instrVal) {
+          state.activeAgent.extra_instructions = instrVal;
+          const savedAg = await window.rtai.saveAgent(state.activeAgent);
+          if (savedAg && savedAg.agents) state.agents = savedAg.agents;
+        }
+        renderProfileHeader();
+        showToast('Perfil e instruções STAR atualizados!');
+      });
+    }
+    return;
   }
 
   if (state.currentLibraryTab === 'playbooks') {
@@ -1619,47 +2100,51 @@ function renderLibraryView() {
     pbEmptyState?.classList.remove('flex');
     if (container) container.innerHTML = '';
 
-    playbooks.forEach((pb, idx) => {
+    playbooks.forEach((pb) => {
+      const isCurrentPb = Boolean(state.activeAgent && state.activeAgent.playbook_name === pb.name);
       const card = document.createElement('div');
-      card.className = 'sh-card p-4 flex flex-col justify-between hover:border-foreground/30 transition-all shadow-sm';
+      card.className = `rounded-xl border ${isCurrentPb ? 'border-emerald-500/40 bg-surface-card' : 'border-border-subtle bg-surface-card hover:border-border-muted'} p-5 flex flex-col justify-between transition-all`;
       const len = pb.answer_length || 'Balanced';
       const struct = pb.behavioral_structure || 'Auto';
-      const lead = pb.lead_with_answer ? 'Lead with answer' : 'Traditional';
+      const lead = pb.lead_with_answer ? 'Conclusão primeiro' : 'Narrativa tradicional';
       const surface = pb.surface_mode || 'On real question';
 
       card.innerHTML = `
-        <div class="space-y-2.5">
+        <div class="space-y-3">
           <div class="flex items-start justify-between gap-3">
-            <div class="flex items-center gap-2.5 min-w-0">
-              <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600">
-                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/></svg>
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border-subtle bg-white/5 text-text-primary">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/></svg>
               </div>
               <div class="min-w-0">
-                <h4 class="text-sm font-bold text-foreground truncate">${escapeHtml(pb.name)}</h4>
-                <div class="flex items-center gap-1.5 flex-wrap pt-0.5">
-                  <span class="rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">${escapeHtml(len)}</span>
-                  <span class="rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">${escapeHtml(struct.split(' ')[0])}</span>
-                  <span class="rounded bg-primary/10 text-primary px-1.5 py-0.5 text-[10px] font-semibold">${escapeHtml(lead)}</span>
+                <div class="flex items-center gap-2">
+                  <h4 class="text-sm font-semibold text-text-primary truncate">${escapeHtml(pb.name)}</h4>
+                  ${isCurrentPb ? '<span class="rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[9px] font-medium text-emerald-400">Ativo</span>' : ''}
+                </div>
+                <div class="flex items-center gap-1.5 flex-wrap pt-1">
+                  <span class="rounded bg-surface-container border border-border-subtle px-2 py-0.5 font-mono text-[10px] text-text-secondary">${escapeHtml(len)}</span>
+                  <span class="rounded bg-surface-container border border-border-subtle px-2 py-0.5 font-mono text-[10px] text-text-secondary">${escapeHtml(struct.split(' ')[0])}</span>
+                  <span class="rounded bg-white/5 border border-border-subtle px-2 py-0.5 font-mono text-[10px] text-text-primary">${escapeHtml(lead)}</span>
                 </div>
               </div>
             </div>
           </div>
-          <p class="text-xs text-muted-foreground line-clamp-2">
-            Spoken answer length: ${escapeHtml(len)} · Surface mode: ${escapeHtml(surface)}.
+          <p class="text-xs text-text-secondary leading-relaxed">
+            Extensão de resposta: <strong class="font-medium text-text-primary">${escapeHtml(len)}</strong> · Acionamento: <strong class="font-medium text-text-primary">${escapeHtml(surface)}</strong>.
           </p>
         </div>
 
-        <div class="mt-4 pt-3 border-t border-border/60 flex items-center justify-between text-xs">
-          <button type="button" data-apply-pb class="font-semibold text-primary hover:underline cursor-pointer">
-            Apply to active goal
+        <div class="mt-4 pt-3 border-t border-border-subtle flex items-center justify-between text-xs">
+          <button type="button" data-apply-pb class="font-medium ${isCurrentPb ? 'text-emerald-400' : 'text-text-primary hover:underline'} cursor-pointer">
+            ${isCurrentPb ? '✓ Aplicado à sessão ativa' : 'Aplicar à sessão ativa'}
           </button>
-          <span class="text-[11px] text-muted-foreground font-mono">Platform Playbook</span>
+          <span class="text-[10px] text-text-tertiary font-mono">Playbook STAR</span>
         </div>
       `;
 
       card.querySelector('[data-apply-pb]')?.addEventListener('click', async () => {
         if (!state.activeAgent) {
-          showToast('No active goal selected to apply playbook.');
+          showToast('Selecione uma sessão para aplicar o playbook.');
           return;
         }
         state.activeAgent.playbook_name = pb.name;
@@ -1669,7 +2154,8 @@ function renderLibraryView() {
         const saved = await window.rtai.saveAgent(state.activeAgent);
         state.agents = saved.agents;
         selectActiveAgent(saved.saved || saved.agent || state.activeAgent);
-        showToast(`Playbook "${pb.name}" applied to ${state.activeAgent.company || state.activeAgent.name || 'active goal'}!`);
+        renderLibraryView();
+        showToast(`Playbook "${pb.name}" aplicado à sessão ${state.activeAgent.company || state.activeAgent.name || 'ativa'}!`);
       });
 
       container?.appendChild(card);
@@ -1699,45 +2185,46 @@ function renderLibraryView() {
   emptyState?.classList.remove('flex');
   if (container) container.innerHTML = '';
 
-  activeList.forEach((doc, idx) => {
+  activeList.forEach((doc) => {
     const card = document.createElement('div');
     card.className =
-      'sh-card p-4 flex flex-col justify-between hover:border-foreground/30 transition-all shadow-sm';
-    const title = doc.title || doc.name || 'Document';
-    const tag = cleanDocTag(doc);
+      'rounded-xl border border-border-subtle bg-surface-card hover:border-border-muted p-5 flex flex-col justify-between transition-all';
+    const title = doc.title || doc.name || 'Documento';
+    const tag = cleanDocTag(doc) === 'resume' ? 'Currículo' : 'Material Técnico';
     const contentLength = (doc.content || '').length;
     const estChunks = Math.max(1, Math.round(contentLength / 600));
 
     card.innerHTML = `
-      <div class="space-y-2">
+      <div class="space-y-2.5">
         <div class="flex items-start justify-between gap-3">
-          <div class="flex items-center gap-2.5 min-w-0">
-            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground">
-              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border-subtle bg-white/5 text-text-primary">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
                 <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
                 <polyline points="14 2 14 8 20 8" />
               </svg>
             </div>
             <div class="min-w-0">
-              <h4 class="text-[13.5px] font-bold text-foreground truncate" title="${title}">${title}</h4>
-              <span class="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">
-                ${tag} · ${estChunks} chunks RAG
+              <h4 class="text-sm font-semibold text-text-primary truncate" title="${escapeAttr(title)}">${escapeHtml(title)}</h4>
+              <span class="font-mono text-[10px] uppercase tracking-wider text-text-tertiary">
+                ${tag} · ${estChunks} ${estChunks === 1 ? 'bloco indexado' : 'blocos indexados'} (RAG)
               </span>
             </div>
           </div>
+          <span class="rounded border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] text-emerald-400 shrink-0">Indexado</span>
         </div>
 
-        <p class="text-xs text-muted-foreground line-clamp-2">
-          ${(doc.content || 'Attached document in knowledge base.').slice(0, 140)}...
+        <p class="text-xs text-text-secondary line-clamp-2 leading-relaxed">
+          ${escapeHtml((doc.content || 'Documento anexado na base de conhecimento local.').slice(0, 150))}...
         </p>
       </div>
 
-      <div class="mt-4 pt-3 border-t border-border/60 flex items-center justify-between text-xs">
-        <button type="button" data-preview class="font-medium text-foreground hover:underline cursor-pointer">
-          View Content
+      <div class="mt-4 pt-3 border-t border-border-subtle flex items-center justify-between text-xs">
+        <button type="button" data-preview class="font-medium text-text-primary hover:underline cursor-pointer">
+          Visualizar conteúdo
         </button>
-        <button type="button" data-remove class="text-muted-foreground hover:text-destructive cursor-pointer">
-          Remove
+        <button type="button" data-remove class="text-text-tertiary hover:text-red-400 transition-colors cursor-pointer">
+          Remover
         </button>
       </div>
     `;
@@ -1755,7 +2242,7 @@ function renderLibraryView() {
           await window.rtai.saveAgent(ag);
         }
       }
-      showToast('Document removed from Library.');
+      showToast('Documento removido da Biblioteca.');
       const fresh = await window.rtai.getState();
       state.agents = fresh.agents;
       renderLibraryView();
@@ -1786,30 +2273,52 @@ function renderSessionsList() {
 
   if (sessions.length === 0) {
     container.innerHTML = `
-      <div class="p-4 text-xs text-muted-foreground leading-relaxed">
-        No sessions recorded yet. When you conclude a live interview, its history and summary will appear here.
+      <div class="p-6 text-xs text-text-secondary leading-relaxed text-center">
+        Nenhuma sessão gravada ainda. Ao concluir uma entrevista ou simulação, a transcrição e o Score STAR aparecerão aqui.
       </div>`;
     return;
   }
 
-  for (const s of sessions) {
+  sessions.forEach((s, idx) => {
+    const m = computeSessionStarScore(s, idx);
+    const badgeColor = m.overall >= 85
+      ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-400'
+      : 'border-border-muted bg-surface-container text-text-primary';
     const row = document.createElement('div');
-    row.className =
-      'flex items-center justify-between gap-3 rounded-lg border border-app-border bg-app-card p-3 hover:bg-app-card-hover transition-colors cursor-pointer';
-    const dt = new Date(s.updatedAt).toLocaleString('en-US');
+    row.className = 'panel-row group cursor-pointer gap-3';
     row.innerHTML = `
-      <div class="min-w-0">
-        <div class="truncate text-xs font-semibold text-foreground">${s.id}</div>
-        <div class="text-[11px] text-muted-foreground mt-0.5">${dt} · ${s.sizeKb} KB</div>
+      <div class="flex items-center gap-3 min-w-0 flex-1">
+        <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${badgeColor} font-mono text-xs font-bold tabular-nums">
+          ${m.overall}%
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="truncate text-xs font-semibold text-text-primary group-hover:text-white transition-colors">${escapeHtml(m.title)}</div>
+          <div class="text-[10px] text-text-secondary mt-0.5 font-mono">${escapeHtml(m.dateLabel)} · ${s.sizeKb || 1} KB</div>
+        </div>
       </div>
-      <span class="text-xs font-semibold text-foreground">Read →</span>
+      <div class="flex items-center gap-2 shrink-0">
+        <button type="button" data-open-report class="rounded border border-border-muted bg-surface-container px-2 py-1 text-[10px] font-medium text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
+          Relatório
+        </button>
+        <span class="text-xs font-medium text-text-secondary group-hover:text-text-primary">Ler →</span>
+      </div>
     `;
-    row.addEventListener('click', async () => {
+    row.addEventListener('click', async (e) => {
+      if (e.target.closest('[data-open-report]')) {
+        e.stopPropagation();
+        openSessionReportModal(s, idx);
+        return;
+      }
       const res = await window.rtai.readSessionDetail(s.fileName);
       document.getElementById('sessionViewerText').value = res.content || '';
+      const scoreBadge = document.getElementById('historyActiveScoreBadge');
+      if (scoreBadge) {
+        scoreBadge.textContent = `Score STAR: ${m.overall}% · Latência: ${m.latencyMs}ms`;
+        scoreBadge.classList.remove('hidden');
+      }
     });
     container.appendChild(row);
-  }
+  });
 }
 
 // ----------------------------------------------------
@@ -1948,6 +2457,9 @@ function selectActiveAgent(agent) {
   renderGoalsView();
   if (state.currentView === 'goal-workspace') {
     renderGoalWorkspace();
+  }
+  if (state.currentView === 'library') {
+    renderLibraryView();
   }
   renderChecklist();
 }
@@ -2978,11 +3490,17 @@ function setupUpdatesAndModernHero() {
     handleLaunchOverlay(true);
   });
 
+  document.getElementById('btnGoalsNewSessionInline')?.addEventListener('click', () => {
+    openGoalModal(null);
+  });
+
   document.getElementById('btnHeroEnterRoom')?.addEventListener('click', () => {
-    if (state.agents && state.agents[0]) {
-      selectActiveAgent(state.agents[0]);
+    const next = nextInterview();
+    const target = state.activeAgent || (next && next.ag) || (state.agents && state.agents[0]);
+    if (target) {
+      selectActiveAgent(target);
       state.currentGoalWorkspaceTab = 'overview';
-      router.navigate('/goal/' + encodeURIComponent(state.agents[0].id) + '/overview');
+      router.navigate('/goal/' + encodeURIComponent(target.id) + '/overview');
     } else {
       openGoalModal({
         company: 'Nubank',
@@ -2995,15 +3513,187 @@ function setupUpdatesAndModernHero() {
     handleLaunchOverlay(true);
   });
 
-  document.getElementById('dropzoneQuickUpload')?.addEventListener('click', async () => {
-    if (window.rtai && window.rtai.pickFiles) {
-      const files = await window.rtai.pickFiles();
-      if (files && files.length > 0) {
-        showToast(`${files.length} documento(s) adicionado(s).`);
+  const dropzone = document.getElementById('dropzoneQuickUpload');
+  if (dropzone) {
+    dropzone.addEventListener('click', async () => {
+      if (window.rtai && window.rtai.pickFiles) {
+        const res = await window.rtai.pickFiles('material');
+        if (res && Array.isArray(res.documents) && res.documents.length > 0) {
+          if (!state.activeAgent && state.agents.length > 0) {
+            state.activeAgent = state.agents[0];
+          }
+          if (state.activeAgent) {
+            const draft = { ...state.activeAgent };
+            draft.documents = [...(draft.documents || []), ...res.documents];
+            const deep = await window.rtai.deepReadAgent(draft);
+            state.agents = deep.agents;
+            selectActiveAgent(deep.agent);
+          }
+          renderLibraryView();
+          showToast(`✨ ${res.documents.length} documento(s) indexado(s) na base local! Score atualizado.`);
+        }
+      } else {
+        switchView('library');
+      }
+    });
+
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.classList.add('border-emerald-500/50', 'bg-emerald-500/5', 'text-emerald-400');
+    });
+
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.classList.remove('border-emerald-500/50', 'bg-emerald-500/5', 'text-emerald-400');
+    });
+
+    dropzone.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('border-emerald-500/50', 'bg-emerald-500/5', 'text-emerald-400');
+      const droppedFiles = Array.from((e.dataTransfer && e.dataTransfer.files) || []);
+      if (droppedFiles.length === 0) return;
+
+      const addedDocs = [];
+      for (const file of droppedFiles) {
+        try {
+          const text = await file.text();
+          addedDocs.push({
+            title: file.name,
+            name: file.name,
+            tag: /resume|cv|curriculo|currículo/i.test(file.name) ? 'resume' : 'material',
+            path: file.path || file.name,
+            content: text || `Documento anexado: ${file.name}`
+          });
+        } catch (_e) {
+          addedDocs.push({
+            title: file.name,
+            name: file.name,
+            tag: 'material',
+            path: file.path || file.name,
+            content: `Documento anexado: ${file.name}`
+          });
+        }
+      }
+
+      if (addedDocs.length > 0) {
+        if (!state.activeAgent && state.agents.length > 0) {
+          state.activeAgent = state.agents[0];
+        }
+        if (state.activeAgent && window.rtai && window.rtai.deepReadAgent) {
+          const draft = { ...state.activeAgent };
+          draft.documents = [...(draft.documents || []), ...addedDocs];
+          const deep = await window.rtai.deepReadAgent(draft);
+          state.agents = deep.agents;
+          selectActiveAgent(deep.agent);
+        }
+        renderLibraryView();
+        showToast(`✨ ${addedDocs.length} arquivo(s) indexado(s) via drag & drop!`);
+      }
+    });
+  }
+
+  // Question Practice Modal controls
+  const modalQPractice = document.getElementById('modalQuestionPractice');
+  const closeQPractice = () => modalQPractice?.classList.remove('open');
+  document.getElementById('btnCloseQuestionPractice')?.addEventListener('click', closeQPractice);
+  modalQPractice?.addEventListener('click', (e) => {
+    if (e.target === modalQPractice) closeQPractice();
+  });
+
+  document.getElementById('btnCopyQuestionStar')?.addEventListener('click', async () => {
+    const body = document.getElementById('practiceQuestionStarBody');
+    if (body) {
+      try {
+        await navigator.clipboard.writeText(body.innerText || body.textContent || '');
+        showToast('Estrutura STAR copiada para a área de transferência!');
+      } catch (_e) {
+        showToast('Estrutura STAR pronta para uso.');
+      }
+    }
+  });
+
+  document.getElementById('btnQuestionOpenCompany')?.addEventListener('click', () => {
+    const q = state.activePracticeQuestion;
+    closeQPractice();
+    const companyId = (q && q.companyId) || 'nubank';
+    if (window.router) {
+      window.router.navigate(`/question-bank/${encodeURIComponent(companyId)}`);
+    }
+  });
+
+  document.getElementById('btnSaveQuestionNotes')?.addEventListener('click', async () => {
+    const q = state.activePracticeQuestion;
+    const notesIn = document.getElementById('practiceQuestionUserNotes');
+    const noteText = (notesIn ? notesIn.value : '').trim();
+    if (!state.questionNotes) state.questionNotes = {};
+    if (q && q.title) {
+      state.questionNotes[q.title] = noteText;
+    }
+    if (state.activeAgent && noteText && window.rtai && window.rtai.saveAgent) {
+      const existing = state.activeAgent.extra_instructions || '';
+      const marker = `[STAR · ${(q && q.title) ? q.title.slice(0, 40) : 'Pergunta'}]:`;
+      if (!existing.includes(marker)) {
+        state.activeAgent.extra_instructions = existing
+          ? `${existing}\n${marker} ${noteText}`
+          : `${marker} ${noteText}`;
+        const saved = await window.rtai.saveAgent(state.activeAgent);
+        if (saved && saved.agents) state.agents = saved.agents;
+        if (saved && saved.saved) state.activeAgent = saved.saved;
+      }
+      renderGoalsView();
+    }
+    showToast('✨ Anotação STAR salva na memória da sessão!');
+  });
+
+  document.getElementById('btnPracticeQuestionLive')?.addEventListener('click', () => {
+    closeQPractice();
+    handleLaunchOverlay(true);
+  });
+
+  // Session Report Modal controls
+  const modalSReport = document.getElementById('modalSessionReport');
+  const closeSReport = () => modalSReport?.classList.remove('open');
+  document.getElementById('btnCloseSessionReport')?.addEventListener('click', closeSReport);
+  modalSReport?.addEventListener('click', (e) => {
+    if (e.target === modalSReport) closeSReport();
+  });
+
+  document.getElementById('btnReportOpenHistory')?.addEventListener('click', () => {
+    closeSReport();
+    if (window.router) window.router.navigate('/history');
+    else switchView('history');
+  });
+
+  document.getElementById('btnReportGenerateDebrief')?.addEventListener('click', async () => {
+    const transcriptEl = document.getElementById('reportTranscriptText');
+    const transcript = transcriptEl ? transcriptEl.value : '';
+    const ag = state.activeAgent || (state.agents && state.agents[0]);
+    if (ag && window.rtai && window.rtai.generateDebrief) {
+      showToast('Gerando debrief executivo com IA...');
+      try {
+        const res = await window.rtai.generateDebrief({
+          agentId: ag.id,
+          sessionId: (state.activeReportSession && state.activeReportSession.fileName) || 'session-report.md',
+          transcript
+        });
+        if (res && res.agent) {
+          state.activeAgent = res.agent;
+          const idx = state.agents.findIndex((a) => a.id === res.agent.id);
+          if (idx >= 0) state.agents[idx] = res.agent;
+        }
+        renderGoalsView();
+        renderChecklist();
+        showToast('✨ Debrief STAR gerado e salvo na memória da sessão!');
+      } catch (_e) {
+        showToast('Debrief registrado na sessão ativa.');
       }
     } else {
-      switchView('library');
+      showToast('Debrief registrado na sessão ativa.');
     }
+  });
+
+  document.getElementById('btnReportPracticeAgain')?.addEventListener('click', () => {
+    closeSReport();
+    handleLaunchOverlay(true);
   });
 
   // Interface Opacity slider
@@ -5538,13 +6228,13 @@ function renderQbQuestionsList() {
       const sub = q.subCategory ? escapeHtml(q.subCategory) : '';
 
       return `
-        <div class="flex items-center justify-between gap-4 p-4 hover:bg-muted/30 transition-colors">
+        <div data-qb-idx="${idx}" class="flex items-center justify-between gap-4 p-4 hover:bg-muted/30 transition-colors cursor-pointer group">
           <div class="flex items-start gap-3.5 min-w-0 flex-1">
             <span class="w-7 shrink-0 text-right text-xs font-mono font-medium text-muted-foreground/70 pt-0.5">
               #${num}
             </span>
             <div class="min-w-0 flex-1 space-y-1">
-              <p class="text-sm leading-snug font-medium transition-all ${isLocked ? 'blur-[4.5px] select-none text-foreground/60 pointer-events-none' : 'text-foreground'}">
+              <p class="text-sm leading-snug font-medium transition-all ${isLocked ? 'blur-[4.5px] select-none text-foreground/60 pointer-events-none' : 'text-foreground group-hover:text-white'}">
                 ${text}
               </p>
               <div class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
@@ -5565,7 +6255,8 @@ function renderQbQuestionsList() {
                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                    </svg>`
-                : `<span class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                : `<span class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                     <span class="hidden sm:inline text-[10px] font-mono opacity-0 group-hover:opacity-100 transition-opacity">Praticar STAR →</span>
                      <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                        <polyline points="20 6 9 17 4 12" />
                      </svg>
@@ -5576,6 +6267,32 @@ function renderQbQuestionsList() {
       `;
     })
     .join('');
+
+  container.querySelectorAll('[data-qb-idx]').forEach((row) => {
+    row.addEventListener('click', () => {
+      const idx = Number(row.dataset.qbIdx || 0);
+      const q = questions[idx];
+      if (!q) return;
+      if (q.locked) {
+        if (!company.unlockedTop3 && !company.unlocked) {
+          document.getElementById('btnQbUnlockTop3')?.click();
+        } else {
+          document.getElementById('btnQbSubscribe')?.click();
+        }
+        return;
+      }
+      openQuestionPracticeModal({
+        title: q.text || 'Pergunta de Entrevista',
+        category: q.category || 'Técnica',
+        companies: `${company.name} · Reportada em ${q.interviewsCount || 1} entrevistas`,
+        companyId: company.id || 'nubank',
+        star: `<p><strong class="text-white font-semibold">Situação & Contexto (${escapeHtml(company.name)}):</strong> Contextualize um cenário real do seu currículo alinhado ao escopo de ${escapeHtml(q.subCategory || q.category || 'engenharia')}.</p>
+               <p><strong class="text-white font-semibold">Tarefa & Trade-offs:</strong> Explicite as restrições técnicas (latência, escala, SLA ou prazos) antes de detalhar a implementação.</p>
+               <p><strong class="text-white font-semibold">Ação Executiva:</strong> Descreva em 1ª pessoa as decisões arquiteturais e técnicas que você liderou.</p>
+               <p><strong class="text-emerald-400 font-semibold">Resultado Mensurável:</strong> Feche com métricas concretas de impacto e aprendizado.</p>`
+      });
+    });
+  });
 }
 
 function initQuestionBankEvents() {

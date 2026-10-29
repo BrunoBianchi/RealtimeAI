@@ -258,3 +258,4 @@ Utiliza base modular de **4px / 8px**:
   - Evitar sombras projetadas pesadas (`box-shadow` difuso preto).
   - Usar bordas internas sutis (`border border-border-subtle`).
   - Sombra sutil de hover: `box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4)`.
+

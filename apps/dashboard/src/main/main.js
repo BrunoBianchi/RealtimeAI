@@ -2477,44 +2477,49 @@ function createWindow() {
         const wait = (ms) => new Promise((r) => setTimeout(r, ms));
         await wait(2400);
 
-        // 1. Capture Light Mode (Final Round AI Views)
-        await mainWindow.webContents.executeJavaScript(`applyTheme('light', 'light'); switchView('goals');`);
-        await wait(600);
-        const imgLightGoals = await mainWindow.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, 'finalround_light_goals.png'), imgLightGoals.toPNG());
+        await mainWindow.webContents.executeJavaScript(`applyTheme('dark', 'dark'); switchView('goals'); window.scrollTo(0, 0);`);
+        await wait(700);
+        const imgGoals = await mainWindow.webContents.capturePage();
+        fs.writeFileSync(path.join(outDir, '01_goals.png'), imgGoals.toPNG());
 
-        await mainWindow.webContents.executeJavaScript(`openGoalModal(state.agents[0]);`);
-        await wait(600);
-        const imgGoalModal = await mainWindow.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, 'finalround_goal_modal.png'), imgGoalModal.toPNG());
-        await mainWindow.webContents.executeJavaScript(`document.getElementById('modalGoalSetup').classList.remove('open');`);
+        await mainWindow.webContents.executeJavaScript(`document.querySelector('main')?.scrollTo(0, 600);`);
+        await wait(500);
+        const imgGoalsBottom = await mainWindow.webContents.capturePage();
+        fs.writeFileSync(path.join(outDir, '02_goals_bottom.png'), imgGoalsBottom.toPNG());
+
+        await mainWindow.webContents.executeJavaScript(`document.querySelector('[data-fq-index="0"]')?.click();`);
+        await wait(500);
+        const imgModalQ = await mainWindow.webContents.capturePage();
+        fs.writeFileSync(path.join(outDir, '03_modal_question_practice.png'), imgModalQ.toPNG());
+        await mainWindow.webContents.executeJavaScript(`document.getElementById('modalQuestionPractice')?.classList.remove('open');`);
         await wait(200);
 
-        await mainWindow.webContents.executeJavaScript(`switchView('library');`);
-        await wait(600);
-        const imgLightLibrary = await mainWindow.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, 'finalround_light_library.png'), imgLightLibrary.toPNG());
+        await mainWindow.webContents.executeJavaScript(`document.querySelector('[data-sim-idx="0"]')?.click();`);
+        await wait(500);
+        const imgModalRep = await mainWindow.webContents.capturePage();
+        fs.writeFileSync(path.join(outDir, '04_modal_session_report.png'), imgModalRep.toPNG());
+        await mainWindow.webContents.executeJavaScript(`document.getElementById('modalSessionReport')?.classList.remove('open');`);
+        await wait(200);
 
-        await mainWindow.webContents.executeJavaScript(`switchView('settings'); switchSettingsTab('shortcuts');`);
+        await mainWindow.webContents.executeJavaScript(`switchView('library'); switchLibraryTab('resumes'); document.querySelector('main')?.scrollTo(0, 0);`);
         await wait(600);
-        const imgLightShortcuts = await mainWindow.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, 'finalround_light_shortcuts.png'), imgLightShortcuts.toPNG());
+        const imgLibResumes = await mainWindow.webContents.capturePage();
+        fs.writeFileSync(path.join(outDir, '05_library_resumes.png'), imgLibResumes.toPNG());
 
-        await mainWindow.webContents.executeJavaScript(`switchView('settings'); switchSettingsTab('billing');`);
+        await mainWindow.webContents.executeJavaScript(`switchView('library'); switchLibraryTab('playbooks');`);
         await wait(600);
-        const imgLightBilling = await mainWindow.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, 'finalround_light_billing.png'), imgLightBilling.toPNG());
+        const imgLibPlaybooks = await mainWindow.webContents.capturePage();
+        fs.writeFileSync(path.join(outDir, '06_library_playbooks.png'), imgLibPlaybooks.toPNG());
 
-        // 2. Capture Dark Mode (Windows Sync / Obsidian Dark)
-        await mainWindow.webContents.executeJavaScript(`applyTheme('dark', 'dark'); switchView('goals');`);
+        await mainWindow.webContents.executeJavaScript(`switchView('settings'); document.querySelector('main')?.scrollTo(0, 0);`);
         await wait(600);
-        const imgDarkGoals = await mainWindow.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, 'finalround_dark_goals.png'), imgDarkGoals.toPNG());
+        const imgSettings = await mainWindow.webContents.capturePage();
+        fs.writeFileSync(path.join(outDir, '07_settings.png'), imgSettings.toPNG());
 
-        await mainWindow.webContents.executeJavaScript(`applyTheme('dark', 'dark'); switchView('settings');`);
+        await mainWindow.webContents.executeJavaScript(`switchView('history'); document.querySelector('main')?.scrollTo(0, 0);`);
         await wait(600);
-        const imgDarkSettings = await mainWindow.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, 'finalround_dark_settings.png'), imgDarkSettings.toPNG());
+        const imgHistory = await mainWindow.webContents.capturePage();
+        fs.writeFileSync(path.join(outDir, '08_history.png'), imgHistory.toPNG());
       } catch (err) {
         console.error('Capture error:', err);
       } finally {

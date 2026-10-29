@@ -344,7 +344,7 @@
      Keeps the 24px/12px type scale, the 28px section rhythm and the
      #14171e / #222734 hairline panels of the reference design. */
   .page-shell {
-    @apply mx-auto w-full max-w-7xl space-y-7;
+    @apply mx-auto w-full max-w-6xl space-y-6;
   }
   .page-header {
     @apply flex flex-wrap items-start justify-between gap-4;

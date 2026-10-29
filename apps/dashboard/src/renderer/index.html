@@ -300,70 +300,66 @@
               </div>
 
               <!-- BEGIN: HeroCardNextInterview -->
-              <section class="relative overflow-hidden rounded-xl border border-app-border bg-app-card p-6 shadow-xl" data-purpose="featured-session">
-                <!-- Glow suave de fundo -->
-                <div class="pointer-events-none absolute -right-20 -top-20 h-80 w-80 rounded-full bg-purple-900/10 blur-3xl"></div>
+              <section id="heroCardSection" class="relative overflow-hidden rounded-xl border border-border-subtle bg-surface-card p-6 shadow-sm" data-purpose="featured-session">
                 <div class="relative z-10 flex flex-col items-start justify-between gap-6 lg:flex-row lg:items-center">
-                  <div class="flex items-start gap-4">
-                    <!-- Logo Nubank -->
-                    <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#820ad1] text-base font-bold text-white shadow-lg shadow-purple-950/40">
+                  <div class="flex items-start gap-4 min-w-0 flex-1">
+                    <!-- Logo da Empresa Ativa -->
+                    <div id="heroCompanyLogo" class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#820ad1] text-base font-bold text-white shadow-sm">
                       nu
                     </div>
-                    <div>
-                      <div class="mb-1 flex items-center gap-2.5">
-                        <span class="rounded border border-purple-500/20 bg-purple-500/10 px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-purple-400">Próxima entrevista</span>
-                        <span class="text-xs font-medium text-app-muted">Hoje às 14:00 (em 2h)</span>
+                    <div class="min-w-0 flex-1">
+                      <div class="mb-1 flex flex-wrap items-center gap-2.5">
+                        <span id="heroBadgeNext" class="rounded border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-400">Próxima entrevista</span>
+                        <span id="heroTimeLabel" class="text-xs font-medium text-text-secondary">Hoje às 14:00 (em 2h)</span>
                       </div>
-                      <h2 class="text-lg font-bold tracking-tight text-foreground">Nubank · Estágio em Engenharia de Software</h2>
-                      <p class="mt-0.5 text-xs text-app-muted">estagio.nubank.com.br · 16 documentos indexados na base local</p>
-                      <!-- Checklist de Requisitos -->
-                      <div class="mt-4 flex flex-wrap items-center gap-3 text-xs">
-                        <div class="chip-muted">
-                          <svg class="h-3.5 w-3.5 text-app-emerald" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                      <h2 id="heroTitle" class="text-lg font-semibold tracking-tight text-text-primary truncate">Nubank · Estágio em Engenharia de Software</h2>
+                      <p id="heroSubtitle" class="mt-0.5 text-xs text-text-secondary truncate">estagio.nubank.com.br · 16 documentos indexados na base local</p>
+                      <!-- Checklist de Requisitos Interativo -->
+                      <div id="heroRequirementsChips" class="mt-4 flex flex-wrap items-center gap-2.5 text-xs">
+                        <button type="button" data-hero-chip="dossier" class="chip-muted hover:border-border-muted transition-colors cursor-pointer">
+                          <svg class="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                             <polyline points="20 6 9 17 4 12"></polyline>
                           </svg>
-                          <span>System Design</span>
-                        </div>
-                        <div class="chip-muted">
-                          <svg class="h-3.5 w-3.5 text-app-emerald" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                          <span>System Design &amp; Dossiê</span>
+                        </button>
+                        <button type="button" data-hero-chip="playbook" class="chip-muted hover:border-border-muted transition-colors cursor-pointer">
+                          <svg class="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                             <polyline points="20 6 9 17 4 12"></polyline>
                           </svg>
                           <span>Respostas STAR</span>
-                        </div>
-                        <div class="chip-muted">
-                          <svg class="h-3.5 w-3.5 text-amber-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <line x1="12" y1="8" x2="12" y2="12"></line>
-                            <line x1="12" x2="12.01" y1="16" y2="16"></line>
+                        </button>
+                        <button type="button" data-hero-chip="resume" class="chip-muted hover:border-border-muted transition-colors cursor-pointer">
+                          <svg class="h-3.5 w-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <polyline points="20 6 9 17 4 12"></polyline>
                           </svg>
-                          <span>Algoritmos &amp; Complexidade (revisar)</span>
-                        </div>
+                          <span>Currículo &amp; Base RAG</span>
+                        </button>
                       </div>
                     </div>
                   </div>
                   <!-- Métricas e Ações -->
-                  <div class="flex w-full shrink-0 flex-col items-stretch gap-6 sm:flex-row lg:w-auto lg:items-center">
+                  <div class="flex w-full shrink-0 flex-col items-stretch gap-4 sm:flex-row lg:w-auto lg:items-center">
                     <!-- Barra de Progresso / Preparação -->
-                    <div class="flex min-w-[150px] flex-col justify-center rounded-xl border border-app-border bg-app-surface p-3.5 px-5">
+                    <div class="flex min-w-[165px] flex-col justify-center rounded-xl border border-border-subtle bg-surface-dim p-3.5 px-4">
                       <div class="mb-1.5 flex items-center justify-between gap-3 text-xs">
-                        <span class="font-medium text-app-muted">Preparação</span>
-                        <span class="font-mono font-bold text-foreground">82%</span>
+                        <span class="font-medium text-text-secondary">Score de Preparo</span>
+                        <span id="heroPrepScore" class="font-mono font-semibold text-text-primary tabular-nums">82%</span>
                       </div>
                       <div class="metric-track">
-                        <i style="width: 82%"></i>
+                        <i id="heroPrepBar" style="width: 82%"></i>
                       </div>
-                      <span class="mt-1 text-[10px] font-medium text-app-emerald">Alta prontidão técnica</span>
+                      <span id="heroPrepStatus" class="mt-1.5 text-[10px] font-medium text-emerald-400">Alta prontidão técnica</span>
                     </div>
                     <!-- Botões de Ação -->
                     <div class="flex flex-col gap-2">
-                      <button id="btnHeroEnterRoom" class="flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-2.5 text-xs font-bold text-slate-900 shadow transition hover:bg-slate-100 active:scale-[0.98] cursor-pointer" type="button">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                      <button id="btnHeroEnterRoom" class="flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-2.5 text-xs font-semibold text-zinc-950 shadow-sm transition hover:bg-zinc-200 active:scale-[0.99] cursor-pointer whitespace-nowrap" type="button">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
                           <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"></path>
                         </svg>
                         <span>Entrar na Sala</span>
                       </button>
-                      <button id="btnHeroStartSimulation" class="flex items-center justify-center gap-2 rounded-lg border border-app-border bg-app-surface px-5 py-2 text-xs font-semibold text-foreground transition hover:bg-app-card-hover cursor-pointer" type="button">
-                        <svg class="w-3.5 h-3.5 text-purple-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                      <button id="btnHeroStartSimulation" class="flex items-center justify-center gap-2 rounded-lg border border-border-muted bg-surface-container px-5 py-2 text-xs font-medium text-text-primary transition hover:bg-surface-container-high cursor-pointer whitespace-nowrap" type="button">
+                        <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                           <polygon points="5 3 19 12 5 21 5 3"></polygon>
                         </svg>
                         <span>Iniciar Simulação</span>
@@ -378,10 +374,10 @@
               <section data-purpose="active-sessions">
                 <div class="mb-3 flex items-center justify-between">
                   <div>
-                    <h3 class="text-sm font-bold tracking-tight text-foreground">Sessões de preparação</h3>
-                    <span id="goalsCountSubtitle" class="text-xs text-app-muted">3 ativas · 1 agendada</span>
+                    <h3 class="text-sm font-semibold tracking-tight text-text-primary">Sessões de preparação</h3>
+                    <span id="goalsCountSubtitle" class="text-xs text-text-secondary">3 ativas · 1 agendada</span>
                   </div>
-                  <button type="button" data-view="goals" class="text-xs font-semibold text-app-muted transition hover:text-foreground cursor-pointer">Ver todas</button>
+                  <button id="btnGoalsNewSessionInline" type="button" class="text-xs font-medium text-text-secondary transition hover:text-text-primary cursor-pointer">+ Nova sessão</button>
                 </div>
                 <div id="goalsCardsContainer" class="panel">
                   <!-- Dynamically rendered goals or default 4 featured sessions -->
@@ -401,64 +397,13 @@
                 <section class="lg:col-span-7" data-purpose="frequent-questions">
                   <div class="mb-3 flex items-center justify-between">
                     <div>
-                      <h3 class="text-sm font-bold tracking-tight text-foreground">Perguntas frequentes</h3>
-                      <span class="text-xs text-app-muted">Das empresas das suas sessões</span>
+                      <h3 class="text-sm font-semibold tracking-tight text-text-primary">Perguntas frequentes</h3>
+                      <span class="text-xs text-text-secondary">Clique em uma pergunta para ver a resposta STAR ou praticar</span>
                     </div>
-                    <button type="button" data-view="question-bank" class="text-xs font-semibold text-app-muted transition hover:text-foreground cursor-pointer">Banco de perguntas</button>
+                    <button type="button" data-view="question-bank" class="text-xs font-medium text-text-secondary transition hover:text-text-primary cursor-pointer">Banco de perguntas →</button>
                   </div>
-                  <div class="panel">
-                    <!-- Pergunta 1 -->
-                    <div class="panel-row">
-                      <div class="flex items-start gap-3">
-                        <span class="mt-0.5 font-mono text-[11px] font-semibold text-app-muted">01</span>
-                        <div>
-                          <h4 class="cursor-pointer text-xs font-medium text-foreground transition hover:text-white">
-                            Conte sobre uma vez em que discordou do seu time.
-                          </h4>
-                          <p class="mt-0.5 text-[10px] text-app-muted">Comportamental · Nubank, iFood +8</p>
-                        </div>
-                      </div>
-                      <span class="font-mono text-xs font-medium text-app-muted">92%</span>
-                    </div>
-                    <!-- Pergunta 2 -->
-                    <div class="panel-row">
-                      <div class="flex items-start gap-3">
-                        <span class="mt-0.5 font-mono text-[11px] font-semibold text-app-muted">02</span>
-                        <div>
-                          <h4 class="cursor-pointer text-xs font-medium text-foreground transition hover:text-white">
-                            Por que você quer trabalhar aqui e não em outra fintech?
-                          </h4>
-                          <p class="mt-0.5 text-[10px] text-app-muted">Cultura · Nubank, Mercado Livre +11</p>
-                        </div>
-                      </div>
-                      <span class="font-mono text-xs font-medium text-app-muted">81%</span>
-                    </div>
-                    <!-- Pergunta 3 -->
-                    <div class="panel-row">
-                      <div class="flex items-start gap-3">
-                        <span class="mt-0.5 font-mono text-[11px] font-semibold text-app-muted">03</span>
-                        <div>
-                          <h4 class="cursor-pointer text-xs font-medium text-foreground transition hover:text-white">
-                            Diferença entre processos e threads — quando usar cada um?
-                          </h4>
-                          <p class="mt-0.5 text-[10px] text-app-muted">Técnica · Itaú, Accenture +5</p>
-                        </div>
-                      </div>
-                      <span class="font-mono text-xs font-medium text-app-muted">78%</span>
-                    </div>
-                    <!-- Pergunta 4 -->
-                    <div class="panel-row">
-                      <div class="flex items-start gap-3">
-                        <span class="mt-0.5 font-mono text-[11px] font-semibold text-app-muted">04</span>
-                        <div>
-                          <h4 class="cursor-pointer text-xs font-medium text-foreground transition hover:text-white">
-                            Como você projetaria um sistema de pagamentos via Pix?
-                          </h4>
-                          <p class="mt-0.5 text-[10px] text-app-muted">System design · Nubank, PicPay +3</p>
-                        </div>
-                      </div>
-                      <span class="font-mono text-xs font-medium text-app-muted">61%</span>
-                    </div>
+                  <div id="frequentQuestionsContainer" class="panel">
+                    <!-- Dynamically populated by renderFrequentQuestions() -->
                   </div>
                 </section>
 
@@ -466,59 +411,24 @@
                 <section class="lg:col-span-5" data-purpose="simulation-history">
                   <div class="mb-3 flex items-center justify-between">
                     <div>
-                      <h3 class="text-sm font-bold tracking-tight text-foreground">Simulações recentes</h3>
-                      <span class="text-xs text-app-muted">Scores STAR &amp; copiloto</span>
+                      <h3 class="text-sm font-semibold tracking-tight text-text-primary">Simulações recentes</h3>
+                      <span class="text-xs text-text-secondary">Scores STAR &amp; relatórios de desempenho</span>
                     </div>
-                    <button type="button" data-view="history" class="text-xs font-semibold text-app-muted transition hover:text-foreground cursor-pointer">Ver histórico</button>
+                    <button type="button" data-view="history" class="text-xs font-medium text-text-secondary transition hover:text-text-primary cursor-pointer">Ver histórico →</button>
                   </div>
                   <div class="panel">
-                    <!-- Simulação 1 -->
-                    <div class="panel-row">
-                      <div class="flex items-center gap-3">
-                        <div class="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-500/20 bg-emerald-500/10 font-mono text-xs font-bold text-app-emerald">
-                          94%
-                        </div>
-                        <div>
-                          <h4 class="text-xs font-semibold text-foreground">Nubank · Mock STAR 03</h4>
-                          <div class="mt-0.5 flex items-center gap-2 text-[10px] text-app-muted">
-                            <span>Ontem às 21:14</span>
-                            <span>·</span>
-                            <span class="text-foreground/70">Latência: 840ms</span>
-                          </div>
-                        </div>
-                      </div>
-                      <button type="button" data-view="history" class="rounded border border-primary/25 bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary transition hover:bg-primary/20 cursor-pointer">
-                        Relatório
-                      </button>
-                    </div>
-                    <!-- Simulação 2 -->
-                    <div class="panel-row">
-                      <div class="flex items-center gap-3">
-                        <div class="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-500/20 bg-emerald-500/10 font-mono text-xs font-bold text-app-emerald">
-                          88%
-                        </div>
-                        <div>
-                          <h4 class="text-xs font-semibold text-foreground">iFood · Go &amp; Concorrência</h4>
-                          <div class="mt-0.5 flex items-center gap-2 text-[10px] text-app-muted">
-                            <span>26 out às 18:30</span>
-                            <span>·</span>
-                            <span class="text-foreground/70">Latência: 918ms</span>
-                          </div>
-                        </div>
-                      </div>
-                      <button type="button" data-view="history" class="rounded border border-primary/25 bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary transition hover:bg-primary/20 cursor-pointer">
-                        Relatório
-                      </button>
+                    <div id="recentSimulationsContainer" class="divide-y divide-app-border">
+                      <!-- Dynamically populated by renderRecentSimulations() -->
                     </div>
                     <!-- Dropzone para novo upload rápido de contexto -->
-                    <div class="bg-app-bg/40 p-3">
-                      <div id="dropzoneQuickUpload" class="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-app-border p-3 text-center text-app-muted transition hover:border-app-border-light hover:text-foreground">
-                        <svg class="h-4 w-4 text-app-muted" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <div class="bg-surface-dim/50 p-3">
+                      <div id="dropzoneQuickUpload" class="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border-muted p-3 text-center text-text-secondary transition hover:border-white/25 hover:bg-white/[0.02] hover:text-text-primary">
+                        <svg class="h-4 w-4 text-text-secondary shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                           <polyline points="17 8 12 3 7 8"></polyline>
-                          <line x1="12" y1="3" y2="15"></line>
+                          <line x1="12" y1="3" x2="12" y2="15"></line>
                         </svg>
-                        <span class="text-xs font-medium">Enviar ou arrastar documentos adicionais</span>
+                        <span class="text-xs font-medium">Enviar ou arrastar documentos adicionais (PDF, DOCX, MD)</span>
                       </div>
                     </div>
                   </div>
@@ -526,21 +436,9 @@
               </div>
               <!-- END: DualColumnSection -->
 
-              <!-- BEGIN: BottomStatusBar -->
-              <footer class="page-footer">
-                <div id="footerVersionLabel">RealTimeAI v2.8.0 - Beta</div>
-                <div class="page-footer-group">
-                  <svg class="h-3.5 w-3.5 text-app-muted" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <rect height="11" rx="2" ry="2" width="18" x="3" y="11"></rect>
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                  </svg>
-                  <span>Dados locais e criptografados</span>
-                </div>
-              </footer>
-              <!-- END: BottomStatusBar -->
-
               <!-- Compatibility container preserving all other test elements -->
               <div class="hidden" aria-hidden="true">
+                <div id="footerVersionLabel">RealTimeAI v2.0.0 - Beta</div>
                 <button id="btnLaunchDemo" type="button"></button>
                 <button id="btnRefreshHero" type="button"></button>
                 <button id="btnHeroWhatsNew" type="button"><span id="homeWhatsNewVersion">v2.8</span></button>
@@ -1072,22 +970,22 @@
             </div>
           </section>
 
-          <!-- ==================== VIEW 2: LIBRARY (IMAGE 2) ==================== -->
+          <!-- ==================== VIEW 2: LIBRARY (EXECUTIVE DESIGN) ==================== -->
           <section id="view-library" class="view-pane">
             <div class="page-shell">
-              <!-- Header Title & Subtitle (Image 2) -->
+              <!-- Header Title & Subtitle -->
               <div class="page-header">
-                <div>
-                  <h1 class="page-title">Library</h1>
-                  <p class="page-subtitle">
-                    The copilot draws on your resumes, materials, playbooks, and what it has learned about you. One account pool, reused across every goal.
+                <div class="space-y-1">
+                  <h1 class="text-xl md:text-2xl font-semibold tracking-tight text-text-primary">Biblioteca &amp; Base RAG</h1>
+                  <p class="text-xs md:text-sm text-text-secondary max-w-2xl">
+                    O copiloto utiliza seus currículos, dossiês técnicos, playbooks STAR e perfil profissional em todas as entrevistas.
                   </p>
                   <div class="flex flex-wrap items-center gap-4 pt-1 text-xs">
-                    <a href="#" id="linkHowLibraryWorks" class="inline-flex items-center gap-1 text-app-muted transition-colors hover:text-foreground">
-                      How the Library works <span class="text-[10px]">↗</span>
+                    <a href="#" id="linkHowLibraryWorks" class="inline-flex items-center gap-1 text-text-tertiary transition-colors hover:text-text-primary">
+                      Como funciona a indexação RAG <span class="text-[10px]">↗</span>
                     </a>
-                    <a href="#" id="linkOpenAiDrive" class="inline-flex items-center gap-1 text-app-muted transition-colors hover:text-foreground">
-                      Need the previous AI Drive? <span class="underline">Open AI Drive on the web</span> <span class="text-[10px]">↗</span>
+                    <a href="#" id="linkOpenAiDrive" class="inline-flex items-center gap-1 text-text-tertiary transition-colors hover:text-text-primary">
+                      Pasta local de documentos <span class="underline">Abrir diretório</span> <span class="text-[10px]">↗</span>
                     </a>
                   </div>
                 </div>
@@ -1095,68 +993,68 @@
                   <button
                     id="btnLibraryGoLive"
                     type="button"
-                    class="flex cursor-pointer items-center gap-2 rounded-lg bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-900 shadow-sm transition-all hover:bg-slate-100 active:scale-[0.98]"
+                    class="flex cursor-pointer items-center gap-2 rounded-lg bg-white px-3.5 py-1.5 text-xs font-semibold text-zinc-950 shadow-xs transition-all hover:bg-zinc-200 active:scale-[0.98]"
                   >
-                    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                       <path d="M4.93 19.07a10 10 0 0 1 0-14.14M2 12h.01M22 12h.01M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.08M8.46 8.46a5 5 0 0 0 0 7.08M12 12v.01" />
                     </svg>
-                    <span id="libraryGoLiveText">Go Live · teste</span>
+                    <span id="libraryGoLiveText">Go Live · Nubank</span>
                   </button>
-                  <button id="btnLibraryHelp" type="button" class="icon-btn h-7 w-7 text-app-muted hover:text-foreground" title="Help">
+                  <button id="btnLibraryHelp" type="button" class="icon-btn h-8 w-8 text-text-secondary hover:text-text-primary border border-border-subtle bg-surface-card rounded-lg" title="Ajuda da Biblioteca">
                     <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                   </button>
                 </div>
               </div>
 
-              <!-- Tabs & Actions Bar (Image 2) -->
-              <div class="flex flex-wrap items-center justify-between gap-3 border-b border-app-border pb-0">
-                <div class="flex items-center gap-1">
+              <!-- Tabs & Actions Bar -->
+              <div class="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle pb-0">
+                <div class="flex items-center gap-1 overflow-x-auto">
                   <button type="button" data-lib-tab="resumes" class="library-tab active">
-                    <span>Resumes</span>
-                    <span id="libBadgeResumes" class="text-xs opacity-75">0</span>
+                    <span>Currículos</span>
+                    <span id="libBadgeResumes" class="nav-count ml-1">0</span>
                   </button>
                   <button type="button" data-lib-tab="materials" class="library-tab">
-                    <span>Materials</span>
-                    <span id="libBadgeMaterials" class="text-xs opacity-75">0</span>
+                    <span>Materiais &amp; Dossiês</span>
+                    <span id="libBadgeMaterials" class="nav-count ml-1">0</span>
                   </button>
                   <button type="button" data-lib-tab="playbooks" class="library-tab">
-                    <span>Playbooks</span>
-                    <span id="libBadgePlaybooks" class="text-xs opacity-75">0</span>
+                    <span>Playbooks STAR</span>
+                    <span id="libBadgePlaybooks" class="nav-count ml-1">0</span>
                   </button>
                   <button type="button" data-lib-tab="about" class="library-tab">
-                    <span>About you</span>
+                    <span>Sobre você</span>
                   </button>
                 </div>
 
-                <!-- Right Action Button (Image 2) -->
-                <div class="flex items-center gap-2 pb-1.5">
+                <!-- Right Action Buttons -->
+                <div class="flex items-center gap-2 pb-2">
                   <button
                     id="btnLibraryNewPlaybook"
                     type="button"
-                    class="hidden inline-flex items-center gap-1.5 rounded-lg border border-border/80 bg-background hover:bg-accent px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm transition-all cursor-pointer"
+                    class="hidden inline-flex items-center gap-1.5 rounded-lg border border-border-muted bg-surface-card hover:bg-surface-container px-3 py-1.5 text-xs font-medium text-text-primary transition-all cursor-pointer"
                   >
                     <span class="text-sm font-bold leading-none">+</span>
-                    <span>New playbook</span>
+                    <span>Novo playbook</span>
                   </button>
                   <div id="libraryDocActions" class="flex items-center gap-2">
                     <button
                       id="btnLibraryPasteText"
                       type="button"
-                      class="sh-btn-outline text-xs"
+                      class="rounded-lg border border-border-subtle bg-surface-card hover:bg-surface-container px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
                     >
-                      + Paste text
+                      + Colar texto
                     </button>
                     <button
                       id="btnLibraryUploadFile"
                       type="button"
-                      class="sh-btn-primary flex items-center gap-1.5 text-xs cursor-pointer"
+                      class="flex items-center gap-1.5 rounded-lg bg-white px-3.5 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 transition-colors cursor-pointer"
                     >
                       <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                         <polyline points="17 8 12 3 7 8" />
                         <line x1="12" y1="3" x2="12" y2="15" />
                       </svg>
-                      <span>Upload a file</span>
+                      <span>Enviar arquivo</span>
                     </button>
                   </div>
                 </div>
@@ -1165,87 +1063,66 @@
               <!-- Library Documents Grid -->
               <div id="libraryDocsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
 
-              <!-- Empty State: Playbooks Tab (Image 2) -->
+              <!-- Empty State: Playbooks Tab -->
               <div
                 id="libraryPlaybooksEmptyState"
-                class="hidden flex-col items-center justify-center py-12 text-center space-y-4"
+                class="hidden flex-col items-center justify-center py-12 text-center space-y-4 rounded-xl border border-border-subtle bg-surface-card p-8"
               >
-                <!-- Notebook Illustration (Image 2) -->
-                <div class="relative w-44 h-36 flex items-center justify-center">
-                  <svg class="w-40 h-32" viewBox="0 0 200 160" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <!-- Shadow -->
-                    <ellipse cx="100" cy="148" rx="80" ry="8" fill="currentColor" class="text-black/5 dark:text-white/5" />
-                    <!-- Notebook Cover (Left side) -->
-                    <rect x="25" y="20" width="70" height="110" rx="6" fill="#FDF8F0" stroke="#262626" stroke-width="3" />
-                    <!-- Notebook Cover (Right side) -->
-                    <rect x="95" y="20" width="70" height="110" rx="6" fill="#FDF8F0" stroke="#262626" stroke-width="3" />
-                    <!-- Spine / Rings -->
-                    <line x1="95" y1="20" x2="95" y2="130" stroke="#262626" stroke-width="3" stroke-dasharray="2 6" />
-                    <!-- Right Page Illustration (Path / Route Map) -->
-                    <rect x="102" y="28" width="56" height="94" rx="3" fill="#FCE9D8" />
-                    <path d="M110 50 Q130 35 125 75 T150 90" stroke="#EA580C" stroke-width="2" stroke-linecap="round" fill="none" />
-                    <circle cx="110" cy="50" r="2.5" fill="#EA580C" />
-                    <circle cx="150" cy="90" r="2.5" fill="#EA580C" />
-                    <!-- Tab Dividers on Right Edge -->
-                    <path d="M165 40 H171 V50 H165" fill="#262626" />
-                    <path d="M165 60 H171 V70 H165" fill="#F97316" />
-                    <path d="M165 80 H171 V90 H165" fill="#262626" />
-                    <!-- Ribbon Bookmark at bottom -->
-                    <path d="M90 120 V145 L95 140 L100 145 V120" fill="#F97316" stroke="#262626" stroke-width="1.5" />
+                <div class="flex h-12 w-12 items-center justify-center rounded-xl border border-border-subtle bg-surface-container text-text-secondary">
+                  <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/>
                   </svg>
                 </div>
 
                 <div class="space-y-1.5 max-w-md">
-                  <h3 class="text-base font-bold text-foreground">
-                    Shape how the copilot answers.
+                  <h3 class="text-sm font-semibold text-text-primary">
+                    Molde como o copiloto estrutura suas respostas.
+                    <span class="sr-only">Shape how the copilot answers.</span>
                   </h3>
-                  <p class="text-xs text-muted-foreground leading-relaxed">
-                    A playbook tunes answer length, structure, and when the copilot speaks up. Goals without a pick run on the platform default.
+                  <p class="text-xs text-text-secondary leading-relaxed">
+                    Um playbook ajusta o tamanho da resposta, a estrutura comportamental (STAR, CAR, Direto) e quando o copiloto intervém.
                   </p>
                   <div>
-                    <a href="#" id="linkPlaybooksWhatPlaybookDoes" class="text-xs text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1">
-                      What a playbook does <span class="text-[10px]">↗</span>
+                    <a href="#" id="linkPlaybooksWhatPlaybookDoes" class="text-xs text-text-tertiary hover:text-text-primary transition-colors inline-flex items-center gap-1">
+                      O que faz um playbook <span class="text-[10px]">↗</span>
                     </a>
                   </div>
                 </div>
 
-                <div class="pt-2">
+                <div class="pt-1">
                   <button
                     id="btnEmptyNewPlaybook"
                     type="button"
-                    class="inline-flex items-center gap-1.5 rounded-lg border border-border/80 bg-background hover:bg-accent px-4 py-2 text-xs font-semibold text-foreground shadow-sm transition-all cursor-pointer"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-border-muted bg-surface-container hover:bg-surface-container-high px-4 py-2 text-xs font-semibold text-text-primary transition-all cursor-pointer"
                   >
                     <span class="text-sm font-bold leading-none">+</span>
-                    <span>New playbook</span>
+                    <span>Criar playbook</span>
                   </button>
                 </div>
               </div>
 
-              <!-- Empty State: Resumes / Materials (Image 4) -->
+              <!-- Empty State: Resumes / Materials -->
               <div
                 id="libraryEmptyState"
-                class="hidden flex-col items-center justify-center py-16 text-center"
+                class="hidden flex-col items-center justify-center py-14 text-center rounded-xl border border-border-subtle bg-surface-card p-8"
               >
-                <!-- Orange binder icon illustration -->
-                <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600">
-                  <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect width="18" height="18" x="3" y="3" rx="2" />
-                    <path d="M3 9h18" />
-                    <path d="M9 21V9" />
+                <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-border-subtle bg-surface-container text-text-secondary">
+                  <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
                   </svg>
                 </div>
-                <h3 class="text-sm font-semibold text-foreground">
-                  Add a material.
+                <h3 class="text-sm font-semibold text-text-primary">
+                  Adicione um documento à base local
                 </h3>
-                <p class="mt-1 text-xs text-muted-foreground max-w-sm">
-                  Notes, briefs, or docs the copilot pulls from while you answer. Attach one to any goal. PDF, DOCX, TXT, or MD, up to 10 MB.
+                <p class="mt-1 text-xs text-text-secondary max-w-sm">
+                  Currículos, dossiês técnicos ou descrições de vagas para o copiloto consultar em tempo real (PDF, DOCX, TXT ou MD).
                 </p>
                 <button
                   id="btnEmptyUploadFile"
                   type="button"
-                  class="mt-4 sh-btn-outline"
+                  class="mt-4 rounded-lg bg-white px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 transition-colors cursor-pointer"
                 >
-                  Upload a file
+                  Enviar arquivo
                 </button>
               </div>
             </div>
@@ -1674,21 +1551,6 @@
                   </div>
                 </div>
               </div>
-
-              <!-- ==================== FOOTER ==================== -->
-              <footer class="flex flex-col sm:flex-row items-center justify-between w-full py-3.5 px-6 text-text-tertiary text-xs border-t border-border-subtle bg-surface-dim mt-8 rounded-b-lg gap-2">
-                <div>
-                  RealTimeAI v2.0.0-Beta • Dados locais e criptografados
-                </div>
-                <div class="flex items-center gap-3 font-mono text-[11px]">
-                  <span class="flex items-center gap-1.5">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                    Latência: <strong class="text-text-secondary font-normal">18ms</strong>
-                  </span>
-                  <span>•</span>
-                  <span>Build 20251030-x64</span>
-                </div>
-              </footer>
             </div>
 
             <div id="settingsLegacySubpanes" class="hidden">
@@ -3248,31 +3110,36 @@
           <section id="view-history" class="view-pane">
             <div class="page-shell">
               <div class="page-header">
-                <div>
-                  <h1 class="page-title">History</h1>
-                  <p class="page-subtitle">
-                    Review transcripts and suggested answers from your past interviews.
+                <div class="space-y-1">
+                  <h1 class="text-xl md:text-2xl font-semibold tracking-tight text-text-primary">Histórico de Sessões &amp; Scores</h1>
+                  <p class="text-xs md:text-sm text-text-secondary">
+                    Revise transcrições completas, respostas sugeridas pelo copiloto e relatórios de pontuação STAR.
                   </p>
                 </div>
                 <div class="page-actions">
-                  <button id="btnOpenSessionsFolder" type="button" class="sh-btn-outline">
-                    Open folder
+                  <button id="btnOpenSessionsFolder" type="button" class="rounded-lg border border-border-subtle bg-surface-card hover:bg-surface-container px-3.5 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
+                    Abrir pasta local
                   </button>
                 </div>
               </div>
 
               <div class="grid grid-cols-1 gap-6 lg:grid-cols-12">
                 <div class="panel max-h-[560px] overflow-y-auto lg:col-span-5" id="sessionsListContainer"></div>
-                <div class="flex flex-col rounded-xl border border-app-border bg-app-card p-5 lg:col-span-7">
-                  <div class="page-eyebrow mb-2">
-                    Conversation Transcript
+                <div class="flex flex-col rounded-xl border border-border-subtle bg-surface-card p-5 lg:col-span-7">
+                  <div class="mb-2 flex items-center justify-between">
+                    <span class="text-[11px] font-semibold uppercase tracking-wider text-text-tertiary">
+                      Transcrição &amp; Sugestões da Sessão
+                    </span>
+                    <span id="historyActiveScoreBadge" class="hidden rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-[11px] font-semibold text-emerald-400">
+                      Score STAR: 94%
+                    </span>
                   </div>
                   <textarea
                     id="sessionViewerText"
                     readonly
                     rows="18"
-                    class="sh-textarea flex-1 font-mono text-xs"
-                    placeholder="Select a session on the left to view the transcript..."
+                    class="sh-textarea flex-1 font-mono text-xs bg-surface-dim border-border-subtle"
+                    placeholder="Selecione uma sessão à esquerda para visualizar a transcrição completa e o relatório..."
                   ></textarea>
                 </div>
               </div>
@@ -3284,10 +3151,10 @@
             <div class="page-shell">
               <!-- Header row: same skeleton as every other page -->
               <div class="page-header">
-                <div>
-                  <h1 class="page-title">Question Bank</h1>
-                  <p class="page-subtitle">
-                    Real interview questions analyzed by JEV Engine from your recorded sessions and active goals.
+                <div class="space-y-1">
+                  <h1 class="text-xl md:text-2xl font-semibold tracking-tight text-text-primary">Banco de Perguntas</h1>
+                  <p class="text-xs md:text-sm text-text-secondary">
+                    Perguntas reais de entrevistas analisadas pelo motor JEV a partir de suas sessões e empresas-alvo.
                   </p>
                 </div>
 
@@ -3295,11 +3162,13 @@
                   <button
                     id="btnHowDataCollected"
                     type="button"
-                    class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-app-border bg-app-card px-3.5 py-1.5 text-xs font-medium text-foreground shadow-sm transition-all hover:border-app-border-light hover:bg-app-card-hover"
+                    class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border-subtle bg-surface-card px-3.5 py-1.5 text-xs font-medium text-text-secondary shadow-xs transition-all hover:border-border-muted hover:text-text-primary"
                   >
-                    <span class="text-app-emerald">ðŸ›¡️</span>
-                    <span>How this data is collected</span>
-                    <span class="text-[10px] text-app-muted">›</span>
+                    <svg class="h-3.5 w-3.5 text-emerald-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    </svg>
+                    <span>Como os dados são coletados</span>
+                    <span class="text-[10px] text-text-tertiary">›</span>
                   </button>
                 </div>
               </div>
@@ -3307,36 +3176,36 @@
               <!-- Search Bar & Stats Counter -->
               <div class="flex flex-wrap items-center justify-between gap-4">
                 <div class="relative max-w-md flex-1">
-                  <svg class="pointer-events-none absolute left-3.5 top-2.5 h-4 w-4 text-app-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <svg class="pointer-events-none absolute left-3.5 top-2.5 h-4 w-4 text-text-tertiary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="11" cy="11" r="8"/>
                     <line x1="21" y1="21" x2="16.65" y2="16.65"/>
                   </svg>
                   <input
                     id="inputSearchQuestionBank"
                     type="text"
-                    placeholder="Search companies by name or domain..."
-                    class="sh-input w-full py-2 pl-10 text-xs"
+                    placeholder="Buscar empresas por nome ou domínio..."
+                    class="sh-input w-full py-2 pl-10 text-xs bg-surface-card border-border-subtle"
                   />
                 </div>
 
-                <div class="flex items-center gap-4 text-xs font-medium text-app-muted">
+                <div class="flex items-center gap-4 text-xs font-medium text-text-secondary">
                   <span class="flex items-center gap-1.5">
-                    <strong id="qbStatTotalCompanies" class="text-sm font-bold text-foreground">0</strong> Companies
+                    <strong id="qbStatTotalCompanies" class="font-mono text-sm font-semibold text-text-primary">0</strong> Empresas
                   </span>
-                  <span class="h-1 w-1 rounded-full bg-border"></span>
+                  <span class="h-1 w-1 rounded-full bg-border-muted"></span>
                   <span class="flex items-center gap-1.5">
-                    <strong id="qbStatTotalQuestions" class="text-sm font-bold text-foreground">0</strong> Questions
+                    <strong id="qbStatTotalQuestions" class="font-mono text-sm font-semibold text-text-primary">0</strong> Perguntas
                   </span>
                 </div>
               </div>
 
               <!-- All Companies Heading & 4-Column Grid -->
               <div class="space-y-3">
-                <div class="flex items-center justify-between border-b border-app-border pb-2">
-                  <h3 class="page-eyebrow">
-                    All companies
+                <div class="flex items-center justify-between border-b border-border-subtle pb-2">
+                  <h3 class="text-[11px] font-semibold uppercase tracking-wider text-text-tertiary">
+                    Empresas indexadas
                   </h3>
-                  <span id="qbAllCompaniesCount" class="font-mono text-xs text-app-muted">
+                  <span id="qbAllCompaniesCount" class="font-mono text-xs text-text-tertiary">
                     0 entries
                   </span>
                 </div>
@@ -3488,16 +3357,19 @@
             </div>
           </section>
 
-          <!-- Global status bar shared by every view -->
-          <footer class="mx-auto mt-8 flex w-full max-w-7xl flex-col justify-between gap-4 border-t border-app-border pt-6 text-[11px] text-app-muted sm:flex-row sm:items-center">
-            <span id="footerVersionLabelGlobal">RealTimeAI v2.8.0 · Beta</span>
-            <span class="flex items-center gap-1.5">
-              <svg class="h-3.5 w-3.5 text-app-muted" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <rect height="11" rx="2" ry="2" width="18" x="3" y="11"></rect>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-              </svg>
-              Dados locais e criptografados
-            </span>
+          <!-- Unified Executive Status Bar shared by every view -->
+          <footer class="mx-auto mt-8 flex w-full max-w-6xl flex-col items-center justify-between gap-2 rounded-b-lg border-t border-border-subtle bg-surface-dim px-6 py-3.5 text-xs text-text-tertiary sm:flex-row">
+            <div id="footerVersionLabelGlobal">
+              RealTimeAI v2.0.0-Beta • Dados locais e criptografados
+            </div>
+            <div class="flex items-center gap-3 font-mono text-[11px]">
+              <span class="flex items-center gap-1.5">
+                <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                Latência: <strong class="font-normal text-text-secondary">18ms</strong>
+              </span>
+              <span>•</span>
+              <span>Build 20251030-x64</span>
+            </div>
           </footer>
         </main>
       </div>
@@ -3801,8 +3673,10 @@
       <div class="sh-card w-full max-w-lg p-6 space-y-4 max-h-[85vh] overflow-y-auto rounded-2xl shadow-xl">
         <div class="flex items-center justify-between border-b border-app-border pb-3">
           <div class="flex items-center gap-2.5">
-            <div class="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-500">
-              ðŸ›¡️
+            <div class="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
             </div>
             <div>
               <h3 class="text-base font-bold text-foreground">How Question Bank Data Is Collected</h3>
@@ -4293,6 +4167,141 @@
             <span>Cancel anytime. Instant activation. Mock checkout simulated.</span>
           </div>
           <button id="btnDismissUpgrade" type="button" class="text-muted-foreground hover:text-foreground underline cursor-pointer">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== MODAL: QUESTION PRACTICE & STAR TEMPLATE ==================== -->
+    <div id="modalQuestionPractice" class="sh-modal-backdrop">
+      <div class="w-full max-w-xl rounded-xl border border-border-subtle bg-surface-card p-6 space-y-5 max-h-[88vh] overflow-y-auto shadow-2xl">
+        <div class="flex items-start justify-between gap-4 border-b border-border-subtle pb-4">
+          <div class="space-y-1.5 min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <span id="practiceQuestionCategory" class="rounded bg-white/5 border border-border-subtle px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider text-text-secondary">Comportamental</span>
+              <span id="practiceQuestionCompany" class="rounded border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-medium text-emerald-400">Nubank · 92% frequência</span>
+            </div>
+            <h3 id="practiceQuestionTitle" class="text-base font-semibold leading-snug text-text-primary">
+              Conte sobre uma vez em que discordou do seu time.
+            </h3>
+          </div>
+          <button id="btnCloseQuestionPractice" type="button" class="icon-btn h-7 w-7 text-text-secondary hover:text-text-primary shrink-0">✕</button>
+        </div>
+
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="font-mono text-[11px] font-semibold uppercase tracking-wider text-text-tertiary">Estrutura Sugerida (Método STAR · Copiloto)</span>
+            <button id="btnCopyQuestionStar" type="button" class="font-mono text-[11px] text-emerald-400 hover:underline cursor-pointer">Copiar roteiro</button>
+          </div>
+
+          <div id="practiceQuestionStarBody" class="space-y-2.5 rounded-lg border border-border-subtle bg-surface-dim p-4 text-xs leading-relaxed text-text-secondary">
+            <!-- Dynamically populated STAR points -->
+          </div>
+
+          <div class="space-y-1.5 pt-1">
+            <label for="practiceQuestionUserNotes" class="block text-xs font-medium text-text-secondary">Seus tópicos-chave para esta pergunta (salvo na sessão ativa):</label>
+            <textarea
+              id="practiceQuestionUserNotes"
+              rows="3"
+              class="sh-textarea text-xs bg-surface-dim border-border-subtle"
+              placeholder="Adicione métricas, tecnologias ou resultados específicos do seu currículo para o copiloto priorizar..."
+            ></textarea>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle pt-4">
+          <button id="btnQuestionOpenCompany" type="button" class="rounded-lg border border-border-subtle bg-surface-dim hover:bg-surface-container px-3.5 py-2 text-xs font-medium text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
+            Ver empresa no Banco de Perguntas
+          </button>
+          <div class="flex items-center gap-2">
+            <button id="btnSaveQuestionNotes" type="button" class="rounded-lg border border-border-muted bg-surface-container hover:bg-surface-container-high px-3.5 py-2 text-xs font-medium text-text-primary transition-colors cursor-pointer">
+              Salvar notas na sessão
+            </button>
+            <button id="btnPracticeQuestionLive" type="button" class="flex items-center gap-1.5 rounded-lg bg-white px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 transition-colors cursor-pointer">
+              <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              <span>Praticar no Copiloto</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== MODAL: SESSION REPORT & STAR SCORE ==================== -->
+    <div id="modalSessionReport" class="sh-modal-backdrop">
+      <div class="w-full max-w-2xl rounded-xl border border-border-subtle bg-surface-card p-6 space-y-5 max-h-[88vh] overflow-y-auto shadow-2xl">
+        <div class="flex items-start justify-between gap-4 border-b border-border-subtle pb-4">
+          <div class="flex items-center gap-3.5 min-w-0">
+            <div id="reportOverallScore" class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/10 font-mono text-base font-bold text-emerald-400">
+              94%
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <h3 id="reportSessionTitle" class="text-base font-semibold text-text-primary truncate">Nubank · Mock STAR 03</h3>
+                <span class="rounded bg-white/5 border border-border-subtle px-2 py-0.5 font-mono text-[10px] text-text-secondary">Relatório STAR</span>
+              </div>
+              <p id="reportSessionMeta" class="mt-0.5 text-xs text-text-secondary">Ontem às 21:14 · Duração: 18 min · Latência média: 840ms</p>
+            </div>
+          </div>
+          <button id="btnCloseSessionReport" type="button" class="icon-btn h-7 w-7 text-text-secondary hover:text-text-primary shrink-0">✕</button>
+        </div>
+
+        <!-- 4 Breakdown Metrics -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="reportMetricsGrid">
+          <div class="rounded-lg border border-border-subtle bg-surface-dim p-3 space-y-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-text-secondary">Estrutura STAR &amp; Impacto</span>
+              <span id="reportMetricStar" class="font-mono font-semibold text-text-primary">96%</span>
+            </div>
+            <div class="metric-track"><i id="reportBarStar" style="width: 96%"></i></div>
+          </div>
+          <div class="rounded-lg border border-border-subtle bg-surface-dim p-3 space-y-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-text-secondary">Domínio Técnico &amp; Trade-offs</span>
+              <span id="reportMetricTech" class="font-mono font-semibold text-text-primary">92%</span>
+            </div>
+            <div class="metric-track"><i id="reportBarTech" style="width: 92%"></i></div>
+          </div>
+          <div class="rounded-lg border border-border-subtle bg-surface-dim p-3 space-y-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-text-secondary">Aderência ao Currículo (RAG)</span>
+              <span id="reportMetricRag" class="font-mono font-semibold text-text-primary">95%</span>
+            </div>
+            <div class="metric-track"><i id="reportBarRag" style="width: 95%"></i></div>
+          </div>
+          <div class="rounded-lg border border-border-subtle bg-surface-dim p-3 space-y-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-text-secondary">Clareza &amp; Tempo de Resposta</span>
+              <span id="reportMetricPacing" class="font-mono font-semibold text-text-primary">91%</span>
+            </div>
+            <div class="metric-track"><i id="reportBarPacing" style="width: 91%"></i></div>
+          </div>
+        </div>
+
+        <!-- Feedback & Transcript Preview -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-mono text-[11px] font-semibold uppercase tracking-wider text-text-tertiary">Diagnóstico &amp; Transcrição da Sessão</span>
+            <span id="reportLatencyBadge" class="font-mono text-[11px] text-emerald-400">● Streaming STT + LLM verificados</span>
+          </div>
+          <textarea
+            id="reportTranscriptText"
+            readonly
+            rows="8"
+            class="sh-textarea font-mono text-xs bg-surface-dim border-border-subtle"
+          ></textarea>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle pt-4">
+          <button id="btnReportOpenHistory" type="button" class="rounded-lg border border-border-subtle bg-surface-dim hover:bg-surface-container px-3.5 py-2 text-xs font-medium text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
+            Abrir no Histórico Completo
+          </button>
+          <div class="flex items-center gap-2">
+            <button id="btnReportGenerateDebrief" type="button" class="rounded-lg border border-border-muted bg-surface-container hover:bg-surface-container-high px-3.5 py-2 text-xs font-medium text-text-primary transition-colors cursor-pointer">
+              Extrair aprendizados p/ Memória
+            </button>
+            <button id="btnReportPracticeAgain" type="button" class="flex items-center gap-1.5 rounded-lg bg-white px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 transition-colors cursor-pointer">
+              <span>Nova Simulação</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
