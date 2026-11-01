@@ -83,7 +83,7 @@
         `<div class="row" style="gap:14px"><span class="avatar" style="width:40px;height:40px;font-size:13px">${esc(C.monogram(p.name || 'Você'))}</span><div class="stack grow" style="gap:0"><span class="strong">${esc(fixText(p.name || 'Sem nome'))}</span><span class="small faint">${esc(fixText([p.headline, p.seniority].filter(Boolean).join(' · ') || 'Cargo não informado'))}</span><span class="small faint">${esc(p.email || '')}</span></div><button type="button" class="btn" data-action="open-profile">${icon('pencil')}Editar perfil</button></div>`)}
       ${card('Aparência', '',
         `<div class="option-cards">${[['dark', 'Escuro', 'moon'], ['light', 'Claro', 'sun'], ['system', 'Sistema', 'monitor']]
-          .map(([v, l, ic]) => `<button type="button" class="option-card ${pref === v ? 'active' : ''}" data-action="set-theme" data-theme="${v}"><span class="t">${icon(ic)}${l}</span><span class="s">${v === 'system' ? 'Segue o Windows' : `Tema ${l.toLowerCase()}`}</span></button>`)
+          .map(([v, l, ic]) => `<button type="button" class="option-card ${pref === v ? 'active' : ''}" aria-pressed="${pref === v}" data-action="set-theme" data-theme="${v}"><span class="t">${icon(ic)}${l}</span><span class="s">${v === 'system' ? 'Segue o Windows' : `Tema ${l.toLowerCase()}`}</span></button>`)
           .join('')}</div>`)}
       ${card('Detecção de reuniões', esc(meetingStatus),
         `${row('Avisar quando uma reunião começar', 'Um popup oferece iniciar o copiloto com a sessão certa.', m ? C.sw('data-change="meeting" data-field="enabled"', m.enabled, !m.supported) : '')}
@@ -103,7 +103,7 @@
       ${card('Modelo de resposta', `Atual: ${esc(C.modelLabel(cur))} via ${esc(C.providerFor(cur))}`,
         `<div class="option-cards">${MODELS.map((m) => {
           const active = cur === m.id || cur === m.alt;
-          return `<button type="button" class="option-card ${active ? 'active' : ''}" data-action="set-model" data-tier="${m.tier}"><span class="t">${active ? '<span class="dot"></span>' : ''}${m.title}<span class="num" style="margin-left:auto">${m.model}</span></span><span class="s">${m.desc}</span></button>`;
+          return `<button type="button" class="option-card ${active ? 'active' : ''}" aria-pressed="${active}" data-action="set-model" data-tier="${m.tier}"><span class="t">${active ? '<span class="dot"></span>' : ''}${m.title}<span class="num" style="margin-left:auto">${m.model}</span></span><span class="s">${m.desc}</span></button>`;
         }).join('')}</div>
         <div class="set-row" style="margin-top:14px;border-top:1px solid var(--border-subtle);padding-top:14px"><div class="txt"><span class="t">ID do modelo</span><span class="s">Qualquer modelo do OpenRouter (provedor/modelo) ou do Cerebras (sem "/").${known ? '' : ' Personalizado.'}</span></div><div class="ctl">${cfgText('model', 'Modelo', cur, 'qwen/qwen3.6-flash', 280)}</div></div>`)}
       ${card('Comportamento', '',
@@ -166,7 +166,7 @@
          <div class="set-row"><div class="txt"><span class="t">Opacidade da janela</span><span class="s">Deixa o painel translúcido sobre outras janelas.</span></div><div class="ctl" style="gap:10px"><input type="range" min="40" max="100" step="5" value="${opacity}" data-input="opacity" data-change="opacity-save" style="width:180px;accent-color:var(--accent)"/><span class="num" id="opacityLabel" style="width:40px;text-align:right">${opacity}%</span></div></div>
          <div class="set-row stacked"><div class="txt"><span class="t">Nome do processo</span><span class="s">Como o Cue aparece no Gerenciador de Tarefas.</span></div>
            <div class="option-cards">${[['none', 'RealTimeAI', 'Normal'], ['settings', 'Configurações', 'Windows Settings'], ['cmd', 'Prompt de Comando', 'cmd.exe'], ['taskmgr', 'Gerenciador de Tarefas', 'Task Manager']]
-             .map(([v, t, s]) => `<button type="button" class="option-card ${disguise === v ? 'active' : ''}" data-action="set-disguise" data-mode="${v}" data-label="${esc(t)}"><span class="t">${esc(t)}</span><span class="s">${esc(s)}</span></button>`)
+             .map(([v, t, s]) => `<button type="button" class="option-card ${disguise === v ? 'active' : ''}" aria-pressed="${disguise === v}" data-action="set-disguise" data-mode="${v}" data-label="${esc(t)}"><span class="t">${esc(t)}</span><span class="s">${esc(s)}</span></button>`)
              .join('')}</div></div>`)}
       ${card('Painel flutuante (HUD)', 'O que o entrevistador não vê durante a chamada',
         `${row('Invisível em compartilhamento e gravação', 'Você vê o HUD na sua tela; a captura não.', cfgSwitch('stealth_screen_capture', 'Invisível em capturas', cfg.stealth_screen_capture !== false))}
@@ -220,7 +220,7 @@
             : ''}`)}
       ${connected
         ? card('Novo evento', '',
-            `<div class="stack gap-12">
+            `<div class="stack">
               <label class="field">Título<input class="input" id="gcalTitle" placeholder="Entrevista técnica · Empresa"/></label>
               <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr"><label class="field">Data<input class="input" type="date" id="gcalDate" value="${iso}"/></label><label class="field">Hora<input class="input" type="time" id="gcalTime"/></label><label class="field">Duração<select class="select" id="gcalDuration">${C.opts([['30', '30 min'], ['45', '45 min'], ['60', '1 hora'], ['90', '1h30'], ['120', '2 horas']], '60')}</select></label></div>
               <label class="field">Notas<textarea class="textarea" id="gcalNotes" rows="2" placeholder="Link da chamada, entrevistadores…"></textarea></label>

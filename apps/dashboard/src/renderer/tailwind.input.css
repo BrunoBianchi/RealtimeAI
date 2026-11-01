@@ -68,7 +68,7 @@ html[data-theme='light'] {
   --border-muted: rgba(9, 10, 12, 0.11);
   --border-strong: rgba(9, 10, 12, 0.14);
   --border-hover: rgba(9, 10, 12, 0.26);
-  --border-focus: rgba(9, 10, 12, 0.42);
+  --border-focus: rgba(9, 10, 12, 0.46);
   --hover-wash: rgba(9, 10, 12, 0.04);
   --row-hover: rgba(9, 10, 12, 0.025);
   --track: rgba(9, 10, 12, 0.08);
@@ -84,6 +84,14 @@ html[data-theme='light'] {
   --accent-soft: rgba(5, 150, 105, 0.09);
   --accent-border: rgba(5, 150, 105, 0.28);
   --accent-dim: rgba(5, 150, 105, 0.45);
+  /* The dark-theme rose/amber/blue are too light on white (2-3.4:1). */
+  --warning: #b45309;
+  --warning-soft: rgba(180, 83, 9, 0.09);
+  --warning-border: rgba(180, 83, 9, 0.28);
+  --danger: #be123c;
+  --danger-soft: rgba(190, 18, 60, 0.08);
+  --danger-border: rgba(190, 18, 60, 0.26);
+  --info: #3b5bdb;
   --btn-primary-bg: #18181b;
   --btn-primary-hover: #27272a;
   --btn-primary-text: #fafafa;
