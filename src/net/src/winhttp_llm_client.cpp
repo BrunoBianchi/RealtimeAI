@@ -286,7 +286,8 @@ std::shared_ptr<ILlmCall> WinHttpLlmClient::start(LlmRequest request, LlmCallbac
         auto run_attempt = [&](const std::string& host, std::uint16_t port, bool secure,
                                const std::string& path, const std::wstring& headers,
                                const std::string& body,
-                               const std::string& host_label) -> AttemptOutcome {
+                               const std::string& host_label,
+                               int response_timeout_ms = 0) -> AttemptOutcome {
             AttemptOutcome out;
             out.res.status = LlmStatus::Completed;
             auto fail = [&](std::string msg, LlmFailure f) {
@@ -333,6 +334,15 @@ std::shared_ptr<ILlmCall> WinHttpLlmClient::start(LlmRequest request, LlmCallbac
                 fail("sending to " + host_label + " failed: " + win::winhttp_error_text(err),
                      classify_winhttp_error(err));
                 return out;
+            }
+            // Fast failover (Req 4.2): with a fallback available, a primary that
+            // has not sent its response headers within the first-byte budget is
+            // treated as a timeout instead of holding the answer for the whole
+            // receive timeout. Only the header wait is bounded; the stream reads
+            // keep the session's receive timeout.
+            if (response_timeout_ms > 0) {
+                DWORD ms = static_cast<DWORD>(response_timeout_ms);
+                WinHttpSetOption(hreq.get(), WINHTTP_OPTION_RECEIVE_RESPONSE_TIMEOUT, &ms, sizeof(ms));
             }
             if (!WinHttpReceiveResponse(hreq.get(), nullptr)) {
                 const DWORD err = GetLastError();
@@ -417,7 +427,7 @@ std::shared_ptr<ILlmCall> WinHttpLlmClient::start(LlmRequest request, LlmCallbac
             const std::string sort = opts.host == "openrouter.ai" ? opts.openrouter_provider_sort : std::string();
             const std::string body = openrouter::build_request_body(active_req, false, sort);
             final_out = run_attempt(opts.host, opts.port, opts.secure, opts.path, headers, body,
-                                    "OpenRouter");
+                                    "OpenRouter", has_fallback(opts) ? opts.first_byte_timeout_ms : 0);
 
             // AUTO-RECOVERY: If token limit was reached before any content streamed
             // (e.g. model spent tokens on internal CoT), immediately retry once with reasoning
@@ -464,8 +474,9 @@ std::shared_ptr<ILlmCall> WinHttpLlmClient::start(LlmRequest request, LlmCallbac
                 const std::string body = openrouter::build_request_body(r, cerebras);
                 const std::string label = attempt == 0 ? "primary provider (Cerebras)"
                                                        : "fallback provider (Groq)";
+                const bool can_fail_over = attempt == 0 && !opts.fallback.host.empty() && !opts.fallback.api_key.empty();
                 final_out = run_attempt(ep.host, opts.port, opts.secure, ep.path, headers, body,
-                                        label);
+                                        label, can_fail_over ? opts.first_byte_timeout_ms : 0);
 
                 // Auto-recovery if token limit reached before content
                 if (!final_out.any_content && final_out.res.finish_reason == "length" && !call->cancelled.load()) {
