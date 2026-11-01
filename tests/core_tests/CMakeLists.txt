@@ -39,6 +39,7 @@ add_executable(core_tests
     test_question_flow.cpp
     test_question_interpretation.cpp
     test_hybrid_rag.cpp
+    test_repair_mojibake.cpp
     test_engine_deadlines.cpp
 )
 
