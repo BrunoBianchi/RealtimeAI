@@ -5,9 +5,12 @@
 //     and level rings, "Responder", "Tela", "Chat", move, collapse, menu,
 //     "Encerrar";
 //   * menu sheet (when open): summary, follow-up, click-through, config...;
-//   * transcript strip: level meter + recent speech as phrase chips;
+//   * chat field (when open);
+//   * live line: who is speaking and the tail of what they said, with the
+//     detection state; it expands into the full scrollable transcript;
 //   * answer card: history navigation, question, streamed answer with
-//     bullets/bold, feedback, and the chat field.
+//     bullets/bold, follow-ups and feedback.
+// A single column at every width: nothing sits side by side.
 // Width is user-resizable (right edge grip); height follows the content.
 // Buttons collapse labels and key hints when the width gets small.
 //
