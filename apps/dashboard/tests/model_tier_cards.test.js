@@ -2,49 +2,45 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
+const { loadRenderer, render, el, tags } = require('./helpers/renderer');
 
-const indexHtmlPath = path.resolve(__dirname, '../src/renderer/index.html');
-const appJsPath = path.resolve(__dirname, '../src/renderer/app.js');
 const mainJsPath = path.resolve(__dirname, '../src/main/main.js');
 
-test('Model Tier Selection: HTML contains 3 accessible cards (Fast, Balanced, Ultra)', () => {
-  const html = fs.readFileSync(indexHtmlPath, 'utf8');
+test('Model Tier Selection: three cards (Rápido, Equilibrado, Ultra), the current one pressed', () => {
+  const cardsFor = (model) => {
+    const { Cue } = loadRenderer({ state: { config: { model } } });
+    const html = render(Cue, 'settings/ai');
+    return { html, cards: tags(html, { 'data-action': 'set-model' }) };
+  };
 
-  // Verify the 3 cards exist
-  assert.ok(html.includes('id="cardModelFast"'), 'Card Fast must exist');
-  assert.ok(html.includes('id="cardModelMedium"'), 'Card Medium must exist');
-  assert.ok(html.includes('id="cardModelUltra"'), 'Card Ultra must exist');
+  const { html, cards } = cardsFor('meta-llama/llama-3.3-70b-instruct');
+  assert.deepStrictEqual(cards.map((c) => c['data-tier']), ['fast', 'medium', 'ultra']);
+  assert.deepStrictEqual(cards.map((c) => c['aria-pressed']), ['false', 'true', 'false']);
+  for (const name of ['Qwen 3.6 Flash', 'Llama 3.3 70B', 'GPT-OSS 120B']) assert.ok(html.includes(name));
+  assert.ok(!/\d+\s*ms\b/.test(html), 'cards must not promise fixed latencies; the HUD shows measured time');
+  assert.ok(html.includes('Atual: Llama 3.3 70B'), 'header names the active model');
 
-  // Verify tier data attributes
-  assert.ok(html.includes('data-tier="fast"'), 'data-tier="fast" must exist');
-  assert.ok(html.includes('data-tier="medium"'), 'data-tier="medium" must exist');
-  assert.ok(html.includes('data-tier="ultra"'), 'data-tier="ultra" must exist');
+  // Both Ultra ids (OpenRouter and Cerebras) light the Ultra card.
+  assert.strictEqual(cardsFor('gpt-oss-120b').cards[2]['aria-pressed'], 'true');
+  assert.strictEqual(cardsFor('openai/gpt-oss-120b').cards[2]['aria-pressed'], 'true');
 
-  // Verify model values
-  assert.ok(html.includes('data-model="qwen/qwen3.6-flash"'), 'Fast model must be qwen/qwen3.6-flash');
-  assert.ok(html.includes('data-model="meta-llama/llama-3.3-70b-instruct"'), 'Medium model must be meta-llama/llama-3.3-70b-instruct');
-  assert.ok(html.includes('data-model="gpt-oss-120b"'), 'Ultra model must be gpt-oss-120b');
-
-  // Each card explains itself: speed/depth meters plus best-for and trade-off lines
-  assert.strictEqual((html.match(/class="tier-meter"/g) || []).length, 6, 'Each card must have Speed and Depth meters');
-  assert.ok((html.match(/>Best for</g) || []).length >= 3, 'Each card must have a "Best for" line');
-  assert.ok((html.match(/>Trade-off</g) || []).length >= 3, 'Each card must have a "Trade-off" line');
-  assert.ok(html.includes('role="radiogroup"'), 'Cards must be exposed as a radio group');
-  assert.ok(!/\d+\s*ms latency/.test(html), 'Cards must not promise fixed latencies; the HUD shows measured time');
-
-  // Verify active badge & backing select element
-  assert.ok(html.includes('id="activeModelBadge"'), 'activeModelBadge element must exist');
-  assert.ok(html.includes('id="selectDefaultModel"'), 'selectDefaultModel must be preserved');
+  // A custom model lights no card and stays editable in the free-text field.
+  const custom = cardsFor('mistralai/mistral-large');
+  assert.ok(custom.cards.every((c) => c['aria-pressed'] === 'false'));
+  assert.ok(custom.html.includes('Personalizado.'));
+  assert.strictEqual(tags(custom.html, { 'data-key': 'model' })[0].value, 'mistralai/mistral-large');
 });
 
-test('Model Tier Selection: app.js contains tier mapping, UI update, and auto-save logic', () => {
-  const appJs = fs.readFileSync(appJsPath, 'utf8');
-
-  assert.ok(appJs.includes('getTierForModel'), 'getTierForModel function must exist in app.js');
-  assert.ok(appJs.includes('updateModelCardsUI'), 'updateModelCardsUI function must exist in app.js');
-  assert.ok(appJs.includes('selectModelTier'), 'selectModelTier function must exist in app.js');
-  assert.ok(appJs.includes('saveConfig'), 'saveConfig call must be triggered on tier change');
-  assert.ok(appJs.includes("'openai/gpt-oss-120b'"), 'Ultra must use the OpenRouter id when no Cerebras key is set');
+test('Model Tier Selection: picking a tier saves the model id the configured provider can serve', async () => {
+  const pick = async (tier, config) => {
+    const r = loadRenderer({ state: { config }, api: { saveConfig: async (patch) => ({ ok: true, config: { ...config, ...patch } }) } });
+    await r.Cue.actions['set-model'](el({ tier }));
+    return r.called('saveConfig')[0][0].model;
+  };
+  assert.strictEqual(await pick('fast', {}), 'qwen/qwen3.6-flash');
+  assert.strictEqual(await pick('medium', {}), 'meta-llama/llama-3.3-70b-instruct');
+  assert.strictEqual(await pick('ultra', {}), 'openai/gpt-oss-120b', 'no Cerebras key: OpenRouter id');
+  assert.strictEqual(await pick('ultra', { has_cerebras_key: true }), 'gpt-oss-120b', 'Cerebras key: direct id');
 });
 
 test('Model Tier Selection: main.js re-launches running overlay on model change', () => {
@@ -54,4 +50,3 @@ test('Model Tier Selection: main.js re-launches running overlay on model change'
   assert.ok(mainJs.includes('configUpdates.model && isOverlayRunning()'), 'main.js must check if overlay is running when model updates');
   assert.ok(mainJs.includes('launchOverlay'), 'main.js must call launchOverlay to reload the overlay with the new model');
 });
-

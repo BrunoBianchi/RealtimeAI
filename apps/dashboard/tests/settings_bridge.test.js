@@ -27,6 +27,7 @@ Module._load = function (request, ...rest) {
 };
 const main = require('../src/main/main.js');
 Module._load = realLoad;
+const { loadRenderer } = require('./helpers/renderer');
 
 const cfgPath = path.join(tmp, 'RealTimeAI', 'config.ini');
 
@@ -59,14 +60,28 @@ test('saving from the dashboard keeps keys it does not manage', () => {
   assert.strictEqual(text.match(/^\[turn\]/gm).length, 1);
 });
 
-test('the HUD Config button reaches the dashboard Settings page', () => {
+test('the HUD Config button reaches the dashboard Settings page', async () => {
   const mainSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'main', 'main.js'), 'utf8');
   const preload = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload', 'preload.js'), 'utf8');
-  const app = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8');
   assert.match(mainSrc, /msg\.type === 'open_settings'/);
   assert.match(mainSrc, /webContents\.send\('rtai:open-settings'/);
   assert.match(preload, /onOpenSettings/);
-  assert.match(app, /onOpenSettings\(\(section\) => \{\s*switchView\('settings'\)/);
   const cpp = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'src', 'app', 'src', 'main.cpp'), 'utf8');
   assert.match(cpp, /encode_simple\("open_settings"/);
+
+  // Every section name the engine or older dashboards send lands on a real tab.
+  const r = loadRenderer();
+  await r.boot();
+  const [open] = r.calls.find(([n]) => n === 'onOpenSettings')[1];
+  const tabs = new Set(['general', 'ai', 'audio', 'privacy', 'overlay', 'calendar', 'shortcuts', 'plan', 'updates']);
+  for (const [section, tab] of Object.entries({
+    general: 'general', appearance: 'general', defaults: 'ai', speech: 'audio', stealth: 'privacy',
+    billing: 'plan', calendar: 'calendar', updates: 'updates', unknown: 'general'
+  })) {
+    open(section);
+    assert.strictEqual(r.S.route.view, 'settings', `${section} opens Settings`);
+    assert.strictEqual(r.S.route.parts[0], tab, `${section} opens the ${tab} tab`);
+    assert.ok(tabs.has(r.S.route.parts[0]));
+    assert.ok(r.page('view').innerHTML.includes(`data-to="settings/${tab}"`), 'the settings page rendered');
+  }
 });

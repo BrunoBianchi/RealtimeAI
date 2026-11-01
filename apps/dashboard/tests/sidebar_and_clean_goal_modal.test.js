@@ -1,63 +1,88 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const fs = require('node:fs');
-const path = require('node:path');
+const { loadRenderer, indexHtml, tags, settle } = require('./helpers/renderer');
+const { css } = require('./helpers/css');
 
-const indexHtmlPath = path.resolve(__dirname, '../src/renderer/index.html');
-const appJsPath = path.resolve(__dirname, '../src/renderer/app.js');
-const tailwindCssPath = path.resolve(__dirname, '../src/renderer/tailwind.input.css');
+test('Clean Sidebar: brand, new session, navigation, next interviews, usage and profile', () => {
+  const aside = indexHtml.match(/<aside\b[^>]*>([\s\S]*?)<\/aside>/)[1];
+  assert.ok(aside.includes('id="engineStatusPill"'), 'engine status next to the brand');
+  assert.ok(/id="btnNewSession"[^>]*data-action="new-session"/.test(aside));
+  for (const id of ['sideNav', 'sidebarNext', 'sidebarUsage', 'profileRow']) assert.ok(aside.includes(`id="${id}"`), id);
+  assert.match(css, /--sidebar-w:\s*\d+px/, 'sidebar width is a token');
 
-test('Clean Sidebar & Compact Plan Sizing (User Feedback Fidelity)', () => {
-  const html = fs.readFileSync(indexHtmlPath, 'utf8');
-  const appJs = fs.readFileSync(appJsPath, 'utf8');
-  const css = fs.readFileSync(tailwindCssPath, 'utf8');
+  const soon = new Date(Date.now() + 2 * 86400000);
+  const iso = `${soon.getFullYear()}-${String(soon.getMonth() + 1).padStart(2, '0')}-${String(soon.getDate()).padStart(2, '0')}`;
+  const r = loadRenderer({
+    state: {
+      agents: [
+        { id: 'a1', company: 'Nubank', role: 'Backend', next_interview_date: iso, next_interview_time: '15:00' },
+        { id: 'a2', company: 'Stone', role: 'SRE' },
+        { id: 'a3', company: 'Itaú', role: 'Dados', archived: true, next_interview_date: iso }
+      ],
+      config: { has_deepgram_key: true, has_llm_key: true }
+    }
+  });
+  r.Cue.state.route = { view: 'sessions', parts: [] };
+  r.Cue.renderShell();
 
-  // Sidebar compact width
-  assert.ok(html.includes('w-[230px]'), 'Sidebar must have compact width w-[230px]');
+  const nav = r.page('sideNav').innerHTML;
+  assert.deepStrictEqual(tags(nav, { 'data-action': 'go' }).map((t) => t['data-to']), ['home', 'sessions', 'history', 'files', 'questions', 'live', 'settings']);
+  assert.ok(/class="nav-item active"[^>]*data-to="sessions"/.test(nav), 'current route is highlighted');
+  assert.ok(nav.includes('<span class="nav-count">2</span>'), 'active (non-archived) sessions are counted');
 
-  // New goal standout button styling (Image 2)
-  assert.ok(html.includes('id="btnNewGoal"'), 'Must have btnNewGoal in sidebar');
-  assert.ok(html.includes('rounded-full bg-white text-zinc-950'), 'btnNewGoal must have prominent white pill styling');
+  const next = r.page('sidebarNext').innerHTML;
+  assert.ok(next.includes('A seguir') && next.includes('Nubank · Backend') && next.includes('15:00') && next.includes('em 2 dias'));
+  assert.ok(!next.includes('Itaú'), 'archived sessions are not "up next"');
 
-  // Compact Equalizer ticks (height reduced from h-5 to h-3, teal #00D29E)
-  assert.ok(appJs.includes("tick.className = 'w-[2.5px] h-3 rounded-full"), 'Ticks must use compact height h-3');
-  assert.ok(appJs.includes('#00D29E'), 'Ticks must use signature teal #00D29E for Pro');
-
-  // Plan card compactness
-  assert.ok(html.includes('id="sidebarUsageCard"'), 'Must have sidebarUsageCard');
-  assert.ok(html.includes('id="sidebarUsageProTag"'), 'Must have sidebarUsageProTag');
-  assert.ok(html.includes('text-[12px] font-bold tracking-tight text-foreground'), 'Usage title must use compact typography');
-
-  // Sidebar navigation and goal items classes
-  assert.ok(css.includes('.sh-nav-item'), 'Must define .sh-nav-item');
-  assert.ok(css.includes('py-1.5 text-[12px]'), 'Nav items must use compact py-1.5 text-[12px]');
-  assert.ok(css.includes('.sh-goal-item'), 'Must define .sh-goal-item');
+  assert.strictEqual(r.page('engineStatusLabel').textContent, 'Pronto', 'both keys configured');
 });
 
-test('Easy & Beautiful Goal Creation & Modal Fidelity (Image 3)', () => {
-  const html = fs.readFileSync(indexHtmlPath, 'utf8');
-  const appJs = fs.readFileSync(appJsPath, 'utf8');
+test('Easy Goal Creation: the new-session wizard asks the essentials and creates the session', async () => {
+  const saved = [];
+  const r = loadRenderer({
+    state: { agents: [] },
+    api: {
+      saveAgent: async (a) => {
+        saved.push(a);
+        return { ok: true, agents: [a], saved: a };
+      },
+      scheduleInterview: async () => ({ ok: true, agents: [], calendar: { ok: true, skipped: true } })
+    }
+  });
+  r.Cue.openModal('new-session');
+  const step1 = r.modals.last;
+  assert.ok(step1.includes('Nova sessão') && step1.includes('Passo 1 / 2'));
+  for (const id of ['nsRole', 'nsCompany', 'nsDate', 'nsTime', 'nsJob']) assert.ok(step1.includes(`id="${id}"`), id);
+  assert.ok(/id="nsRole"[^>]*autofocus/.test(step1), 'role field is focused first');
+  assert.ok(tags(step1).filter((t) => t['data-ns-format']).length >= 4, 'interview formats');
 
-  // Modal header & quick setup
-  assert.ok(html.includes('id="goalModalTitle"'), 'Must have goalModalTitle');
-  assert.ok(html.includes('id="goalModalBadge"'), 'Must have goalModalBadge');
-  assert.ok(html.includes('id="goalModalSubtitle"'), 'Must have goalModalSubtitle');
+  const box = r.dialogs[0].querySelector('#nsModal');
+  const clickOn = (attr) => box.fire('click', { target: { closest: (sel) => (sel === `[${attr}]` ? { dataset: {} } : null) } });
+  const field = (id, value) => (box.querySelector(`#${id}`).value = value);
 
-  // Key inputs & auto-research
-  assert.ok(html.includes('id="inputModalRole"'), 'Must have inputModalRole');
-  assert.ok(html.includes('id="inputModalCompany"'), 'Must have inputModalCompany');
-  assert.ok(html.includes('id="btnGoalModalCompanyRecon"'), 'Must have btnGoalModalCompanyRecon');
+  // Nothing typed: the wizard refuses to continue.
+  await clickOn('data-ns-next');
+  assert.ok(r.toasts().some((t) => t.error && t.text === 'Informe pelo menos o cargo ou a empresa.'));
+  assert.ok(box.innerHTML.includes('Passo 1 / 2'));
 
-  // Image 3 fidelity: Attached Files & Custom Instructions
-  assert.ok(html.includes('Attached Files (RAG)'), 'Must have Attached Files (RAG) label');
-  assert.ok(html.includes('id="btnModalUploadFiles"'), 'Must have btnModalUploadFiles');
-  assert.ok(html.includes('id="modalGoalDocsList"'), 'Must have modalGoalDocsList');
-  assert.ok(html.includes('Custom Instructions &amp; Company Dossier'), 'Must have Custom Instructions & Company Dossier section');
-  assert.ok(html.includes('id="inputModalExtraInstructions"'), 'Must have inputModalExtraInstructions');
-  assert.ok(html.includes('id="inputModalCompanyResearch"'), 'Must have inputModalCompanyResearch');
+  field('nsRole', 'Backend Engineer');
+  field('nsCompany', 'nubank.com.br');
+  field('nsDate', '2099-02-01');
+  field('nsTime', '11:00');
+  field('nsJob', 'Go e Kafka');
+  await clickOn('data-ns-next');
+  assert.ok(box.innerHTML.includes('Passo 2 / 2') && box.innerHTML.includes('id="nsResearch"'));
+  box.querySelector('#nsResearch').checked = false;
+  await clickOn('data-ns-next');
+  await settle();
 
-  // Fast creation logic in app.js
-  assert.ok(appJs.includes('isNew ? \'New goal\' : \'Configure Goal\''), 'app.js must dynamically set New goal title');
-  assert.ok(appJs.includes('roleInput.focus()'), 'app.js must auto-focus role input when opened');
-  assert.ok(appJs.includes('handleGoalEnterKey'), 'app.js must support Enter key shortcut for instant save');
+  assert.strictEqual(saved.length, 1);
+  const a = saved[0];
+  assert.strictEqual(a.company, 'Nubank', 'a domain becomes the brand name');
+  assert.strictEqual(a.role, 'Backend Engineer');
+  assert.strictEqual(a.job_description, 'Go e Kafka');
+  assert.strictEqual(a.next_interview_date, '2099-02-01');
+  assert.strictEqual(r.called('companyRecon').length, 0, 'research switched off');
+  assert.deepStrictEqual(r.called('scheduleInterview'), [[{ goalId: a.id, date: '2099-02-01', time: '11:00' }]]);
+  assert.strictEqual(r.location.hash, `#/session/${a.id}`, 'opens the new session');
 });

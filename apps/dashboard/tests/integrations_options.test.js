@@ -2,68 +2,62 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
+const { loadRenderer, render, sources, el, tags } = require('./helpers/renderer');
+const { loadMain } = require('./helpers/main');
 
-const indexHtmlPath = path.resolve(__dirname, '../src/renderer/index.html');
-const appJsPath = path.resolve(__dirname, '../src/renderer/app.js');
 const preloadJsPath = path.resolve(__dirname, '../src/preload/preload.js');
 const mainJsPath = path.resolve(__dirname, '../src/main/main.js');
 
-test('Integrations & Options: HTML contains AI Providers options (Image 1)', () => {
-  const html = fs.readFileSync(indexHtmlPath, 'utf8');
+const cfgKeys = (html) => tags(html, { 'data-change': 'cfg' }).map((t) => t['data-key']);
 
-  // AI Providers pane & top 5 controls
-  assert.ok(html.includes('id="selectActiveModelChoice"'), 'selectActiveModelChoice must exist');
-  assert.ok(html.includes('id="selectBackgroundModelChoice"'), 'selectBackgroundModelChoice must exist');
-  assert.ok(html.includes('id="selectAiResponseLanguageChoice"'), 'selectAiResponseLanguageChoice must exist');
-  assert.ok(html.includes('id="toggleDirectAssist"'), 'toggleDirectAssist must exist');
-  assert.ok(html.includes('id="toggleFastResponseMode"'), 'toggleFastResponseMode must exist');
-
-  // Pill tabs and content
-  assert.ok(html.includes('id="pillTabCloudProviders"'), 'pillTabCloudProviders must exist');
-  assert.ok(html.includes('id="pillTabLocalGateways"'), 'pillTabLocalGateways must exist');
-  assert.ok(html.includes('id="pillTabAiPrivacy"'), 'pillTabAiPrivacy must exist');
-  assert.ok(html.includes('id="pillContentCloudProviders"'), 'pillContentCloudProviders must exist');
-  assert.ok(html.includes('id="pillContentLocalGateways"'), 'pillContentLocalGateways must exist');
-  assert.ok(html.includes('id="pillContentAiPrivacy"'), 'pillContentAiPrivacy must exist');
-
-  // Cloud API keys
-  assert.ok(html.includes('id="cfgOpenAiKey"'), 'cfgOpenAiKey must exist');
-  assert.ok(html.includes('id="cfgAnthropicKey"'), 'cfgAnthropicKey must exist');
-  assert.ok(html.includes('id="cfgGeminiKey"'), 'cfgGeminiKey must exist');
-
-  // Local & Privacy
-  assert.ok(html.includes('id="cfgLocalEndpoint"'), 'cfgLocalEndpoint must exist');
-  assert.ok(html.includes('id="cfgLocalModel"'), 'cfgLocalModel must exist');
-  assert.ok(html.includes('id="cfgZeroRetention"'), 'cfgZeroRetention must exist');
-  assert.ok(html.includes('id="cfgLocalFallback"'), 'cfgLocalFallback must exist');
-  assert.ok(html.includes('id="cfgPiiMasking"'), 'cfgPiiMasking must exist');
+test('Integrations & Options: Settings > AI has models, behavior, keys and local endpoints', () => {
+  const { Cue } = loadRenderer({ state: { config: { ai_response_language: 'en-US', background_model: 'auto' } } });
+  const html = render(Cue, 'settings/ai');
+  for (const key of ['model', 'auto_suggest', 'cooldown_s', 'ai_response_language', 'fast_response_mode', 'direct_assist',
+    'background_model', 'reasoning', 'max_tokens', 'temperature', 'keywords', 'llm_url', 'local_endpoint', 'local_model']) {
+    assert.ok(cfgKeys(html).includes(key), `AI settings must have a control for ${key}`);
+  }
+  // Selects open on the saved value.
+  assert.ok(/data-key="ai_response_language"[^>]*>[\s\S]*?<option value="en-US" selected>/.test(html));
+  // Background model offers the three tiers plus automatic.
+  const bg = html.slice(html.indexOf('data-key="background_model"'));
+  for (const id of ['auto', 'qwen/qwen3.6-flash', 'meta-llama/llama-3.3-70b-instruct', 'openai/gpt-oss-120b']) {
+    assert.ok(bg.includes(`<option value="${id}"`), `background model option ${id}`);
+  }
+  // Cloud providers beyond OpenRouter.
+  const keyFields = tags(html, { 'data-key-input': true }).map((t) => t['data-key-input']);
+  for (const key of ['openai_key', 'anthropic_key', 'gemini_key']) assert.ok(keyFields.includes(key), key);
 });
 
-test('Integrations & Options: HTML contains Speech Provider and Audio Configuration (Image 2)', () => {
-  const html = fs.readFileSync(indexHtmlPath, 'utf8');
-
-  // Speech & Audio Pane
-  assert.ok(html.includes('id="subpane-speech"'), 'subpane-speech must exist');
-  assert.ok(html.includes('id="selectSpeechProvider"'), 'selectSpeechProvider must exist');
-  assert.ok(html.includes('id="selectSpeechLanguage"'), 'selectSpeechLanguage must exist');
-
-  // Audio Configuration
-  assert.ok(html.includes('id="btnTestSound"'), 'btnTestSound must exist');
-  assert.ok(html.includes('id="meterInputLevel"'), 'meterInputLevel must exist');
-  assert.ok(html.includes('id="inputLevelValue"'), 'inputLevelValue must exist');
-  assert.ok(html.includes('id="meterSystemAudioLevel"'), 'meterSystemAudioLevel must exist');
-  assert.ok(html.includes('id="systemAudioLevelValue"'), 'systemAudioLevelValue must exist');
-  assert.ok(html.includes('id="selectInputDevice"'), 'selectInputDevice must exist');
-  assert.ok(html.includes('id="selectOutputDevice"'), 'selectOutputDevice must exist');
+test('Integrations & Options: Settings > Audio lists real devices, the mic meter and the test sound', () => {
+  const { Cue } = loadRenderer({
+    state: {
+      config: { language: 'en-US', audio_input_device: 'mic-2', endpointing_ms: 300 },
+      ui: { audioDevices: { inputs: [{ deviceId: 'mic-1', label: 'Headset' }, { deviceId: 'mic-2', label: 'USB Mic' }], outputs: [{ deviceId: 'out-1', label: 'Speakers' }] } }
+    }
+  });
+  const html = render(Cue, 'settings/audio');
+  for (const key of ['mic_enabled', 'loopback_enabled', 'noise_cancellation', 'endpointing_ms', 'keyterms', 'vad', 'energy_threshold']) {
+    assert.ok(cfgKeys(html).includes(key), `audio settings must have ${key}`);
+  }
+  const input = html.slice(html.indexOf('data-kind="input"'), html.indexOf('data-kind="output"'));
+  assert.ok(input.includes('<option value="default"') && input.includes('Headset'));
+  assert.ok(input.includes('<option value="mic-2" selected>USB Mic</option>'), 'saved microphone is selected');
+  assert.ok(html.slice(html.indexOf('data-kind="output"')).includes('Speakers'));
+  assert.ok(html.includes('id="micVu"') && html.includes('id="micDb"'), 'mic level meter');
+  assert.ok(tags(html, { 'data-action': 'test-sound' }).length === 1);
+  assert.ok(/data-change="language">[\s\S]*?<option value="en-US" selected>/.test(html), 'interview language select');
 });
 
-test('Integrations & Options: HTML contains Google Calendar connection & meeting detection (Images 3 & 4)', () => {
-  const html = fs.readFileSync(indexHtmlPath, 'utf8');
-
-  assert.ok(html.includes('id="btnConnectGoogleCalendarHero"'), 'btnConnectGoogleCalendarHero must exist');
-  assert.ok(html.includes('id="cfgCalendarDetectMeetings"'), 'cfgCalendarDetectMeetings must exist');
-  assert.ok(html.includes('Connect Google Calendar to see your next meetings'), 'Hero connection description must exist');
-  assert.ok(html.includes('Offers to start RealTimeAI when a Zoom, Teams, Meet or Webex call begins'), 'Detect meetings description must exist');
+test('Integrations & Options: meeting detection and Google Calendar have their own settings', () => {
+  const { Cue } = loadRenderer({
+    state: { meeting: { supported: true, enabled: true, keepInTray: false, active: [], mutedApps: [] }, gcal: { status: { configured: true, connected: false } } }
+  });
+  const general = render(Cue, 'settings/general');
+  assert.deepStrictEqual(tags(general, { 'data-change': 'meeting' }).map((t) => t['data-field']), ['enabled', 'keepInTray']);
+  assert.ok(general.includes('Observando Meet, Teams, Zoom, Discord, Slack e outros.'));
+  const calendar = render(Cue, 'settings/calendar');
+  assert.ok(tags(calendar, { 'data-action': 'gcal-connect' }).length === 1, 'configured client: Conectar');
 });
 
 test('Integrations & Options: preload.js exposes testSound API', () => {
@@ -88,12 +82,33 @@ test('Integrations & Options: main.js reads, writes, and supports all new integr
   assert.ok(main.includes('audio_output_device'), 'main.js must handle audio_output_device');
 });
 
-test('Integrations & Options: app.js handles AI providers switching, audio device enumeration, and test sound', () => {
-  const appJs = fs.readFileSync(appJsPath, 'utf8');
+test('Integrations & Options: device changes save both key spellings and the test sound reaches the main process', async () => {
+  const r = loadRenderer({ api: { saveConfig: async () => ({ ok: true }) } });
+  await r.Cue.changes['audio-device'](el({ kind: 'output' }, { value: 'out-1', selectedOptions: [{ textContent: 'Speakers' }] }));
+  assert.deepStrictEqual(r.called('saveConfig'), [[{ audio_output_device: 'out-1', output_device: 'out-1' }]]);
+  await r.Cue.actions['test-sound']();
+  assert.strictEqual(r.called('testSound').length, 1);
+});
 
-  assert.ok(appJs.includes('setupAiProvidersAndAudio'), 'setupAiProvidersAndAudio function must exist in app.js');
-  assert.ok(appJs.includes('selectActiveModelChoice'), 'selectActiveModelChoice must be wired in app.js');
-  assert.ok(appJs.includes('btnTestSound'), 'btnTestSound must be wired in app.js');
-  assert.ok(appJs.includes('btnConnectGoogleCalendarHero'), 'btnConnectGoogleCalendarHero must be wired in app.js');
-  assert.ok(appJs.includes('cfgCalendarDetectMeetings'), 'cfgCalendarDetectMeetings must be wired in app.js');
+test('Integrations & Options: every setting the dashboard writes reads back the same from config.ini', () => {
+  // Keys of every cfg* control and every saveConfig({ ... }) literal in the renderer.
+  const src = Object.values(sources).join('\n');
+  const keys = new Set([...src.matchAll(/cfg(?:Switch|Select|Number|Text)\('([a-z_]+)'/g)].map((m) => m[1]));
+  for (const m of src.matchAll(/saveConfig\(\{\s*([^}]+)\}/g)) for (const k of m[1].matchAll(/([a-z_]+)\s*:/g)) keys.add(k[1]);
+  // Legacy spellings sent next to the canonical key (main.js accepts both).
+  const ALIASES = { input_device: 'audio_input_device', output_device: 'audio_output_device' };
+  assert.ok(keys.size > 30, `found ${keys.size} keys`);
+
+  const { main, restore } = loadMain();
+  try {
+    for (const key of keys) {
+      const canonical = ALIASES[key] || key;
+      const before = main.readConfigIni()[canonical];
+      const value = typeof before === 'boolean' ? !before : typeof before === 'number' ? before + 1 : `x-${key}`;
+      main.writeConfigIni({ [key]: value });
+      assert.strictEqual(String(main.readConfigIni()[canonical]), String(value), `${key} does not survive config.ini`);
+    }
+  } finally {
+    restore();
+  }
 });

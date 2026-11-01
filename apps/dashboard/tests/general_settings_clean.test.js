@@ -2,38 +2,45 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
+const { loadRenderer, render, el, tags } = require('./helpers/renderer');
+const { loadMain } = require('./helpers/main');
 
-const indexHtmlPath = path.resolve(__dirname, '../src/renderer/index.html');
-const appJsPath = path.resolve(__dirname, '../src/renderer/app.js');
 const mainJsPath = path.resolve(__dirname, '../src/main/main.js');
 
-test('General Settings: Obsolete keys and save button removed from UI', () => {
-  const html = fs.readFileSync(indexHtmlPath, 'utf8');
+const PROVIDERS = ['deepgram_key', 'llm_key', 'cerebras_key', 'groq_key', 'openai_key', 'anthropic_key', 'gemini_key'];
 
-  // Verify removed elements
-  assert.ok(!html.includes('id="btnSaveGeneralSettings"'), 'btnSaveGeneralSettings button must be removed');
-  assert.ok(!html.includes('id="cfgCerebrasKey"'), 'cfgCerebrasKey input must be removed');
-  assert.ok(!html.includes('id="cfgGroqKey"'), 'cfgGroqKey input must be removed');
+test('General Settings: one auto-saving field per provider key, no save button', () => {
+  const { Cue } = loadRenderer({
+    state: { config: { has_deepgram_key: true, deepgram_key_display: '••••••••a1b2', has_llm_key: false } }
+  });
+  const html = render(Cue, 'settings/ai');
 
-  // Verify core API key inputs and badges exist
-  assert.ok(html.includes('id="cfgDeepgramKey"'), 'cfgDeepgramKey must exist');
-  assert.ok(html.includes('id="cfgLlmKey"'), 'cfgLlmKey must exist');
-  assert.ok(html.includes('id="badgeDgKey"'), 'badgeDgKey must exist');
-  assert.ok(html.includes('id="badgeLlmKey"'), 'badgeLlmKey must exist');
-  assert.ok(html.includes('id="btnClearDgKey"'), 'btnClearDgKey must exist');
-  assert.ok(html.includes('id="btnClearLlmKey"'), 'btnClearLlmKey must exist');
+  const fields = tags(html, { 'data-key-input': true });
+  assert.deepStrictEqual(fields.map((f) => f['data-key-input']), PROVIDERS, 'Cerebras and Groq are back: the engine uses them');
+  for (const f of fields) {
+    assert.strictEqual(f.type, 'password', `${f['data-key-input']} is masked`);
+    assert.strictEqual(f.autocomplete, 'off');
+  }
+  // A saved key shows only its mask and can be removed; a missing one asks to paste.
+  assert.strictEqual(fields[0].placeholder, '••••••••a1b2');
+  assert.strictEqual(fields[1].placeholder, 'Cole a chave');
+  assert.deepStrictEqual(tags(html, { 'data-action': 'clear-key' }).map((b) => b['data-key']), ['deepgram_key']);
+  assert.ok(html.includes('● conectada') && html.includes('○ não definida'));
+  assert.ok(!/>\s*Salvar\s*</.test(html), 'no save button: keys save on Enter or blur');
 });
 
-test('General Settings: app.js contains auto-save and clear handlers', () => {
-  const appJs = fs.readFileSync(appJsPath, 'utf8');
-
-  assert.ok(!appJs.includes('cfgCerebrasKey'), 'app.js must not reference cfgCerebrasKey');
-  assert.ok(!appJs.includes('cfgGroqKey'), 'app.js must not reference cfgGroqKey');
-  assert.ok(!appJs.includes('btnSaveGeneralSettings'), 'app.js must not reference btnSaveGeneralSettings');
-
-  assert.ok(appJs.includes('setupKeyAutoSave'), 'setupKeyAutoSave must exist in app.js');
-  assert.ok(appJs.includes('btnClearDgKey'), 'btnClearDgKey handler must exist in app.js');
-  assert.ok(appJs.includes('btnClearLlmKey'), 'btnClearLlmKey handler must exist in app.js');
+test('General Settings: removing a key asks first, then clears it', async () => {
+  let asked = 0;
+  const r = loadRenderer({ api: { saveConfig: async () => ({ ok: true }) } });
+  r.Cue.confirm = async () => {
+    asked += 1;
+    return asked > 1; // refuse the first time, accept the second
+  };
+  const btn = el({ key: 'llm_key', label: 'OpenRouter' });
+  await r.Cue.actions['clear-key'](btn);
+  assert.strictEqual(r.called('saveConfig').length, 0, 'cancelled: nothing saved');
+  await r.Cue.actions['clear-key'](btn);
+  assert.deepStrictEqual(r.called('saveConfig'), [[{ llm_key: '' }]]);
 });
 
 test('General Settings: main.js masks keys in English and supports key clearing', () => {
@@ -43,3 +50,18 @@ test('General Settings: main.js masks keys in English and supports key clearing'
   assert.ok(!mainJs.includes('Criptografada via Windows DPAPI'), 'Portuguese DPAPI mask must be removed');
 });
 
+test('General Settings: a plaintext key never reaches the renderer in full', () => {
+  const { main, restore } = loadMain();
+  try {
+    // Not encrypted yet (the engine does that on its first run).
+    main.writeConfigIni({ llm_key: 'sk-or-v1-0123456789abcdef' });
+    const cfg = main.readConfigIni();
+    assert.strictEqual(cfg.has_llm_key, true);
+    assert.strictEqual(cfg.llm_key_display, '••••••••cdef', 'only the last 4 characters are shown');
+    for (const [k, v] of Object.entries(cfg)) {
+      if (k.endsWith('_display')) assert.ok(!String(v).includes('0123456789'), `${k} must not carry the key`);
+    }
+  } finally {
+    restore();
+  }
+});
