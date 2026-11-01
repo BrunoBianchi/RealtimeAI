@@ -690,13 +690,13 @@ function renderShell() {
   };
   const nav = document.getElementById('sideNav');
   if (nav) {
-    nav.innerHTML = NAV.map(([id, label, ic]) => {
+    setHtml(nav, NAV.map(([id, label, ic]) => {
       const right =
         id === 'live' && running
           ? '<span class="nav-live-dot" title="Copiloto ativo"></span>'
           : `<span class="nav-count">${counts[id] === undefined || counts[id] === '' ? '' : counts[id]}</span>`;
       return `<button type="button" class="nav-item ${navActive(id) ? 'active' : ''}" data-action="go" data-to="${id}" title="${esc(label)}">${icon(ic)}<span class="nav-label">${esc(label)}</span>${right}</button>`;
-    }).join('');
+    }).join(''));
   }
 
   const crumb = document.getElementById('crumb');
@@ -734,11 +734,11 @@ function renderShell() {
   const next = document.getElementById('sidebarNext');
   if (next) {
     const upcoming = upcomingAgents().slice(0, 2);
-    next.innerHTML = upcoming.length
+    setHtml(next, upcoming.length
       ? `<span class="eyebrow" style="padding:0 10px">A seguir</span>${upcoming
           .map(({ a, iv }) => `<button type="button" class="next-item" data-action="go" data-to="session/${esc(a.id)}"><span class="t">${esc(agentTitle(a))}</span><span class="s">${esc(fmtDateShort(iv.at))}${iv.hasTime ? ` · ${esc(iv.time)}` : ''} · ${esc(relDays(iv.days).toLowerCase())}</span></button>`)
           .join('')}`
-      : '';
+      : '');
   }
 
   // Usage card
@@ -750,11 +750,11 @@ function renderShell() {
       const filled = (u.pct / 100) * 12;
       return `<span class="${i < Math.floor(filled) ? 'on' : i < filled ? 'half' : ''}"></span>`;
     }).join('');
-    card.innerHTML = `
+    setHtml(card, `
       <div class="row between"><span class="eyebrow">Uso do mês</span><span class="pill">${esc(u.planLabel)}</span></div>
       <div class="row" style="align-items:baseline;gap:6px"><span style="font-size:22px;font-weight:600;letter-spacing:-.03em;line-height:1">${u.usedMin}</span><span class="num">${u.limit ? `/ ${u.limit} min` : 'min transcritos'}</span></div>
       ${u.limit ? `<div class="usage-ticks">${ticks}</div>` : ''}
-      <div class="row between faint" style="font-size:11.5px"><span>${u.limit ? `${u.left} min restantes` : plural(u.sessions, 'sessão', 'sessões')}</span><span class="nowrap">${u.limit ? `Renova ${esc(u.renewLabel)}` : esc(u.monthLabel)}</span></div>`;
+      <div class="row between faint" style="font-size:11.5px"><span>${u.limit ? `${u.left} min restantes` : plural(u.sessions, 'sessão', 'sessões')}</span><span class="nowrap">${u.limit ? `Renova ${esc(u.renewLabel)}` : esc(u.monthLabel)}</span></div>`);
   }
 
   // Profile
@@ -771,18 +771,20 @@ function renderShell() {
   const live = document.getElementById('btnGoLive');
   if (live) {
     if (running) {
-      const since = S.overlayStatus.startedAt ? fmtClock(Date.now() - S.overlayStatus.startedAt) : '';
       live.className = 'btn live';
-      live.innerHTML = `<span class="dot" style="background:#fff;animation:pulse 1.4s infinite"></span>${S.overlayStatus.mode === 'demo' ? 'Simulando' : 'Ao vivo'}${since ? ` <span class="mono" style="font-size:11px;opacity:.85">${since}</span>` : ''}`;
+      // The clock span is ticked in place (tickLiveClock) so the pulse
+      // animation is not restarted every second.
+      setHtml(live, `<span class="dot" style="background:#fff;animation:pulse 1.4s infinite"></span>${S.overlayStatus.mode === 'demo' ? 'Simulando' : 'Ao vivo'} <span class="mono" id="btnGoLiveClock" style="font-size:11px;opacity:.85"></span>`);
+      tickLiveClock();
     } else {
       live.className = 'btn raised';
-      live.innerHTML = '<span class="dot"></span>Entrar ao vivo';
+      setHtml(live, '<span class="dot"></span>Entrar ao vivo');
     }
   }
   const stealth = document.getElementById('btnStealthChip');
   if (stealth) {
     const on = Boolean(S.stealthState && S.stealthState.active);
-    stealth.innerHTML = `${icon(on ? 'eye-slash' : 'eye')}${on ? 'Oculto' : 'Visível'}`;
+    setHtml(stealth, `${icon(on ? 'eye-slash' : 'eye')}${on ? 'Oculto' : 'Visível'}`);
     stealth.style.color = on ? 'var(--accent)' : '';
   }
   const upd = document.getElementById('btnUpdateChip');
@@ -792,11 +794,27 @@ function renderShell() {
     upd.hidden = !show;
     if (show) {
       const v = S.update.latestVersion || '';
-      upd.innerHTML = `${icon('download')}${st === 'downloaded' ? 'Reiniciar para atualizar' : st === 'downloading' ? `Baixando ${S.update.progress ? Math.round(S.update.progress.percent || 0) + '%' : ''}` : `Atualização ${esc(v)}`}`;
+      setHtml(upd, `${icon('download')}${st === 'downloaded' ? 'Reiniciar para atualizar' : st === 'downloading' ? `Baixando ${S.update.progress ? Math.round(S.update.progress.percent || 0) + '%' : ''}` : `Atualização ${esc(v)}`}`);
     }
   }
 }
 Cue.renderShell = renderShell;
+
+// Writes markup only when it changed: the shell is refreshed often, and an
+// identical rewrite still costs a reflow and restarts CSS animations.
+function setHtml(el, html) {
+  if (el.__html === html) return;
+  el.__html = html;
+  el.innerHTML = html;
+}
+
+function tickLiveClock() {
+  const el = document.getElementById('btnGoLiveClock');
+  if (!el) return false;
+  const st = S.overlayStatus;
+  el.textContent = st && st.startedAt ? fmtClock(Date.now() - st.startedAt) : '';
+  return true;
+}
 
 function upcomingAgents() {
   return S.agents
@@ -965,9 +983,9 @@ function subscribe() {
       if (S.route.view === 'questions' || S.route.view === 'home') refresh();
     }
   });
-  // Clock on the live button and countdowns.
+  // Clock on the live button (ticked in place; full shell only if it is missing).
   setInterval(() => {
-    if (S.overlayStatus && S.overlayStatus.running) renderShell();
+    if (S.overlayStatus && S.overlayStatus.running && !tickLiveClock()) renderShell();
   }, 1000);
 }
 

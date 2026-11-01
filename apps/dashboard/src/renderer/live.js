@@ -29,6 +29,7 @@
       link: { voce: '', outros: '' },
       levels: { voce: 0, outros: 0, voce_speaking: false, outros_speaking: false },
       transcript: [],
+      transcriptRev: 0,
       partial: { voce: '', outros: '' },
       answers: [],
       cur: -1,
@@ -65,7 +66,7 @@
       return;
     }
     if (parts.has('levels')) paintLevels();
-    if (parts.has('transcript')) paint('liveTranscript', transcriptHtml(), true);
+    if (parts.has('transcript')) paintTranscript();
     if (parts.has('answer')) {
       paint('liveAnswer', answerHtml(), false);
       paint('liveAnswerNav', answerNavHtml(), false);
@@ -80,6 +81,23 @@
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
     el.innerHTML = html;
     if (stickBottom && atBottom) el.scrollTop = el.scrollHeight;
+  }
+
+  // Interim results arrive many times per second while someone talks; only the
+  // partial bubbles change then, so the committed turns are not re-rendered.
+  function paintTranscript() {
+    const el = document.getElementById('liveTranscript');
+    if (!el) return;
+    const L = S.live;
+    const live = el.querySelector('.live-partials');
+    if (live && el.dataset.rev === String(L.transcriptRev)) {
+      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+      live.innerHTML = partialsHtml();
+      if (atBottom) el.scrollTop = el.scrollHeight;
+      return;
+    }
+    paint('liveTranscript', transcriptHtml(), true);
+    el.dataset.rev = String(L.transcriptRev);
   }
 
   C.liveOnEvent = (msg) => {
@@ -107,6 +125,7 @@
         L.partial[msg.src] = '';
         if (String(msg.text || '').trim()) L.transcript.push({ src: msg.src, text: fixText(msg.text), t: Number(msg.start) || 0 });
         if (L.transcript.length > 400) L.transcript.splice(0, L.transcript.length - 400);
+        L.transcriptRev++;
         mark('transcript');
         break;
       case 'answer_start': {
@@ -210,12 +229,17 @@
   function transcriptHtml() {
     const L = S.live;
     const items = L.transcript.slice(-120);
-    const parts = items.map((t) => bubble(t.src, t.text, C.fmtClock(t.t), false));
-    for (const src of ['outros', 'voce']) if (L.partial[src]) parts.push(bubble(src, L.partial[src], '', true));
-    if (!parts.length) {
+    const partials = partialsHtml();
+    if (!items.length && !partials) {
       return `<div class="empty" style="padding:48px 0">${icon('microphone')}<span>${S.overlayStatus.running ? 'Ouvindo… as falas aparecem aqui.' : 'Inicie a escuta para transcrever.'}</span></div>`;
     }
-    return parts.join('');
+    return items.map((t) => bubble(t.src, t.text, C.fmtClock(t.t), false)).join('') +
+      `<div class="live-partials" style="display:contents">${partials}</div>`;
+  }
+
+  function partialsHtml() {
+    const L = S.live;
+    return ['outros', 'voce'].filter((src) => L.partial[src]).map((src) => bubble(src, L.partial[src], '', true)).join('');
   }
 
   function bubble(src, text, time, partial) {
