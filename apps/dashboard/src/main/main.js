@@ -193,28 +193,31 @@ function readConfigIni() {
   const stealth = ini.stealth || {};
   const sistema = ini.sistema || ini.updates || {};
 
-  const maskOrShow = (v) => {
+  // A key is never sent to the renderer in full: a plaintext one (an env var,
+  // or one the engine has not encrypted yet) would show up as the field's
+  // placeholder, i.e. on a screen share.
+  const maskKey = (v) => {
     if (!v) return '';
     if (v.startsWith('dpapi:')) return '•••••••• (Encrypted via Windows DPAPI)';
-    return v;
+    return v.length > 12 ? `••••••••${v.slice(-4)}` : '••••••••';
   };
 
   return {
     configPath,
     rawIni: ini,
-    deepgram_key_display: maskOrShow(dg.api_key || process.env.DEEPGRAM_API_KEY || ''),
+    deepgram_key_display: maskKey(dg.api_key || process.env.DEEPGRAM_API_KEY || ''),
     has_deepgram_key: Boolean(dg.api_key || process.env.DEEPGRAM_API_KEY),
-    llm_key_display: maskOrShow(llm.api_key || process.env.OPENROUTER_API_KEY || ''),
+    llm_key_display: maskKey(llm.api_key || process.env.OPENROUTER_API_KEY || ''),
     has_llm_key: Boolean(llm.api_key || process.env.OPENROUTER_API_KEY),
-    cerebras_key_display: maskOrShow(llm.cerebras_api_key || process.env.CEREBRAS_API_KEY || ''),
+    cerebras_key_display: maskKey(llm.cerebras_api_key || process.env.CEREBRAS_API_KEY || ''),
     has_cerebras_key: Boolean(llm.cerebras_api_key || process.env.CEREBRAS_API_KEY),
-    groq_key_display: maskOrShow(llm.groq_api_key || process.env.GROQ_API_KEY || ''),
+    groq_key_display: maskKey(llm.groq_api_key || process.env.GROQ_API_KEY || ''),
     has_groq_key: Boolean(llm.groq_api_key || process.env.GROQ_API_KEY),
-    openai_key_display: maskOrShow(llm.openai_api_key || process.env.OPENAI_API_KEY || ''),
+    openai_key_display: maskKey(llm.openai_api_key || process.env.OPENAI_API_KEY || ''),
     has_openai_key: Boolean(llm.openai_api_key || process.env.OPENAI_API_KEY),
-    anthropic_key_display: maskOrShow(llm.anthropic_api_key || process.env.ANTHROPIC_API_KEY || ''),
+    anthropic_key_display: maskKey(llm.anthropic_api_key || process.env.ANTHROPIC_API_KEY || ''),
     has_anthropic_key: Boolean(llm.anthropic_api_key || process.env.ANTHROPIC_API_KEY),
-    gemini_key_display: maskOrShow(llm.gemini_api_key || process.env.GEMINI_API_KEY || ''),
+    gemini_key_display: maskKey(llm.gemini_api_key || process.env.GEMINI_API_KEY || ''),
     has_gemini_key: Boolean(llm.gemini_api_key || process.env.GEMINI_API_KEY),
     background_model: llm.background_model || llm.modelo_segundo_plano || 'auto',
     ai_response_language: llm.ai_response_language || llm.idioma_resposta || 'auto',
