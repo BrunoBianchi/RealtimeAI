@@ -98,8 +98,11 @@ test('Real Questions System: JSONL (.jsonl) Session Extraction', () => {
 });
 
 test('Real Questions System: Frontend Codebase is Free of Mock Strings', () => {
-  const appJsPath = path.join(__dirname, '..', 'src', 'renderer', 'app.js');
-  const appJsContent = fs.readFileSync(appJsPath, 'utf8');
+  const rendererDir = path.join(__dirname, '..', 'src', 'renderer');
+  const appJsContent = fs.readdirSync(rendererDir)
+    .filter((f) => f.endsWith('.js'))
+    .map((f) => fs.readFileSync(path.join(rendererDir, f), 'utf8'))
+    .join('\n');
 
   // The previous mock string was: transcript: 'Practice interview debrief transcript'
   assert.ok(

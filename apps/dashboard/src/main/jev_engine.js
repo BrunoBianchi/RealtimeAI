@@ -3,7 +3,9 @@ const path = require('path');
 const { getCompanySvgLogo } = require('./company_logos');
 const { resolveAndCacheCompanyLogo, deriveDomainFromCompanyName } = require('./company_logo_service');
 
-const SEED_FILE = path.join(__dirname, 'question_bank_seed.json');
+// Questions shipped by older builds as sample content ("q-nu-01"...). They
+// were never asked in a real session, so they are purged on load.
+const SAMPLE_QUESTION_ID = /^q-[a-z0-9]+-\d+$/i;
 
 /**
  * Enterprise & Technology Companies Dictionary for accurate transcript detection.
@@ -49,7 +51,7 @@ const KNOWN_COMPANIES = [
  */
 function detectCompanyFromTranscript(transcriptText, fallbackName = '') {
   if (!transcriptText || typeof transcriptText !== 'string') {
-    const cleanFallback = (fallbackName || 'Accenture').trim();
+    const cleanFallback = (fallbackName || 'Empresa não identificada').trim();
     return {
       name: cleanFallback,
       id: cleanFallback.toLowerCase().replace(/[^a-z0-9]/g, '') || 'company',
@@ -299,33 +301,45 @@ function validateQuestionWithJev(text) {
 function categorizeQuestionWithJev(questionText) {
   const lower = questionText.toLowerCase();
 
+  // Opening, culture/motivation and past-experience questions come first:
+  // they are the most common and were all falling into "Technical".
+  if (/(fale (um pouco )?sobre (você|voce|sua trajetória)|sua trajetória|se apresent|tell me about yourself|walk me through your (background|resume))/iu.test(lower)) {
+    return { category: 'Opening', subCategory: 'Apresentação' };
+  }
+  if (/(cultura|valores|por que (você|voce) quer|por que (a|o) |o que (você|voce) (mais )?(quer|busca|espera)|motiva|se identifica|why (do you want|this company|us)|culture|values)/iu.test(lower)) {
+    return { category: 'Culture', subCategory: 'Cultura e motivação' };
+  }
+  if (/(conte(-me)? (um pouco )?sobre (o |a |seu |sua )?(projeto|experiência|trabalho)|seu projeto|sua experiência|tell me about (your|the) (project|experience))/iu.test(lower)) {
+    return { category: 'Experience', subCategory: 'Projetos e experiência' };
+  }
+
   // Behavioral (STAR) - check early so questions about conflicts/situations with architecture/code get prioritized
-  if (/(tell me about a time|describe a situation|conflict|disagree|mistake|failure|pressure|deadline|teammate|stakeholder|leadership|priorit|feedback|star method|difficult colleague|conte sobre|descreva|conflito|liderança|pressão)\b/i.test(lower)) {
+  if (/(tell me about a time|describe a situation|conflict|disagree|mistake|failure|pressure|deadline|teammate|stakeholder|leadership|priorit|feedback|star method|difficult colleague|conte sobre|descreva|conflito|liderança|pressão)(?!\p{L})/iu.test(lower)) {
     return { category: 'Behavioral', subCategory: 'Leadership / STAR' };
   }
 
   // Coding
-  if (/(algorithm|data structure|leetcode|binary tree|array|string|hashmap|recursion|time complexity|o\(|write code|code implementation|regex|sort|big-o|pointer|stack|heap|algoritmo|estrutura de dados)\b/i.test(lower)) {
+  if (/(algorithm|data structure|leetcode|binary tree|array|string|hashmap|recursion|time complexity|o\(|write code|code implementation|regex|sort|big-o|pointer|stack|heap|algoritmo|estrutura de dados)(?!\p{L})/iu.test(lower)) {
     return { category: 'Technical', subCategory: 'Coding' };
   }
 
   // System Design
-  if (/(system design|distributed|high availability|sharding|load balanc|throughput|latency|microservice|caching|kafka|redis|message queue|event-driven|partition|rate limit|cluster|distribuído|alta disponibilidade|mensageria)\b/i.test(lower)) {
+  if (/(system design|distributed|high availability|sharding|load balanc|throughput|latency|microservice|caching|kafka|redis|message queue|event-driven|partition|rate limit|cluster|distribuído|alta disponibilidade|mensageria)(?!\p{L})/iu.test(lower)) {
     return { category: 'Technical', subCategory: 'System design' };
   }
 
   // Architecture & Database
-  if (/(architecture|api design|rest|grpc|database|schema|nosql|sql|postgres|aws|cloud|docker|kubernetes|design pattern|trade-off|tradeoff|migration|zero downtime|arquitetura|banco de dados|migração)\b/i.test(lower)) {
+  if (/(architecture|api design|rest|grpc|database|schema|nosql|sql|postgres|aws|cloud|docker|kubernetes|design pattern|trade-off|tradeoff|migration|zero downtime|arquitetura|banco de dados|migração)(?!\p{L})/iu.test(lower)) {
     return { category: 'Technical', subCategory: 'Architecture' };
   }
 
   // Domain knowledge & Industry Strategy
-  if (/(business|compliance|revenue|pricing|market|customer|client|regulation|saas|vendor|roi|industry|product strategy|roadmap|fintech|security compliance|negócio|cliente|mercado|estratégia)\b/i.test(lower)) {
+  if (/(business|compliance|revenue|pricing|market|customer|client|regulation|saas|vendor|roi|industry|product strategy|roadmap|fintech|security compliance|negócio|cliente|mercado|estratégia)(?!\p{L})/iu.test(lower)) {
     return { category: 'Domain knowledge', subCategory: 'Industry / Strategy' };
   }
 
   // Default fallback
-  return { category: 'Technical', subCategory: 'Engineering Practice' };
+  return { category: 'General', subCategory: 'Geral' };
 }
 
 /**
@@ -470,6 +484,76 @@ function extractQuestionsFromTranscript(transcriptText) {
 /**
  * Loads the active Question Bank, syncing dynamically with real user goals and sessions.
  */
+// ---------------------------------------------------------------------------
+// Generalist filter: the bank keeps questions any candidate could be asked.
+// Questions about the candidate's own projects, products or past answers
+// ("seu projeto da Midea", "o projeto Tech Finance", "outro exemplo") are
+// specific to one person and are left out.
+// ---------------------------------------------------------------------------
+const PERSONAL_REF_RE = /(?<!\p{L})(?:seu|sua|seus|suas|teu|tua|your)\s+(?:próprio\s+|própria\s+)?(?:projeto|projetos|produto|aplicativo|app|startup|tcc|case|portf[oó]lio|project|product|startup)(?!\p{L})/iu;
+const BACK_REF_RE = /(?<!\p{L})(?:(?:esse|este|desse|deste|nesse|neste|aquele|daquele|naquele)\s+(?:projeto|produto|caso|exemplo|aplicativo)|outro exemplo|another example|(?:o que|como|que) você (?:falou|mencionou|disse|comentou|citou)|you (?:mentioned|said))(?!\p{L})/iu;
+// "projeto X" / "projeto da X" with X capitalized: a named project.
+const NAMED_PROJECT_RE = /(?<!\p{L})(?:projeto|project)\s+(?:d[aoe]s?\s+|of\s+)?\p{Lu}/u;
+// Tech names that show up in résumés but are generic in a question.
+const GENERIC_TERMS = new Set([
+  'ia', 'ai', 'sql', 'nosql', 'python', 'java', 'javascript', 'typescript', 'react', 'node', 'next', 'next.js', 'go',
+  'golang', 'rust', 'kotlin', 'swift', 'c', 'c++', 'c#', 'aws', 'gcp', 'azure', 'docker', 'kubernetes', 'git', 'github',
+  'linux', 'api', 'apis', 'rest', 'graphql', 'kafka', 'redis', 'postgres', 'postgresql', 'mysql', 'mongodb', 'spark',
+  'excel', 'power', 'bi', 'scrum', 'agile', 'star', 'llm', 'llms', 'ml', 'pix', 'brasil', 'brazil', 'são', 'paulo'
+]);
+const STOP_CAPS = new Set(['eu', 'você', 'voce', 'como', 'qual', 'quais', 'por', 'que', 'o', 'a', 'os', 'as', 'no', 'na', 'em', 'de', 'do', 'da', 'e', 'se', 'um', 'uma', 'conte', 'fale', 'descreva', 'poderia', 'the', 'how', 'what', 'why', 'tell', 'can', 'could', 'i']);
+
+function normWord(w) {
+  return String(w || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+// Capitalized names in the candidate's own documents (projects, employers,
+// products). Target companies and generic tech words are not "personal".
+function buildCandidateTerms(appDataDir) {
+  const terms = new Set();
+  const companies = new Set();
+  const agentsDir = path.join(appDataDir || '', 'agents');
+  if (!appDataDir || !fs.existsSync(agentsDir)) return { terms, companies };
+  for (const f of fs.readdirSync(agentsDir).filter((x) => x.endsWith('.json'))) {
+    try {
+      const a = JSON.parse(fs.readFileSync(path.join(agentsDir, f), 'utf8'));
+      for (const w of String(a.company || '').split(/[\s\-–—·|/]+/)) if (w.length > 2) companies.add(normWord(w));
+      for (const d of a.documents || []) {
+        const text = String(d.content || '').slice(0, 60000);
+        for (const m of text.matchAll(/(?<!\p{L})\p{Lu}[\p{L}\p{N}]+(?:\s+\p{Lu}[\p{L}\p{N}]+)*/gu)) {
+          for (const w of [m[0], m[0].replace(/\s+/g, '')]) {
+            const n = normWord(w);
+            if (n.length > 2 && !GENERIC_TERMS.has(n) && !STOP_CAPS.has(n)) terms.add(n);
+          }
+        }
+      }
+    } catch (_e) {}
+  }
+  for (const c of companies) terms.delete(c);
+  return { terms, companies };
+}
+
+function isGeneralistQuestion(text, ctx = {}) {
+  const t = String(text || '');
+  if (!t.trim()) return false;
+  if (PERSONAL_REF_RE.test(t) || BACK_REF_RE.test(t) || NAMED_PROJECT_RE.test(t)) return false;
+  const terms = ctx.terms;
+  if (terms && terms.size) {
+    const company = normWord(ctx.company || '');
+    const words = [...t.matchAll(/(?<!\p{L})\p{Lu}[\p{L}\p{N}.]*(?:\s+\p{Lu}[\p{L}\p{N}.]*)*/gu)].map((m) => m[0]);
+    for (const [i, w] of words.entries()) {
+      // The first word of the sentence is capitalized by grammar, not a name.
+      if (i === 0 && t.trimStart().startsWith(w) && !/\s/.test(w)) continue;
+      for (const cand of [w, w.replace(/\s+/g, '')]) {
+        const n = normWord(cand);
+        if (!n || n === company || (ctx.companies && ctx.companies.has(n)) || GENERIC_TERMS.has(n)) continue;
+        if (terms.has(n)) return false;
+      }
+    }
+  }
+  return true;
+}
+
 function loadQuestionBank(appDataDir) {
   const bankPath = path.join(appDataDir, 'question_bank.json');
   let data = null;
@@ -480,27 +564,34 @@ function loadQuestionBank(appDataDir) {
     } catch (_e) {}
   }
 
-  // Load from seed if missing or corrupt
-  if (!data || !Array.isArray(data.companies) || data.companies.length === 0) {
-    if (fs.existsSync(SEED_FILE)) {
-      try {
-        data = JSON.parse(fs.readFileSync(SEED_FILE, 'utf8'));
-      } catch (_e) {}
-    }
-  }
-
-  if (!data) {
+  if (!data || !Array.isArray(data.companies)) {
     data = { totalInterviews: 0, totalCompanies: 0, totalQuestions: 0, companies: [] };
   }
 
-  let seedData = null;
-  if (fs.existsSync(SEED_FILE)) {
-    try {
-      seedData = JSON.parse(fs.readFileSync(SEED_FILE, 'utf8'));
-    } catch (_e) {}
-  }
-
   let updated = false;
+
+  // Only generalist questions extracted from real sessions stay; nothing is locked.
+  const candidate = buildCandidateTerms(appDataDir);
+  for (const comp of data.companies) {
+    const before = Array.isArray(comp.questions) ? comp.questions.length : 0;
+    comp.questions = (comp.questions || []).filter(
+      (q) =>
+        q && q.text && !SAMPLE_QUESTION_ID.test(String(q.id || '')) &&
+        isGeneralistQuestion(q.text, { ...candidate, company: comp.name })
+    );
+    for (const q of comp.questions) {
+      if (q.locked) {
+        q.locked = false;
+        updated = true;
+      }
+    }
+    if (comp.questions.length !== before) updated = true;
+  }
+  const withQuestions = data.companies.filter((c) => c.questions.length > 0);
+  if (withQuestions.length !== data.companies.length) {
+    data.companies = withQuestions;
+    updated = true;
+  }
 
   // 1. Detect active user goal company
   let activeGoalCompany = '';
@@ -537,13 +628,6 @@ function loadQuestionBank(appDataDir) {
           updated = true;
         }
       }
-      if ((!comp.questions || comp.questions.length === 0) && seedData && Array.isArray(seedData.companies)) {
-        const seedComp = seedData.companies.find((sc) => sc.id === comp.id);
-        if (seedComp && Array.isArray(seedComp.questions) && seedComp.questions.length > 0) {
-          comp.questions = JSON.parse(JSON.stringify(seedComp.questions));
-          updated = true;
-        }
-      }
       // Truthful question counts: questionsReported MUST equal the real array length!
       const realCount = Array.isArray(comp.questions) ? comp.questions.length : 0;
       if (comp.questionsReported !== realCount) {
@@ -554,8 +638,8 @@ function loadQuestionBank(appDataDir) {
     }
 
     // 3. Pin active goal company (e.g. Nubank) to index 0 (top of Question Bank!)
-    const targetCompName = (activeGoalCompany || 'nubank').toLowerCase();
-    const targetIdx = data.companies.findIndex(
+    const targetCompName = activeGoalCompany.toLowerCase();
+    const targetIdx = !targetCompName ? -1 : data.companies.findIndex(
       (c) => c.name.toLowerCase().includes(targetCompName) || c.id === targetCompName
     );
     if (targetIdx > 0) {
@@ -597,14 +681,18 @@ function saveQuestionBank(appDataDir, bankData) {
  * Automatically ingests questions from an ended interview session into the Question Bank.
  * Automatically detects the company from the transcript and fetches/caches its real logo!
  */
-async function ingestSessionQuestions(appDataDir, transcriptText, companyName = '') {
+// opts.exactCompany: the caller knows the company (the session's goal); skip
+// guessing it from the transcript, where candidates also name past employers.
+async function ingestSessionQuestions(appDataDir, transcriptText, companyName = '', opts = {}) {
   const extracted = extractQuestionsFromTranscript(transcriptText);
   if (!extracted || extracted.length === 0) {
     return { ok: true, questionsExtracted: 0, added: 0 };
   }
 
   // 1. Detect company from transcript text
-  const detection = detectCompanyFromTranscript(transcriptText, companyName);
+  const detection = opts.exactCompany && companyName
+    ? detectCompanyFromTranscript('', companyName)
+    : detectCompanyFromTranscript(transcriptText, companyName);
   const cleanName = detection.name;
   const compId = detection.id;
 
@@ -647,7 +735,9 @@ async function ingestSessionQuestions(appDataDir, transcriptText, companyName = 
   }
 
   let addedCount = 0;
+  const candidate = buildCandidateTerms(appDataDir);
   for (const q of extracted) {
+    if (!isGeneralistQuestion(q.text, { ...candidate, company: company.name })) continue;
     company.categories[q.category] = (company.categories[q.category] || 0) + 1;
     if (q.subCategory && company.subCategories[q.subCategory] !== undefined) {
       company.subCategories[q.subCategory] = (company.subCategories[q.subCategory] || 0) + 1;
@@ -669,7 +759,7 @@ async function ingestSessionQuestions(appDataDir, transcriptText, companyName = 
         subCategory: q.subCategory,
         interviewsCount: 1,
         lastReported: 'Today',
-        locked: !company.unlocked
+        locked: false
       });
       company.questionsReported = (company.questionsReported || 0) + 1;
       bank.totalQuestions = (bank.totalQuestions || 0) + 1;
@@ -690,6 +780,23 @@ async function ingestSessionQuestions(appDataDir, transcriptText, companyName = 
     added: addedCount,
     questions: extracted
   };
+}
+
+/**
+ * Rebuilds the bank from scratch out of real session transcripts.
+ * entries: [{ text, company }] (text in any format extractQuestionsFromTranscript reads).
+ */
+async function rebuildQuestionBank(appDataDir, entries) {
+  saveQuestionBank(appDataDir, { totalInterviews: 0, totalCompanies: 0, totalQuestions: 0, companies: [] });
+  let added = 0;
+  for (const e of entries || []) {
+    if (!e || !e.text) continue;
+    try {
+      const r = await ingestSessionQuestions(appDataDir, e.text, e.company || '', { exactCompany: Boolean(e.company) });
+      added += (r && r.added) || 0;
+    } catch (_e) {}
+  }
+  return { ok: true, added, bank: loadQuestionBank(appDataDir) };
 }
 
 /**
@@ -727,5 +834,8 @@ module.exports = {
   loadQuestionBank,
   saveQuestionBank,
   ingestSessionQuestions,
+  rebuildQuestionBank,
+  isGeneralistQuestion,
+  buildCandidateTerms,
   unlockCompany
 };

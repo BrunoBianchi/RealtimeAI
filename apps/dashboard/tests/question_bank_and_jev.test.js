@@ -105,7 +105,7 @@ Interviewer: What is your approach to handling disagreement with a technical lea
     const google = bank.companies.find((c) => c.id === 'google');
     assert.ok(google, 'Google company created in Question Bank');
     assert.equal(google.questions.length, 2);
-    assert.equal(google.questions[0].locked, true);
+    assert.equal(google.questions[0].locked, false);
 
     // Unlock top 3 preview
     const unlockRes = jevEngine.unlockCompany(tmpDir, 'google', true);
@@ -117,45 +117,13 @@ Interviewer: What is your approach to handling disagreement with a technical lea
   }
 });
 
-test('Question Bank UI: HTML Elements and Fidelity Presence', () => {
-  const htmlPath = path.join(__dirname, '..', 'src', 'renderer', 'index.html');
-  const html = fs.readFileSync(htmlPath, 'utf8');
-
-  // Navigation sidebar item
-  assert.ok(html.includes('Question Bank'));
-  assert.ok(html.includes('navBadgeQuestionBank'));
-
-  // Main Question Bank view (Image 1)
-  assert.ok(html.includes('id="view-question-bank"'));
-  assert.ok(html.includes('id="btnHowDataCollected"'));
-  assert.ok(html.includes('id="inputSearchQuestionBank"'));
-  assert.ok(html.includes('id="qbStatTotalCompanies"'));
-  assert.ok(html.includes('id="qbStatTotalQuestions"'));
-  assert.ok(html.includes('id="qbCompaniesGrid"'));
-
-  // Company detail view (Images 2 & 3)
-  assert.ok(html.includes('id="view-question-bank-company"'));
-  assert.ok(html.includes('id="btnBackToQuestionBank"'));
-  assert.ok(html.includes('id="qbCompanyName"'));
-  assert.ok(html.includes('id="qbCompanyMonogram"'));
-  assert.ok(html.includes('id="qbMetricInterviews"'));
-  assert.ok(html.includes('id="qbMetricQuestions"'));
-  assert.ok(html.includes('id="qbMetricLastReported"'));
-  assert.ok(html.includes('id="qbTabAll"'));
-  assert.ok(html.includes('id="qbTabTechnical"'));
-  assert.ok(html.includes('id="qbTabDomain"'));
-  assert.ok(html.includes('id="qbTabBehavioral"'));
-  assert.ok(html.includes('id="qbSubCoding"'));
-  assert.ok(html.includes('id="qbSubSystemDesign"'));
-  assert.ok(html.includes('id="qbUnlockBanner"'));
-  assert.ok(html.includes('id="btnQbUnlockTop3"'));
-  assert.ok(html.includes('id="btnQbSubscribe"'));
-  assert.ok(html.includes('id="qbQuestionsList"'));
-
-  // Privacy modal & Settings toggle
-  assert.ok(html.includes('id="modalHowDataCollected"'));
-  assert.ok(html.includes('id="toggleModalShareQuestions"'));
-  assert.ok(html.includes('id="cfgShareQuestions"'));
+test('Question Bank UI: real data only, no paywall', () => {
+  const views = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'views.js'), 'utf8');
+  assert.ok(views.includes('C.views.questions'), 'question bank view registered');
+  assert.ok(views.includes("data-action=\"q-rebuild\""), 'bank can be rebuilt from recorded sessions');
+  assert.ok(views.includes('data-change="share-questions"'), 'sharing toggle on the page');
+  assert.ok(!/q-unlock|Desbloquear top 3/.test(views), 'no unlock paywall for your own questions');
+  assert.ok(!views.includes('frequencyScore'), 'frequency comes from interview counts, not a stored score');
 });
 
 test('Question Bank Preload Bridge & IPC registration', () => {
@@ -311,7 +279,7 @@ Interviewer: Describe a situation where you had to debug a memory leak in a Node
     assert.equal(cap.domain, 'capgemini.com');
     assert.ok(cap.logo && cap.logo.startsWith('data:image/'));
     assert.ok(cap.questions.length >= 2);
-    assert.equal(cap.questions[0].locked, true);
+    assert.equal(cap.questions[0].locked, false);
 
     // Unlock top 3 questions
     const unlockRes = jevEngine.unlockCompany(tmpDir, 'capgemini', true);
@@ -319,6 +287,51 @@ Interviewer: Describe a situation where you had to debug a memory leak in a Node
     assert.equal(unlockRes.company.unlockedTop3, true);
     assert.equal(unlockRes.company.questions[0].locked, false);
     assert.equal(unlockRes.company.questions[1].locked, false);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('Question Bank keeps only generalist questions, not the candidate own projects', async () => {
+  const keep = [
+    'Por que você quer trabalhar na Nubank?',
+    'Conte-me sobre sua carreira e trajetória profissional?',
+    'Como você desenharia um rate limiter distribuído?',
+    'Poderia compartilhar uma situação em que você discordou da maioria da equipe?'
+  ];
+  const drop = [
+    'Conte-me um pouco sobre o seu projeto da Midea?',
+    'Conte-me um pouco sobre o projeto Tech Finance?',
+    'No seu projeto de IA, como você escolheu as tecnologias?',
+    'Poderia trazer outro exemplo de como definiu prioridades?',
+    'Você já tinha a ideia antes de definir esse projeto?',
+    'Tell me about your project at Acme'
+  ];
+  for (const q of keep) assert.equal(jevEngine.isGeneralistQuestion(q, { company: 'Nubank' }), true, q);
+  for (const q of drop) assert.equal(jevEngine.isGeneralistQuestion(q, { company: 'Nubank' }), false, q);
+
+  // Names found in the candidate's documents (projects, past employers) make a question personal.
+  const tmpDir = path.join(__dirname, '..', '.tmp_test_generalist_' + Date.now());
+  fs.mkdirSync(path.join(tmpDir, 'agents'), { recursive: true });
+  try {
+    fs.writeFileSync(
+      path.join(tmpDir, 'agents', 'goal.json'),
+      JSON.stringify({ company: 'Nubank', documents: [{ tag: 'resume', content: 'Built the Orbital Ledger platform at Kestrel Labs using Python.' }] })
+    );
+    const ctx = jevEngine.buildCandidateTerms(tmpDir);
+    assert.equal(jevEngine.isGeneralistQuestion('Como o Orbital Ledger lidava com falhas?', { ...ctx, company: 'Nubank' }), false);
+    assert.equal(jevEngine.isGeneralistQuestion('Como você usaria Python para analisar dados da Nubank?', { ...ctx, company: 'Nubank' }), true);
+
+    const res = await jevEngine.ingestSessionQuestions(
+      tmpDir,
+      'Interviewer: Why do you want to work at Nubank?\nInterviewer: Tell me about your project Orbital Ledger, how did it scale?',
+      'Nubank',
+      { exactCompany: true }
+    );
+    const bank = jevEngine.loadQuestionBank(tmpDir);
+    const texts = bank.companies.flatMap((c) => c.questions.map((q) => q.text));
+    assert.ok(!texts.some((t) => /Orbital/.test(t)), 'personal project question not stored');
+    assert.ok(res.ok);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
