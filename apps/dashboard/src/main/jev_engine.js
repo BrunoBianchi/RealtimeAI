@@ -3,7 +3,9 @@ const path = require('path');
 const { getCompanySvgLogo } = require('./company_logos');
 const { resolveAndCacheCompanyLogo, deriveDomainFromCompanyName } = require('./company_logo_service');
 
-const SEED_FILE = path.join(__dirname, 'question_bank_seed.json');
+// Questions shipped by older builds as sample content ("q-nu-01"...). They
+// were never asked in a real session, so they are purged on load.
+const SAMPLE_QUESTION_ID = /^q-[a-z0-9]+-\d+$/i;
 
 /**
  * Enterprise & Technology Companies Dictionary for accurate transcript detection.
@@ -49,7 +51,7 @@ const KNOWN_COMPANIES = [
  */
 function detectCompanyFromTranscript(transcriptText, fallbackName = '') {
   if (!transcriptText || typeof transcriptText !== 'string') {
-    const cleanFallback = (fallbackName || 'Accenture').trim();
+    const cleanFallback = (fallbackName || 'Empresa não identificada').trim();
     return {
       name: cleanFallback,
       id: cleanFallback.toLowerCase().replace(/[^a-z0-9]/g, '') || 'company',
@@ -195,6 +197,8 @@ function detectCompanyFromTranscript(transcriptText, fallbackName = '') {
   };
 }
 
+const MARKUP_RE = /\*\*|`|\$[^$\s][^$]*\$|\\(?:div|times|frac|cdot|sqrt)\b|^\s*[-*•]\s|\|\s*-{3}/;
+
 /**
  * Validates whether a candidate string is a substantive, meaningful interview question.
  * Filters out audio tests, administrative chat, greetings, and casual noise.
@@ -210,10 +214,14 @@ function validateQuestionWithJev(text) {
   // Strip common conversational filler prefixes
   trimmed = trimmed
     .replace(/^(so|okay|well|alright|cool|um|uh|now|great|yeah|yes|ok|right|então|bem|certo|legal)[,\s]+/i, '')
-    .replace(/^(my next question is:?|another question:?|let me ask you:?|i want to ask you:?|question:?|minha próxima pergunta é:?|outra pergunta:?|quero te perguntar:?|pergunta:?)[,\s]*/i, '')
+    .replace(/^(my next question is:?|another question:?|let me ask you:?|i want to ask you:?|question:?|minha próxima pergunta é:?|outra pergunta:?|quero te perguntar:?|pergunta:?|responda(?: por [áa]udio)?:|como eu responderia:?)[,\s]*/i, '')
+    .replace(/^["“']+|["”']+$/g, '')
     .trim();
 
   if (trimmed.length < 18) return { valid: false, reason: 'too_short' };
+  // Markdown and math come from the copilot's own answers ("**10%**",
+  // "$1/5$ de 50"), never from what an interviewer says.
+  if (MARKUP_RE.test(trimmed)) return { valid: false, reason: 'markup' };
 
   const lower = trimmed.toLowerCase();
 
@@ -258,7 +266,7 @@ function validateQuestionWithJev(text) {
 
   // Question signals: question mark or interrogative lead words
   const hasQuestionMark = lower.includes('?');
-  const hasInterrogativeLead = /^(what|how|why|when|where|who|which|can you|could you|would you|tell me|describe|walk me|explain|have you|in your experience|share an example|give an example|qual|quais|como|por que|porque|poderia|descreva|conte-me|conte sobre|fale sobre|explique|você já|voce ja|me dê um exemplo|dê um exemplo)\b/i.test(lower);
+  const hasInterrogativeLead = /^(what|how|why|when|where|who|which|can you|could you|would you|tell me|describe|walk me|explain|have you|in your experience|share an example|give an example|qual|quais|como|por que|porque|poderia|descreva|conte-me|conte sobre|conte (uma|um)|me conte|me fale|fale sobre|explique|imagine|você já|voce ja|me dê um exemplo|dê um exemplo)\b/i.test(lower);
 
   if (!hasQuestionMark && !hasInterrogativeLead) {
     return { valid: false, reason: 'not_a_question' };
@@ -279,7 +287,10 @@ function validateQuestionWithJev(text) {
 
   const hasSubstantiveTerm = substantiveTerms.some((term) => lower.includes(term));
 
-  if (!hasSubstantiveTerm && !hasInterrogativeLead) {
+  // A full sentence ending in "?" is a question even without an interview
+  // keyword ("Você comentou que..., como faz isso?"); JEV then decides.
+  const longQuestion = hasQuestionMark && trimmed.split(/\s+/).length >= 7;
+  if (!hasSubstantiveTerm && !hasInterrogativeLead && !longQuestion) {
     return { valid: false, reason: 'not_interview_question' };
   }
 
@@ -299,33 +310,45 @@ function validateQuestionWithJev(text) {
 function categorizeQuestionWithJev(questionText) {
   const lower = questionText.toLowerCase();
 
+  // Opening, culture/motivation and past-experience questions come first:
+  // they are the most common and were all falling into "Technical".
+  if (/(fale (um pouco )?sobre (você|voce|sua trajetória)|sua trajetória|se apresent|tell me about yourself|walk me through your (background|resume))/iu.test(lower)) {
+    return { category: 'Opening', subCategory: 'Apresentação' };
+  }
+  if (/(cultura|valores|por que (você|voce) quer|por que (a|o) |o que (você|voce) (mais )?(quer|busca|espera)|motiva|se identifica|why (do you want|this company|us)|culture|values)/iu.test(lower)) {
+    return { category: 'Culture', subCategory: 'Cultura e motivação' };
+  }
+  if (/(conte(-me)? (um pouco )?sobre (o |a |seu |sua )?(projeto|experiência|trabalho)|seu projeto|sua experiência|tell me about (your|the) (project|experience))/iu.test(lower)) {
+    return { category: 'Experience', subCategory: 'Projetos e experiência' };
+  }
+
   // Behavioral (STAR) - check early so questions about conflicts/situations with architecture/code get prioritized
-  if (/(tell me about a time|describe a situation|conflict|disagree|mistake|failure|pressure|deadline|teammate|stakeholder|leadership|priorit|feedback|star method|difficult colleague|conte sobre|descreva|conflito|liderança|pressão)\b/i.test(lower)) {
+  if (/(tell me about a time|a time when|describe a situation|give an example|conflict|disagree|mistake|failure|pressure|deadline|teammate|stakeholder|leadership|priorit|feedback|responsibilit|star method|difficult colleague|conte sobre|conte (uma|um) (vez|situação|momento|exemplo)|me conte|uma vez em que|uma situação em que|um momento em que|teve que|precisou|dê um exemplo|assumi[ru]|responsabilidade|como (você|voce) lid(a|aria|ou)|descreva|conflito|liderança|pressão)(?!\p{L})/iu.test(lower)) {
     return { category: 'Behavioral', subCategory: 'Leadership / STAR' };
   }
 
   // Coding
-  if (/(algorithm|data structure|leetcode|binary tree|array|string|hashmap|recursion|time complexity|o\(|write code|code implementation|regex|sort|big-o|pointer|stack|heap|algoritmo|estrutura de dados)\b/i.test(lower)) {
+  if (/(algorithm|data structure|leetcode|binary tree|array|string|hashmap|recursion|time complexity|o\(|write code|code implementation|regex|sort|big-o|pointer|stack|heap|algoritmo|estrutura de dados)(?!\p{L})/iu.test(lower)) {
     return { category: 'Technical', subCategory: 'Coding' };
   }
 
   // System Design
-  if (/(system design|distributed|high availability|sharding|load balanc|throughput|latency|microservice|caching|kafka|redis|message queue|event-driven|partition|rate limit|cluster|distribuído|alta disponibilidade|mensageria)\b/i.test(lower)) {
+  if (/(system design|distributed|high availability|sharding|load balanc|throughput|latency|microservice|caching|kafka|redis|message queue|event-driven|partition|rate limit|cluster|distribuído|alta disponibilidade|mensageria)(?!\p{L})/iu.test(lower)) {
     return { category: 'Technical', subCategory: 'System design' };
   }
 
   // Architecture & Database
-  if (/(architecture|api design|rest|grpc|database|schema|nosql|sql|postgres|aws|cloud|docker|kubernetes|design pattern|trade-off|tradeoff|migration|zero downtime|arquitetura|banco de dados|migração)\b/i.test(lower)) {
+  if (/(architecture|api design|rest|grpc|database|schema|nosql|sql|postgres|aws|cloud|docker|kubernetes|design pattern|trade-off|tradeoff|migration|zero downtime|arquitetura|banco de dados|migração)(?!\p{L})/iu.test(lower)) {
     return { category: 'Technical', subCategory: 'Architecture' };
   }
 
   // Domain knowledge & Industry Strategy
-  if (/(business|compliance|revenue|pricing|market|customer|client|regulation|saas|vendor|roi|industry|product strategy|roadmap|fintech|security compliance|negócio|cliente|mercado|estratégia)\b/i.test(lower)) {
+  if (/(business|compliance|revenue|pricing|market|customer|client|regulation|saas|vendor|roi|industry|product strategy|roadmap|fintech|security compliance|negócio|cliente|mercado|estratégia)(?!\p{L})/iu.test(lower)) {
     return { category: 'Domain knowledge', subCategory: 'Industry / Strategy' };
   }
 
   // Default fallback
-  return { category: 'Technical', subCategory: 'Engineering Practice' };
+  return { category: 'General', subCategory: 'Geral' };
 }
 
 /**
@@ -349,9 +372,19 @@ function extractQuestionsFromTranscript(transcriptText) {
 
   const candidateQuestions = [];
   const lines = transcriptText.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  // A session export (.md) has a timeline of labeled turns, copilot blocks
+  // ("> ...") and an LLM summary at the end; only labeled interviewer turns
+  // and the question quoted in a copilot block are questions there.
+  const isExport = /^##\s+Timeline\s*$/m.test(transcriptText);
 
   for (const rawLine of lines) {
     const line = rawLine.trim();
+
+    if (isExport && /^##\s+(Summary|Resumo)\b/i.test(line)) break;
+    // A copilot block is the copilot's answer, except its quoted question.
+    if (line.startsWith('>') && !/^>\s*(?:Question|Pergunta|Trigger|Prompt):\s*"/i.test(line)) continue;
+    // "*[02:16] Notice: ...*", "*[03:27] Suggestion rating: ...*"
+    if (/^\*\[[\d:]+\]/.test(line)) continue;
 
     // Skip markdown metadata, headers and suggestion system fields
     if (
@@ -369,6 +402,7 @@ function extractQuestionsFromTranscript(transcriptText) {
 
     let turnText = line;
     let isInterviewer = true;
+    let labeled = false;
 
     // 1. Check JSONL format
     if (line.startsWith('{') && line.endsWith('}')) {
@@ -385,6 +419,8 @@ function extractQuestionsFromTranscript(transcriptText) {
           isInterviewer = false;
         }
         // In jsonl, suggestion objects have obj.trigger for questions
+        // (screenshots, recaps and follow-up lists are not questions).
+        if (obj.type === 'suggestion' && /^(screenshot|recap|follow_up)$/.test(String(obj.reason || ''))) continue;
         if (obj.type === 'suggestion' && obj.trigger) {
           turnText = obj.trigger;
           isInterviewer = true;
@@ -413,17 +449,22 @@ function extractQuestionsFromTranscript(transcriptText) {
       if (qQuoteMatch && qQuoteMatch[1]) {
         turnText = qQuoteMatch[1];
         isInterviewer = true;
+        labeled = true;
       } else {
         // Interviewer timestamps & speaker labels
         // Matches: "**[00:15] Others:** ...", "**[00:15] Outros:** ...", "Interviewer: ...", "Entrevistador: ..."
         if (/^\*{0,2}\[[\d:]+\]\s*(?:Others|Outros|Interviewer|Entrevistador|Recruiter|Lead|Engineer)\s*:\*{0,2}/i.test(line)) {
           isInterviewer = true;
+          labeled = true;
           turnText = line.replace(/^\*{0,2}\[[\d:]+\]\s*(?:Others|Outros|Interviewer|Entrevistador|Recruiter|Lead|Engineer)\s*:\*{0,2}\s*/i, '');
         } else if (/^(?:interviewer|entrevistador|others|outros|recruiter|lead|engineer|question|pergunta|q):\s*/i.test(line)) {
           isInterviewer = true;
+          labeled = true;
           turnText = line.replace(/^(?:interviewer|entrevistador|others|outros|recruiter|lead|engineer|question|pergunta|q):\s*/i, '');
         }
       }
+      // In an export, an unlabeled line is never the interviewer.
+      if (isExport && !labeled) continue;
     }
 
     if (!isInterviewer || !turnText || turnText.trim().length < 15) continue;
@@ -470,6 +511,121 @@ function extractQuestionsFromTranscript(transcriptText) {
 /**
  * Loads the active Question Bank, syncing dynamically with real user goals and sessions.
  */
+// ---------------------------------------------------------------------------
+// Generalist filter: the bank keeps questions any candidate could be asked.
+// Questions about the candidate's own projects, products or past answers
+// ("seu projeto da Midea", "o projeto Tech Finance", "outro exemplo") are
+// specific to one person and are left out.
+// ---------------------------------------------------------------------------
+const PERSONAL_REF_RE = /(?<!\p{L})(?:seu|sua|seus|suas|teu|tua|your)\s+(?:próprio\s+|própria\s+)?(?:projeto|projetos|produto|aplicativo|app|startup|tcc|case|portf[oó]lio|project|product|startup)(?!\p{L})/iu;
+const BACK_REF_RE = /(?<!\p{L})(?:(?:esse|este|desse|deste|nesse|neste|aquele|daquele|naquele)\s+(?:projeto|produto|caso|exemplo|aplicativo)|outro exemplo|another example|(?:o que|como|que) você (?:falou|mencionou|disse|comentou|citou)|você (?:falou|mencionou|disse|comentou|citou) que|you (?:mentioned|said))(?!\p{L})/iu;
+// "projeto X" / "projeto da X" with X capitalized: a named project.
+const NAMED_PROJECT_RE = /(?<!\p{L})(?:projeto|project)\s+(?:d[aoe]s?\s+|of\s+)?\p{Lu}/u;
+// Tech names that show up in résumés but are generic in a question.
+const GENERIC_TERMS = new Set([
+  'ia', 'ai', 'sql', 'nosql', 'python', 'java', 'javascript', 'typescript', 'react', 'node', 'next', 'next.js', 'go',
+  'golang', 'rust', 'kotlin', 'swift', 'c', 'c++', 'c#', 'aws', 'gcp', 'azure', 'docker', 'kubernetes', 'git', 'github',
+  'linux', 'api', 'apis', 'rest', 'graphql', 'kafka', 'redis', 'postgres', 'postgresql', 'mysql', 'mongodb', 'spark',
+  'excel', 'power', 'bi', 'scrum', 'agile', 'star', 'llm', 'llms', 'ml', 'pix', 'brasil', 'brazil', 'são', 'paulo'
+]);
+const STOP_CAPS = new Set(['eu', 'você', 'voce', 'como', 'qual', 'quais', 'por', 'que', 'o', 'a', 'os', 'as', 'no', 'na', 'em', 'de', 'do', 'da', 'e', 'se', 'um', 'uma', 'conte', 'fale', 'descreva', 'poderia', 'the', 'how', 'what', 'why', 'tell', 'can', 'could', 'i']);
+
+function normWord(w) {
+  return String(w || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+// Capitalized names in the candidate's own documents (projects, employers,
+// products). Target companies and generic tech words are not "personal".
+function buildCandidateTerms(appDataDir) {
+  const terms = new Set();
+  const companies = new Set();
+  const agentsDir = path.join(appDataDir || '', 'agents');
+  if (!appDataDir || !fs.existsSync(agentsDir)) return { terms, companies };
+  for (const f of fs.readdirSync(agentsDir).filter((x) => x.endsWith('.json'))) {
+    try {
+      const a = JSON.parse(fs.readFileSync(path.join(agentsDir, f), 'utf8'));
+      for (const w of String(a.company || '').split(/[\s\-–—·|/]+/)) if (w.length > 2) companies.add(normWord(w));
+      for (const d of a.documents || []) {
+        const text = String(d.content || '').slice(0, 60000);
+        for (const m of text.matchAll(/(?<!\p{L})\p{Lu}[\p{L}\p{N}]+(?:\s+\p{Lu}[\p{L}\p{N}]+)*/gu)) {
+          for (const w of [m[0], m[0].replace(/\s+/g, '')]) {
+            const n = normWord(w);
+            if (n.length > 2 && !GENERIC_TERMS.has(n) && !STOP_CAPS.has(n)) terms.add(n);
+          }
+        }
+      }
+    } catch (_e) {}
+  }
+  for (const c of companies) terms.delete(c);
+  return { terms, companies };
+}
+
+function isGeneralistQuestion(text, ctx = {}) {
+  const t = String(text || '');
+  if (!t.trim()) return false;
+  if (PERSONAL_REF_RE.test(t) || BACK_REF_RE.test(t) || NAMED_PROJECT_RE.test(t)) return false;
+  const terms = ctx.terms;
+  if (terms && terms.size) {
+    const company = normWord(ctx.company || '');
+    const words = [...t.matchAll(/(?<!\p{L})\p{Lu}[\p{L}\p{N}.]*(?:\s+\p{Lu}[\p{L}\p{N}.]*)*/gu)].map((m) => m[0]);
+    for (const [i, w] of words.entries()) {
+      // The first word of the sentence is capitalized by grammar, not a name.
+      if (i === 0 && t.trimStart().startsWith(w) && !/\s/.test(w)) continue;
+      for (const cand of [w, w.replace(/\s+/g, '')]) {
+        const n = normWord(cand);
+        if (!n || n === company || (ctx.companies && ctx.companies.has(n)) || GENERIC_TERMS.has(n)) continue;
+        if (terms.has(n)) return false;
+      }
+    }
+  }
+  return true;
+}
+
+// Bank format version: 3 = questions extracted from the session events and
+// classified by JEV (the main process rebuilds an older bank once).
+const QUESTION_BANK_VERSION = 3;
+
+// What JEV calls each kind of question -> the bank's category. "especifica"
+// (only makes sense for one candidate) and "nao_pergunta" are left out.
+const JEV_QUESTION_TYPES = {
+  pessoal: ['Behavioral', 'Pessoal e comportamental'],
+  cultura: ['Culture', 'Cultura e valores'],
+  motivacao: ['Culture', 'Motivação'],
+  abertura: ['Opening', 'Apresentação'],
+  tecnica: ['Technical', 'Técnica'],
+  dominio: ['Domain knowledge', 'Negócio e produto'],
+  salario: ['Salary', 'Salário e condições']
+};
+
+// Applies JEV's verdicts ({ i, tipo, pergunta }) to the extracted questions.
+// A question JEV did not return keeps the rule-based reading if it is
+// generalist; one JEV rejected is dropped.
+function applyJevClassification(extracted, items, ctx) {
+  const byIndex = new Map();
+  for (const it of Array.isArray(items) ? items : []) {
+    const i = Number(it && it.i);
+    if (Number.isInteger(i) && i >= 0 && i < extracted.length) byIndex.set(i, it);
+  }
+  const out = [];
+  extracted.forEach((q, i) => {
+    const it = byIndex.get(i);
+    if (!it) {
+      if (isGeneralistQuestion(q.text, ctx)) out.push({ ...q, classifiedBy: 'regras' });
+      return;
+    }
+    const type = JEV_QUESTION_TYPES[String(it.tipo || '').toLowerCase()];
+    if (!type) return;
+    const val = validateQuestionWithJev(String(it.pergunta || '').trim());
+    out.push({
+      text: anonymizeWithJev(val.valid ? val.cleaned : q.text),
+      category: type[0],
+      subCategory: type[1],
+      classifiedBy: 'jev'
+    });
+  });
+  return out;
+}
+
 function loadQuestionBank(appDataDir) {
   const bankPath = path.join(appDataDir, 'question_bank.json');
   let data = null;
@@ -480,27 +636,34 @@ function loadQuestionBank(appDataDir) {
     } catch (_e) {}
   }
 
-  // Load from seed if missing or corrupt
-  if (!data || !Array.isArray(data.companies) || data.companies.length === 0) {
-    if (fs.existsSync(SEED_FILE)) {
-      try {
-        data = JSON.parse(fs.readFileSync(SEED_FILE, 'utf8'));
-      } catch (_e) {}
-    }
-  }
-
-  if (!data) {
-    data = { totalInterviews: 0, totalCompanies: 0, totalQuestions: 0, companies: [] };
-  }
-
-  let seedData = null;
-  if (fs.existsSync(SEED_FILE)) {
-    try {
-      seedData = JSON.parse(fs.readFileSync(SEED_FILE, 'utf8'));
-    } catch (_e) {}
+  if (!data || !Array.isArray(data.companies)) {
+    data = { version: QUESTION_BANK_VERSION, totalInterviews: 0, totalCompanies: 0, totalQuestions: 0, companies: [] };
   }
 
   let updated = false;
+
+  // Only generalist questions extracted from real sessions stay; nothing is locked.
+  const candidate = buildCandidateTerms(appDataDir);
+  for (const comp of data.companies) {
+    const before = Array.isArray(comp.questions) ? comp.questions.length : 0;
+    comp.questions = (comp.questions || []).filter(
+      (q) =>
+        q && q.text && !SAMPLE_QUESTION_ID.test(String(q.id || '')) && !MARKUP_RE.test(q.text) &&
+        isGeneralistQuestion(q.text, { ...candidate, company: comp.name })
+    );
+    for (const q of comp.questions) {
+      if (q.locked) {
+        q.locked = false;
+        updated = true;
+      }
+    }
+    if (comp.questions.length !== before) updated = true;
+  }
+  const withQuestions = data.companies.filter((c) => c.questions.length > 0);
+  if (withQuestions.length !== data.companies.length) {
+    data.companies = withQuestions;
+    updated = true;
+  }
 
   // 1. Detect active user goal company
   let activeGoalCompany = '';
@@ -537,13 +700,6 @@ function loadQuestionBank(appDataDir) {
           updated = true;
         }
       }
-      if ((!comp.questions || comp.questions.length === 0) && seedData && Array.isArray(seedData.companies)) {
-        const seedComp = seedData.companies.find((sc) => sc.id === comp.id);
-        if (seedComp && Array.isArray(seedComp.questions) && seedComp.questions.length > 0) {
-          comp.questions = JSON.parse(JSON.stringify(seedComp.questions));
-          updated = true;
-        }
-      }
       // Truthful question counts: questionsReported MUST equal the real array length!
       const realCount = Array.isArray(comp.questions) ? comp.questions.length : 0;
       if (comp.questionsReported !== realCount) {
@@ -554,8 +710,8 @@ function loadQuestionBank(appDataDir) {
     }
 
     // 3. Pin active goal company (e.g. Nubank) to index 0 (top of Question Bank!)
-    const targetCompName = (activeGoalCompany || 'nubank').toLowerCase();
-    const targetIdx = data.companies.findIndex(
+    const targetCompName = activeGoalCompany.toLowerCase();
+    const targetIdx = !targetCompName ? -1 : data.companies.findIndex(
       (c) => c.name.toLowerCase().includes(targetCompName) || c.id === targetCompName
     );
     if (targetIdx > 0) {
@@ -597,14 +753,18 @@ function saveQuestionBank(appDataDir, bankData) {
  * Automatically ingests questions from an ended interview session into the Question Bank.
  * Automatically detects the company from the transcript and fetches/caches its real logo!
  */
-async function ingestSessionQuestions(appDataDir, transcriptText, companyName = '') {
+// opts.exactCompany: the caller knows the company (the session's goal); skip
+// guessing it from the transcript, where candidates also name past employers.
+async function ingestSessionQuestions(appDataDir, transcriptText, companyName = '', opts = {}) {
   const extracted = extractQuestionsFromTranscript(transcriptText);
   if (!extracted || extracted.length === 0) {
     return { ok: true, questionsExtracted: 0, added: 0 };
   }
 
   // 1. Detect company from transcript text
-  const detection = detectCompanyFromTranscript(transcriptText, companyName);
+  const detection = opts.exactCompany && companyName
+    ? detectCompanyFromTranscript('', companyName)
+    : detectCompanyFromTranscript(transcriptText, companyName);
   const cleanName = detection.name;
   const compId = detection.id;
 
@@ -647,7 +807,23 @@ async function ingestSessionQuestions(appDataDir, transcriptText, companyName = 
   }
 
   let addedCount = 0;
-  for (const q of extracted) {
+  const candidate = buildCandidateTerms(appDataDir);
+  const ctx = { ...candidate, company: company.name };
+  // opts.classify(texts, { company }) -> [{ i, tipo, pergunta }] | null: JEV
+  // reads each question (kind, generic wording, whether it belongs in a bank).
+  // Without it, or when it fails, the rule-based reading stands.
+  let verdicts = null;
+  if (typeof opts.classify === 'function') {
+    try {
+      verdicts = await opts.classify(extracted.map((q) => q.text), { company: company.name });
+    } catch (_e) {
+      verdicts = null;
+    }
+  }
+  const accepted = verdicts
+    ? applyJevClassification(extracted, verdicts, ctx)
+    : extracted.filter((q) => isGeneralistQuestion(q.text, ctx)).map((q) => ({ ...q, classifiedBy: 'regras' }));
+  for (const q of accepted) {
     company.categories[q.category] = (company.categories[q.category] || 0) + 1;
     if (q.subCategory && company.subCategories[q.subCategory] !== undefined) {
       company.subCategories[q.subCategory] = (company.subCategories[q.subCategory] || 0) + 1;
@@ -660,6 +836,11 @@ async function ingestSessionQuestions(appDataDir, transcriptText, companyName = 
     if (existingQ) {
       existingQ.interviewsCount = (existingQ.interviewsCount || 1) + 1;
       existingQ.lastReported = 'Today';
+      if (q.classifiedBy === 'jev') {
+        existingQ.category = q.category;
+        existingQ.subCategory = q.subCategory;
+        existingQ.classifiedBy = 'jev';
+      }
     } else {
       if (!company.questions) company.questions = [];
       company.questions.unshift({
@@ -667,9 +848,10 @@ async function ingestSessionQuestions(appDataDir, transcriptText, companyName = 
         text: q.text,
         category: q.category,
         subCategory: q.subCategory,
+        classifiedBy: q.classifiedBy,
         interviewsCount: 1,
         lastReported: 'Today',
-        locked: !company.unlocked
+        locked: false
       });
       company.questionsReported = (company.questionsReported || 0) + 1;
       bank.totalQuestions = (bank.totalQuestions || 0) + 1;
@@ -686,10 +868,28 @@ async function ingestSessionQuestions(appDataDir, transcriptText, companyName = 
     detectedCompany: detection,
     domain: company.domain,
     logo: company.logo,
-    questionsExtracted: extracted.length,
+    questionsExtracted: accepted.length,
     added: addedCount,
-    questions: extracted
+    questions: accepted
   };
+}
+
+/**
+ * Rebuilds the bank from scratch out of real session transcripts.
+ * entries: [{ text, company }] (text in any format extractQuestionsFromTranscript reads).
+ */
+// opts.classify: see ingestSessionQuestions.
+async function rebuildQuestionBank(appDataDir, entries, opts = {}) {
+  saveQuestionBank(appDataDir, { version: QUESTION_BANK_VERSION, totalInterviews: 0, totalCompanies: 0, totalQuestions: 0, companies: [] });
+  let added = 0;
+  for (const e of entries || []) {
+    if (!e || !e.text) continue;
+    try {
+      const r = await ingestSessionQuestions(appDataDir, e.text, e.company || '', { exactCompany: Boolean(e.company), classify: opts.classify });
+      added += (r && r.added) || 0;
+    } catch (_e) {}
+  }
+  return { ok: true, added, bank: loadQuestionBank(appDataDir) };
 }
 
 /**
@@ -718,6 +918,9 @@ function unlockCompany(appDataDir, companyId, previewOnly = true) {
 }
 
 module.exports = {
+  QUESTION_BANK_VERSION,
+  JEV_QUESTION_TYPES,
+  applyJevClassification,
   KNOWN_COMPANIES,
   detectCompanyFromTranscript,
   validateQuestionWithJev,
@@ -727,5 +930,8 @@ module.exports = {
   loadQuestionBank,
   saveQuestionBank,
   ingestSessionQuestions,
+  rebuildQuestionBank,
+  isGeneralistQuestion,
+  buildCandidateTerms,
   unlockCompany
 };

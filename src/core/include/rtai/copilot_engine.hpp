@@ -29,6 +29,7 @@
 #include <functional>
 
 #include "rtai/analytics_client.hpp"
+#include "rtai/answer_memory.hpp"
 #include "rtai/copilot_events.hpp"
 #include "rtai/copilot_prompt.hpp"
 #include "rtai/decision_policy.hpp"
@@ -61,6 +62,13 @@ struct CopilotConfig {
     // Automatic answers may come back as "[SKIP]" (the model saw nothing to
     // answer): their card only appears once the first words show a real answer.
     bool allow_skip{true};
+    // Answers already given come back with follow-ups on the same subject
+    // (rtai/answer_memory.hpp). Once a thread outgrows its verbatim budget, a
+    // background model folds it into a summary, off the live path. Null
+    // `compaction_llm`: the live client; empty `compaction_model`: `model`.
+    AnswerMemoryConfig answer_memory{};
+    std::shared_ptr<ILlmClient> compaction_llm;
+    std::string compaction_model;
     std::chrono::steady_clock::time_point session_start{std::chrono::steady_clock::now()};
     std::chrono::milliseconds tick{20};
 };

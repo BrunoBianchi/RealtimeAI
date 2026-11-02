@@ -2,97 +2,130 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
+const { loadRenderer, render, indexHtml, tags } = require('./helpers/renderer');
 
-const indexHtmlPath = path.resolve(__dirname, '../src/renderer/index.html');
-const appJsPath = path.resolve(__dirname, '../src/renderer/app.js');
 const preloadJsPath = path.resolve(__dirname, '../src/preload/preload.js');
 const mainJsPath = path.resolve(__dirname, '../src/main/main.js');
 
-test('Task 5.1 / Property 1: Estrutura HTML do Goal Workspace e 3 Abas (Requirements: 1.1, 1.2, 1.3)', () => {
-  const html = fs.readFileSync(indexHtmlPath, 'utf8');
+const AGENT = {
+  id: 'a1',
+  company: 'Nubank',
+  role: 'Backend Engineer',
+  job_description: 'Go e Kafka',
+  next_interview_date: '2099-01-10',
+  next_interview_time: '10:00',
+  documents: [{ title: 'cv.pdf', tag: 'resume', content: 'x'.repeat(2048) }],
+  playbook_name: 'STAR executivo',
+  answer_language: 'en-US',
+  coding_language: 'Go',
+  stage: 'Technical'
+};
 
-  // Verify workspace pane
-  assert.ok(html.includes('id="view-goal-workspace"'), 'Goal Workspace pane must exist');
-  assert.ok(html.includes('id="btnWorkspaceBackToGoals"'), 'Back to Goals breadcrumb must exist');
-  assert.ok(html.includes('id="workspaceBreadcrumbGoalName"'), 'Goal title breadcrumb must exist');
-  assert.ok(html.includes('id="btnWorkspaceGoLive"'), 'Go Live button in workspace must exist');
+function workspace(agent = AGENT, state = {}) {
+  const r = loadRenderer({ state: { agents: [agent], playbooks: [{ name: 'STAR executivo' }, { name: 'Conciso' }], ...state } });
+  return { ...r, html: render(r.Cue, `session/${agent.id}`) };
+}
 
-  // Verify the 3 tabs
-  assert.ok(html.includes('id="tabGoalOverview"'), 'Overview tab button must exist');
-  assert.ok(html.includes('id="tabGoalPrep"'), 'Prep tab button must exist');
-  assert.ok(html.includes('id="tabGoalSessions"'), 'Sessions tab button must exist');
+const actions = (html) => tags(html, { 'data-action': true }).map((t) => t['data-action']);
 
-  // Verify the 3 tab panes
-  assert.ok(html.includes('id="paneGoalOverview"'), 'Overview pane must exist');
-  assert.ok(html.includes('id="paneGoalPrep"'), 'Prep pane must exist');
-  assert.ok(html.includes('id="paneGoalSessions"'), 'Sessions pane must exist');
+test('Task 5.1 / Property 1: header of a session (back, title, date, edit, schedule, simulate, go live)', () => {
+  const { html } = workspace();
+  assert.ok(/data-action="go" data-to="sessions"/.test(html), 'back to Sessões');
+  assert.ok(html.includes('Nubank · Backend Engineer'));
+  assert.ok(html.includes('10 jan · 10:00'), 'interview date and time');
+  for (const a of ['edit-session', 'open-scheduler', 'start-copilot']) assert.ok(actions(html).includes(a), a);
+  const starts = tags(html, { 'data-action': 'start-copilot' });
+  assert.deepStrictEqual(starts.map((s) => s['data-demo'] || ''), ['1', ''], 'Simular (demo) and Iniciar ao vivo');
+  assert.ok(html.includes('Reagendar'), 'scheduled: Reagendar');
 
-  // Verify stage update dropdown and scheduler trigger
-  assert.ok(html.includes('id="btnUpdateProgress"'), 'Update progress dropdown must exist');
-  assert.ok(html.includes('id="menuUpdateProgress"'), 'Update progress menu must exist');
-  assert.ok(html.includes('id="btnOpenScheduler"'), 'Add interview date trigger must exist');
+  // While this session is live the button jumps to the live view instead.
+  const live = workspace(AGENT, { overlayStatus: { running: true, agentId: 'a1', mode: 'live' } });
+  assert.ok(live.html.includes('Ao vivo agora') && /data-action="go" data-to="live"/.test(live.html));
+
+  // Unknown id: a way back, not a crash.
+  const r = loadRenderer();
+  const missing = render(r.Cue, 'session/nope');
+  assert.ok(missing.includes('Sessão não encontrada') && missing.includes('data-to="sessions"'));
 });
 
-test('Task 5.1 / Property 2: Modais New Playbook e Interview Scheduler (Requirements: 2.1, 11.1, 16.1)', () => {
-  const html = fs.readFileSync(indexHtmlPath, 'utf8');
+test('Task 5.1 / Property 2: playbook and scheduler dialogs', async () => {
+  const r = loadRenderer({
+    state: { agents: [AGENT] },
+    api: {
+      savePlaybook: async (pb) => ({ ok: true, playbooks: [pb] }),
+      saveAgent: async (a) => ({ ok: true, agents: [a], saved: a }),
+      clearInterview: async () => ({ ok: true, calendar: { skipped: true } })
+    }
+  });
 
-  // New Playbook Modal (Image 5 fidelity)
-  assert.ok(html.includes('id="modalNewPlaybook"'), 'New Playbook modal must exist');
-  assert.ok(html.includes('id="inputPlaybookName"'), 'Playbook name input must exist');
-  assert.ok(html.includes('id="btnPlaybookLenConcise"'), 'Concise length button must exist');
-  assert.ok(html.includes('id="btnPlaybookLenBalanced"'), 'Balanced length button must exist');
-  assert.ok(html.includes('id="btnPlaybookLenThorough"'), 'Thorough length button must exist');
-  assert.ok(html.includes('id="selectPlaybookStructure"'), 'Behavioral structure select must exist');
-  assert.ok(html.includes('id="togglePlaybookLeadAnswer"'), 'Lead with answer toggle must exist');
-  assert.ok(html.includes('id="togglePlaybookTradeoffs"'), 'Name trade-offs toggle must exist');
-  assert.ok(html.includes('id="btnSaveNewPlaybook"'), 'Save playbook button must exist');
+  r.Cue.openModal('playbook', 'a1');
+  const pb = r.modals.last;
+  for (const id of ['pbName', 'pbLen', 'pbStruct', 'pbLead', 'pbTrade', 'pbSave']) assert.ok(pb.includes(`id="${id}"`), id);
+  assert.deepStrictEqual(tags(pb).filter((t) => t['data-v']).map((t) => t['data-v']), ['Concise', 'Balanced', 'Thorough']);
+  const dlg = r.dialogs[0];
+  dlg.querySelector('#pbName').value = '';
+  await dlg.querySelector('#pbSave').fire('click');
+  assert.strictEqual(r.called('savePlaybook').length, 0, 'a playbook needs a name');
+  dlg.querySelector('#pbName').value = 'Direto';
+  dlg.querySelector('#pbStruct').value = 'CAR (Context, Action, Result)';
+  dlg.querySelector('#pbLead').checked = true;
+  dlg.querySelector('#pbTrade').checked = true;
+  await dlg.querySelector('#pbSave').fire('click');
+  assert.deepStrictEqual(r.called('savePlaybook'), [[{ name: 'Direto', answer_length: 'Balanced', behavioral_structure: 'CAR (Context, Action, Result)', lead_with_answer: true, name_tradeoffs: true }]]);
+  const applied = r.called('saveAgent')[0][0];
+  assert.strictEqual(applied.playbook_name, 'Direto', 'saved playbook is applied to the session');
 
-  // Interview Scheduler Modal
-  assert.ok(html.includes('id="modalInterviewScheduler"'), 'Interview Scheduler modal must exist');
-  assert.ok(html.includes('id="inputInterviewDate"'), 'Date input must exist');
-  assert.ok(html.includes('id="inputInterviewTime"'), 'Time input must exist');
-  assert.ok(html.includes('id="btnSchedulerSkip"'), 'Skip for now button must exist');
-  assert.ok(html.includes('id="btnSchedulerConfirm"'), 'Confirm schedule button must exist');
+  r.Cue.openModal('scheduler', 'a1');
+  const sc = r.modals.last;
+  for (const id of ['scAgent', 'scDate', 'scTime', 'scSave', 'scClear']) assert.ok(sc.includes(`id="${id}"`), id);
+  assert.ok(sc.includes('value="2099-01-10"') && sc.includes('value="10:00"'), 'opens on the saved date');
+  const sched = r.dialogs[1];
+  sched.querySelector('#scAgent').value = 'a1';
+  await sched.querySelector('#scClear').fire('click');
+  assert.deepStrictEqual(r.called('clearInterview'), [['a1']]);
 });
 
-test('Task 5.1 / Property 3: Seções da Aba Overview e Goal Memory (Requirements: 4.1, 5.1, 6.1)', () => {
-  const html = fs.readFileSync(indexHtmlPath, 'utf8');
+test('Task 5.1 / Property 3: readiness, context and memory sections', () => {
+  const { html } = workspace();
+  assert.ok(html.includes('>Preparo<') && html.includes('>50%<'), 'résumé (30) + job (20)');
+  assert.strictEqual((html.match(/class="check-item done"/g) || []).length, 2);
+  assert.strictEqual((html.match(/class="check-item /g) || []).length, 6);
+  for (const id of ['ctxJob', 'ctxResearch', 'ctxInstr']) assert.ok(html.includes(`id="${id}"`), id);
+  assert.ok(html.includes('>Go e Kafka</textarea>'));
+  assert.ok(actions(html).includes('save-context') && actions(html).includes('company-recon'));
 
-  assert.ok(html.includes('id="overviewInterviewEmpty"'), 'Empty interview state must exist');
-  assert.ok(html.includes('id="overviewInterviewScheduled"'), 'Scheduled interview state must exist');
-  assert.ok(html.includes('id="overviewStatusResume"'), 'Goal context Resume status must exist');
-  assert.ok(html.includes('id="overviewStatusMaterials"'), 'Goal context Materials status must exist');
-  assert.ok(html.includes('id="overviewStatusPlaybook"'), 'Goal context Playbook status must exist');
-  assert.ok(html.includes('id="overviewGoalMemoryEmpty"'), 'Goal Memory empty state must exist');
-  assert.ok(html.includes('id="overviewGoalMemoryFilled"'), 'Goal Memory filled state must exist');
-  assert.ok(html.includes('id="overviewGoalMemoryStrengthsList"'), 'Goal Memory strengths list must exist');
-  assert.ok(html.includes('id="overviewGoalMemoryImproveList"'), 'Goal Memory improve list must exist');
-  assert.ok(html.includes('id="overviewRecentSessionsContainer"'), 'Recent sessions container must exist');
+  // Copilot memory: empty state, then what the debriefs learned.
+  assert.ok(html.includes('Gere um debrief depois de uma sessão'));
+  const filled = workspace({ ...AGENT, next_focus: 'Focus on: métricas', goal_memory: { strengths: ['Clareza'], improve: ['Ser mais breve'] } }).html;
+  assert.ok(filled.includes('Próximo foco') && filled.includes('>métricas<'), 'next focus without the prefix');
+  assert.ok(filled.includes('<div class="bullet">Clareza</div>') && filled.includes('<div class="bullet neutral">Ser mais breve</div>'));
 });
 
-test('Task 5.1 / Property 4: Seções da Aba Prep e Response Defaults (Requirements: 8.1, 9.1, 10.1, 11.2)', () => {
-  const html = fs.readFileSync(indexHtmlPath, 'utf8');
+test('Task 5.1 / Property 4: answer defaults (playbook, language, code, stage) and linked files', () => {
+  const { html } = workspace();
+  assert.ok(/data-change="agent-playbook"[^>]*>[\s\S]*?<option value="STAR executivo" selected>/.test(html));
+  assert.ok(actions(html).includes('new-playbook'));
+  const fields = tags(html, { 'data-change': 'agent-field' }).map((t) => t['data-field']);
+  assert.deepStrictEqual(fields, ['answer_language', 'coding_language', 'stage']);
+  assert.ok(html.includes('<option value="en-US" selected>') && html.includes('<option value="Go" selected>') && html.includes('<option value="Technical" selected>'));
 
-  assert.ok(html.includes('id="btnPrepStartPractice"'), 'Start Practice button must exist');
-  assert.ok(html.includes('id="prepNextFocusCard"'), 'Next focus card must exist');
-  assert.ok(html.includes('id="prepNextFocusEmpty"'), 'Next focus empty state must exist');
-  assert.ok(html.includes('id="prepNextFocusFilled"'), 'Next focus filled state must exist');
-  assert.ok(html.includes('id="btnPrepEditBrief"'), 'Edit goal brief button must exist');
-  assert.ok(html.includes('id="btnPrepPinResume"'), 'Pin resume button must exist');
-  assert.ok(html.includes('id="btnPrepAddMaterial"'), 'Add material button must exist');
-  assert.ok(html.includes('id="btnPrepNewPlaybook"'), 'New playbook trigger must exist');
-  assert.ok(html.includes('id="selectPrepPlaybook"'), 'Select playbook must exist');
-  assert.ok(html.includes('id="selectPrepAnswerLang"'), 'Select answer language must exist');
-  assert.ok(html.includes('id="selectPrepCodingLang"'), 'Select coding language must exist');
+  // Files: the résumé is listed; without one the drop zone asks for it.
+  assert.ok(html.includes('cv.pdf') && html.includes('2.0 KB'));
+  assert.ok(actions(html).includes('preview-doc') && actions(html).includes('remove-doc'));
+  assert.ok(!html.includes('Anexe seu currículo'));
+  const noCv = workspace({ ...AGENT, documents: [] }).html;
+  assert.ok(noCv.includes('Anexe seu currículo') && /data-action="add-docs"[^>]*data-tag="resume"/.test(noCv));
 });
 
-test('Task 5.1 / Property 5: Seções da Aba Sessions e Debrief State (Requirements: 13.1, 13.4, 13.5)', () => {
-  const html = fs.readFileSync(indexHtmlPath, 'utf8');
-
-  assert.ok(html.includes('id="sessionsProcessingCard"'), 'Debrief processing card must exist');
-  assert.ok(html.includes('id="workspaceSessionsEmpty"'), 'Empty sessions card must exist');
-  assert.ok(html.includes('id="btnSessionsOpenPrep"'), 'Open Prep button in sessions empty state must exist');
-  assert.ok(html.includes('id="workspaceSessionsList"'), 'Sessions list container must exist');
+test('Task 5.1 / Property 5: recorded sessions of this goal', () => {
+  const empty = workspace().html;
+  assert.ok(empty.includes('Nenhuma sessão gravada para esta vaga ainda.'));
+  const withRecs = workspace(AGENT, {
+    sessions: [{ id: '2026-10-01_10-00-00_ab12', goalLabel: 'Nubank · Backend Engineer', startedAt: '2026-10-01T13:00:00Z', durationSeconds: 1800, mode: 'demo' }]
+  }).html;
+  assert.ok(/data-action="go" data-to="review\/2026-10-01_10-00-00_ab12"/.test(withRecs), 'a recorded session opens its review');
+  assert.ok(withRecs.includes('Simulação') && withRecs.includes('30 min'));
+  assert.ok(actions(withRecs).includes('archive-session') && actions(withRecs).includes('delete-session'));
 });
 
 test('Task 5.1 / Property 6: Preload API exports para Goal Workspace (Requirements: 3.1, 11.1, 15.1)', () => {
@@ -118,21 +151,21 @@ test('Task 5.1 / Property 7: Main Process IPC Handlers registrados (Requirements
   assert.ok(mainJs.includes('DEFAULT_PLAYBOOKS'), 'DEFAULT_PLAYBOOKS constant must exist');
 });
 
-test('Task 5.1 / Property 8: Lógica de Abas, Checklist e Horizon Filters em app.js (Requirements: 1.3, 7.4, 14.1)', () => {
-  const appJs = fs.readFileSync(appJsPath, 'utf8');
-
-  assert.ok(appJs.includes('switchGoalWorkspaceTab'), 'app.js must define switchGoalWorkspaceTab');
-  assert.ok(appJs.includes('renderGoalWorkspace'), 'app.js must define renderGoalWorkspace');
-  assert.ok(appJs.includes('renderWorkspaceOverview'), 'app.js must define renderWorkspaceOverview');
-  assert.ok(appJs.includes('renderWorkspacePrep'), 'app.js must define renderWorkspacePrep');
-  assert.ok(appJs.includes('renderWorkspaceSessions'), 'app.js must define renderWorkspaceSessions');
-  assert.ok(appJs.includes('renderChecklist'), 'app.js must define renderChecklist');
-  assert.ok(appJs.includes('goalsFilter'), 'app.js must support goalsFilter');
+test('Task 5.1 / Property 8: the sessions list splits upcoming and past, archived on demand', () => {
+  const agents = [
+    { id: 'a1', company: 'Nubank', role: 'Backend' },
+    { id: 'a2', company: 'Stone', role: 'SRE', archived: true }
+  ];
+  const r = loadRenderer({ state: { agents } });
+  const upcoming = render(r.Cue, 'sessions');
+  assert.ok(upcoming.includes('Nubank') && !upcoming.includes('Stone'), 'archived sessions are hidden by default');
+  assert.ok(tags(upcoming, { 'data-change': 'toggle-archived' }).length === 1);
+  r.S.ui.showArchived = true;
+  assert.ok(render(r.Cue, 'sessions').includes('Stone'));
 });
 
 test('Task 5.1 / Property 9: Persistência e Limpeza de Data da Entrevista (Requirements: 2.1, 3.2, 7.2)', () => {
   const mainJs = fs.readFileSync(mainJsPath, 'utf8');
-  const appJs = fs.readFileSync(appJsPath, 'utf8');
   const preloadJs = fs.readFileSync(preloadJsPath, 'utf8');
 
   // main.js must read next_interview_date cleanly and sync next_interview object
@@ -143,27 +176,21 @@ test('Task 5.1 / Property 9: Persistência e Limpeza de Data da Entrevista (Requ
   // preload.js must support both object and positional args
   assert.ok(preloadJs.includes('goalIdOrObj'), 'preload.js scheduleInterview must handle flexible arguments');
 
-  // app.js must format display date
-  assert.ok(appJs.includes('formatDisplayDate'), 'app.js must define formatDisplayDate');
-  assert.ok(appJs.includes('formatDisplayDate(dateVal)'), 'app.js must format date on schedule confirm');
+  // The renderer reads both shapes (flat fields and the next_interview object).
+  const { Cue } = loadRenderer();
+  const flat = Cue.agentInterview({ next_interview_date: '2099-05-02', next_interview_time: '09:15' });
+  const nested = Cue.agentInterview({ next_interview: { date: '2099-05-02', time: '09:15' } });
+  for (const iv of [flat, nested]) {
+    assert.strictEqual(iv.date, '2099-05-02');
+    assert.strictEqual(iv.hasTime, true);
+    assert.strictEqual(iv.at.getHours(), 9);
+  }
+  assert.strictEqual(Cue.agentInterview({ next_interview_date: 'amanhã' }), null, 'invalid dates are ignored');
 });
 
 test('Task 5.1 / Property 10: Remoção visual dos botões extras do topo e links funcionais (User Request)', () => {
-  const html = fs.readFileSync(indexHtmlPath, 'utf8');
-  const appJs = fs.readFileSync(appJsPath, 'utf8');
-
-  // Header should not contain btnToggleTranscriptionMode or btnLaunchDemo in the visible app-no-drag header
-  const headerMatch = html.match(/<header\b[^>]*>([\s\S]*?)<\/header>/);
-  assert.ok(headerMatch, 'Header element must exist');
-  const headerContent = headerMatch[1];
-  assert.ok(!headerContent.includes('id="btnToggleTranscriptionMode"'), 'Top header must NOT contain btnToggleTranscriptionMode');
-  assert.ok(!headerContent.includes('id="btnLaunchDemo"'), 'Top header must NOT contain btnLaunchDemo');
-  assert.ok(headerContent.includes('id="btnTopGoLive"'), 'Top header must retain btnTopGoLive');
-
-  // Wire-up of links in Sessions and Prep
-  assert.ok(appJs.includes("getElementById('linkSessionsRunFirst')"), 'app.js must attach click listener to linkSessionsRunFirst');
-  assert.ok(appJs.includes("getElementById('linkHowLiveStarts')"), 'app.js must attach click listener to linkHowLiveStarts');
-  assert.ok(appJs.includes("getElementById('linkHowPracticeWorks')"), 'app.js must attach click listener to linkHowPracticeWorks');
-  assert.ok(appJs.includes("getElementById('linkSourcesExplained')"), 'app.js must attach click listener to linkSourcesExplained');
+  const header = indexHtml.match(/<header\b[^>]*>([\s\S]*?)<\/header>/)[1];
+  assert.ok(!header.includes('TranscriptionMode'), 'the transcription-only toggle lives in the live view, not the top bar');
+  assert.ok(!/data-demo=/.test(header), 'no demo launcher in the top bar');
+  assert.ok(header.includes('id="btnGoLive"'), 'top bar keeps Go Live');
 });
-

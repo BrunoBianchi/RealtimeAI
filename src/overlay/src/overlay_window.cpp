@@ -72,7 +72,8 @@ enum HitId : int {
     kStripClear, kPrev, kNext, kAnsClear, kAnsExpand, kCopy, kVoteUp, kVoteDown,
     kChatField, kChatSend, kChatClose, kQuickRecap, kQuickFollow, kQuickShot, kQuickChat, kNotice, kBtnNextQuestion,
     kTabSuggested, kTabTranscript, kToggleAuto, kToggleTranscriptionOnly, kChipPickBase, kActionRecap = 600, kActionFollow, kActionAsk, kSuggestedAskBase = 700,
-    kStyleConcise = 801, kStyleDetailed = 802, kStyleStar = 803, kFollowUpRowBase = 810
+    kStyleConcise = 801, kStyleDetailed = 802, kStyleStar = 803, kFollowUpRowBase = 810,
+    kQuickShorter = 820, kQuickExample, kQuickCode, kStripLatest, kTranscriptToggle
 };
 
 // ── HUD de reunião: painel largo, 640-1100px, ancorado no topo-centro ──
@@ -315,6 +316,7 @@ struct OverlayWindow::Impl {
     UINT dpi{96};
     float scale{1.0f};
     bool render_pending{false};
+    std::chrono::steady_clock::time_point last_render_at{}; // leading-edge coalescing in drain()
     // True once at least one frame has been presented via UpdateLayeredWindow.
     // Lets render() safely preserve the previous frame on a layout failure
     // (Req 14.5) without blanking the very first paint.
@@ -369,7 +371,12 @@ struct OverlayWindow::Impl {
     std::deque<SuggestionView> history;
     std::size_t cursor{0};
     bool follow_latest{true};
-    float scroll{0.0f};
+    float scroll{0.0f};          // answer body offset from the top (DIP)
+    float ans_scroll_max{0.0f};
+    float tr_scroll{0.0f};       // transcript offset from the bottom (DIP)
+    float tr_scroll_max{0.0f};
+    D2D1_RECT_F ans_view_rect{}; // last drawn areas, for wheel routing
+    D2D1_RECT_F tr_view_rect{};
     bool user_scrolled{false};
     bool unseen_answer{false};
     bool auto_answer_on{true};
@@ -433,6 +440,9 @@ struct OverlayWindow::Impl {
     bool collapsed{false};
     bool menu_open{false};
     bool answer_expanded{false};
+    // Single-column HUD: the transcript is one live line above the answer;
+    // this opens the full scrollable history in its place.
+    bool transcript_open{false};
     float width{kHudW};
     // Work-area height (DIP) of the monitor resolve_anchor last placed us on.
     // The render height ceiling is window_height(content, frac, this) so the
@@ -487,6 +497,12 @@ struct OverlayWindow::Impl {
     // monitor from the window's current center (used when re-centering after a
     // width change); otherwise it anchors on the primary.
     void reposition(bool use_persisted);
+    // Keeps the window inside the work area of the monitor it is on (after a
+    // width change or at startup with a remembered position).
+    void keep_on_screen();
+    // DIP from the window top to the bottom of its monitor's work area.
+    float space_below_dip() const;
+    bool have_saved_pos{false};
 
     void drain();
     // Applies one engine event to the plain model. Returns true when the event
@@ -556,6 +572,14 @@ struct OverlayWindow::Impl {
     D2D1_COLOR_F button_fill(int id, bool ghost) const;
     float kbd_width(const KeyHint& k) const;
     void draw_kbd(const KeyHint& k, float x, float cy);
+    void draw_kbd(const KeyHint& k, float x, float cy, const D2D1_COLOR_F& bg, const D2D1_COLOR_F& fg);
+    float action_width(const std::wstring& label, const KeyHint* k, int density) const;
+    void draw_action(const D2D1_RECT_F& r, int id, const std::wstring& label, const char* icon_name,
+                     const KeyHint* k, int density, bool primary, bool active);
+    void draw_fade(const D2D1_RECT_F& r, const D2D1_COLOR_F& base, bool at_bottom);
+    void draw_scrollbar(float x, float top, float view_h, float content_h, float offset);
+    void draw_transcript(const D2D1_RECT_F& r, bool compact);
+    float draw_answer_panel(float x, float y, float w, float min_h, float max_h);
     float button_width(const std::wstring& label, const KeyHint* k, bool with_label, bool with_kbd) const;
     void draw_button(const D2D1_RECT_F& r, int id, const std::wstring& label, const char* icon_name,
                      const KeyHint* k, bool with_label, bool with_kbd, bool ghost = false,
@@ -569,6 +593,7 @@ struct OverlayWindow::Impl {
     float draw_menu(float y);
     float draw_strip(float y);         // legacy strip
     float draw_answer(float y);
+    float draw_live_line(float x, float y, float w);
     float draw_notice(float y);
     // PostInterviewReport dashboard (Req 9.1-9.4): three animated Score_Rings on
     // top and the three Instant_Feedback lines beside/under them. Returns the y
@@ -700,7 +725,9 @@ bool OverlayWindow::Impl::create(std::string* error) {
     auto set_wda = reinterpret_cast<SetWDAFn>(
         GetProcAddress(GetModuleHandleW(L"user32.dll"), "SetWindowDisplayAffinity"));
     const DWORD affinity = opts.stealth_screen_capture ? 0x00000011 /* WDA_EXCLUDEFROMCAPTURE */ : 0;
-    if (set_wda && set_wda(hwnd, affinity)) {
+    if (!opts.stealth_screen_capture) {
+        capture_excluded = false; // turned off in Settings: nothing to apply, nothing to warn about
+    } else if (set_wda && set_wda(hwnd, affinity)) {
         capture_excluded = true; // Req 11.5
     } else {
         capture_excluded = false;
@@ -722,8 +749,12 @@ bool OverlayWindow::Impl::create(std::string* error) {
     // that as the persisted center lets resolve_anchor pick the monitor that
     // contains it and re-center Top-Center on that monitor's work area, falling
     // back to the primary when the center is off every monitor.
-    reposition(/*use_persisted=*/!opts.settings_file.empty());
+    // A position the user dragged to is kept (clamped onto its monitor);
+    // otherwise the HUD starts Top-Center on the primary monitor.
+    if (have_saved_pos) keep_on_screen();
+    else reposition(/*use_persisted=*/false);
     render(); // first frame (sets the layered bitmap and size)
+    keep_on_screen();
     ShowWindow(hwnd, SW_SHOWNOACTIVATE);
     return true;
 }
@@ -789,8 +820,11 @@ void OverlayWindow::Impl::load_state(int& x, int& y) { // Req 1 persistence
         y = work.top + ui::clamp_anchor_top(); // topo em [8,10] DIP — zona foveal da webcam (Req 1.1)
     };
     width = std::min(ui::clamp_width(width), max_fitting_width);
+    // Default width comes from the config ([overlay] largura); a width the
+    // user dragged to (saved in the settings file) wins over it.
+    const float configured = ui::clamp_width(opts.width_dip);
     if (opts.settings_file.empty()) {
-        width = std::min(kHudW, max_fitting_width);
+        width = std::min(configured, max_fitting_width);
         centered_top();
         return;
     }
@@ -799,7 +833,7 @@ void OverlayWindow::Impl::load_state(int& x, int& y) { // Req 1 persistence
     if (sw >= static_cast<int>(kMinW) && sw <= static_cast<int>(kMaxW))
         width = std::min(static_cast<float>(sw), max_fitting_width);
     else
-        width = std::min(kHudW, max_fitting_width);
+        width = std::min(configured, max_fitting_width);
     collapsed = GetPrivateProfileIntW(L"overlay", L"recolhido", 0, f) != 0;
     centered_top();
     const int sx = static_cast<int>(GetPrivateProfileIntW(L"overlay", L"x", INT_MIN, f));
@@ -808,6 +842,7 @@ void OverlayWindow::Impl::load_state(int& x, int& y) { // Req 1 persistence
     if (MonitorFromPoint(POINT{sx + 40, sy + 20}, MONITOR_DEFAULTTONULL)) { // still on a connected monitor
         x = sx;
         y = sy;
+        have_saved_pos = true;
     }
 }
 
@@ -820,6 +855,38 @@ void OverlayWindow::Impl::save_state() {
     WritePrivateProfileStringW(L"overlay", L"y", std::to_wstring(r.top).c_str(), f);
     WritePrivateProfileStringW(L"overlay", L"largura", std::to_wstring(static_cast<int>(width)).c_str(), f);
     WritePrivateProfileStringW(L"overlay", L"recolhido", collapsed ? L"1" : L"0", f);
+}
+
+void OverlayWindow::Impl::keep_on_screen() {
+    if (!hwnd) return;
+    RECT wr{};
+    if (!GetWindowRect(hwnd, &wr)) return;
+    HMONITOR mon = MonitorFromRect(&wr, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO mi{};
+    mi.cbSize = sizeof(mi);
+    if (!GetMonitorInfoW(mon, &mi)) return;
+    const RECT& wa = mi.rcWork;
+    const int wpx = static_cast<int>(std::ceil(width * scale));
+    int x = wr.left, y = wr.top;
+    if (x + wpx > wa.right) x = wa.right - wpx;
+    if (x < wa.left) x = wa.left;
+    if (y < wa.top) y = wa.top;
+    const int min_visible = static_cast<int>(std::lround(80.0f * scale));
+    if (y > wa.bottom - min_visible) y = wa.bottom - min_visible;
+    anchor_work_h = std::max(360.0f, static_cast<float>(wa.bottom - wa.top) / scale);
+    if (x != wr.left || y != wr.top) {
+        SetWindowPos(hwnd, nullptr, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+}
+
+float OverlayWindow::Impl::space_below_dip() const {
+    RECT wr{};
+    if (!hwnd || !GetWindowRect(hwnd, &wr)) return work_height_dip();
+    HMONITOR mon = MonitorFromRect(&wr, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO mi{};
+    mi.cbSize = sizeof(mi);
+    if (!GetMonitorInfoW(mon, &mi)) return work_height_dip();
+    return std::max(240.0f, static_cast<float>(mi.rcWork.bottom - wr.top) / scale);
 }
 
 float OverlayWindow::Impl::work_height_dip() const {
@@ -983,6 +1050,12 @@ void OverlayWindow::Impl::drain() {
             render_pending = false;
         }
         render();
+    } else if (!render_pending &&
+               std::chrono::steady_clock::now() - last_render_at >= std::chrono::milliseconds(16)) {
+        // Leading edge: the last frame is already a full window old, so this
+        // delta is shown now instead of waiting on a WM_TIMER that the system
+        // tick rounds up to 16-31 ms. Bursts still fold into one timer frame.
+        render();
     } else {
         invalidate(); // coalesce into one frame per 16 ms (Req 5.3)
     }
@@ -1105,21 +1178,15 @@ bool OverlayWindow::Impl::apply(EngineEvent& ev) {
                         // auto-generate follow-up questions for the side panel (lightweight local heuristic)
                         if (e.status == LlmStatus::Completed && !e.text.empty()) {
                             suggested_questions.clear();
+                            // Questions the answer itself proposes (follow-up
+                            // lists); never echo the interviewer's question back.
                             auto qs = text::extract_questions(e.text);
-                            if (qs.empty()) qs = text::extract_questions(it->trigger);
                             for (auto& q : qs) {
                                 if (suggested_questions.size() >= 4) break;
                                 q = text::trim(q);
                                 if (q.size() >= 8) suggested_questions.push_back(q);
                             }
-                            if (suggested_questions.empty() && !it->trigger.empty()) {
-                                // fallback: make the trigger into a question chip
-                                std::string t = text::trim(it->trigger);
-                                if (!t.empty()) {
-                                    if (t.back() != '?') t.push_back('?');
-                                    suggested_questions.push_back(t);
-                                }
-                            }
+
                         }
                         break;
                     }
@@ -1670,43 +1737,26 @@ void OverlayWindow::Impl::on_click(int id) {
             answer_expanded = !answer_expanded;
             invalidate();
             break;
-        case kStyleConcise:
-            selected_style = 0;
-            if (cb.on_chat) cb.on_chat("Resuma a resposta de forma concisa e direta ao ponto.");
+        case kQuickShorter: if (cb.on_quick_action) cb.on_quick_action(1); follow_latest = true; break;
+        case kQuickExample: if (cb.on_quick_action) cb.on_quick_action(2); follow_latest = true; break;
+        case kQuickCode: if (cb.on_quick_action) cb.on_quick_action(3); follow_latest = true; break;
+        case kStripLatest: tr_scroll = 0.0f; break;
+        case kTranscriptToggle:
+            transcript_open = !transcript_open;
+            tr_scroll = 0.0f;
             invalidate();
-            break;
-        case kStyleDetailed:
-            selected_style = 1;
-            if (cb.on_chat) cb.on_chat("Detalhe a resposta tecnicamente com foco em arquitetura e trade-offs.");
-            invalidate();
-            break;
-        case kStyleStar:
-            selected_style = 2;
-            if (cb.on_chat) cb.on_chat("Formule a resposta estritamente no formato STAR (Situação, Tarefa, Ação, Resultado).");
-            invalidate();
-            break;
-        case kChipPickBase:
-            if (cb.on_chat) cb.on_chat("Reforce a resposta anterior focando na estrutura STAR.");
-            break;
-        case kChipPickBase + 1:
-            if (cb.on_chat) cb.on_chat("Quais foram os impactos quantitativos e métricas mensuráveis desse resultado?");
-            break;
-        case kChipPickBase + 2:
-            if (cb.on_chat) cb.on_chat("Explique os principais trade-offs técnicos e arquiteturais considerados.");
-            break;
-        case kChipPickBase + 3:
-            if (cb.on_chat) cb.on_chat("Dê um exemplo prático de código ou implementação dessa solução.");
-            break;
-        case kFollowUpRowBase:
-            if (cb.on_chat) cb.on_chat("Como você mensurou as métricas de sucesso dessa entrega na prática?");
-            break;
-        case kFollowUpRowBase + 1:
-            if (cb.on_chat) cb.on_chat("Quais foram os principais desafios técnicos de concorrência ou escala?");
             break;
         case kCopy: {
             if (history.empty()) break;
             const auto& sv = history[std::min(cursor, history.size() - 1)];
-            std::wstring w = widen(sv.body);
+            std::string plain;
+            for (const auto& fl : format_suggestion(sv.body, false)) {
+                if (!plain.empty()) plain += "\r\n";
+                if (fl.kind == FormattedLine::Kind::Bullet) plain += "- ";
+                plain += fl.plain();
+            }
+            if (plain.empty()) plain = sv.body;
+            std::wstring w = widen(plain);
             if (OpenClipboard(hwnd)) {
                 EmptyClipboard();
                 if (HGLOBAL g = GlobalAlloc(GMEM_MOVEABLE, (w.size() + 1) * sizeof(wchar_t))) {
@@ -1732,7 +1782,10 @@ void OverlayWindow::Impl::on_click(int id) {
             break;
         }
         case kChatField: focus_chat(); break;
-        case kChatSend: send_chat(); break;
+        case kChatSend:
+            if (edit.empty()) focus_chat();
+            else send_chat();
+            break;
         case kChatClose:
             chat_open = false;
             blur_chat(true);
@@ -1759,20 +1812,12 @@ void OverlayWindow::Impl::on_click(int id) {
         // same as [Tab] (Req 9.3).
         case kBtnNextQuestion: promote_next_pending(); follow_latest = true; break;
         default:
-            if (id >= kChipPickBase && id < kChipPickBase + 8) {
-                int idx = id - kChipPickBase;
-                if (idx >=0 && idx < (int)suggested_questions.size() && cb.on_suggested_pick)
+            if (id >= kSuggestedAskBase && id < kSuggestedAskBase + 8) {
+                const auto idx = static_cast<std::size_t>(id - kSuggestedAskBase);
+                if (idx < suggested_questions.size() && cb.on_suggested_pick) {
                     cb.on_suggested_pick(suggested_questions[idx]);
-                else if (cb.on_suggested_pick && !history.empty()) {
-                    const auto& sv2 = history[std::min(cursor,history.size()-1)];
-                    auto qs2 = text::extract_questions(sv2.body);
-                    if (qs2.empty()) qs2 = text::extract_questions(sv2.trigger);
-                    if (idx >=0 && idx < (int)qs2.size()) cb.on_suggested_pick(qs2[idx]);
+                    follow_latest = true;
                 }
-            } else if (id >= kSuggestedAskBase && id < kSuggestedAskBase + 8) {
-                int idx = id - kSuggestedAskBase;
-                if (idx >=0 && idx < (int)suggested_questions.size() && cb.on_suggested_pick)
-                    cb.on_suggested_pick(suggested_questions[idx]);
             }
             break;
     }
@@ -2001,17 +2046,19 @@ float OverlayWindow::Impl::kbd_width(const KeyHint& k) const {
     return w;
 }
 
-void OverlayWindow::Impl::draw_kbd(const KeyHint& k, float x, float cy) {
+void OverlayWindow::Impl::draw_kbd(const KeyHint& k, float x, float cy) { draw_kbd(k, x, cy, pal.kbd, pal.muted); }
+
+void OverlayWindow::Impl::draw_kbd(const KeyHint& k, float x, float cy, const D2D1_COLOR_F& bg, const D2D1_COLOR_F& fg) {
     const float w = kbd_width(k);
-    fill_round(D2D1::RectF(x, cy - 10.0f, x + w, cy + 10.0f), 6.0f, pal.kbd);
+    fill_round(D2D1::RectF(x, cy - 10.0f, x + w, cy + 10.0f), 6.0f, bg);
     auto lm = layout(k.mods, f_kbd.get(), 200.0f, 30.0f);
-    text_centered_v(lm.get(), x + 6.0f, cy, pal.muted);
+    text_centered_v(lm.get(), x + 6.0f, cy, fg);
     const float kx = x + 6.0f + width_of(lm.get()) + 4.0f;
     if (k.icon) {
-        icon(k.icon, kx + 6.0f, cy, 12.0f, pal.muted, 2.2f);
+        icon(k.icon, kx + 6.0f, cy, 12.0f, fg, 2.2f);
     } else if (k.key) {
         auto lk = layout(k.key, f_kbd.get(), 60.0f, 30.0f);
-        text_centered_v(lk.get(), kx, cy, pal.muted);
+        text_centered_v(lk.get(), kx, cy, fg);
     }
 }
 
@@ -2064,14 +2111,64 @@ void OverlayWindow::Impl::icon_button(const D2D1_RECT_F& r, int id, const char* 
 // ---------------------------------------------------------------------------
 
 
+// Width of one action pill at a density: 0 = icon + label + key hint,
+// 1 = icon + label, 2 = icon only.
+float OverlayWindow::Impl::action_width(const std::wstring& label, const KeyHint* k, int density) const {
+    if (density >= 2) return 32.0f;
+    float w = 30.0f + text_w(label, f_small_bold.get()) + 14.0f;
+    if (density == 0 && k) w += kbd_width(*k) + 4.0f;
+    return w;
+}
+
+void OverlayWindow::Impl::draw_action(const D2D1_RECT_F& r, int id, const std::wstring& label, const char* icon_name,
+                                      const KeyHint* k, int density, bool primary, bool active) {
+    const float cy = (r.top + r.bottom) / 2.0f;
+    const float rad = (r.bottom - r.top) / 2.0f;
+    D2D1_COLOR_F fg = pal.text;
+    if (primary) {
+        const bool down = pressed == id && hover == id;
+        fill_round(r, rad, down ? rgba(214, 214, 220) : hover == id ? rgba(255, 255, 255) : rgba(236, 236, 240));
+        fg = rgba(14, 15, 18);
+    } else {
+        fill_round(r, rad, button_fill(id, false));
+        stroke_round(r, rad, active ? with_alpha(pal.accent_soft, 0.85f) : pal.border, active ? 1.5f : 1.0f);
+    }
+    std::wstring tip = label;
+    if (k) {
+        tip += L"  (";
+        tip += k->mods;
+        tip += L" ";
+        tip += k->key ? k->key : L"Enter";
+        tip += L")";
+    }
+    if (density >= 2) {
+        icon(icon_name, (r.left + r.right) / 2.0f, cy, 15.0f, fg);
+        add_hit(r, id, tip);
+        return;
+    }
+    icon(icon_name, r.left + 16.0f, cy, 14.0f, fg);
+    auto l = layout(label, f_small_bold.get(), 300.0f, 30.0f);
+    text_centered_v(l.get(), r.left + 30.0f, cy, fg);
+    if (density == 0 && k) {
+        draw_kbd(*k, r.right - 10.0f - kbd_width(*k), cy, primary ? rgba(0, 0, 0, 0.08f) : pal.kbd,
+                 primary ? rgba(14, 15, 18, 0.62f) : pal.muted);
+    }
+    add_hit(r, id, density == 0 ? std::wstring() : tip);
+}
+
+// Top bar: capture toggles | Answer, Screen, Chat (+ model) | timer and window
+// controls. The action pills shrink in three steps (labels + key hints,
+// labels, icons) and the timer/model pill drop out first, so nothing overlaps
+// at any width between kMinW and kMaxW.
 float OverlayWindow::Impl::draw_control_bar(float y) {
     const float L = kMargin, R = width - kMargin;
     const D2D1_RECT_F bar = D2D1::RectF(L, y, R, y + kBarH);
     panel(bar, pal.bar);
     add_hit(bar, kDragArea); // empty bar area drags the window (lowest priority)
     const float cy = y + kBarH / 2.0f;
+    if (!history.empty() && !history.back().done) draw_shimmer(bar);
 
-    // ---- capture toggles: system audio ("Outros"), microphone ("Você") ----
+    // ---- capture toggles: system audio (interviewer), microphone (you) ----
     float x = L + 8.0f;
     for (AudioSource s : {AudioSource::Loopback, AudioSource::Microphone}) {
         const auto& lane = lanes[static_cast<std::size_t>(s)];
@@ -2088,152 +2185,139 @@ float OverlayWindow::Impl::draw_control_bar(float y) {
         const char* ic = s == AudioSource::Loopback ? (recording ? "monitor" : "monitor-off") : (recording ? "mic" : "mic-off");
         icon(ic, ccx, cy, 15.0f, err ? pal.red : (recording ? pal.text : pal.muted));
         if (recording) {
-            dot(x + 23.0f, cy - 8.0f, 3.5f, pal.green);
+            const bool linking = lane.state == LinkState::Connecting || lane.state == LinkState::Reconnecting;
+            dot(x + 24.0f, cy - 9.0f, 3.5f, err ? pal.red : linking ? pal.amber : pal.red);
         }
-        std::string who = s == AudioSource::Loopback ? "System audio (Others)" : "Microphone (You)";
+        std::string who = s == AudioSource::Loopback ? "System audio (interviewer)" : "Microphone (you)";
         std::string st;
-        if (!lane.enabled) st = "disabled in config.ini";
-        else if (lane.paused) st = "paused · click to resume";
+        if (!lane.enabled) st = "turned off in Settings";
+        else if (lane.paused) st = "paused, click to resume";
         else if (err) st = "error: " + lane.detail;
-        else if (lane.state == LinkState::Connected) st = "recording · click to pause";
-        else st = (lane.detail.empty() ? std::string(to_string(lane.state)) : lane.detail) + " · click to pause";
+        else if (lane.state == LinkState::Connected) st = "recording, click to pause";
+        else st = (lane.detail.empty() ? std::string(to_string(lane.state)) : lane.detail) + ", click to pause";
         add_hit(r, id, widen(who + ": " + st));
         x += 34.0f;
     }
     x += 4.0f;
+    brush->SetColor(pal.border_soft);
+    rt->DrawLine(D2D1::Point2F(x, cy - 12.0f), D2D1::Point2F(x, cy + 12.0f), brush.get());
+    x += 8.0f;
 
-    // Right group in Image 5: Timer, 3-dots, Collapse, Stealth, Move
+    // ---- right group: end, menu, collapse, hide, move ----
     float rx = R - 8.0f;
-    const std::string timer_str = clock_text(std::chrono::steady_clock::now() - opts.session_start);
-    auto ltime = layout(widen(timer_str), f_small_bold.get(), 70.0f, 30.0f);
-    const float tw = width_of(ltime.get()) + 26.0f;
-    const D2D1_RECT_F tr = D2D1::RectF(rx - tw, cy - 12.5f, rx, cy + 12.5f);
-    fill_round(tr, 12.5f, rgba(16, 185, 129, 0.12f));
-    stroke_round(tr, 12.5f, rgba(16, 185, 129, 0.35f), 1.0f);
-    dot(tr.left + 9.0f, cy, 3.0f, pal.green);
-    text_centered_v(ltime.get(), tr.left + 17.0f, cy, pal.green);
-    add_hit(tr, kNone, L"Tempo de sessão ao vivo");
-    rx -= tw + 8.0f;
-
-    // 3-dots more menu
-    icon_button(D2D1::RectF(rx - 26.0f, cy - 13.0f, rx, cy + 13.0f), kBtnMenu, "ellipsis-vertical", L"Mais opções", nullptr, !menu_open);
-    rx -= 28.0f;
-
-    // Collapse icon
-    icon_button(D2D1::RectF(rx - 26.0f, cy - 13.0f, rx, cy + 13.0f), kBtnCollapse, collapsed ? "maximize-2" : "minimize-2", collapsed ? L"Expandir" : L"Recolher");
-    rx -= 28.0f;
-
-    // Stealth icon (eye-off)
-    icon_button(D2D1::RectF(rx - 26.0f, cy - 13.0f, rx, cy + 13.0f), kMenuHide, "eye-off", L"Ocultar HUD (Ctrl Alt H)");
-    rx -= 28.0f;
-
-    // Move icon (crosshair / drag)
-    icon_button(D2D1::RectF(rx - 26.0f, cy - 13.0f, rx, cy + 13.0f), kBtnMove, "move", L"Arrastar HUD");
-    rx -= 32.0f;
-
-    // Responsive width budget for action buttons
-    const float mid_space = rx - x;
-    const bool show_kbd = mid_space > 480.0f;
-    const bool show_model = mid_space > 350.0f;
-
-    // 1. Primary White Pill: Answer ⌘ ↵
     {
-        const float btn_w = show_kbd ? 112.0f : 84.0f;
-        const D2D1_RECT_F r = D2D1::RectF(x, cy - 14.5f, x + btn_w, cy + 14.5f);
-        const D2D1_COLOR_F bg = hover == kBtnAnswer ? rgba(255, 255, 255, 1.0f) : rgba(244, 244, 246, 0.96f);
-        fill_round(r, 14.5f, bg);
-        icon("sparkles", r.left + 14.0f, cy, 14.0f, rgba(12, 13, 16, 1.0f));
-        auto l = layout(L"Answer", f_small_bold.get(), 60.0f, 30.0f);
-        text_centered_v(l.get(), r.left + 26.0f, cy, rgba(12, 13, 16, 1.0f));
-        if (show_kbd) {
-            auto kbd = layout(L"⌘ ↵", f_small.get(), 36.0f, 20.0f);
-            const float kw = width_of(kbd.get()) + 8.0f;
-            const D2D1_RECT_F kr = D2D1::RectF(r.right - kw - 6.0f, cy - 8.5f, r.right - 6.0f, cy + 8.5f);
-            fill_round(kr, 4.0f, rgba(0, 0, 0, 0.12f));
-            text_centered_v(kbd.get(), kr.left + 4.0f, cy, rgba(12, 13, 16, 0.85f));
+        const D2D1_RECT_F r = D2D1::RectF(rx - 28.0f, cy - 14.0f, rx, cy + 14.0f);
+        fill_round(r, 14.0f, hover == kBtnEnd ? rgba(239, 59, 59, 0.26f) : rgba(239, 59, 59, 0.12f));
+        icon("power", (r.left + r.right) / 2.0f, cy, 14.0f, pal.end_hover);
+        add_hit(r, kBtnEnd, L"End the session and save it  (Ctrl Alt Q)");
+        rx -= 32.0f;
+    }
+    icon_button(D2D1::RectF(rx - 28.0f, cy - 14.0f, rx, cy + 14.0f), kBtnMenu, "ellipsis-vertical", L"More", nullptr,
+                !menu_open);
+    rx -= 30.0f;
+    {
+        const D2D1_RECT_F r = D2D1::RectF(rx - 28.0f, cy - 14.0f, rx, cy + 14.0f);
+        icon_button(r, kBtnCollapse, collapsed ? "maximize-2" : "minimize-2",
+                    collapsed ? L"Expand the HUD" : L"Collapse to the bar");
+        if (collapsed && unseen_answer) dot(r.right - 5.0f, r.top + 5.0f, 3.5f, pal.accent);
+        rx -= 30.0f;
+    }
+    icon_button(D2D1::RectF(rx - 28.0f, cy - 14.0f, rx, cy + 14.0f), kMenuHide, "eye-off",
+                L"Hide the HUD  (Ctrl Alt H shows it again)");
+    rx -= 30.0f;
+    icon_button(D2D1::RectF(rx - 28.0f, cy - 14.0f, rx, cy + 14.0f), kBtnMove, "move", L"Drag to move");
+    rx -= 34.0f;
+
+    // ---- actions, sized to the room left ----
+    static const KeyHint k_ans{L"Ctrl Alt", nullptr, "corner-down-left"};
+    static const KeyHint k_shot{L"Ctrl Alt", L"S", nullptr};
+    static const KeyHint k_chat{L"Ctrl Alt", L"K", nullptr};
+    struct Act {
+        int id;
+        const wchar_t* label;
+        const char* icon;
+        const KeyHint* k;
+        bool primary;
+        bool active;
+    };
+    const Act acts[] = {
+        {kBtnAnswer, L"Answer", "sparkles", &k_ans, true, false},
+        {kBtnShot, L"Screen", "camera", &k_shot, false, shot_busy},
+        {kBtnChat, L"Chat", "message-square", &k_chat, false, chat_open && opts.llm_enabled},
+    };
+    auto need = [&](int d) {
+        float w = 0.0f;
+        for (const auto& a : acts) w += action_width(a.label, a.k, d) + 6.0f;
+        return w;
+    };
+    const std::wstring timer = widen(clock_text(std::chrono::steady_clock::now() - opts.session_start));
+    const float timer_w = text_w(timer, f_small_bold.get()) + 26.0f;
+    const float room = rx - x;
+    int density = 2;
+    bool show_timer = false;
+    for (int d = 0; d < 3; ++d) {
+        if (need(d) + timer_w + 8.0f <= room) {
+            density = d;
+            show_timer = true;
+            break;
         }
-        add_hit(r, kBtnAnswer, L"Gerar resposta sugerida (Ctrl Alt Enter)");
-        x += btn_w + 6.0f;
+    }
+    if (!show_timer) {
+        for (int d = 0; d < 3; ++d) {
+            if (need(d) <= room) {
+                density = d;
+                break;
+            }
+        }
     }
 
-    // 2. Secondary Dark Pill: Screenshot ⌘ ⇧ S
-    {
-        const float btn_w = show_kbd ? 134.0f : 100.0f;
-        const D2D1_RECT_F r = D2D1::RectF(x, cy - 14.5f, x + btn_w, cy + 14.5f);
-        fill_round(r, 14.5f, button_fill(kBtnShot, false));
-        stroke_round(r, 14.5f, pal.border, 1.0f);
-        icon("camera", r.left + 14.0f, cy, 14.0f, pal.text);
-        auto l = layout(L"Screenshot", f_small.get(), 75.0f, 30.0f);
-        text_centered_v(l.get(), r.left + 26.0f, cy, pal.text);
-        if (show_kbd) {
-            auto kbd = layout(L"⌘ ⇧ S", f_small.get(), 45.0f, 20.0f);
-            const float kw = width_of(kbd.get()) + 8.0f;
-            const D2D1_RECT_F kr = D2D1::RectF(r.right - kw - 6.0f, cy - 8.5f, r.right - 6.0f, cy + 8.5f);
-            fill_round(kr, 4.0f, rgba(255, 255, 255, 0.08f));
-            text_centered_v(kbd.get(), kr.left + 4.0f, cy, pal.muted);
-        }
-        if (shot_busy) {
-            fill_round(r, 14.5f, rgba(0, 0, 0, 0.50f));
+    if (show_timer) {
+        const D2D1_RECT_F tr = D2D1::RectF(rx - timer_w, cy - 12.5f, rx, cy + 12.5f);
+        fill_round(tr, 12.5f, rgba(16, 185, 129, 0.12f));
+        stroke_round(tr, 12.5f, rgba(16, 185, 129, 0.32f), 1.0f);
+        dot(tr.left + 10.0f, cy, 3.0f, pal.green);
+        auto lt = layout(timer, f_small_bold.get(), 90.0f, 30.0f);
+        text_centered_v(lt.get(), tr.left + 18.0f, cy, pal.green);
+        add_hit(tr, kDragArea, L"Session time");
+        rx -= timer_w + 8.0f;
+    }
+
+    for (const auto& a : acts) {
+        const float w = action_width(a.label, a.k, density);
+        if (x + w > rx + 1.0f) break; // never overlap the right group
+        const D2D1_RECT_F r = D2D1::RectF(x, cy - 15.0f, x + w, cy + 15.0f);
+        draw_action(r, a.id, a.label, a.icon, a.k, density, a.primary, a.active);
+        if (a.id == kBtnShot && shot_busy) {
+            fill_round(r, 15.0f, rgba(0, 0, 0, 0.45f));
             const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                                 std::chrono::steady_clock::now().time_since_epoch()).count();
             const float mid = (r.left + r.right) / 2.0f;
             for (int i = 0; i < 3; ++i) {
                 const float phase = static_cast<float>((ms + i * 400) % 1200) / 1200.0f;
-                const float a = 0.3f + 0.7f * 0.5f * (1.0f - std::cos(phase * 6.2831853f));
-                dot(mid - 6.0f + static_cast<float>(i) * 6.0f, cy, 2.2f, with_alpha(pal.text, a));
+                const float al = 0.3f + 0.7f * 0.5f * (1.0f - std::cos(phase * 6.2831853f));
+                dot(mid - 6.0f + static_cast<float>(i) * 6.0f, cy, 2.2f, with_alpha(pal.text, al));
             }
         }
-        add_hit(r, kBtnShot, L"Capturar tela e resolver (Ctrl Alt S)");
-        x += btn_w + 6.0f;
+        x += w + 6.0f;
     }
 
-    // 3. Secondary Dark Pill: Chat ⌘ ⇧ ␣
-    {
-        const float btn_w = show_kbd ? 104.0f : 72.0f;
-        const D2D1_RECT_F r = D2D1::RectF(x, cy - 14.5f, x + btn_w, cy + 14.5f);
-        fill_round(r, 14.5f, button_fill(kBtnChat, false));
-        stroke_round(r, 14.5f, chat_open ? with_alpha(pal.accent, 0.85f) : pal.border, chat_open ? 1.5f : 1.0f);
-        icon("message-square", r.left + 14.0f, cy, 14.0f, pal.text);
-        auto l = layout(L"Chat", f_small.get(), 40.0f, 30.0f);
-        text_centered_v(l.get(), r.left + 26.0f, cy, pal.text);
-        if (show_kbd) {
-            auto kbd = layout(L"⌘ ⇧ ␣", f_small.get(), 42.0f, 20.0f);
-            const float kw = width_of(kbd.get()) + 8.0f;
-            const D2D1_RECT_F kr = D2D1::RectF(r.right - kw - 6.0f, cy - 8.5f, r.right - 6.0f, cy + 8.5f);
-            fill_round(kr, 4.0f, rgba(255, 255, 255, 0.08f));
-            text_centered_v(kbd.get(), kr.left + 4.0f, cy, pal.muted);
-        }
-        add_hit(r, kBtnChat, L"Alternar chat de acompanhamento (Ctrl Alt K)");
-        x += btn_w + 6.0f;
-    }
-
-    // 4. Model Dropdown Pill
-    if (show_model && x < rx - 50.0f) {
-        std::wstring model_name = L"Claude Sonnet 4.6";
-        if (!opts.llm_model.empty()) {
-            std::string m = opts.llm_model;
-            auto slash = m.find('/');
-            if (slash != std::string::npos) m = m.substr(slash + 1);
-            if (m.find("claude-3.5-haiku") != std::string::npos || m.find("sonnet") != std::string::npos) model_name = L"Claude Sonnet 4.6";
-            else if (m.find("qwen") != std::string::npos) model_name = L"Qwen 3.6 Flash";
-            else if (m.find("gpt-4o") != std::string::npos) model_name = L"GPT-5";
-            else if (m.find("gemini") != std::string::npos) model_name = L"Gemini 2.5 Flash";
-            else model_name = widen(m);
-        }
-        auto lm = layout(model_name, f_small.get(), 140.0f, 30.0f);
-        const float mw = width_of(lm.get());
-        const float btn_w = std::min(26.0f + mw + 20.0f, rx - x - 4.0f);
-        if (btn_w > 40.0f) {
-            const D2D1_RECT_F r = D2D1::RectF(x, cy - 14.5f, x + btn_w, cy + 14.5f);
-            fill_round(r, 14.5f, rgba(26, 27, 32, 0.90f));
-            stroke_round(r, 14.5f, pal.border, 1.0f);
-            icon("settings", r.left + 12.0f, cy, 13.0f, pal.muted);
-            rt->PushAxisAlignedClip(D2D1::RectF(r.left + 22.0f, r.top, r.right - 14.0f, r.bottom), D2D1_ANTIALIAS_MODE_ALIASED);
-            text_centered_v(lm.get(), r.left + 23.0f, cy, pal.text);
-            rt->PopAxisAlignedClip();
-            icon("chevron-down", r.right - 9.0f, cy, 11.0f, pal.muted);
-            add_hit(r, kMenuConfig, L"Alternar Modelo de IA (Configurações)");
-        }
+    // Model in use (real id, provider prefix dropped). Opens Settings.
+    if (opts.llm_enabled && !opts.llm_model.empty() && rx - x >= 130.0f) {
+        std::string m = opts.llm_model;
+        if (const auto slash = m.find('/'); slash != std::string::npos) m = m.substr(slash + 1);
+        auto lm = line_layout(widen(m), f_small.get(), std::min(190.0f, rx - x - 40.0f));
+        const float w = std::min(rx - x, 34.0f + width_of(lm.get()) + 12.0f);
+        const D2D1_RECT_F r = D2D1::RectF(x + 2.0f, cy - 13.0f, x + 2.0f + w, cy + 13.0f);
+        fill_round(r, 13.0f, hover == kMenuConfig ? pal.ghost_hover : rgba(255, 255, 255, 0.03f));
+        stroke_round(r, 13.0f, pal.border_soft, 1.0f);
+        icon("sparkles", r.left + 14.0f, cy, 12.0f, pal.muted);
+        text_centered_v(lm.get(), r.left + 26.0f, cy, pal.muted);
+        add_hit(r, kMenuConfig, widen("Model: " + opts.llm_model + "  (change it in Settings)"));
+    } else if (!opts.llm_enabled && rx - x >= 150.0f) {
+        auto ln = line_layout(L"No LLM key: transcription only", f_small.get(), rx - x - 8.0f);
+        text_centered_v(ln.get(), x + 4.0f, cy, pal.amber);
+        add_hit(D2D1::RectF(x, cy - 12.0f, x + width_of(ln.get()) + 8.0f, cy + 12.0f), kMenuConfig,
+                L"Add the OpenRouter key in Settings > General to get answers");
     }
 
     return bar.bottom;
@@ -2297,27 +2381,51 @@ float OverlayWindow::Impl::draw_menu(float y) {
     return pr.bottom;
 }
 
+// Chat row: one text field, Send and Close. Shown under the bar while the
+// chat is open (only when an LLM is configured).
 float OverlayWindow::Impl::draw_strip(float y) {
-    if (collapsed || !chat_open) return y;
+    if (collapsed || !chat_open || !opts.llm_enabled) return y;
     const float L = kMargin, R = width - kMargin;
-    const float strip_h = 42.0f;
-    const D2D1_RECT_F sr = D2D1::RectF(L, y + kGap, R, y + kGap + strip_h);
-    panel(sr, rgba(18, 19, 23, 0.96f));
-    add_hit(sr, kChatField, L"Clique para digitar no chat");
+    const D2D1_RECT_F sr = D2D1::RectF(L, y + kGap, R, y + kGap + 42.0f);
+    panel(sr, pal.panel);
+    add_hit(sr, kChatField); // anywhere on the row focuses the field
     const float cy = (sr.top + sr.bottom) / 2.0f;
+    const bool roomy = R - L >= 520.0f;
 
-    // Sparkles icon on the left
-    icon("sparkles", L + 18.0f, cy, 15.0f, pal.accent_soft);
+    const D2D1_RECT_F close_r = D2D1::RectF(R - 8.0f - 26.0f, cy - 13.0f, R - 8.0f, cy + 13.0f);
+    icon_button(close_r, kChatClose, "x", L"Close the chat  (Esc)");
 
-    // Text field or placeholder
-    const float tx = L + 36.0f;
-    const float send_w = 66.0f;
-    const float close_w = 26.0f;
-    const float tw = R - 12.0f - close_w - send_w - 95.0f - tx;
+    const bool can_send = !edit.empty();
+    const float send_w = roomy ? 76.0f : 32.0f;
+    const D2D1_RECT_F send_r = D2D1::RectF(close_r.left - 6.0f - send_w, cy - 13.0f, close_r.left - 6.0f, cy + 13.0f);
+    fill_round(send_r, 13.0f,
+               can_send ? (hover == kChatSend ? rgba(255, 255, 255) : rgba(236, 236, 240)) : rgba(255, 255, 255, 0.07f));
+    const D2D1_COLOR_F sfg = can_send ? rgba(14, 15, 18) : pal.muted;
+    if (roomy) {
+        icon("send", send_r.left + 17.0f, cy, 13.0f, sfg);
+        auto ls = layout(L"Send", f_small_bold.get(), 60.0f, 24.0f);
+        text_centered_v(ls.get(), send_r.left + 30.0f, cy, sfg);
+    } else {
+        icon("send", (send_r.left + send_r.right) / 2.0f, cy, 13.0f, sfg);
+    }
+    add_hit(send_r, kChatSend, L"Send  (Enter)");
+
+    const D2D1_RECT_F field = D2D1::RectF(L + 8.0f, cy - 14.0f, send_r.left - 8.0f, cy + 14.0f);
+    fill_round(field, 9.0f, chat_focused ? rgba(255, 255, 255, 0.07f) : rgba(255, 255, 255, 0.035f));
+    stroke_round(field, 9.0f, chat_focused ? with_alpha(pal.accent_soft, 0.75f) : pal.border_soft, 1.0f);
+    icon("message-square", field.left + 15.0f, cy, 13.0f, chat_focused ? pal.accent_soft : pal.muted);
+    const float tx = field.left + 30.0f;
+    const float tw = std::max(24.0f, field.right - 10.0f - tx);
 
     if (edit.empty()) {
-        auto l = line_layout(L"Ask a follow-up or type context...", f_body.get(), tw);
-        text_centered_v(l.get(), tx, cy, with_alpha(pal.muted, chat_focused ? 0.75f : 0.95f));
+        const wchar_t* ph = chat_focused ? L"Type and press Enter. Esc closes."
+                                         : L"Ask about the conversation or add context  (Ctrl Alt K)";
+        auto l = line_layout(ph, f_body.get(), tw);
+        text_centered_v(l.get(), tx, cy, with_alpha(pal.muted, 0.9f));
+        if (chat_focused) {
+            const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - caret_t0).count();
+            if ((ms / 530) % 2 == 0) fill_round(D2D1::RectF(tx, cy - 8.0f, tx + 1.5f, cy + 8.0f), 0.5f, pal.text);
+        }
     } else {
         const std::wstring t = to_w(edit.text());
         auto l = layout(t, f_body.get(), 10000.0f, 30.0f);
@@ -2332,416 +2440,628 @@ float OverlayWindow::Impl::draw_strip(float y) {
         if (caret_x - chat_scroll_x > tw - 4.0f) chat_scroll_x = caret_x - tw + 4.0f;
         if (caret_x - chat_scroll_x < 0.0f) chat_scroll_x = caret_x;
         if (width_of(l.get()) < tw) chat_scroll_x = 0.0f;
-        rt->PushAxisAlignedClip(D2D1::RectF(tx - 2.0f, sr.top, tx + tw + 2.0f, sr.bottom), D2D1_ANTIALIAS_MODE_ALIASED);
-        if (!t.empty()) text_centered_v(l.get(), tx - chat_scroll_x, cy, pal.text);
+        rt->PushAxisAlignedClip(D2D1::RectF(tx - 2.0f, field.top, tx + tw + 2.0f, field.bottom), D2D1_ANTIALIAS_MODE_ALIASED);
+        text_centered_v(l.get(), tx - chat_scroll_x, cy, pal.text);
         if (chat_focused) {
             const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - caret_t0).count();
             if ((ms / 530) % 2 == 0) {
                 const float cxp = tx - chat_scroll_x + caret_x;
-                fill_round(D2D1::RectF(cxp, cy - 9.0f, cxp + 1.5f, cy + 9.0f), 0.5f, pal.text);
+                fill_round(D2D1::RectF(cxp, cy - 8.0f, cxp + 1.5f, cy + 8.0f), 0.5f, pal.text);
             }
         }
         rt->PopAxisAlignedClip();
     }
-
-    // Badges ⌘ K and ⌘ ↵
-    float bx = R - close_w - send_w - 90.0f;
-    auto lk = layout(L"⌘ K", f_small.get(), 36.0f, 24.0f);
-    fill_round(D2D1::RectF(bx, cy - 9.0f, bx + 34.0f, cy + 9.0f), 4.0f, rgba(255, 255, 255, 0.06f));
-    stroke_round(D2D1::RectF(bx + 0.5f, cy - 8.5f, bx + 33.5f, cy + 8.5f), 3.5f, pal.border);
-    text_centered_v(lk.get(), bx + 6.0f, cy, pal.muted);
-
-    bx += 40.0f;
-    auto lret = layout(L"⌘ ↵", f_small.get(), 36.0f, 24.0f);
-    fill_round(D2D1::RectF(bx, cy - 9.0f, bx + 34.0f, cy + 9.0f), 4.0f, rgba(255, 255, 255, 0.06f));
-    stroke_round(D2D1::RectF(bx + 0.5f, cy - 8.5f, bx + 33.5f, cy + 8.5f), 3.5f, pal.border);
-    text_centered_v(lret.get(), bx + 6.0f, cy, pal.muted);
-
-    // Send button (white pill)
-    const D2D1_RECT_F send_r = D2D1::RectF(R - close_w - send_w - 6.0f, cy - 13.0f, R - close_w - 6.0f, cy + 13.0f);
-    const D2D1_COLOR_F send_bg = hover == kChatSend ? rgba(255, 255, 255, 1.0f) : rgba(244, 244, 246, 0.95f);
-    fill_round(send_r, 13.0f, send_bg);
-    auto lsend = layout(L"Send ↵", f_small_bold.get(), send_w, 24.0f);
-    text_centered_v(lsend.get(), send_r.left + 12.0f, cy, rgba(12, 13, 16, 1.0f));
-    add_hit(send_r, kChatSend, L"Enviar mensagem (Enter)");
-
-    // Close button
-    const D2D1_RECT_F close_r = D2D1::RectF(R - close_w, cy - 13.0f, R, cy + 13.0f);
-    icon_button(close_r, kChatClose, "x", L"Fechar chat (Esc)");
-
     return sr.bottom;
 }
 
-} // namespace rtai
-namespace rtai {
-float OverlayWindow::Impl::draw_answer(float y) {
-    if (collapsed) return y;
-    const float L = kMargin, R = width - kMargin;
-    const float top_y = y + kGap;
-    const float total_w = R - L;
-    const float col_gap = 12.0f;
-    const float left_w = std::clamp(total_w * 0.38f, 320.0f, 440.0f);
-    const float right_x = L + left_w + col_gap;
-    const float right_w = R - right_x;
+// Vertical fade over the edge of a scrolled area, in the panel colour.
+void OverlayWindow::Impl::draw_fade(const D2D1_RECT_F& r, const D2D1_COLOR_F& base, bool at_bottom) {
+    constexpr int kSteps = 8;
+    const float h = (r.bottom - r.top) / kSteps;
+    for (int i = 0; i < kSteps; ++i) {
+        const float t = static_cast<float>(i + 1) / kSteps; // 0 = far from the edge, 1 = at the edge
+        const float yy = at_bottom ? r.top + h * static_cast<float>(i) : r.bottom - h * static_cast<float>(i + 1);
+        brush->SetColor(with_alpha(base, base.a * t * 0.9f));
+        rt->FillRectangle(D2D1::RectF(r.left, yy, r.right, yy + h + 0.5f), brush.get());
+    }
+}
 
+void OverlayWindow::Impl::draw_scrollbar(float x, float top, float view_h, float content_h, float offset) {
+    if (content_h <= view_h + 0.5f) return;
+    const float thumb_h = std::max(24.0f, view_h * view_h / content_h);
+    const float t = std::clamp(offset / (content_h - view_h), 0.0f, 1.0f);
+    const float ty = top + (view_h - thumb_h) * t;
+    fill_round(D2D1::RectF(x, top, x + 3.0f, top + view_h), 1.5f, rgba(255, 255, 255, 0.04f));
+    fill_round(D2D1::RectF(x, ty, x + 3.0f, ty + thumb_h), 1.5f, rgba(255, 255, 255, 0.22f));
+}
+
+// Live transcript, newest at the bottom. Scrolls with the wheel (offset is
+// measured from the bottom, so new speech stays in view unless the user
+// scrolled up to read something older).
+void OverlayWindow::Impl::draw_transcript(const D2D1_RECT_F& r, bool compact) {
+    const D2D1_COLOR_F bg = rgba(15, 16, 19, 0.96f);
+    panel(r, bg);
+    tr_view_rect = r;
+    const float pad = 12.0f;
+    const auto& sys = lanes[static_cast<std::size_t>(AudioSource::Loopback)];
+    const auto& mic = lanes[static_cast<std::size_t>(AudioSource::Microphone)];
+    const bool any_on = (sys.enabled && !sys.paused) || (mic.enabled && !mic.paused);
+
+    float feed_top = r.top + 8.0f;
+    if (!compact) {
+        const float cy = r.top + 20.0f;
+        auto lh = layout(L"TRANSCRIPT", f_small_bold.get(), 120.0f, 20.0f);
+        text_centered_v(lh.get(), r.left + pad, cy, pal.muted);
+        icon_button(D2D1::RectF(r.right - 8.0f - 24.0f, cy - 12.0f, r.right - 8.0f, cy + 12.0f), kStripClear, "trash-2",
+                    L"Clear the transcript  (Ctrl Alt Shift Backspace)");
+        const bool hearing = (sys.enabled && !sys.paused && sys.speaking) || (mic.enabled && !mic.paused && mic.speaking);
+        const wchar_t* st = !any_on ? L"Paused" : hearing ? L"Hearing" : L"Listening";
+        auto ls = layout(st, f_small.get(), 80.0f, 20.0f);
+        const float sx = r.right - 40.0f - width_of(ls.get());
+        text_centered_v(ls.get(), sx, cy, any_on ? pal.text_sub : pal.amber);
+        dot(sx - 8.0f, cy, 3.0f, !any_on ? pal.amber : hearing ? pal.green : with_alpha(pal.green, 0.45f));
+        brush->SetColor(pal.faint);
+        rt->DrawLine(D2D1::Point2F(r.left + pad, r.top + 38.0f), D2D1::Point2F(r.right - pad, r.top + 38.0f), brush.get());
+        feed_top = r.top + 44.0f;
+    }
+    const D2D1_RECT_F feed = D2D1::RectF(r.left + pad, feed_top, r.right - pad - 4.0f, r.bottom - 8.0f);
+    const float fw = feed.right - feed.left;
+    const float fh = feed.bottom - feed.top;
+
+    // Merge phrase chunks back into one paragraph per speaker turn.
+    struct Para {
+        AudioSource src;
+        std::string text;
+        bool live;
+    };
+    std::vector<Para> paras;
+    for (const auto& ch : strip.chunks(100000)) {
+        if (!paras.empty() && paras.back().src == ch.source && !ch.speaker_change) {
+            paras.back().text += " " + ch.text;
+            paras.back().live = paras.back().live || ch.live;
+        } else {
+            paras.push_back(Para{ch.source, ch.text, ch.live});
+        }
+    }
+
+    if (paras.empty()) {
+        tr_scroll = 0.0f;
+        tr_scroll_max = 0.0f;
+        const wchar_t* msg = !any_on ? L"Capture is paused. Press Ctrl Alt P or click the source icons to resume."
+                             : compact ? L"Listening. The conversation shows up here."
+                                       : L"Listening. What the interviewer says (system audio) and what you say "
+                                         L"(microphone) shows up here as it is spoken.";
+        auto lm = layout(msg, f_small.get(), fw, fh);
+        draw_text(lm.get(), feed.left, feed.top + (compact ? 4.0f : 6.0f), pal.muted);
+        return;
+    }
+
+    struct Block {
+        ComPtr<IDWriteTextLayout> who, body;
+        bool you;
+        bool live;
+        float h;
+    };
+    std::vector<Block> blocks;
+    float total = 0.0f;
+    for (std::size_t i = 0; i < paras.size(); ++i) {
+        const bool you = paras[i].src == AudioSource::Microphone;
+        Block b{};
+        b.you = you;
+        b.live = paras[i].live;
+        b.who = layout(you ? L"You" : L"Interviewer", f_small_bold.get(), fw, 18.0f);
+        b.body = layout(widen(paras[i].text), f_small.get(), fw);
+        b.h = 17.0f + height_of(b.body.get());
+        total += b.h + (i + 1 < paras.size() ? 9.0f : 0.0f);
+        blocks.push_back(std::move(b));
+    }
+    tr_scroll_max = std::max(0.0f, total - fh);
+    tr_scroll = std::clamp(tr_scroll, 0.0f, tr_scroll_max);
+
+    rt->PushAxisAlignedClip(feed, D2D1_ANTIALIAS_MODE_ALIASED);
+    float ty = (total <= fh ? feed.top : feed.bottom - total + tr_scroll);
+    for (const auto& b : blocks) {
+        if (ty + b.h >= feed.top - 2.0f && ty <= feed.bottom + 2.0f) {
+            draw_text(b.who.get(), feed.left, ty, b.you ? pal.accent_soft : pal.text);
+            if (b.live) dot(feed.left + width_of(b.who.get()) + 7.0f, ty + 8.0f, 2.5f, pal.green);
+            draw_text(b.body.get(), feed.left, ty + 17.0f, b.you ? pal.text_you : pal.text_sub);
+        }
+        ty += b.h + 9.0f;
+    }
+    rt->PopAxisAlignedClip();
+    if (total > fh) {
+        const float off_top = tr_scroll_max - tr_scroll; // content hidden above
+        if (off_top > 1.0f) draw_fade(D2D1::RectF(feed.left, feed.top, feed.right, feed.top + 18.0f), bg, false);
+        if (tr_scroll > 1.0f) {
+            draw_fade(D2D1::RectF(feed.left, feed.bottom - 18.0f, feed.right, feed.bottom), bg, true);
+            // Newer speech below: one click jumps back to the live edge.
+            const D2D1_RECT_F jr = D2D1::RectF(r.right - pad - 26.0f, feed.bottom - 26.0f, r.right - pad, feed.bottom);
+            fill_round(jr, 13.0f, hover == kStripLatest ? rgba(70, 72, 80) : rgba(48, 50, 56, 0.96f));
+            icon("arrow-down", (jr.left + jr.right) / 2.0f, (jr.top + jr.bottom) / 2.0f, 13.0f, pal.text);
+            add_hit(jr, kStripLatest, L"Jump to the latest");
+        }
+        draw_scrollbar(r.right - 7.0f, feed.top, fh, total, off_top);
+    }
+}
+
+// Answer panel. Height follows the content between min_h and max_h; past
+// max_h the answer body scrolls with the wheel.
+float OverlayWindow::Impl::draw_answer_panel(float x, float y, float w, float min_h, float max_h) {
     SuggestionView* sv = history.empty() ? nullptr : &history[std::min(cursor, history.size() - 1)];
+    const D2D1_COLOR_F bg = rgba(17, 18, 22, 0.96f);
+    const float pad = 14.0f;
+    const float inner = std::max(60.0f, w - 2.0f * pad);
+    const float X = x + pad;
+    const bool generating = (sv && !sv->done) || shot_busy;
+    const bool has_body = sv && !sv->body.empty();
+
+    // ---------------- measure ----------------
+    const float header_h = 40.0f;
+    const float pill_h = pending_question ? 36.0f : 0.0f;
+
+    std::wstring tag, qtext;
+    if (sv) {
+        switch (sv->reason) {
+            case TriggerReason::Screenshot: tag = L"Screen"; break;
+            case TriggerReason::Chat:       tag = L"You asked"; break;
+            case TriggerReason::Recap:      tag = L"Summary"; break;
+            case TriggerReason::FollowUp:   tag = L"Follow-up"; break;
+            case TriggerReason::Keyword:    tag = L"Topic"; break;
+            default:                        tag = L"Question"; break;
+        }
+        if (!sv->understood.empty()) qtext = widen(sv->understood);
+        else if (!text::trim(sv->trigger).empty()) qtext = widen(sv->trigger);
+        else if (sv->reason == TriggerReason::Screenshot) qtext = L"Analyze what is on the screen";
+        else if (sv->reason == TriggerReason::Recap) qtext = L"Summary of the conversation so far";
+        else if (sv->reason == TriggerReason::FollowUp) qtext = L"Questions you could ask";
+        else qtext = L"Answer to the latest speech";
+    }
+    ComPtr<IDWriteTextLayout> q_l;
+    float q_text_h = 0.0f;
+    if (!qtext.empty()) {
+        q_l = layout(qtext, f_body_bold.get(), inner, 64.0f); // at most 3 lines, clipped
+        q_text_h = std::min(height_of(q_l.get()), 64.0f);
+    }
+    const float q_h = sv ? 24.0f + q_text_h + 12.0f : 0.0f;
+
+    struct BodyLine {
+        ComPtr<IDWriteTextLayout> l;
+        float indent;
+        float gap;
+        float h;
+        D2D1_COLOR_F c;
+        bool bullet;
+    };
+    std::vector<BodyLine> lines;
+    float body_h = 0.0f;
+    if (has_body) {
+        const auto fmt = format_suggestion(sv->body, !sv->done);
+        for (std::size_t i = 0; i < fmt.size(); ++i) {
+            const auto& fl = fmt[i];
+            BodyLine b{};
+            b.bullet = fl.kind == FormattedLine::Kind::Bullet;
+            b.indent = b.bullet ? 16.0f : 0.0f;
+            IDWriteTextFormat* f = f_body.get();
+            b.c = pal.text_sub;
+            if (fl.kind == FormattedLine::Kind::Headline) {
+                f = f_body_bold.get();
+                b.c = pal.text;
+            } else if (fl.kind == FormattedLine::Kind::Label) {
+                f = f_small_bold.get();
+                b.c = pal.muted;
+            }
+            b.l = rich_layout(fl.segments, f, inner - b.indent - 6.0f);
+            b.h = std::max(18.0f, height_of(b.l.get()));
+            b.gap = i == 0 ? 0.0f : (fl.kind == FormattedLine::Kind::Label ? 12.0f : 7.0f);
+            body_h += b.gap + b.h;
+            lines.push_back(std::move(b));
+        }
+    }
+    // Messages shown instead of (or after) the body.
+    std::wstring state_msg;
+    D2D1_COLOR_F state_c = pal.text_sub;
+    bool state_dots = false;
+    bool state_err = false;
+    if (!has_body) {
+        if (shot_busy && (!sv || sv->done)) {
+            state_msg = L"Capturing the screen and sending it to the model";
+            state_dots = true;
+        } else if (sv && !sv->done) {
+            state_msg = sv->waiting ? L"Still waiting for the model. If this keeps happening, check the connection or "
+                                      L"pick a faster model in Settings."
+                                    : L"Writing the answer";
+            state_dots = !sv->waiting;
+            if (sv->waiting) state_c = pal.amber;
+        } else if (sv && sv->status == LlmStatus::Failed) {
+            state_msg = L"Could not generate an answer" + (sv->error.empty() ? std::wstring(L".") : L": " + widen(sv->error));
+            state_c = pal.red;
+            state_err = true;
+        } else if (sv && sv->status == LlmStatus::Cancelled) {
+            state_msg = L"Answer cancelled.";
+            state_c = pal.muted;
+        } else if (sv) {
+            state_msg = L"The model returned an empty answer. Press Answer to try again.";
+            state_c = pal.muted;
+        } else if (!opts.llm_enabled) {
+            state_msg = L"Answers are off because no OpenRouter key is set. Add it in Settings > General; the "
+                        L"transcript keeps working meanwhile.";
+            state_c = pal.amber;
+        } else {
+            state_msg = auto_answer_on
+                            ? L"Ready. Questions from the interviewer are answered automatically. Press Ctrl Alt Enter "
+                              L"to answer what was just said, Ctrl Alt S to analyze the screen or Ctrl Alt K to ask "
+                              L"in the chat."
+                            : L"Auto-answer is off. Press Ctrl Alt Enter to answer what was just said, Ctrl Alt S to "
+                              L"analyze the screen or Ctrl Alt K to ask in the chat.";
+        }
+    } else if (sv->done && sv->status == LlmStatus::Failed) {
+        state_msg = L"The answer was cut off" + (sv->error.empty() ? std::wstring(L".") : L": " + widen(sv->error));
+        state_c = pal.red;
+        state_err = true;
+    }
+    ComPtr<IDWriteTextLayout> state_l;
+    if (!state_msg.empty()) {
+        const float sx = state_dots ? 28.0f : 0.0f;
+        state_l = layout(state_msg, f_body.get(), inner - sx);
+        body_h += (has_body ? 10.0f : 0.0f) + std::max(20.0f, height_of(state_l.get()));
+    }
+
+    // Follow-up chips (latest answer only).
+    std::vector<std::pair<ComPtr<IDWriteTextLayout>, D2D1_RECT_F>> chips;
+    float fu_h = 0.0f;
+    const bool on_latest = sv && cursor + 1 == history.size();
+    if (on_latest && sv->done && has_body && !suggested_questions.empty() && opts.llm_enabled) {
+        float cx = 0.0f, cyy = 0.0f;
+        for (std::size_t i = 0; i < suggested_questions.size() && i < 4; ++i) {
+            auto l = line_layout(widen(suggested_questions[i]), f_small.get(), inner - 24.0f);
+            const float cw = std::min(inner, width_of(l.get()) + 24.0f);
+            if (cx > 0.0f && cx + cw > inner) {
+                cx = 0.0f;
+                cyy += 30.0f;
+            }
+            chips.push_back({l, D2D1::RectF(cx, cyy, cx + cw, cyy + 24.0f)});
+            cx += cw + 6.0f;
+        }
+        fu_h = 22.0f + cyy + 24.0f + 12.0f;
+    }
+    const float footer_h = (sv && sv->done && has_body) ? 38.0f : 0.0f;
+
+    const float fixed = header_h + pill_h + q_h + 12.0f + 12.0f + fu_h + footer_h;
+    const float body_view = std::clamp(body_h, 20.0f, std::max(60.0f, max_h - fixed));
+    const float panel_h = std::max(min_h, fixed + body_view);
+    ans_scroll_max = std::max(0.0f, body_h - body_view);
+    scroll = std::clamp(scroll, 0.0f, ans_scroll_max);
+
+    // ---------------- draw ----------------
+    const D2D1_RECT_F pr = D2D1::RectF(x, y, x + w, y + panel_h);
+    panel(pr, bg);
+    ans_view_rect = pr;
+    if (generating) draw_shimmer(pr);
+
+    // Header: title + status ... nav, copy, expand, clear.
+    {
+        const float cy = y + 20.0f;
+        float lx = X;
+        if (w >= 380.0f) {
+            auto lt = layout(L"ANSWER", f_small_bold.get(), 120.0f, 20.0f);
+            text_centered_v(lt.get(), lx, cy, pal.muted);
+            lx += width_of(lt.get()) + 10.0f;
+        }
+        const bool failed = sv && sv->done && sv->status == LlmStatus::Failed;
+        const bool ready = sv && sv->done && has_body && !failed;
+        const wchar_t* st = generating ? L"Writing" : failed ? L"Error" : ready ? L"Ready" : L"Idle";
+        const D2D1_COLOR_F sc = generating ? pal.amber : failed ? pal.red : ready ? pal.green : pal.muted;
+        auto ls = layout(st, f_small.get(), 80.0f, 18.0f);
+        const D2D1_RECT_F br = D2D1::RectF(lx, cy - 10.0f, lx + width_of(ls.get()) + 24.0f, cy + 10.0f);
+        fill_round(br, 10.0f, with_alpha(sc, 0.12f));
+        float da = 1.0f;
+        if (generating) {
+            const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                std::chrono::steady_clock::now().time_since_epoch()).count();
+            da = 0.45f + 0.55f * 0.5f * (1.0f + std::cos(static_cast<float>(ms % 1000) / 1000.0f * 6.2831853f));
+        }
+        dot(br.left + 10.0f, cy, 3.0f, with_alpha(sc, da));
+        text_centered_v(ls.get(), br.left + 17.0f, cy, sc);
+
+        float rx = x + w - 8.0f;
+        auto ib = [&](int id, const char* ic, const wchar_t* tip) {
+            icon_button(D2D1::RectF(rx - 26.0f, cy - 13.0f, rx, cy + 13.0f), id, ic, tip);
+            rx -= 28.0f;
+        };
+        if (!history.empty()) ib(kAnsClear, "trash-2", L"Clear all answers  (Ctrl Alt Backspace)");
+        if (sv || answer_expanded) {
+            ib(kAnsExpand, answer_expanded ? "minimize-2" : "maximize-2",
+               answer_expanded ? L"Back to the normal height" : L"Use more of the screen height");
+        }
+        if (has_body) {
+            const bool copied = std::chrono::steady_clock::now() - copied_at < std::chrono::milliseconds(1500);
+            ib(kCopy, copied ? "check" : "copy", copied ? L"Copied" : L"Copy the answer");
+        }
+        if (history.size() > 1) {
+            rx -= 4.0f;
+            const bool can_next = cursor + 1 < history.size();
+            icon_button(D2D1::RectF(rx - 24.0f, cy - 12.0f, rx, cy + 12.0f), kNext, "chevron-right",
+                        L"Next answer  (Ctrl Alt Right)", can_next ? nullptr : &pal.muted);
+            rx -= 26.0f;
+            auto lc = layout(widen(std::to_string(cursor + 1) + "/" + std::to_string(history.size())), f_small.get(),
+                             60.0f, 18.0f);
+            const float cw = width_of(lc.get());
+            text_centered_v(lc.get(), rx - cw, cy, pal.muted);
+            rx -= cw + 2.0f;
+            icon_button(D2D1::RectF(rx - 24.0f, cy - 12.0f, rx, cy + 12.0f), kPrev, "chevron-left",
+                        L"Previous answer  (Ctrl Alt Left)", cursor > 0 ? nullptr : &pal.muted);
+        }
+        brush->SetColor(pal.faint);
+        rt->DrawLine(D2D1::Point2F(x + 10.0f, y + header_h), D2D1::Point2F(x + w - 10.0f, y + header_h), brush.get());
+    }
+    float cyy = y + header_h;
+
+    // A newer question is waiting while the user is still speaking.
+    if (pending_question) {
+        const D2D1_RECT_F r = D2D1::RectF(X, cyy + 8.0f, X + inner, cyy + 32.0f);
+        fill_round(r, 12.0f, hover == kBtnNextQuestion ? with_alpha(pal.accent, 0.30f) : with_alpha(pal.accent, 0.18f));
+        stroke_round(r, 12.0f, with_alpha(pal.accent_soft, 0.6f), 1.0f);
+        const float pcy = (r.top + r.bottom) / 2.0f;
+        icon("message-circle-question", r.left + 14.0f, pcy, 13.0f, pal.accent_soft);
+        static const KeyHint k_tab{L"Ctrl Alt", L"Tab", nullptr};
+        const float kw = inner >= 360.0f ? kbd_width(k_tab) : 0.0f;
+        auto lp = line_layout(L"New question: " + widen(pending_question_text), f_small_bold.get(),
+                              inner - 40.0f - kw - 8.0f);
+        text_centered_v(lp.get(), r.left + 28.0f, pcy, pal.text);
+        if (kw > 0.0f) draw_kbd(k_tab, r.right - 8.0f - kw, pcy);
+        add_hit(r, kBtnNextQuestion, L"Show the new question  (Ctrl Alt Tab)");
+        cyy += pill_h;
+    }
+
+    // Question.
+    if (sv) {
+        const float tcy = cyy + 12.0f + 9.0f;
+        auto lt = layout(tag, f_small_bold.get(), 120.0f, 18.0f);
+        const D2D1_RECT_F tr = D2D1::RectF(X, tcy - 9.0f, X + width_of(lt.get()) + 14.0f, tcy + 9.0f);
+        fill_round(tr, 9.0f, rgba(255, 255, 255, 0.06f));
+        text_centered_v(lt.get(), tr.left + 7.0f, tcy, pal.muted);
+        if (!sv->clock.empty()) {
+            auto lclk = layout(widen(sv->clock), f_small.get(), 60.0f, 18.0f);
+            text_centered_v(lclk.get(), tr.right + 8.0f, tcy, with_alpha(pal.muted, 0.8f));
+        }
+        draw_text(q_l.get(), X, cyy + 12.0f + 24.0f, pal.text);
+        cyy += 12.0f + q_h - 12.0f;
+        brush->SetColor(pal.faint);
+        rt->DrawLine(D2D1::Point2F(X, cyy + 6.0f), D2D1::Point2F(X + inner, cyy + 6.0f), brush.get());
+    }
+    cyy += 12.0f;
+
+    // Body (scrollable).
+    const D2D1_RECT_F view = D2D1::RectF(X - 2.0f, cyy, X + inner + 2.0f, cyy + body_view);
+    rt->PushAxisAlignedClip(view, D2D1_ANTIALIAS_MODE_ALIASED);
+    {
+        float by = cyy - scroll;
+        for (const auto& b : lines) {
+            by += b.gap;
+            if (by + b.h >= view.top - 2.0f && by <= view.bottom + 2.0f) {
+                if (b.bullet) dot(X + 5.0f, by + 9.5f, 2.5f, pal.accent_soft);
+                draw_text(b.l.get(), X + b.indent, by, b.c);
+            }
+            by += b.h;
+        }
+        if (state_l) {
+            if (has_body) by += 10.0f;
+            float sx = X;
+            if (state_dots) {
+                const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                    std::chrono::steady_clock::now().time_since_epoch()).count();
+                for (int i = 0; i < 3; ++i) {
+                    const float phase = static_cast<float>((ms + i * 180) % 900) / 900.0f;
+                    const float al = 0.25f + 0.75f * 0.5f * (1.0f - std::cos(phase * 6.2831853f));
+                    dot(X + 4.0f + static_cast<float>(i) * 8.0f, by + 9.5f, 2.6f, with_alpha(pal.accent_soft, al));
+                }
+                sx += 28.0f;
+            } else if (state_err) {
+                icon("triangle-alert", X + 7.0f, by + 9.5f, 14.0f, pal.red);
+                sx += 22.0f;
+            }
+            draw_text(state_l.get(), sx, by, state_c);
+        }
+    }
+    rt->PopAxisAlignedClip();
+    if (ans_scroll_max > 0.0f) {
+        if (scroll > 1.0f) draw_fade(D2D1::RectF(view.left, view.top, view.right, view.top + 20.0f), bg, false);
+        if (scroll < ans_scroll_max - 1.0f) {
+            draw_fade(D2D1::RectF(view.left, view.bottom - 26.0f, view.right, view.bottom), bg, true);
+            auto lm = layout(L"Scroll for more", f_small.get(), 120.0f, 18.0f);
+            const float mw = width_of(lm.get()) + 30.0f;
+            const D2D1_RECT_F mr = D2D1::RectF(X + inner - mw, view.bottom - 22.0f, X + inner, view.bottom - 2.0f);
+            fill_round(mr, 10.0f, rgba(48, 50, 56, 0.96f));
+            icon("arrow-down", mr.left + 11.0f, (mr.top + mr.bottom) / 2.0f, 11.0f, pal.text_sub);
+            text_centered_v(lm.get(), mr.left + 20.0f, (mr.top + mr.bottom) / 2.0f, pal.text_sub);
+        }
+        draw_scrollbar(x + w - 7.0f, view.top, body_view, body_h, scroll);
+    }
+    cyy += body_view + 12.0f;
+
+    // Follow-ups.
+    if (!chips.empty()) {
+        auto lf = layout(L"ASK NEXT", f_small_bold.get(), 120.0f, 18.0f);
+        text_centered_v(lf.get(), X, cyy + 8.0f, pal.muted);
+        const float base = cyy + 22.0f;
+        for (std::size_t i = 0; i < chips.size(); ++i) {
+            const D2D1_RECT_F rr = D2D1::RectF(X + chips[i].second.left, base + chips[i].second.top,
+                                               X + chips[i].second.right, base + chips[i].second.bottom);
+            const int id = kSuggestedAskBase + static_cast<int>(i);
+            fill_round(rr, 12.0f, hover == id ? rgba(255, 255, 255, 0.10f) : rgba(255, 255, 255, 0.045f));
+            stroke_round(rr, 12.0f, hover == id ? with_alpha(pal.accent_soft, 0.7f) : pal.border_soft, 1.0f);
+            text_centered_v(chips[i].first.get(), rr.left + 12.0f, (rr.top + rr.bottom) / 2.0f,
+                            hover == id ? pal.text : pal.text_sub);
+            add_hit(rr, id, widen("Ask: " + suggested_questions[i]));
+        }
+        cyy += fu_h;
+    }
+
+    // Footer: rating, quick rewrites and timing.
+    if (footer_h > 0.0f) {
+        const float fcy = y + panel_h - 20.0f;
+        brush->SetColor(pal.faint);
+        rt->DrawLine(D2D1::Point2F(x + 10.0f, y + panel_h - footer_h), D2D1::Point2F(x + w - 10.0f, y + panel_h - footer_h),
+                     brush.get());
+        float fx = X - 4.0f;
+        const D2D1_COLOR_F up = sv->vote > 0 ? pal.green : pal.muted;
+        const D2D1_COLOR_F dn = sv->vote < 0 ? pal.red : pal.muted;
+        icon_button(D2D1::RectF(fx, fcy - 12.0f, fx + 24.0f, fcy + 12.0f), kVoteUp, "thumbs-up", L"Good answer", &up);
+        fx += 26.0f;
+        icon_button(D2D1::RectF(fx, fcy - 12.0f, fx + 24.0f, fcy + 12.0f), kVoteDown, "thumbs-down", L"Bad answer", &dn);
+        fx += 32.0f;
+
+        std::wstring metrics;
+        if (sv->ttft_ms >= 0) metrics += L"first word " + widen(seconds_pt(sv->ttft_ms));
+        if (sv->total_ms > 0) metrics += (metrics.empty() ? L"" : L" · ") + widen(seconds_pt(sv->total_ms));
+        ComPtr<IDWriteTextLayout> lmx;
+        float mxw = 0.0f;
+        if (!metrics.empty()) {
+            lmx = layout(metrics, f_small.get(), 220.0f, 18.0f);
+            mxw = width_of(lmx.get());
+        }
+        if (opts.llm_enabled) {
+            struct Quick {
+                int id;
+                const wchar_t* label;
+                const wchar_t* tip;
+            };
+            const Quick qs[] = {{kQuickShorter, L"Shorter", L"Rewrite it shorter  (Alt 1)"},
+                                {kQuickExample, L"Example", L"Add an example from your resume  (Alt 2)"},
+                                {kQuickCode, L"Code", L"Show code with complexity  (Alt 3)"}};
+            const float limit = X + inner - (mxw > 0.0f ? mxw + 12.0f : 0.0f);
+            for (const auto& q : qs) {
+                auto lq = layout(q.label, f_small.get(), 100.0f, 18.0f);
+                const float qw = width_of(lq.get()) + 18.0f;
+                if (fx + qw > limit) break;
+                const D2D1_RECT_F qr = D2D1::RectF(fx, fcy - 11.0f, fx + qw, fcy + 11.0f);
+                fill_round(qr, 11.0f, hover == q.id ? rgba(255, 255, 255, 0.10f) : rgba(255, 255, 255, 0.045f));
+                text_centered_v(lq.get(), qr.left + 9.0f, fcy, hover == q.id ? pal.text : pal.text_sub);
+                add_hit(qr, q.id, q.tip);
+                fx += qw + 6.0f;
+            }
+        }
+        if (lmx && X + inner - mxw > fx) {
+            text_centered_v(lmx.get(), X + inner - mxw, fcy, with_alpha(pal.muted, 0.85f));
+            add_hit(D2D1::RectF(X + inner - mxw, fcy - 9.0f, X + inner, fcy + 9.0f), kNone,
+                    widen("Model: " + (sv->model.empty() ? opts.llm_model : sv->model)));
+        }
+    }
+    return panel_h;
+}
+
+// Content area under the bar. Wide windows: transcript on the left, answer on
+// the right. Narrow windows: a short transcript strip above the answer.
+float OverlayWindow::Impl::draw_answer(float y) {
+    if (collapsed) {
+        tr_view_rect = ans_view_rect = D2D1::RectF(0, 0, 0, 0);
+        return y;
+    }
+    const float L = kMargin, R = width - kMargin;
+    const float top = y + kGap;
+    const float avail = R - L;
+
+    // Height budget: a fraction of the monitor (or most of it when expanded),
+    // never past the bottom of the work area below the window.
+    const float work_h = work_height_dip();
+    float cap = answer_expanded ? work_h - 40.0f : std::max(260.0f, work_h * opts.max_height_fraction);
+    cap = std::min(cap, space_below_dip() - top - 20.0f);
+    cap = std::max(cap, 200.0f);
+
+    // One column at every width: the live transcript line, the optional full
+    // transcript drawer, then the answer card using the whole width. The eyes
+    // stay on a single reading line instead of jumping between two panels.
+    float cy = draw_live_line(L, top, avail);
+    if (transcript_open) {
+        const float th = std::clamp(cap * 0.38f, 120.0f, 260.0f);
+        draw_transcript(D2D1::RectF(L, cy + kGap, R, cy + kGap + th), true);
+        cy += kGap + th;
+    } else {
+        tr_view_rect = D2D1::RectF(0, 0, 0, 0);
+    }
+    const float ay = cy + kGap;
+    const float h = draw_answer_panel(L, ay, avail, history.empty() ? 120.0f : 160.0f, std::max(160.0f, cap - (ay - top)));
+    return ay + h;
+}
+
+// One-row live transcript: who is speaking and the tail of what they said,
+// with the detection state on the right and a toggle for the full history.
+float OverlayWindow::Impl::draw_live_line(float x, float y, float w) {
+    constexpr float kH = 40.0f;
+    const D2D1_RECT_F r = D2D1::RectF(x, y, x + w, y + kH);
+    const SuggestionView* sv = history.empty() ? nullptr : &history.back();
+    const bool generating = sv && !sv->done;
+    const bool detected = pending_question || generating;
+    panel(r, detected ? rgba(16, 33, 27, 0.96f) : rgba(15, 16, 19, 0.96f));
+    if (detected) stroke_round(r, kRadius, with_alpha(pal.green, 0.32f), 1.0f);
+    const float cy = (r.top + r.bottom) / 2.0f;
 
     const auto& sys = lanes[static_cast<std::size_t>(AudioSource::Loopback)];
     const auto& mic = lanes[static_cast<std::size_t>(AudioSource::Microphone)];
+    const bool any_on = (sys.enabled && !sys.paused) || (mic.enabled && !mic.paused);
 
-    const float work_h = work_height_dip();
-    float card_h;
-    if (answer_expanded) {
-        card_h = std::max(480.0f, work_h - top_y - 20.0f);
+    // Last speaker turn, merged from its phrase chunks.
+    AudioSource src = AudioSource::Loopback;
+    std::string said;
+    bool live = false;
+    for (const auto& ch : strip.chunks(100000)) {
+        if (said.empty() || ch.source != src || ch.speaker_change) {
+            src = ch.source;
+            said = ch.text;
+            live = ch.live;
+        } else {
+            said += " " + ch.text;
+            live = live || ch.live;
+        }
+    }
+
+    // Right side first, so the text gets whatever width is left.
+    float rx = r.right - 8.0f;
+    icon_button(D2D1::RectF(rx - 26.0f, cy - 13.0f, rx, cy + 13.0f), kTranscriptToggle,
+                transcript_open ? "chevron-up" : "chevron-down",
+                transcript_open ? L"Hide the full transcript" : L"Show the full transcript");
+    rx -= 32.0f;
+    {
+        const wchar_t* st = pending_question ? L"New question"
+                            : generating     ? L"Detected"
+                            : !any_on        ? L"Paused"
+                            : live           ? L"Hearing"
+                                             : L"Listening";
+        const D2D1_COLOR_F sc = detected ? pal.green : !any_on ? pal.amber : pal.muted;
+        auto ls = layout(st, f_small.get(), 120.0f, 18.0f);
+        const float pw = width_of(ls.get()) + 24.0f;
+        const D2D1_RECT_F pr = D2D1::RectF(rx - pw, cy - 10.0f, rx, cy + 10.0f);
+        fill_round(pr, 10.0f, with_alpha(sc, detected ? 0.16f : 0.08f));
+        dot(pr.left + 10.0f, cy, 3.0f, sc);
+        text_centered_v(ls.get(), pr.left + 17.0f, cy, sc);
+        if (pending_question) add_hit(pr, kBtnNextQuestion, L"Show the new question  (Ctrl Alt Tab)");
+        rx = pr.left - 10.0f;
+    }
+
+    float lx = r.left + 12.0f;
+    if (said.empty()) {
+        auto lm = line_layout(any_on ? L"Listening. What the interviewer says shows up here."
+                                     : L"Capture is paused. Click the source icons or press Ctrl Alt P.",
+                              f_small.get(), std::max(40.0f, rx - lx));
+        text_centered_v(lm.get(), lx, cy, pal.muted);
     } else {
-        card_h = std::clamp(work_h * 0.58f, 400.0f, 540.0f);
+        const bool you = src == AudioSource::Microphone;
+        auto lw = layout(you ? L"You" : L"Interviewer", f_small_bold.get(), 120.0f, 18.0f);
+        dot(lx + 3.0f, cy, 3.0f, live ? pal.green : with_alpha(pal.green, 0.4f));
+        lx += 12.0f;
+        text_centered_v(lw.get(), lx, cy, you ? pal.accent_soft : pal.text);
+        lx += width_of(lw.get()) + 8.0f;
+        // The tail is what matters while someone is mid-sentence.
+        std::wstring tail = widen(said);
+        const float room = std::max(40.0f, rx - lx);
+        const std::size_t keep = static_cast<std::size_t>(room / 6.2f);
+        if (tail.size() > keep && keep > 8) tail = L"…" + tail.substr(tail.size() - keep);
+        auto lt = line_layout(tail, f_small.get(), room);
+        text_centered_v(lt.get(), lx, cy, you ? pal.text_you : pal.text_sub);
     }
-
-    const D2D1_RECT_F left_r = D2D1::RectF(L, top_y, L + left_w, top_y + card_h);
-    const D2D1_RECT_F right_r = D2D1::RectF(right_x, top_y, R, top_y + card_h);
-
-    // =========================================================================
-    // LEFT COLUMN: LIVE TRANSCRIPT
-    // =========================================================================
-    panel(left_r, rgba(15, 16, 19, 0.96f));
-
-    // 1. Mini top-bar of Left Column
-    {
-        const float cy = top_y + 18.0f;
-        // Equalizer: 3 animated bars
-        const float lvl = std::max(sys.level, mic.level);
-        const bool speaking = (sys.enabled && !sys.paused && sys.level > 0.03f) || (mic.enabled && !mic.paused && mic.level > 0.03f);
-        for (int i = 0; i < 3; ++i) {
-            const float h = 4.0f + 12.0f * std::min(1.0f, lvl * (0.6f + i * 0.25f) * 1.5f);
-            const float bx = left_r.left + 12.0f + static_cast<float>(i) * 5.5f;
-            fill_round(D2D1::RectF(bx, cy - h / 2.0f, bx + 2.5f, cy + h / 2.0f), 1.2f, speaking ? pal.green : with_alpha(pal.green, 0.45f));
-        }
-
-        // Language pill: measured dynamically
-        std::wstring cur_lang = L"Português";
-        auto l_lang = layout(cur_lang, f_small.get(), 100.0f, 20.0f);
-        const float ltw = width_of(l_lang.get());
-        const float lang_w = 22.0f + ltw + 18.0f;
-        const float lang_x = left_r.left + 36.0f;
-        const D2D1_RECT_F lang_r = D2D1::RectF(lang_x, cy - 11.0f, lang_x + lang_w, cy + 11.0f);
-        fill_round(lang_r, 11.0f, rgba(255, 255, 255, 0.05f));
-        stroke_round(lang_r, 11.0f, pal.border, 1.0f);
-        icon("globe", lang_r.left + 10.0f, cy, 12.0f, pal.muted);
-        text_centered_v(l_lang.get(), lang_r.left + 18.0f, cy, pal.text);
-        icon("chevron-down", lang_r.right - 8.0f, cy, 10.0f, pal.muted);
-        add_hit(lang_r, kMenuConfig, L"Idioma de transcrição (Configurações)");
-
-        // Right side: Collapse icon and Clear button
-        const float icon_w = 22.0f;
-        const float clr_w = 64.0f;
-        const D2D1_RECT_F min_r = D2D1::RectF(left_r.right - icon_w - 10.0f, cy - 11.0f, left_r.right - 10.0f, cy + 11.0f);
-        icon_button(min_r, kBtnCollapse, "minimize-2", L"Recolher");
-
-        const D2D1_RECT_F clr_r = D2D1::RectF(min_r.left - clr_w - 6.0f, cy - 11.0f, min_r.left - 6.0f, cy + 11.0f);
-        fill_round(clr_r, 11.0f, button_fill(kStripClear, false));
-        auto l_clr = layout(L"Clear", f_small.get(), 30.0f, 20.0f);
-        text_centered_v(l_clr.get(), clr_r.left + 8.0f, cy, pal.muted);
-        auto l_kclr = layout(L"⇧⌫", f_small.get(), 20.0f, 20.0f);
-        text_centered_v(l_kclr.get(), clr_r.right - 20.0f, cy, pal.muted);
-        add_hit(clr_r, kStripClear, L"Limpar transcrição (Ctrl Alt Shift Backspace)");
-    }
-
-    // 2. Subheader: LIVE TRANSCRIPT | N turns
-    const auto chunks = strip.chunks(30);
-    {
-        const float sub_y = top_y + 44.0f;
-        auto l_head = layout(L"LIVE TRANSCRIPT", f_small_bold.get(), 140.0f, 20.0f);
-        text_centered_v(l_head.get(), left_r.left + 14.0f, sub_y, rgba(160, 160, 172, 1.0f));
-
-        const std::wstring turns_str = chunks.empty() ? L"0 turns" : widen(std::to_string(chunks.size()) + " turns");
-        auto l_turns = layout(turns_str, f_small.get(), 70.0f, 20.0f);
-        text_centered_v(l_turns.get(), left_r.right - 14.0f - width_of(l_turns.get()), sub_y, pal.muted);
-    }
-
-    // Divider
-    brush->SetColor(pal.faint);
-    rt->DrawLine(D2D1::Point2F(left_r.left + 12.0f, top_y + 56.0f), D2D1::Point2F(left_r.right - 12.0f, top_y + 56.0f), brush.get());
-
-    // 3. Transcript Feed Area
-    const D2D1_RECT_F feed_clip = D2D1::RectF(left_r.left + 12.0f, top_y + 60.0f, left_r.right - 12.0f, left_r.bottom - 36.0f);
-    rt->PushAxisAlignedClip(feed_clip, D2D1_ANTIALIAS_MODE_ALIASED);
-    {
-        float ty = top_y + 64.0f;
-        const float fw = feed_clip.right - feed_clip.left;
-
-        if (chunks.empty()) {
-            auto l_w1 = layout(L"Aguardando áudio da chamada...", f_small_bold.get(), fw, 20.0f);
-            text_centered_v(l_w1.get(), feed_clip.left, ty + 10.0f, pal.text);
-            ty += 22.0f;
-            auto l_w2 = line_layout(L"O RealTimeAI transcreve a fala do entrevistador (áudio) e a sua (microfone) em tempo real.", f_small.get(), fw);
-            text_centered_v(l_w2.get(), feed_clip.left, ty + 6.0f, pal.muted);
-            ty += height_of(l_w2.get()) + 20.0f;
-        } else {
-            for (const auto& ch : chunks) {
-                if (ty > feed_clip.bottom - 80.0f) break;
-                const bool loopback = ch.source == AudioSource::Loopback;
-                const wchar_t* who = loopback ? L"Interviewer" : L"Você";
-                auto l_spk = layout(who, f_small_bold.get(), 100.0f, 18.0f);
-                text_centered_v(l_spk.get(), feed_clip.left, ty + 6.0f, loopback ? pal.text : pal.accent_soft);
-                if (ch.live) {
-                    dot(feed_clip.left + width_of(l_spk.get()) + 8.0f, ty + 6.0f, 2.5f, pal.green);
-                }
-                ty += 18.0f;
-                auto l_msg = line_layout(widen(ch.text), f_small.get(), fw);
-                text_centered_v(l_msg.get(), feed_clip.left, ty + 6.0f, pal.text_sub);
-                ty += height_of(l_msg.get()) + 10.0f;
-            }
-        }
-
-        // Highlighted Card: Question detected
-        const float qbox_h = 60.0f;
-        const D2D1_RECT_F qbox = D2D1::RectF(feed_clip.left, ty, feed_clip.right, ty + qbox_h);
-        const bool has_q = sv && (!sv->trigger.empty() || !sv->understood.empty());
-        fill_round(qbox, 8.0f, has_q ? rgba(16, 185, 129, 0.08f) : rgba(255, 255, 255, 0.03f));
-        stroke_round(qbox, 8.0f, has_q ? rgba(16, 185, 129, 0.35f) : pal.border, 1.0f);
-
-        dot(qbox.left + 12.0f, qbox.top + 13.0f, 3.0f, has_q ? pal.green : pal.muted);
-        auto l_qbadge = layout(has_q ? L"Pergunta detectada" : L"Aguardando pergunta...", f_small_bold.get(), 160.0f, 20.0f);
-        text_centered_v(l_qbadge.get(), qbox.left + 20.0f, qbox.top + 13.0f, has_q ? pal.green : pal.muted);
-
-        std::wstring q_text = has_q
-            ? (sv->understood.empty() ? widen(sv->trigger) : widen(sv->understood))
-            : L"Pressione Answer (⌘ ↵) para responder à fala atual.";
-        auto l_qtxt = layout(q_text, f_small.get(), fw - 20.0f, 34.0f);
-        text_centered_v(l_qtxt.get(), qbox.left + 10.0f, qbox.top + 34.0f, has_q ? pal.text : pal.text_sub);
-        ty += qbox_h + 10.0f;
-
-        // Bottom listening / transcribing indicator
-        const bool active_audio = (sys.enabled && !sys.paused && sys.level > 0.02f) || (mic.enabled && !mic.paused && mic.level > 0.02f);
-        dot(feed_clip.left + 6.0f, ty + 8.0f, 3.0f, active_audio ? pal.green : pal.muted);
-        auto l_trans = layout(active_audio ? L"transcrevendo..." : L"ouvindo...", f_small.get(), 120.0f, 18.0f);
-        text_centered_v(l_trans.get(), feed_clip.left + 14.0f, ty + 8.0f, active_audio ? pal.text : pal.muted);
-    }
-    rt->PopAxisAlignedClip();
-
-    // 4. Left Column Sticky Footer: SESSION CONTEXT | Edit
-    {
-        const float foot_y = left_r.bottom - 18.0f;
-        brush->SetColor(pal.faint);
-        rt->DrawLine(D2D1::Point2F(left_r.left + 12.0f, left_r.bottom - 36.0f), D2D1::Point2F(left_r.right - 12.0f, left_r.bottom - 36.0f), brush.get());
-
-        auto l_ctx = layout(L"SESSION CONTEXT", f_small_bold.get(), 130.0f, 20.0f);
-        text_centered_v(l_ctx.get(), left_r.left + 14.0f, foot_y, pal.muted);
-
-        auto l_edit = layout(L"Edit", f_small_bold.get(), 40.0f, 20.0f);
-        const float edit_x = left_r.right - 14.0f - width_of(l_edit.get());
-        const D2D1_RECT_F edit_r = D2D1::RectF(edit_x - 4.0f, foot_y - 10.0f, left_r.right - 10.0f, foot_y + 10.0f);
-        text_centered_v(l_edit.get(), edit_x, foot_y, pal.accent_soft);
-        add_hit(edit_r, kMenuConfig, L"Editar contexto e currículo no Dashboard");
-    }
-
-    // =========================================================================
-    // RIGHT COLUMN: QUESTION + SUGGESTED ANSWER
-    // =========================================================================
-    panel(right_r, rgba(17, 18, 22, 0.96f));
-
-    // 1. Top Toolbar of Right Column
-    {
-        const float cy = top_y + 20.0f;
-        float rx = right_r.left + 14.0f;
-
-        // Navigation prev / next
-        const D2D1_RECT_F prev_r = D2D1::RectF(rx, cy - 11.0f, rx + 44.0f, cy + 11.0f);
-        fill_round(prev_r, 4.0f, button_fill(kPrev, false));
-        auto l_prev = layout(L"⌘ ←", f_small.get(), 40.0f, 18.0f);
-        text_centered_v(l_prev.get(), rx + 6.0f, cy, cursor > 0 ? pal.text : pal.muted);
-        add_hit(prev_r, kPrev, L"Resposta anterior (Ctrl Alt ←)");
-        rx += 50.0f;
-
-        const std::wstring count_str = history.empty()
-            ? L"0 / 0"
-            : widen(std::to_string(cursor + 1) + " / " + std::to_string(history.size()));
-        auto l_cnt = layout(count_str, f_small.get(), 40.0f, 18.0f);
-        text_centered_v(l_cnt.get(), rx, cy, pal.muted);
-        rx += 38.0f;
-
-        const D2D1_RECT_F next_r = D2D1::RectF(rx, cy - 11.0f, rx + 44.0f, cy + 11.0f);
-        fill_round(next_r, 4.0f, button_fill(kNext, false));
-        auto l_next = layout(L"⌘ →", f_small.get(), 40.0f, 18.0f);
-        text_centered_v(l_next.get(), rx + 6.0f, cy, (sv && cursor + 1 < history.size()) ? pal.text : pal.muted);
-        add_hit(next_r, kNext, L"Próxima resposta (Ctrl Alt →)");
-        rx += 56.0f;
-
-        // Segmented Style Tabs: Concise | Detailed | STAR
-        const float seg_w = 200.0f;
-        const D2D1_RECT_F seg_r = D2D1::RectF(rx, cy - 13.0f, rx + seg_w, cy + 13.0f);
-        fill_round(seg_r, 6.0f, rgba(255, 255, 255, 0.04f));
-        stroke_round(seg_r, 6.0f, pal.border, 1.0f);
-
-        const float part_w = seg_w / 3.0f;
-        for (int i = 0; i < 3; ++i) {
-            const D2D1_RECT_F pr = D2D1::RectF(seg_r.left + i * part_w + 1.0f, seg_r.top + 1.0f, seg_r.left + (i + 1) * part_w - 1.0f, seg_r.bottom - 1.0f);
-            const bool active = selected_style == i;
-            if (active) fill_round(pr, 5.0f, rgba(45, 46, 52, 0.95f));
-            const wchar_t* lbls[] = {L"Concise", L"Detailed", L"STAR"};
-            auto ls = layout(lbls[i], active ? f_small_bold.get() : f_small.get(), part_w, 20.0f);
-            text_centered_v(ls.get(), pr.left + (part_w - width_of(ls.get())) / 2.0f, cy, active ? pal.text : pal.muted);
-            add_hit(pr, kStyleConcise + i, lbls[i]);
-        }
-
-        // Right buttons: Clear and Expand
-        float right_bx = right_r.right - 14.0f - 24.0f;
-        icon_button(D2D1::RectF(right_bx, cy - 12.0f, right_bx + 24.0f, cy + 12.0f), kAnsExpand, answer_expanded ? "minimize-2" : "maximize-2", answer_expanded ? L"Recolher" : L"Expandir");
-        right_bx -= 30.0f;
-
-        const D2D1_RECT_F clr_r = D2D1::RectF(right_bx - 64.0f, cy - 11.0f, right_bx, cy + 11.0f);
-        fill_round(clr_r, 5.0f, button_fill(kAnsClear, false));
-        auto l_c = layout(L"Clear ⌘ ⌫", f_small.get(), 62.0f, 18.0f);
-        text_centered_v(l_c.get(), clr_r.left + 5.0f, cy, pal.muted);
-        add_hit(clr_r, kAnsClear, L"Limpar resposta atual");
-    }
-
-    // Divider
-    brush->SetColor(pal.faint);
-    rt->DrawLine(D2D1::Point2F(right_r.left + 14.0f, top_y + 40.0f), D2D1::Point2F(right_r.right - 14.0f, top_y + 40.0f), brush.get());
-
-    // 2. Section 1: QUESTION
-    float sec_y = top_y + 52.0f;
-    {
-        // Header
-        auto l_qhdr = layout(L"QUESTION", f_small_bold.get(), 80.0f, 20.0f);
-        text_centered_v(l_qhdr.get(), right_r.left + 14.0f, sec_y, pal.muted);
-
-        // Tag: Motivation / Tech / General / Screenshot
-        const float tag_x = right_r.left + 14.0f + width_of(l_qhdr.get()) + 10.0f;
-        const wchar_t* tag_lbl = sv ? (sv->reason == TriggerReason::Screenshot ? L"Screenshot" : (sv->reason == TriggerReason::Chat ? L"Chat" : (sv->reason == TriggerReason::FollowUp ? L"Follow-up" : L"Entrevista"))) : L"Entrevista";
-        auto l_tag = layout(tag_lbl, f_small.get(), 90.0f, 18.0f);
-        const float tw = width_of(l_tag.get()) + 14.0f;
-        const D2D1_RECT_F tag_r = D2D1::RectF(tag_x, sec_y - 9.0f, tag_x + tw, sec_y + 9.0f);
-        fill_round(tag_r, 4.0f, rgba(255, 255, 255, 0.05f));
-        text_centered_v(l_tag.get(), tag_r.left + 7.0f, sec_y, pal.muted);
-
-        // Copy button
-        const bool copied_recently = std::chrono::steady_clock::now() - copied_at < std::chrono::milliseconds(1500);
-        const D2D1_RECT_F copy_r = D2D1::RectF(right_r.right - 36.0f, sec_y - 10.0f, right_r.right - 14.0f, sec_y + 10.0f);
-        icon_button(copy_r, kCopy, copied_recently ? "check" : "copy", copied_recently ? L"Copiado!" : L"Copiar resposta");
-
-        sec_y += 18.0f;
-        // Question text
-        std::wstring q_text;
-        if (sv && sv->reason == TriggerReason::Screenshot) {
-            q_text = L"Análise da Tela Capturada e Resolução do Problema";
-        } else if (sv && !sv->trigger.empty()) {
-            q_text = widen(sv->trigger);
-        } else if (sv && !sv->understood.empty()) {
-            q_text = widen(sv->understood);
-        } else {
-            q_text = L"Aguardando pergunta da entrevista...";
-        }
-        auto l_qtitle = layout(q_text, f_body_bold.get(), right_w - 40.0f, 40.0f);
-        text_centered_v(l_qtitle.get(), right_r.left + 14.0f, sec_y + 8.0f, pal.text);
-        sec_y += height_of(l_qtitle.get()) + 14.0f;
-    }
-
-    // Divider
-    brush->SetColor(pal.faint);
-    rt->DrawLine(D2D1::Point2F(right_r.left + 14.0f, sec_y), D2D1::Point2F(right_r.right - 14.0f, sec_y), brush.get());
-    sec_y += 12.0f;
-
-    // 3. Section 2: SUGGESTED ANSWER
-    {
-        auto l_anshdr = layout(L"SUGGESTED ANSWER", f_small_bold.get(), 140.0f, 20.0f);
-        text_centered_v(l_anshdr.get(), right_r.left + 14.0f, sec_y, pal.muted);
-
-        // Badge: • Ready / • Gerando / • Standby
-        const float rdy_x = right_r.left + 14.0f + width_of(l_anshdr.get()) + 10.0f;
-        const D2D1_RECT_F rdy_r = D2D1::RectF(rdy_x, sec_y - 9.0f, rdy_x + 65.0f, sec_y + 9.0f);
-        const bool is_generating = (sv && !sv->done) || shot_busy;
-        const bool is_ready = sv && sv->done && !sv->body.empty();
-        fill_round(rdy_r, 4.0f, is_generating ? rgba(245, 158, 11, 0.12f) : (is_ready ? rgba(16, 185, 129, 0.12f) : rgba(255, 255, 255, 0.05f)));
-        stroke_round(rdy_r, 4.0f, is_generating ? rgba(245, 158, 11, 0.35f) : (is_ready ? rgba(16, 185, 129, 0.30f) : pal.border), 1.0f);
-        dot(rdy_r.left + 8.0f, sec_y, 2.5f, is_generating ? rgba(245, 158, 11, 1.0f) : (is_ready ? pal.green : pal.muted));
-        auto l_rdy = layout(is_generating ? L"Gerando" : (is_ready ? L"Ready" : L"Standby"), f_small.get(), 45.0f, 18.0f);
-        text_centered_v(l_rdy.get(), rdy_r.left + 16.0f, sec_y, is_generating ? rgba(245, 158, 11, 1.0f) : (is_ready ? pal.green : pal.muted));
-
-        sec_y += 18.0f;
-
-        if (sv && !sv->body.empty()) {
-            const auto formatted = format_suggestion(sv->body, !sv->done);
-            for (const auto& fl : formatted) {
-                if (sec_y > right_r.bottom - 74.0f) break;
-                const bool bullet = fl.kind == FormattedLine::Kind::Bullet;
-                const float indent = bullet ? 16.0f : 0.0f;
-                if (bullet) dot(right_r.left + 18.0f, sec_y + 7.0f, 2.5f, pal.green);
-                auto l = rich_layout(fl.segments, f_small.get(), right_w - 30.0f - indent);
-                text_centered_v(l.get(), right_r.left + 18.0f + indent, sec_y + 7.0f, pal.text_sub);
-                sec_y += std::max(18.0f, height_of(l.get())) + 4.0f;
-            }
-        } else if (shot_busy) {
-            dot(right_r.left + 18.0f, sec_y + 7.0f, 2.5f, rgba(245, 158, 11, 1.0f));
-            auto l_load = layout(L"Capturando tela do monitor e enviando para o modelo multimodal...", f_small.get(), right_w - 30.0f, 24.0f);
-            text_centered_v(l_load.get(), right_r.left + 26.0f, sec_y + 7.0f, pal.text);
-            sec_y += 24.0f;
-        } else if (sv && !sv->done) {
-            dot(right_r.left + 18.0f, sec_y + 7.0f, 2.5f, pal.green);
-            auto l_load = layout(L"Consultando base de conhecimento RAG e formulando resposta técnica...", f_small.get(), right_w - 30.0f, 24.0f);
-            text_centered_v(l_load.get(), right_r.left + 26.0f, sec_y + 7.0f, pal.text);
-            sec_y += 24.0f;
-        } else {
-            auto l_empty1 = layout(L"Nenhuma sugestão gerada no momento.", f_small_bold.get(), right_w - 30.0f, 20.0f);
-            text_centered_v(l_empty1.get(), right_r.left + 18.0f, sec_y + 7.0f, pal.text);
-            sec_y += 20.0f;
-            auto l_empty2 = line_layout(L"O copiloto transcreve a conversa e formula respostas com base no currículo ao detectar perguntas. Pressione Answer (⌘ ↵) ou envie uma dúvida no chat acima.", f_small.get(), right_w - 30.0f);
-            text_centered_v(l_empty2.get(), right_r.left + 18.0f, sec_y + 6.0f, pal.text_sub);
-            sec_y += height_of(l_empty2.get()) + 8.0f;
-        }
-        sec_y += 8.0f;
-    }
-
-    // 4. Section 3: KEY TALKING POINTS
-    {
-        auto l_pts = layout(L"KEY TALKING POINTS", f_small_bold.get(), 140.0f, 20.0f);
-        text_centered_v(l_pts.get(), right_r.left + 14.0f, sec_y, pal.muted);
-        sec_y += 16.0f;
-
-        const wchar_t* pills[] = {
-            L"Estrutura STAR",
-            L"Impacto & Métricas",
-            L"Trade-offs Técnicos",
-            L"Exemplo Prático"
-        };
-        float px = right_r.left + 14.0f;
-        for (int i = 0; i < 4; ++i) {
-            auto lp = layout(pills[i], f_small.get(), 200.0f, 20.0f);
-            const float pw = width_of(lp.get()) + 18.0f;
-            const D2D1_RECT_F pr = D2D1::RectF(px, sec_y - 10.0f, px + pw, sec_y + 10.0f);
-            const bool hov = hover == (kChipPickBase + i);
-            fill_round(pr, 10.0f, hov ? rgba(255, 255, 255, 0.10f) : rgba(255, 255, 255, 0.05f));
-            stroke_round(pr, 10.0f, hov ? pal.accent_soft : pal.border, 1.0f);
-            text_centered_v(lp.get(), px + 9.0f, sec_y, hov ? pal.text : pal.text_sub);
-            add_hit(pr, kChipPickBase + i, pills[i]);
-            px += pw + 8.0f;
-        }
-        sec_y += 20.0f;
-    }
-
-    // 5. Section 4: LIKELY FOLLOW-UPS
-    {
-        auto l_fu = layout(L"LIKELY FOLLOW-UPS", f_small_bold.get(), 140.0f, 20.0f);
-        text_centered_v(l_fu.get(), right_r.left + 14.0f, sec_y, pal.muted);
-        sec_y += 16.0f;
-
-        const wchar_t* fus[] = {
-            L"↪  Como você mensurou as métricas de sucesso dessa entrega na prática?",
-            L"↪  Quais foram os principais desafios técnicos de concorrência ou escala?"
-        };
-        for (int i = 0; i < 2; ++i) {
-            const D2D1_RECT_F fr = D2D1::RectF(right_r.left + 14.0f, sec_y - 8.0f, right_r.right - 14.0f, sec_y + 12.0f);
-            const bool hov = hover == (kFollowUpRowBase + i);
-            fill_round(fr, 4.0f, hov ? rgba(255, 255, 255, 0.04f) : rgba(0, 0, 0, 0.0f));
-            auto lf = line_layout(fus[i], f_small.get(), right_w - 30.0f);
-            text_centered_v(lf.get(), fr.left + 4.0f, sec_y, hov ? pal.text : pal.text_sub);
-            add_hit(fr, kFollowUpRowBase + i, fus[i]);
-            sec_y += 20.0f;
-        }
-    }
-
-    return top_y + card_h;
+    add_hit(D2D1::RectF(r.left, r.top, rx, r.bottom), kTranscriptToggle,
+            transcript_open ? L"Hide the full transcript" : L"Show the full transcript");
+    return r.bottom;
 }
 
 // Pulse_Bar (Req 13.1, 13.4, 13.5): three vertical micro-bars, each 12 DIP
@@ -3122,7 +3442,6 @@ float OverlayWindow::Impl::draw_notice(float y) {
 }
 
 void OverlayWindow::Impl::draw_tooltip(float max_y) {
-    (void)max_y;
     if (hover == kNone || pressed != kNone || resizing) return;
     if (std::chrono::steady_clock::now() - hover_since < std::chrono::milliseconds(550)) return;
     const Hit* h = nullptr;
@@ -3133,10 +3452,12 @@ void OverlayWindow::Impl::draw_tooltip(float max_y) {
         }
     }
     if (!h || h->tip.empty()) return;
+    if (h->id == kResize) return;
     auto l = layout(h->tip, f_small.get(), std::min(420.0f, width - 2 * kMargin - 20.0f));
     const float tw = width_of(l.get()) + 20.0f, th = height_of(l.get()) + 12.0f;
     float x = std::clamp((h->r.left + h->r.right) / 2 - tw / 2, kMargin, width - kMargin - tw);
     float y = h->r.bottom + 6.0f;
+    if (y + th > max_y && h->r.top - 6.0f - th >= kMargin) y = h->r.top - 6.0f - th;
     fill_round(D2D1::RectF(x, y, x + tw, y + th), 8.0f, rgba(12, 12, 14, 0.97f));
     stroke_round(D2D1::RectF(x + 0.5f, y + 0.5f, x + tw - 0.5f, y + th - 0.5f), 7.5f, pal.border);
     draw_text(l.get(), x + 10.0f, y + 6.0f, pal.text);
@@ -3151,6 +3472,7 @@ void OverlayWindow::Impl::draw_tooltip(float max_y) {
 void OverlayWindow::Impl::render() {
     if (!hwnd || hidden) return;
     if (!ensure_device()) return;
+    last_render_at = std::chrono::steady_clock::now();
     const float work = work_height_dip();
     const int wpx = static_cast<int>(std::ceil(width * scale));
     const int max_hpx = static_cast<int>(std::ceil((work + 260.0f) * scale));
@@ -3183,13 +3505,19 @@ void OverlayWindow::Impl::render() {
     // easier to scan and preserves enough horizontal room for the reference
     // layout's actions and source indicators.
     y = draw_control_bar(y);
-    y = draw_strip(y);
     y = draw_menu(y);
+    y = draw_strip(y);
     y = draw_answer(y);
     y = draw_notice(y);
     }
-    // Right-edge grip for resizing the width (highest priority, 5 px).
-    add_hit(D2D1::RectF(width - kMargin - 4.0f, kMargin, width, y), kResize, L"");
+    // Right-edge grip for resizing the width (highest priority). A small
+    // handle shows while it is hovered or dragged.
+    if (hover == kResize || resizing) {
+        const float mid = (kMargin + y) / 2.0f;
+        fill_round(D2D1::RectF(width - kMargin - 3.5f, mid - 18.0f, width - kMargin + 0.5f, mid + 18.0f), 2.0f,
+                   with_alpha(pal.accent_soft, 0.9f));
+    }
+    add_hit(D2D1::RectF(width - kMargin - 6.0f, kMargin, width, y), kResize, L"Drag to resize");
     draw_tooltip(y);
     const float bottom = std::max(y, tooltip_bottom) + kMargin;
 
@@ -3316,8 +3644,8 @@ LRESULT OverlayWindow::Impl::handle(UINT m, WPARAM w, LPARAM l) {
                 const float nw = ui::clamp_width(resize_start_w + static_cast<float>(pt.x - resize_start_x) / scale);
                 if (std::fabs(nw - width) >= 1.0f) {
                     width = nw;
-                    reposition(/*use_persisted=*/true); // keep Top-Center as width changes (Req 1.4)
                     render(); // immediate: the grip should follow the pointer
+                    keep_on_screen();
                 }
                 return 0;
             }
@@ -3381,8 +3709,16 @@ LRESULT OverlayWindow::Impl::handle(UINT m, WPARAM w, LPARAM l) {
             return 0;
         case WM_MOUSEWHEEL: {
             const float delta = static_cast<float>(GET_WHEEL_DELTA_WPARAM(w)) / WHEEL_DELTA;
-            scroll -= delta * 48.0f;
-            user_scrolled = true;
+            POINT pt{GET_X_LPARAM(l), GET_Y_LPARAM(l)}; // screen coordinates
+            ScreenToClient(hwnd, &pt);
+            const float px = static_cast<float>(pt.x) / scale, py = static_cast<float>(pt.y) / scale;
+            auto inside = [&](const D2D1_RECT_F& r) { return px >= r.left && px < r.right && py >= r.top && py < r.bottom; };
+            if (inside(tr_view_rect)) {
+                tr_scroll = std::clamp(tr_scroll + delta * 40.0f, 0.0f, tr_scroll_max); // up = older
+            } else {
+                scroll = std::clamp(scroll - delta * 48.0f, 0.0f, ans_scroll_max);
+                user_scrolled = true;
+            }
             invalidate();
             return 0;
         }
@@ -3416,7 +3752,9 @@ LRESULT OverlayWindow::Impl::handle(UINT m, WPARAM w, LPARAM l) {
             }
             break;
         case WM_EXITSIZEMOVE:
+            keep_on_screen();
             save_state();
+            invalidate(); // the height budget depends on where the window now sits
             return 0;
         case WM_DPICHANGED: {
             dpi = HIWORD(w);

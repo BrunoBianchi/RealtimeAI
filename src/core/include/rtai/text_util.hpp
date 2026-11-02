@@ -130,6 +130,88 @@ inline std::string truncate_utf8(std::string_view s, std::size_t max_bytes) {
     return std::string(s.substr(0, cut));
 }
 
+// Repairs one round of "double-encoded UTF-8" mojibake: text that was UTF-8,
+// got decoded as Windows-1252/Latin-1 and re-encoded as UTF-8 ("AÃ§Ã£o" instead
+// of "Ação", "Â·" instead of "·"). Returns the repaired string when every
+// non-ASCII code point of the input maps back to a single cp1252 byte and the
+// result is shorter valid UTF-8 (a round-trip that legitimate non-Latin text
+// virtually never passes); nullopt means "leave this string untouched".
+// Used to self-heal user data written by older builds.
+inline std::optional<std::string> repair_mojibake(std::string_view s) {
+    bool has_non_ascii = false;
+    for (unsigned char c : s) {
+        if (c >= 0x80) { has_non_ascii = true; break; }
+    }
+    if (!has_non_ascii) return std::nullopt;
+    // cp1252 -> Unicode for the 0x80-0x9F range (the rest is Latin-1).
+    static constexpr char32_t kCp1252High[32] = {
+        0x20AC, 0x0081, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021,
+        0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0x008D, 0x017D, 0x008F,
+        0x0090, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014,
+        0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0x009D, 0x017E, 0x0178
+    };
+    std::string repaired;
+    repaired.reserve(s.size());
+    std::size_t i = 0;
+    while (i < s.size()) {
+        const auto c = static_cast<unsigned char>(s[i]);
+        if (c < 0x80) {
+            repaired.push_back(static_cast<char>(c));
+            ++i;
+            continue;
+        }
+        const std::size_t n = utf8_seq_len(c);
+        if (n == 0 || i + n > s.size()) return std::nullopt;  // not valid UTF-8
+        for (std::size_t k = 1; k < n; ++k) {
+            if ((static_cast<unsigned char>(s[i + k]) & 0xC0) != 0x80) return std::nullopt;
+        }
+        char32_t cp = 0;
+        if (n == 2) cp = ((c & 0x1Fu) << 6) | (static_cast<unsigned char>(s[i + 1]) & 0x3Fu);
+        else if (n == 3) cp = ((c & 0x0Fu) << 12) | ((static_cast<unsigned char>(s[i + 1]) & 0x3Fu) << 6)
+                                | (static_cast<unsigned char>(s[i + 2]) & 0x3Fu);
+        else cp = ((c & 0x07u) << 18) | ((static_cast<unsigned char>(s[i + 1]) & 0x3Fu) << 12)
+                     | ((static_cast<unsigned char>(s[i + 2]) & 0x3Fu) << 6)
+                     | (static_cast<unsigned char>(s[i + 3]) & 0x3Fu);
+        unsigned char byte = 0;
+        bool mapped = false;
+        if (cp >= 0xA0 && cp <= 0xFF) {
+            byte = static_cast<unsigned char>(cp);
+            mapped = true;
+        } else {
+            for (int t = 0; t < 32; ++t) {
+                if (kCp1252High[t] == cp) {
+                    // Slots 0x81/0x8D/0x8F/0x90/0x9D are unmapped in cp1252
+                    // and can never appear in mojibake produced from real text.
+                    if (t == 0x01 || t == 0x0D || t == 0x0F || t == 0x10 || t == 0x1D) return std::nullopt;
+                    byte = static_cast<unsigned char>(0x80 + t);
+                    mapped = true;
+                    break;
+                }
+            }
+        }
+        if (!mapped) return std::nullopt;  // a code point cp1252 cannot produce
+        repaired.push_back(static_cast<char>(byte));
+        i += n;
+    }
+    // The repaired bytes must be strictly shorter and valid UTF-8; otherwise
+    // this was normal text (Greek/Cyrillic/CJK/emoji), not mojibake.
+    if (repaired.size() >= s.size()) return std::nullopt;
+    std::string check;
+    check.reserve(repaired.size());
+    std::size_t j = 0;
+    while (j < repaired.size()) {
+        const auto c = static_cast<unsigned char>(repaired[j]);
+        const std::size_t n = utf8_seq_len(c);
+        if (n == 0 || j + n > repaired.size()) return std::nullopt;
+        for (std::size_t k = 1; k < n; ++k) {
+            if ((static_cast<unsigned char>(repaired[j + k]) & 0xC0) != 0x80) return std::nullopt;
+        }
+        check.append(repaired.substr(j, n));
+        j += n;
+    }
+    return check;
+}
+
 // Keeps at most `max_bytes` from the end, starting on a code point boundary.
 inline std::string tail_utf8(std::string_view s, std::size_t max_bytes) {
     if (s.size() <= max_bytes) return std::string(s);

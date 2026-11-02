@@ -1,76 +1,83 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const fs = require('node:fs');
-const path = require('node:path');
+const { loadRenderer, tags } = require('./helpers/renderer');
 
-const indexHtmlPath = path.resolve(__dirname, '../src/renderer/index.html');
-const appJsPath = path.resolve(__dirname, '../src/renderer/app.js');
+const SESSION_ID = '2026-10-01_10-00-00_ab12';
+const STATE = {
+  config: { model: 'qwen/qwen3.6-flash', has_deepgram_key: true, has_llm_key: true },
+  agents: [{ id: 'a1', company: 'Nubank', role: 'Backend', documents: [{ title: 'cv.pdf', tag: 'resume', content: 'Go' }] }],
+  sessions: [{ id: SESSION_ID, goalLabel: 'Nubank · Backend', startedAt: '2026-10-01T13:00:00Z', durationSeconds: 1500, questionsCount: 4 }],
+  profile: { name: 'Ana Souza', plan: 'free', transcriptionUsage: { limitMinutes: 300 } },
+  questionBank: { companies: [{ company: 'Nubank', questions: [{ id: 'q1', text: 'Fale de um projeto difícil', category: 'behavioral' }] }] },
+  gcal: { status: { configured: true, connected: false } },
+  meeting: { supported: true, enabled: true, active: [], mutedApps: [] }
+};
 
-test('Client-side Router: app.js defines router and routes', () => {
-  const appJs = fs.readFileSync(appJsPath, 'utf8');
+async function booted() {
+  const r = loadRenderer({ state: STATE, api: { getState: async () => STATE } });
+  await r.boot();
+  return r;
+}
 
-  assert.ok(appJs.includes('const router = {'), 'app.js must declare router');
-  assert.ok(appJs.includes('window.router = router;'), 'router must be exposed on window');
-  assert.ok(appJs.includes('navigate(path'), 'router must have navigate function');
-  assert.ok(appJs.includes('handleRoute()'), 'router must have handleRoute function');
-  assert.ok(appJs.includes('getCurrentRoute()'), 'router must have getCurrentRoute function');
-
-  // Route patterns supported
-  assert.ok(appJs.includes("root === 'goals'"), 'router must support /goals route');
-  assert.ok(appJs.includes("root === 'goal'"), 'router must support /goal/:id/:tab route');
-  assert.ok(appJs.includes("root === 'library'"), 'router must support /library route');
-  assert.ok(appJs.includes("root === 'history'"), 'router must support /history route');
-  assert.ok(appJs.includes("root === 'settings'"), 'router must support /settings route');
-
-  // History & hash listener
-  assert.ok(appJs.includes("window.addEventListener('hashchange'"), 'app.js must listen to hashchange');
-  assert.ok(appJs.includes("window.addEventListener('popstate'"), 'app.js must listen to popstate');
+test('Client-side Router: hash routes map to views', async () => {
+  const r = await booted();
+  assert.strictEqual(r.location.hash, '#/home', 'starts on #/home');
+  const cases = [
+    ['home', 'home', []],
+    ['sessions', 'sessions', []],
+    ['history', 'sessions', ['past']],
+    ['sessions/past', 'sessions', ['past']],
+    ['session/a1', 'session', ['a1']],
+    [`review/${SESSION_ID}`, 'review', [SESSION_ID]],
+    ['files', 'files', []],
+    ['questions', 'questions', []],
+    ['live', 'live', []],
+    ['settings/calendar', 'settings', ['calendar']],
+    ['nao-existe', 'home', []]
+  ];
+  for (const [path, view, parts] of cases) {
+    r.Cue.navigate(path);
+    assert.strictEqual(r.location.hash, `#/${path}`);
+    assert.strictEqual(r.S.route.view, view, `#/${path} -> ${view}`);
+    assert.deepStrictEqual([...r.S.route.parts], parts, `#/${path} parts`);
+  }
+  // History is the "past" tab of Sessões, and the sidebar highlights it.
+  r.Cue.navigate('history');
+  assert.strictEqual(r.S.ui.sessTab, 'past');
+  assert.ok(/class="nav-item active"[^>]*data-to="history"/.test(r.page('sideNav').innerHTML));
+  assert.strictEqual(r.page('crumb').textContent, 'Histórico');
 });
 
-test('Prep Session & Goal Workspace Navigation: Buttons and Tab Routes', () => {
-  const html = fs.readFileSync(indexHtmlPath, 'utf8');
-  const appJs = fs.readFileSync(appJsPath, 'utf8');
+test('Prep Session & Goal Workspace Navigation: links go where they say', async () => {
+  const r = await booted();
+  r.Cue.navigate('session/a1');
+  const html = r.page('view').innerHTML;
+  assert.ok(tags(html, { 'data-action': 'go', 'data-to': 'sessions' }).length >= 1, 'back to Sessões');
+  assert.ok(tags(html, { 'data-action': 'go', 'data-to': `review/${SESSION_ID}` }).length === 1, 'recorded session opens its review');
+  assert.strictEqual(r.page('crumb').textContent, 'Sessões / Nubank · Backend');
 
-  // Button Continue prep on Image 2 warm card
-  assert.ok(html.includes('id="btnOverviewContinuePrep"'), 'index.html must have btnOverviewContinuePrep');
-  assert.ok(appJs.includes("getElementById('btnOverviewContinuePrep')"), 'app.js must wire btnOverviewContinuePrep');
-  assert.ok(appJs.includes("'/prep'"), 'Continue prep button must route to /prep');
-
-  // Back button and tabs
-  assert.ok(html.includes('id="btnWorkspaceBackToGoals"'), 'index.html must have btnWorkspaceBackToGoals');
-  assert.ok(appJs.includes("router.navigate('/goals')"), 'Back to Goals must navigate to /goals');
-  assert.ok(appJs.includes("'/overview'"), 'Overview tab/card must route to /overview');
-  assert.ok(appJs.includes("'/sessions'"), 'Sessions tab must route to /sessions');
+  // Every internal link on every screen points at a route the router knows.
+  const known = new Set(['home', 'sessions', 'history', 'session', 'review', 'files', 'questions', 'live', 'settings']);
+  for (const path of ['home', 'sessions', 'history', 'session/a1', `review/${SESSION_ID}`, 'files', 'questions', 'live', 'settings/general']) {
+    r.Cue.navigate(path);
+    const links = tags(r.page('view').innerHTML + r.page('sideNav').innerHTML, { 'data-action': 'go' });
+    for (const l of links) assert.ok(known.has(String(l['data-to']).split('/')[0]), `#/${path}: link to unknown route ${l['data-to']}`);
+  }
 });
 
-test('Prep Session & Workspace UI Fidelity (Images 1, 2, 3, 4)', () => {
-  const html = fs.readFileSync(indexHtmlPath, 'utf8');
-
-  // Image 1: Breadcrumb and Help
-  assert.ok(html.includes('id="btnWorkspaceHelp"'), 'Image 1 help button must exist');
-  assert.ok(html.includes('id="workspaceBreadcrumbGoalName"'), 'Image 1 breadcrumb goal name must exist');
-
-  // Image 2: Overview Warm Peach Card & Sections
-  assert.ok(html.includes('NEXT FOCUS · EARLIER COMPLETED REFLECTIONS'), 'Image 2 warm card eyebrow must exist');
-  assert.ok(html.includes('Next Focus appears only after reflection is committed to Goal Memory.'), 'Image 2 warm card text must exist');
-  assert.ok(html.includes('id="linkHowPrepLoopWorks"'), 'Image 2 how prep loop works link must exist');
-  assert.ok(html.includes('GOAL MEMORY'), 'Image 2 Goal Memory badge must exist');
-  assert.ok(html.includes('id="overviewSessionsCountBadge"'), 'Image 2 sessions count badge must exist');
-  assert.ok(html.includes('Goal context'), 'Image 2 Goal context card must exist');
-
-  // Image 3: Future Sessions Banner & Goal Brief
-  assert.ok(html.includes('FUTURE SESSIONS'), 'Image 3 future sessions eyebrow must exist');
-  assert.ok(html.includes('id="btnPrepStartPractice"'), 'Image 3 Start Practice button must exist');
-  assert.ok(html.includes('id="linkHowPracticeWorks"'), 'Image 3 how practice works link must exist');
-  assert.ok(html.includes('id="prepNextFocusCard"'), 'Image 3 Next focus card must exist');
-  assert.ok(html.includes('id="btnPrepEditBrief"'), 'Image 3 Edit Goal brief button must exist');
-
-  // Image 4: Knowledge Sources & Response Defaults
-  assert.ok(html.includes('id="btnPrepPinResume"'), 'Image 4 Pin a Goal resume button must exist');
-  assert.ok(html.includes('id="btnPrepAddMaterial"'), 'Image 4 Attach from Library button must exist');
-  assert.ok(html.includes('id="linkWhatPlaybookDoes"'), 'Image 4 what a playbook does link must exist');
-  assert.ok(html.includes('id="selectPrepPlaybook"'), 'Image 4 selectPrepPlaybook must exist');
-  assert.ok(html.includes('id="selectPrepAnswerLang"'), 'Image 4 selectPrepAnswerLang must exist');
-  assert.ok(html.includes('id="selectPrepCodingLang"'), 'Image 4 selectPrepCodingLang must exist');
-  assert.ok(html.includes('Preflight can override these for one Session without rewriting this Goal.'), 'Image 4 disclaimer subtext must exist');
+test('Prep Session & Workspace UI: every screen renders with real data and without it', async () => {
+  const paths = ['home', 'sessions', 'history', 'session/a1', `review/${SESSION_ID}`, 'files', 'questions', 'live',
+    ...['general', 'ai', 'audio', 'privacy', 'overlay', 'calendar', 'shortcuts', 'plan', 'updates'].map((t) => `settings/${t}`)];
+  const full = await booted();
+  const empty = loadRenderer();
+  await empty.boot();
+  for (const r of [full, empty]) {
+    for (const path of paths) {
+      r.Cue.navigate(path);
+      const html = r.page('view').innerHTML;
+      assert.ok(html.length > 200, `#/${path} rendered`);
+      assert.ok(!html.includes('Esta tela falhou ao carregar'), `#/${path} threw while rendering`);
+      assert.ok(!/undefined|NaN|\[object Object\]/.test(html.replace(/<svg[\s\S]*?<\/svg>/g, '')), `#/${path} shows a raw undefined/NaN`);
+    }
+  }
 });

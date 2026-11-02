@@ -173,10 +173,23 @@ test('wiring: IPC, preload bridges, settings controls and popup actions', () => 
   for (const fn of ['getMeetingDetection', 'setMeetingDetection', 'testMeetingPopup', 'onMeetingDetection']) {
     assert.ok(preload.includes(fn), `preload exposes ${fn}`);
   }
-  const html = read('src/renderer/index.html');
-  for (const id of ['cfgMeetingDetect', 'cfgMeetingTray', 'meetingDetectStatus', 'btnMeetingTest', 'btnMeetingUnmute']) {
-    assert.ok(html.includes(`id="${id}"`), `settings has #${id}`);
-  }
+  // Settings > General: on/off, keep in tray, status line, test and unmute.
+  const { loadRenderer, render, tags } = require('./helpers/renderer');
+  const settings = (meeting) => {
+    const { Cue } = loadRenderer({ state: { meeting } });
+    return render(Cue, 'settings/general');
+  };
+  const on = settings({ supported: true, enabled: true, keepInTray: true, active: [{ name: 'Zoom' }], mutedApps: ['teams'], appNames: { teams: 'Microsoft Teams' } });
+  assert.deepStrictEqual(tags(on, { 'data-change': 'meeting' }).map((t) => t['data-field']), ['enabled', 'keepInTray']);
+  assert.ok(on.includes('Em chamada agora: Zoom.'), 'status names the live call');
+  assert.ok(on.includes('Microsoft Teams') && tags(on, { 'data-action': 'meeting-unmute' }).length === 1, 'muted apps can be unmuted');
+  assert.ok(tags(on, { 'data-action': 'meeting-test' }).length === 1);
+  const off = settings({ supported: true, enabled: false, keepInTray: false, active: [], mutedApps: [] });
+  assert.ok(off.includes('Desligada: nenhum aviso quando uma reunião começa.'));
+  assert.ok(/data-field="keepInTray"[^>]*disabled/.test(off), 'tray option needs detection on');
+  assert.ok(!off.includes('meeting-unmute'));
+  const unsupported = settings({ supported: false, enabled: false, active: [], mutedApps: [] });
+  assert.ok(unsupported.includes('Disponível só no Windows.') && /data-field="enabled"[^>]*disabled/.test(unsupported));
   const popup = read('src/renderer/meeting_popup.html');
   for (const id of ['btnStart', 'btnLater', 'btnMute', 'selGoal', 'btnStop', 'btnKeep']) {
     assert.ok(popup.includes(`id="${id}"`), `popup has #${id}`);

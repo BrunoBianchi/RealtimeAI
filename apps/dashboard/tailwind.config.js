@@ -3,6 +3,16 @@ module.exports = {
   darkMode: ['class'],
   content: ['./src/renderer/**/*.{html,js}'],
   theme: {
+    // Breakpoints are viewport widths, but the content sits next to a 232 px
+    // sidebar (window min width 1024). lg/xl start later so two-column layouts
+    // only appear when the content area really has room for them.
+    screens: {
+      sm: '640px',
+      md: '768px',
+      lg: '1200px',
+      xl: '1440px',
+      '2xl': '1680px'
+    },
     extend: {
       fontFamily: {
         sans: [

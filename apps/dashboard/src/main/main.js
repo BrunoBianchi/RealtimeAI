@@ -30,6 +30,7 @@ let mainWindow = null;
 let overlayProcess = null;
 let overlayMode = null;
 let overlayAgentId = null;
+let overlayStartedAt = 0;
 let overlayVersion = ''; // reported by the overlay's hello (rtai_app --server)
 let isQuitting = false;
 let flagStore = null;
@@ -192,28 +193,31 @@ function readConfigIni() {
   const stealth = ini.stealth || {};
   const sistema = ini.sistema || ini.updates || {};
 
-  const maskOrShow = (v) => {
+  // A key is never sent to the renderer in full: a plaintext one (an env var,
+  // or one the engine has not encrypted yet) would show up as the field's
+  // placeholder, i.e. on a screen share.
+  const maskKey = (v) => {
     if (!v) return '';
     if (v.startsWith('dpapi:')) return '•••••••• (Encrypted via Windows DPAPI)';
-    return v;
+    return v.length > 12 ? `••••••••${v.slice(-4)}` : '••••••••';
   };
 
   return {
     configPath,
     rawIni: ini,
-    deepgram_key_display: maskOrShow(dg.api_key || process.env.DEEPGRAM_API_KEY || ''),
+    deepgram_key_display: maskKey(dg.api_key || process.env.DEEPGRAM_API_KEY || ''),
     has_deepgram_key: Boolean(dg.api_key || process.env.DEEPGRAM_API_KEY),
-    llm_key_display: maskOrShow(llm.api_key || process.env.OPENROUTER_API_KEY || ''),
+    llm_key_display: maskKey(llm.api_key || process.env.OPENROUTER_API_KEY || ''),
     has_llm_key: Boolean(llm.api_key || process.env.OPENROUTER_API_KEY),
-    cerebras_key_display: maskOrShow(llm.cerebras_api_key || process.env.CEREBRAS_API_KEY || ''),
+    cerebras_key_display: maskKey(llm.cerebras_api_key || process.env.CEREBRAS_API_KEY || ''),
     has_cerebras_key: Boolean(llm.cerebras_api_key || process.env.CEREBRAS_API_KEY),
-    groq_key_display: maskOrShow(llm.groq_api_key || process.env.GROQ_API_KEY || ''),
+    groq_key_display: maskKey(llm.groq_api_key || process.env.GROQ_API_KEY || ''),
     has_groq_key: Boolean(llm.groq_api_key || process.env.GROQ_API_KEY),
-    openai_key_display: maskOrShow(llm.openai_api_key || process.env.OPENAI_API_KEY || ''),
+    openai_key_display: maskKey(llm.openai_api_key || process.env.OPENAI_API_KEY || ''),
     has_openai_key: Boolean(llm.openai_api_key || process.env.OPENAI_API_KEY),
-    anthropic_key_display: maskOrShow(llm.anthropic_api_key || process.env.ANTHROPIC_API_KEY || ''),
+    anthropic_key_display: maskKey(llm.anthropic_api_key || process.env.ANTHROPIC_API_KEY || ''),
     has_anthropic_key: Boolean(llm.anthropic_api_key || process.env.ANTHROPIC_API_KEY),
-    gemini_key_display: maskOrShow(llm.gemini_api_key || process.env.GEMINI_API_KEY || ''),
+    gemini_key_display: maskKey(llm.gemini_api_key || process.env.GEMINI_API_KEY || ''),
     has_gemini_key: Boolean(llm.gemini_api_key || process.env.GEMINI_API_KEY),
     background_model: llm.background_model || llm.modelo_segundo_plano || 'auto',
     ai_response_language: llm.ai_response_language || llm.idioma_resposta || 'auto',
@@ -709,6 +713,14 @@ function sanitizeId(raw) {
   return s || 'agente-' + Date.now();
 }
 
+function guessDocumentTag(fileName, defaultTag) {
+  const lower = String(fileName || '').toLowerCase();
+  if (lower.includes('cv') || lower.includes('curriculo') || lower.includes('resume')) return 'resume';
+  if (lower.includes('vaga') || lower.includes('job') || lower.includes('jd')) return 'job';
+  if (lower.includes('proj') || lower.includes('arquitetura') || lower.includes('readme')) return 'project';
+  return defaultTag || 'doc';
+}
+
 function normalizeDocumentItem(d) {
   const title = String(d.title || d.name || 'Documento').trim();
   const tag = String(d.tag || d.path || 'doc').trim();
@@ -739,6 +751,88 @@ function inheritableDocuments(donor) {
     .filter((d) => !isGarbageDocument(d) && isCandidateDocument(d));
 }
 
+// Self-heal for agent files written by older builds: some free-text fields
+// carry one round of cp1252 double-encoding (UTF-8 decoded as Windows-1252
+// and re-encoded, so "A\u00e7\u00e3o" reads as "A\u00c3\u00a7\u00c3\u00a3o"). Detection is
+// conservative: a string is repaired only when every non-ASCII code point maps
+// back to a single cp1252 byte AND the re-encoded bytes decode as valid UTF-8,
+// which legitimate Portuguese/Greek/Cyrillic text virtually never does.
+const CP1252_REVERSE = {
+  0x20ac: 0x80, 0x201a: 0x82, 0x0192: 0x83, 0x201e: 0x84, 0x2026: 0x85,
+  0x2020: 0x86, 0x2021: 0x87, 0x02c6: 0x88, 0x2030: 0x89, 0x0160: 0x8a,
+  0x2039: 0x8b, 0x0152: 0x8c, 0x017d: 0x8e, 0x2018: 0x91, 0x2019: 0x92,
+  0x201c: 0x93, 0x201d: 0x94, 0x2022: 0x95, 0x2013: 0x96, 0x2014: 0x97,
+  0x02dc: 0x98, 0x2122: 0x99, 0x0161: 0x9a, 0x203a: 0x9b, 0x0153: 0x9c,
+  0x017e: 0x9e, 0x0178: 0x9f
+};
+
+function looksDoubleEncoded(s) {
+  if (typeof s !== 'string' || !s) return false;
+  let nonAscii = 0;
+  for (const ch of s) {
+    const cp = ch.codePointAt(0);
+    if (cp <= 0x7f) continue;
+    nonAscii += 1;
+    if (!((cp >= 0xa0 && cp <= 0xff) || Object.prototype.hasOwnProperty.call(CP1252_REVERSE, cp))) {
+      return false; // contains a code point cp1252 cannot produce
+    }
+  }
+  return nonAscii > 0;
+}
+
+function repairDoubleEncoded(s) {
+  if (typeof s !== 'string' || !s || !looksDoubleEncoded(s)) return s;
+  const bytes = [];
+  for (const ch of s) {
+    const cp = ch.codePointAt(0);
+    if (cp <= 0xff) bytes.push(cp);
+    else bytes.push(CP1252_REVERSE[cp]);
+  }
+  const decoded = Buffer.from(bytes).toString('utf8');
+  if (decoded.includes('\uFFFD')) return s; // not valid UTF-8 after repair
+  // Mojibake always shrinks (each original byte became 2+ UTF-8 bytes).
+  // Same-size output means the input was already clean accented text.
+  if (Buffer.byteLength(decoded, 'utf8') >= Buffer.byteLength(s, 'utf8')) return s;
+  return decoded;
+}
+
+function healAgentStrings(ag) {
+  if (!ag || typeof ag !== 'object') return false;
+  let changed = false;
+  const fields = ['name', 'company', 'role', 'job_description', 'calendar_event',
+    'company_research', 'company_dossier', 'custom_instructions', 'extra_instructions',
+    'mini_compact', 'next_focus', 'playbook_name', 'answer_language', 'coding_language'];
+  for (const f of fields) {
+    if (typeof ag[f] === 'string') {
+      const fixed = repairDoubleEncoded(ag[f]);
+      if (fixed !== ag[f]) { ag[f] = fixed; changed = true; }
+    }
+  }
+  if (Array.isArray(ag.documents)) {
+    for (const d of ag.documents) {
+      if (d && typeof d === 'object') {
+        for (const k of ['name', 'title', 'content']) {
+          if (typeof d[k] === 'string') {
+            const fixed = repairDoubleEncoded(d[k]);
+            if (fixed !== d[k]) { d[k] = fixed; changed = true; }
+          }
+        }
+      }
+    }
+  }
+  if (ag.goal_memory && typeof ag.goal_memory === 'object') {
+    for (const key of ['strengths', 'improve']) {
+      if (Array.isArray(ag.goal_memory[key])) {
+        ag.goal_memory[key] = ag.goal_memory[key].map((s) => {
+          const fixed = repairDoubleEncoded(s);
+          if (fixed !== s) changed = true;
+          return fixed;
+        });
+      }
+    }
+  }
+  return changed;
+}
 function loadAllAgents() {
   const agentsDir = path.join(getAppDataDir(), 'agents');
   const files = fs.readdirSync(agentsDir).filter((f) => f.endsWith('.json'));
@@ -748,6 +842,13 @@ function loadAllAgents() {
       const fullPath = path.join(agentsDir, file);
       const stat = fs.statSync(fullPath);
       const data = JSON.parse(fs.readFileSync(fullPath, 'utf8').replace(/^\uFEFF/, ''));
+      // Self-heal cp1252 double-encoding written by older builds; persist the
+      // repaired file so the fix survives restarts.
+      if (healAgentStrings(data)) {
+        try {
+          fs.writeFileSync(fullPath, JSON.stringify(data, null, 2), 'utf8');
+        } catch (_e) {}
+      }
       data.id = data.id || path.basename(file, '.json');
       data.company_research = data.company_research || data.company_dossier || '';
       data.company_dossier = data.company_research;
@@ -962,6 +1063,414 @@ function cancelInterviewNotification(goalId) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// JEV session evaluation: every interviewer question + the candidate's spoken
+// answer scored on one fixed rubric by an LLM judge, against the goal's
+// company research, job description and résumé. Cached next to the session
+// as <id>.jev.json so the review screen is stable and costs one run.
+// ---------------------------------------------------------------------------
+const JEV_VERSION = 3;
+const JEV_CRITERIA = ['adequacao', 'cultura', 'estrutura', 'evidencias', 'objetividade'];
+const JEV_QUESTION_RE = /\?\s*$|^(como|por ?que|qual|quais|o que|quando|onde|quanto|me (conta|fala|diz)|conte|descreva|explique|fale|voc[eê] (pode|poderia|conseguiria|j[aá])|what|why|how|tell me|describe|can you|could you|walk me)\b/i;
+
+function readSessionEvents(sessionId) {
+  const safe = path.basename(String(sessionId || '')).replace(/\.(md|jsonl)$/i, '');
+  const file = path.join(getAppDataDir(), 'sessions', `${safe}.jsonl`);
+  if (!fs.existsSync(file)) return { id: safe, events: [] };
+  const events = [];
+  for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
+    if (!line || line[0] !== '{') continue;
+    try {
+      events.push(JSON.parse(line));
+    } catch (_e) {}
+  }
+  return { id: safe, events };
+}
+
+// Consecutive turns of the same speaker form one block (the engine emits a
+// turn per endpoint, i.e. a few words at a time).
+function sessionBlocks(events) {
+  const blocks = [];
+  for (const e of events) {
+    if (e.type !== 'turn' || !String(e.text || '').trim()) continue;
+    const src = e.src === 'voce' ? 'voce' : 'outros';
+    const t0 = Number(e.t0 || e.t) || 0;
+    const t1 = Number(e.t) || t0;
+    const last = blocks[blocks.length - 1];
+    if (last && last.src === src) {
+      last.text += ` ${String(e.text).trim()}`;
+      last.t1 = t1;
+      last.parts += 1;
+    } else {
+      blocks.push({ src, text: String(e.text).trim(), t0, t1, parts: 1 });
+    }
+  }
+  return blocks;
+}
+
+// Practice prompts wrap the interviewer's question: "Responda por áudio: ..."
+// pasted in the chat, or `Como eu responderia: "..."` from the question bank.
+const PRACTICE_PREFIX_RE = /^\s*(?:responda(?:\s+por\s+[áa]udio)?|como eu responderia|pergunta|question)\s*:\s*/i;
+const QUESTION_LEAD_RE = /^(imagine|conte|descreva|explique|fale|me (conta|conte|fala|fale|diga|diz|d[eê])|d[eê] um exemplo)\b/i;
+// Suggestions that answered something the candidate may say out loud
+// (screenshots, recaps and follow-up lists are not questions).
+const ANSWER_REASONS = new Set(['question', 'manual', 'chat', 'keyword', 'long_turn']);
+
+function questionFromTrigger(text) {
+  return String(text || '').replace(PRACTICE_PREFIX_RE, '').replace(/^["“'\s]+|["”'\s]+$/g, '').trim();
+}
+
+function looksLikeQuestion(text) {
+  const t = String(text || '').trim();
+  return /\?/.test(t) || QUESTION_LEAD_RE.test(t) || t.split(/(?<=[.?!])\s+/).some((s) => JEV_QUESTION_RE.test(s.trim()));
+}
+
+// Where the questions are in a session log, in time order: the interviewer's
+// question blocks, plus the questions the copilot received some other way
+// (pasted or typed in the chat, sent from the question bank, or asked into
+// the microphone when the call ran without system audio). A suggestion that
+// answered an interviewer block only lends it the engine's reading.
+function sessionQuestionAnchors(events) {
+  const anchors = [];
+  for (const b of sessionBlocks(events)) {
+    if (b.src === 'outros' && looksLikeQuestion(b.text)) anchors.push({ t: b.t0, end: b.t1, text: b.text, understood: '', sugg: null, from: 'interviewer' });
+  }
+  for (const s of events) {
+    if (s.type !== 'suggestion' || s.status !== 'completed' || !ANSWER_REASONS.has(String(s.reason || ''))) continue;
+    const t = Number(s.t) || 0;
+    const block = anchors.find((a) => a.from === 'interviewer' && !a.sugg && t >= a.t && t <= a.end + 15000);
+    if (block) {
+      block.sugg = s;
+      block.understood = s.understood || '';
+      continue;
+    }
+    const text = questionFromTrigger(s.understood || s.trigger);
+    if (text.length < 12 || !looksLikeQuestion(text)) continue;
+    anchors.push({ t, end: t, text, understood: '', sugg: s, from: 'copilot' });
+  }
+  return anchors.sort((a, b) => a.t - b.t);
+}
+
+// Each question with what the candidate said after it, until the next one.
+function jevPairs(events) {
+  const anchors = sessionQuestionAnchors(events);
+  const turns = events.filter((e) => e.type === 'turn' && e.src === 'voce' && String(e.text || '').trim());
+  const pairs = [];
+  anchors.forEach((q, i) => {
+    const until = i + 1 < anchors.length ? anchors[i + 1].t : Infinity;
+    // A turn's t is when it closed: what closed after the question was asked.
+    const said = turns.filter((e) => Number(e.t) > q.end && Number(e.t) <= until);
+    const answer = said.map((e) => String(e.text).trim()).join(' ').trim();
+    const words = (answer.match(/[\p{L}\p{N}']+/gu) || []).length;
+    if (words < 8) return;
+    const first = said[0];
+    const last = said[said.length - 1];
+    pairs.push({
+      t: q.t,
+      question: q.text.slice(-900),
+      understood: q.understood,
+      answer: answer.slice(0, 2400),
+      answerSeconds: Math.max(0, Math.round((Number(last.t) - Number(first.t0 || first.t)) / 1000)),
+      copilot: q.sugg ? String(q.sugg.text || '').slice(0, 1200) : '',
+      ttftMs: q.sugg ? Number(q.sugg.ttft_ms) || null : null
+    });
+  });
+  return pairs.slice(0, 24);
+}
+
+function callOpenRouterJson(messages, maxTokens, timeoutMs) {
+  const apiKey = getOpenRouterApiKey();
+  if (!apiKey) return Promise.resolve({ ok: false, error: 'Configure a chave do OpenRouter para usar a avaliação JEV.' });
+  const payload = JSON.stringify({
+    model: SOL_ANALYSIS_MODEL,
+    messages,
+    max_tokens: maxTokens,
+    temperature: 0,
+    stream: false,
+    response_format: { type: 'json_object' },
+    // The judge needs no chain of thought; reasoning tokens would eat max_tokens.
+    reasoning: { enabled: false }
+  });
+  return new Promise((resolve) => {
+    const req = https.request(
+      'https://openrouter.ai/api/v1/chat/completions',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload, 'utf8'),
+          'HTTP-Referer': 'https://realtimeai.local',
+          'X-Title': 'RealTimeAI JEV'
+        },
+        timeout: timeoutMs || 60000
+      },
+      (res) => {
+        const chunks = [];
+        res.on('data', (c) => chunks.push(c));
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+            if (parsed.error) return resolve({ ok: false, error: parsed.error.message || 'Erro do provedor.' });
+            const choice = parsed?.choices?.[0] || {};
+            const content = String(choice.message?.content || '');
+            const match = content.match(/\{[\s\S]*\}/);
+            if (!match) {
+              console.warn('[jev] no JSON', choice.finish_reason, content.slice(0, 300));
+              return resolve({ ok: false, error: `Resposta do avaliador sem JSON (${choice.finish_reason || 'vazia'}).` });
+            }
+            resolve({ ok: true, json: JSON.parse(match[0]) });
+          } catch (e) {
+            resolve({ ok: false, error: `Resposta inválida do avaliador: ${e.message}` });
+          }
+        });
+      }
+    );
+    req.on('error', (e) => resolve({ ok: false, error: e.message }));
+    req.on('timeout', () => {
+      req.destroy();
+      resolve({ ok: false, error: 'O avaliador demorou demais para responder.' });
+    });
+    req.write(payload);
+    req.end();
+  });
+}
+
+// "NUBANK - Estágio — https://…" (the goal named in the session log) -> "NUBANK".
+function companyFromGoalLabel(label) {
+  return String(label || '').split(/\s+[-–—·|]\s+/)[0].replace(/https?:\/\/\S+/g, '').trim();
+}
+
+function jevContext(agent, goalLabel) {
+  if (!agent) {
+    const company = companyFromGoalLabel(goalLabel);
+    return company
+      ? `Empresa: ${company} | Vaga registrada na sessão: ${goalLabel}\nNão há pesquisa salva desta empresa: avalie a cultura pelo que se sabe publicamente sobre os valores e a forma de trabalhar da ${company}.`
+      : 'Empresa e vaga desconhecidas: avalie a cultura pelo que é comum em empresas de tecnologia.';
+  }
+  const docs = Array.isArray(agent.documents) ? agent.documents : [];
+  const resume = docs.find((d) => /resume|cv|curric/i.test(`${d.tag || ''} ${d.title || ''}`));
+  return [
+    `Empresa: ${agent.company || '(não informada)'} | Vaga: ${agent.role || '(não informada)'}`,
+    agent.company_research ? `Cultura e contexto da empresa:\n${String(agent.company_research).slice(0, 2600)}` : '',
+    agent.job_description ? `Descrição da vaga:\n${String(agent.job_description).slice(0, 1500)}` : '',
+    resume ? `Currículo do candidato (trecho):\n${String(resume.content || '').slice(0, 2200)}` : ''
+  ].filter(Boolean).join('\n\n');
+}
+
+const JEV_SYSTEM = `Você é o JEV, avaliador de entrevistas. Avalie a RESPOSTA FALADA do candidato (não a do copiloto) a cada pergunta, sempre com a mesma rubrica, notas inteiras de 0 a 10:
+- adequacao: responde exatamente o que foi perguntado.
+- cultura: alinhamento com a cultura e os valores da empresa descritos no contexto.
+- estrutura: organização (STAR quando comportamental; raciocínio claro quando técnica).
+- evidencias: exemplos concretos, números e fatos coerentes com o currículo; penalize fatos inventados.
+- objetividade: vai direto ao ponto, sem rodeios nem repetição.
+A transcrição vem de reconhecimento de voz e pode ter erros de palavra; não penalize isso.
+Responda SOMENTE JSON em português do Brasil.`;
+
+async function evaluateSessionWithJev({ sessionId, agentId, force }) {
+  const { id, events } = readSessionEvents(sessionId);
+  if (!events.length) return { ok: false, error: 'Esta sessão não tem registro de eventos para avaliar.' };
+  const cachePath = path.join(getAppDataDir(), 'sessions', `${id}.jev.json`);
+  if (!force && fs.existsSync(cachePath)) {
+    try {
+      const cached = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+      if (cached.version === JEV_VERSION) return { ok: true, cached: true, evaluation: cached };
+    } catch (_e) {}
+  }
+  const pairs = jevPairs(events);
+  if (!pairs.length) {
+    return { ok: false, error: 'Nenhuma pergunta com resposta falada foi encontrada: o JEV avalia o que você disse no microfone depois de cada pergunta (do entrevistador, do chat ou do banco de perguntas).' };
+  }
+
+  const agent = agentId ? loadAllAgents().find((a) => a.id === agentId) : null;
+  const start = events.find((e) => e.type === 'notice' && /^Active goal:/i.test(e.text || ''));
+  const goalLabel = start ? String(start.text).replace(/^Active goal:\s*/i, '').split(' · ')[0] : '';
+  const companyName = agent ? agent.company : companyFromGoalLabel(goalLabel);
+  const context = jevContext(agent, goalLabel);
+  const items = [];
+  const BATCH = 5;
+  const batches = [];
+  for (let i = 0; i < pairs.length; i += BATCH) batches.push(pairs.slice(i, i + BATCH));
+  const results = await Promise.all(
+    batches.map((batch, bi) =>
+      callOpenRouterJson(
+        [
+          { role: 'system', content: JEV_SYSTEM },
+          {
+            role: 'user',
+            content: `${context}\n\nAvalie os pares abaixo e devolva {"items":[{"i":<índice>,"pergunta":"<pergunta reescrita em uma frase clara>","tipo":"comportamental|tecnica|cultura|motivacao|outra","notas":{"adequacao":0,"cultura":0,"estrutura":0,"evidencias":0,"objetividade":0},"veredito":"<uma frase>","dica":"<uma ação concreta para melhorar>"}]}\n\n${batch
+              .map((p, k) => `#${bi * BATCH + k}\nPERGUNTA: ${p.understood || p.question}\nRESPOSTA DO CANDIDATO: ${p.answer}`)
+              .join('\n\n')}`
+          }
+        ],
+        2200,
+        70000
+      )
+    )
+  );
+  const failed = results.find((r) => !r.ok);
+  if (failed && results.every((r) => !r.ok)) return { ok: false, error: failed.error };
+  for (const r of results) {
+    if (!r.ok) continue;
+    for (const it of (r.json && r.json.items) || []) {
+      const idx = Number(it.i);
+      const pair = pairs[idx];
+      if (!pair) continue;
+      const notas = {};
+      for (const c of JEV_CRITERIA) {
+        const v = Number(it.notas && it.notas[c]);
+        notas[c] = Number.isFinite(v) ? Math.max(0, Math.min(10, Math.round(v))) : null;
+      }
+      const vals = Object.values(notas).filter((v) => v != null);
+      items.push({
+        ...pair,
+        index: idx,
+        pergunta: String(it.pergunta || pair.understood || pair.question).slice(0, 400),
+        tipo: String(it.tipo || 'outra'),
+        notas,
+        score: vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) : null,
+        veredito: String(it.veredito || '').slice(0, 400),
+        dica: String(it.dica || '').slice(0, 400)
+      });
+    }
+  }
+  items.sort((a, b) => a.index - b.index);
+  if (!items.length) return { ok: false, error: (failed && failed.error) || 'O avaliador não devolveu notas.' };
+
+  const criteria = {};
+  for (const c of JEV_CRITERIA) {
+    const vals = items.map((i) => i.notas[c]).filter((v) => v != null);
+    criteria[c] = vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) : null;
+  }
+  const crit = Object.values(criteria).filter((v) => v != null);
+  const score = crit.length ? Math.round(crit.reduce((a, b) => a + b, 0) / crit.length) : null;
+
+  const synth = await callOpenRouterJson(
+    [
+      { role: 'system', content: 'Você é o JEV e escreve o feedback final para o candidato sobre o desempenho dele na entrevista, com base nas avaliações por pergunta. Fale do candidato (em segunda pessoa), não das notas nem da avaliação. Responda SOMENTE JSON em português do Brasil.' },
+      {
+        role: 'user',
+        content: `Empresa: ${companyName || '(desconhecida)'}. Médias (0-100): ${JSON.stringify(criteria)}.\nAvaliações por pergunta:\n${items
+          .map((i) => `- [${i.score}] ${i.pergunta} | ${i.veredito} | dica: ${i.dica}`)
+          .join('\n')}\n\nDevolva {"resumo":"<2 frases para o candidato sobre o desempenho geral, citando a cultura da empresa>","fortes":["até 3 pontos fortes concretos"],"melhorar":["até 3 melhorias concretas e acionáveis"]}`
+      }
+    ],
+    700,
+    45000
+  );
+
+  const evaluation = {
+    version: JEV_VERSION,
+    sessionId: id,
+    evaluatedAt: new Date().toISOString(),
+    model: SOL_ANALYSIS_MODEL,
+    agentId: agent ? agent.id : '',
+    company: companyName || '',
+    score,
+    criteria,
+    items,
+    partial: Boolean(failed),
+    resumo: synth.ok ? String(synth.json.resumo || '') : '',
+    fortes: synth.ok && Array.isArray(synth.json.fortes) ? synth.json.fortes.map(String).slice(0, 3) : [],
+    melhorar: synth.ok && Array.isArray(synth.json.melhorar) ? synth.json.melhorar.map(String).slice(0, 3) : []
+  };
+  fs.writeFileSync(cachePath, JSON.stringify(evaluation, null, 2), 'utf8');
+  return { ok: true, cached: false, evaluation };
+}
+
+// Interviewer text of every saved session, as the question extractor reads it.
+// JEV reads each candidate question the way a shared interview bank needs it:
+// what kind of question it is and a clear, generic wording. A question that
+// only makes sense for this candidate, or is not an interview question at all
+// (a request to the copilot, a quiz on screen, a piece of an answer), is left
+// out. Returns null without an OpenRouter key or when the call fails, and the
+// rule-based reading is used instead.
+const JEV_BANK_SYSTEM = `Você é o JEV e organiza um banco de perguntas reais de entrevista, que outros candidatos usam para treinar. Classifique cada item pelo tipo:
+- pessoal: sobre a experiência e o comportamento do candidato, pede uma história ("me conte uma vez em que você teve que assumir uma nova responsabilidade", conflito, erro, liderança, pressão, aprendizado, trabalho em equipe).
+- cultura: valores e forma de trabalhar da empresa, fit cultural.
+- motivacao: por que esta empresa ou vaga, objetivos de carreira.
+- abertura: apresentação ("fale sobre você", trajetória).
+- tecnica: conhecimento técnico, código, arquitetura, system design, dados.
+- dominio: negócio, produto, mercado.
+- salario: salário, benefícios, disponibilidade, modelo de trabalho.
+- especifica: só faz sentido para este candidato e não dá para generalizar.
+- nao_pergunta: não é pergunta de entrevista (pedido ao copiloto, conta ou exercício de tela, cumprimento, teste de áudio, trecho de resposta).
+Se a pergunta cita um projeto, empresa ou resposta do candidato mas tem uma versão genérica útil ("Você comentou que aprendeu React com protótipos; como faz isso?" -> "Como você aprende uma tecnologia nova rapidamente?"), reescreva genérica e classifique pelo tipo dela.
+"pergunta": a pergunta clara, completa e genérica, sem nomes do candidato, no idioma original. Responda SOMENTE JSON.`;
+
+async function classifyQuestionsWithJev(questions, { company } = {}) {
+  if (!Array.isArray(questions) || !questions.length || !getOpenRouterApiKey()) return null;
+  const res = await callOpenRouterJson(
+    [
+      { role: 'system', content: JEV_BANK_SYSTEM },
+      {
+        role: 'user',
+        content: `Empresa da entrevista: ${company || '(desconhecida)'}\n\n${questions
+          .map((q, i) => `#${i} ${q}`)
+          .join('\n')}\n\nDevolva {"items":[{"i":<índice>,"tipo":"pessoal|cultura|motivacao|abertura|tecnica|dominio|salario|especifica|nao_pergunta","pergunta":"<pergunta>"}]}`
+      }
+    ],
+    Math.min(3000, 400 + questions.length * 90),
+    60000
+  );
+  return res.ok && res.json && Array.isArray(res.json.items) ? res.json.items : null;
+}
+
+// The questions of a session log as lines the question extractor reads: the
+// interviewer's question blocks and, when JEV can vet them, the questions the
+// copilot got from the chat or the question bank. Copilot answers never go in.
+// "X, X" from repeated speech or scripted demos -> "X"; a trailing "." would
+// become ".?" once the extractor adds the question mark.
+function sessionQuestionLines(events, { withChat }) {
+  const dedupe = (t) => String(t).replace(/(.{12,}?)[\s,;:-]+\1/g, '$1').trim().replace(/[.\s]+$/, '');
+  const lines = [];
+  for (const a of sessionQuestionAnchors(events)) {
+    if (a.from === 'interviewer') {
+      lines.push(a.understood ? `Pergunta: "${dedupe(a.understood).replace(/"/g, "'")}"` : `Entrevistador: ${dedupe(a.text)}`);
+    } else if (withChat) {
+      lines.push(`Pergunta: "${dedupe(a.text).replace(/"/g, "'")}"`);
+    }
+  }
+  return lines;
+}
+
+const bankClassifier = (questions, ctx) => classifyQuestionsWithJev(questions, ctx);
+
+async function rebuildQuestionBankFromSessions() {
+  const sessions = loadPastSessions();
+  const agents = loadAllAgents();
+  const withChat = Boolean(getOpenRouterApiKey());
+  const entries = [];
+  for (const s of sessions) {
+    // Only sessions that ran with a goal: the goal names the company.
+    const label = String(s.goalLabel || '');
+    if (!label) continue;
+    const { events } = readSessionEvents(s.id);
+    if (!events.length) continue;
+    const lines = sessionQuestionLines(events, { withChat });
+    if (!lines.length) continue;
+    const lower = label.toLowerCase();
+    const agent = agents.find((a) => a.company && lower.includes(String(a.company).toLowerCase()));
+    entries.push({ text: lines.join('\n'), company: agent ? agent.company : companyFromGoalLabel(label) });
+  }
+  return jevEngine.rebuildQuestionBank(getAppDataDir(), entries, { classify: bankClassifier });
+}
+
+// A bank built by an older version (questions taken from the copilot's
+// answers, rule-based categories) is rebuilt once from the session logs.
+async function migrateQuestionBank() {
+  try {
+    const bank = jevEngine.loadQuestionBank(getAppDataDir());
+    if (bank.version === jevEngine.QUESTION_BANK_VERSION) return;
+    const res = await rebuildQuestionBankFromSessions();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('rtai:question-bank-updated', { rebuilt: true, added: (res && res.added) || 0 });
+    }
+  } catch (err) {
+    console.warn('[question-bank] rebuild failed:', err);
+  }
+}
+
 async function generateSessionDebrief({ sessionId, goalId, agentId, transcript: providedTranscript }) {
   const targetId = goalId || agentId;
   const agents = loadAllAgents();
@@ -1070,7 +1579,7 @@ async function generateSessionDebrief({ sessionId, goalId, agentId, transcript: 
   let jevExtraction = null;
   if (cfg.share_anonymized_questions !== false && transcript) {
     try {
-      jevExtraction = await jevEngine.ingestSessionQuestions(getAppDataDir(), transcript, goal.company || '');
+      jevExtraction = await jevEngine.ingestSessionQuestions(getAppDataDir(), transcript, goal.company || '', { classify: bankClassifier });
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('rtai:question-bank-updated', jevExtraction);
       }
@@ -1169,6 +1678,9 @@ function saveAgentToDisk(agent) {
     // materials and skips re-reading them (it recomputes on any change).
     mini_compact_fingerprint: agent.mini_compact_fingerprint || '',
     stage,
+    // Interview format shown on the dashboard (behavioral, technical, panel...).
+    interview_format: String(agent.interview_format || '').trim(),
+    archived: Boolean(agent.archived),
     next_interview: nextInterview,
     next_interview_date: nextDate,
     next_interview_time: nextTime,
@@ -1661,6 +2173,64 @@ function getKnowledgeBaseKeywords() {
 // ---------------------------------------------------------------------------
 // Past Sessions Reader
 // ---------------------------------------------------------------------------
+// Facts from the session's event log (<id>.jsonl, written by the engine next
+// to the Markdown): which goal ran, the mode, turn and answer counts. Every
+// field is null/0 when the log is missing (older sessions have only the .md).
+function readSessionEventMeta(jsonlPath) {
+  const meta = {
+    hasEvents: false, startedAt: '', mode: '', llmModel: '', language: '', goalLabel: '',
+    turnsYou: 0, turnsOthers: 0, suggestions: 0, avgTtftMs: null, jevAvg: null, endedReason: ''
+  };
+  let raw = '';
+  try {
+    raw = fs.readFileSync(jsonlPath, 'utf8');
+  } catch (_e) {
+    return meta;
+  }
+  meta.hasEvents = true;
+  const ttfts = [];
+  const jev = [];
+  for (const line of raw.split(/\r?\n/)) {
+    if (!line || line[0] !== '{') continue;
+    let ev;
+    try {
+      ev = JSON.parse(line);
+    } catch (_e) {
+      continue;
+    }
+    if (ev.type === 'session_start') {
+      meta.startedAt = ev.started_at || '';
+      meta.mode = ev.mode || '';
+      meta.llmModel = ev.llm_model || '';
+      meta.language = ev.language || '';
+    } else if (ev.type === 'notice' && !meta.goalLabel && /^Active goal:/i.test(ev.text || '')) {
+      meta.goalLabel = String(ev.text).replace(/^Active goal:\s*/i, '').split(' · ').slice(0, 2).join(' · ').replace(/\s*\(.*?\)\s*$/, '').trim();
+    } else if (ev.type === 'turn') {
+      if (ev.src === 'voce') meta.turnsYou += 1;
+      else meta.turnsOthers += 1;
+    } else if (ev.type === 'suggestion' && ev.status === 'completed') {
+      meta.suggestions += 1;
+      if (Number(ev.ttft_ms) > 0) ttfts.push(Number(ev.ttft_ms));
+    } else if (ev.type === 'jev' && Number.isFinite(Number(ev.relevance))) {
+      jev.push(Number(ev.relevance));
+    } else if (ev.type === 'session_end') {
+      meta.endedReason = ev.reason || '';
+    }
+  }
+  if (ttfts.length) meta.avgTtftMs = Math.round(ttfts.reduce((a, b) => a + b, 0) / ttfts.length);
+  if (jev.length) meta.jevAvg = Math.round((jev.reduce((a, b) => a + b, 0) / jev.length) * 10) / 10;
+  return meta;
+}
+
+function readJevScore(file) {
+  try {
+    const ev = JSON.parse(fs.readFileSync(file, 'utf8'));
+    return Number.isFinite(ev.score) ? ev.score : null;
+  } catch (_e) {
+    return null;
+  }
+}
+
 function loadPastSessions() {
   const sessionsDir = path.join(getAppDataDir(), 'sessions');
   if (!fs.existsSync(sessionsDir)) return [];
@@ -1736,7 +2306,9 @@ function loadPastSessions() {
         groundedAnswersCount: groundedInSession,
         avgLatencyMs: avgLat,
         durationSeconds: durSec,
-        wordsCount: words
+        wordsCount: words,
+        ...readSessionEventMeta(path.join(sessionsDir, `${path.basename(mdFile, '.md')}.jsonl`)),
+        jevScore: readJevScore(path.join(sessionsDir, `${path.basename(mdFile, '.md')}.jev.json`))
       });
     } catch (_e) {}
   }
@@ -1757,17 +2329,17 @@ function loadUserProfile(cachedSessions) {
   }
   if (!data) {
     data = {
-      name: 'Bruno',
-      email: 'bruno@realtimeai.dev',
-      headline: 'Senior Engineer',
-      seniority: 'Senior / Staff',
-      linkedin: 'linkedin.com/in/bruno',
+      name: '',
+      email: '',
+      headline: '',
+      seniority: '',
+      linkedin: '',
       themePreference: 'dark',
       loggedIn: true
     };
   }
   if (!data.themePreference) data.themePreference = 'dark';
-  if (!data.plan) data.plan = 'premium';
+  if (!data.plan) data.plan = 'free';
 
   // Compute real transcription statistics from actual session files
   const sessions = cachedSessions || loadPastSessions();
@@ -1777,23 +2349,13 @@ function loadUserProfile(cachedSessions) {
     totalDurSec += (s.durationSeconds || 0);
     totalWords += (s.wordsCount || 0);
   }
-  const realUsedMinutes = Math.max(1, Math.round(totalDurSec / 60));
-
-  if (!data.transcriptionUsage) {
-    data.transcriptionUsage = {
-      usedMinutes: realUsedMinutes,
-      limitMinutes: 60,
-      sessionsCount: sessions.length,
-      wordsCount: totalWords
-    };
-  } else {
-    data.transcriptionUsage.usedMinutes = data.transcriptionUsage.usedMinutes || realUsedMinutes;
-    data.transcriptionUsage.sessionsCount = data.transcriptionUsage.sessionsCount || sessions.length;
-    data.transcriptionUsage.wordsCount = data.transcriptionUsage.wordsCount || totalWords;
-    if (typeof data.transcriptionUsage.limitMinutes !== 'number') {
-      data.transcriptionUsage.limitMinutes = 60;
-    }
-  }
+  // Always recomputed from the session files; no quota is invented.
+  data.transcriptionUsage = {
+    usedMinutes: Math.round(totalDurSec / 60),
+    limitMinutes: null,
+    sessionsCount: sessions.length,
+    wordsCount: totalWords
+  };
   return data;
 }
 
@@ -1835,10 +2397,12 @@ function isOverlayRunning() {
 
 function broadcastOverlayStatus() {
   if (mainWindow && !mainWindow.isDestroyed()) {
+    const running = Boolean(overlayProcess && !overlayProcess.killed);
     mainWindow.webContents.send('rtai:overlay-status', {
-      running: Boolean(overlayProcess && !overlayProcess.killed),
+      running,
       mode: overlayMode || 'idle',
-      agentId: overlayAgentId || ''
+      agentId: overlayAgentId || '',
+      startedAt: running ? overlayStartedAt : 0
     });
   }
   onOverlayStatusChanged();
@@ -1862,6 +2426,40 @@ function stopRunningOverlay() {
   } catch (_e) {}
   externalOverlay = { running: false, checkedAt: Date.now(), pending: false };
   broadcastOverlayStatus();
+}
+
+// Engine events (server_protocol.hpp) forwarded to the dashboard's live view.
+const LIVE_EVENT_TYPES = new Set([
+  'hello', 'status', 'live', 'turn', 'answer_start', 'answer_delta', 'answer_done',
+  'notice', 'pause', 'level', 'bye'
+]);
+
+// Commands the live view may send to the engine's stdin. Anything else is
+// refused: config and quit go through their own handlers.
+const OVERLAY_COMMANDS = new Set(['answer', 'chat', 'recap', 'followup', 'pause', 'rate', 'clear_chat']);
+
+function sendOverlayCommand(command) {
+  const cmd = command && String(command.cmd || '');
+  if (!OVERLAY_COMMANDS.has(cmd)) return { ok: false, error: `Unknown command: ${cmd}` };
+  if (!overlayProcess || overlayProcess.killed || !overlayProcess.stdin || !overlayProcess.stdin.writable) {
+    return { ok: false, error: 'The copilot is not running.' };
+  }
+  const payload = { cmd };
+  if (cmd === 'chat') payload.text = String(command.text || '').slice(0, 4000);
+  if (cmd === 'pause') {
+    payload.src = ['voce', 'outros', 'all'].includes(command.src) ? command.src : 'all';
+    payload.paused = Boolean(command.paused);
+  }
+  if (cmd === 'rate') {
+    payload.id = Math.max(0, parseInt(command.id, 10) || 0);
+    payload.vote = Number(command.vote) < 0 ? -1 : 1;
+  }
+  try {
+    overlayProcess.stdin.write(JSON.stringify(payload) + '\n');
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
 }
 
 function launchOverlay({ agent, demo = false, configOverrides = {} }) {
@@ -1895,6 +2493,7 @@ function launchOverlay({ agent, demo = false, configOverrides = {} }) {
   overlayMode = demo ? 'demo' : 'live';
   overlayAgentId = savedAgent ? savedAgent.id : '';
 
+  overlayStartedAt = Date.now();
   overlayProcess = spawn(exePath, args, {
     cwd: path.dirname(exePath),
     detached: false,
@@ -1920,8 +2519,10 @@ function launchOverlay({ agent, demo = false, configOverrides = {} }) {
 
   let lineBuffer = '';
   if (overlayProcess.stdout) {
+    // A multi-byte character can straddle two chunks; the decoder keeps it whole.
+    overlayProcess.stdout.setEncoding('utf8');
     overlayProcess.stdout.on('data', (chunk) => {
-      lineBuffer += chunk.toString('utf8');
+      lineBuffer += chunk;
       const lines = lineBuffer.split(/\r?\n/);
       lineBuffer = lines.pop();
       for (const line of lines) {
@@ -1929,6 +2530,11 @@ function launchOverlay({ agent, demo = false, configOverrides = {} }) {
         if (!trimmed || !trimmed.startsWith('{')) continue;
         try {
           const msg = JSON.parse(trimmed);
+          // The dashboard's live view mirrors the engine: transcript, answers,
+          // audio levels and notices, exactly as the HUD receives them.
+          if (LIVE_EVENT_TYPES.has(msg.type) && mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('rtai:live-event', msg);
+          }
           if (msg.type === 'mode' && mainWindow && !mainWindow.isDestroyed()) {
             mainWindow.webContents.send('rtai:mode', Boolean(msg.on));
           } else if (msg.type === 'hello' && mainWindow && !mainWindow.isDestroyed()) {
@@ -1946,22 +2552,28 @@ function launchOverlay({ agent, demo = false, configOverrides = {} }) {
             // The HUD's Config button: one settings screen, the dashboard's.
             showSettingsWindow(msg.section || 'general');
           } else if (msg.type === 'summary') {
+            // The engine names the field "export" (server_protocol.hpp).
+            const exportPath = msg.export_path || msg.export || '';
             if (mainWindow && !mainWindow.isDestroyed()) {
               mainWindow.webContents.send('rtai:summary', {
                 ok: Boolean(msg.ok),
                 text: msg.text || '',
-                export_path: msg.export_path || ''
+                export_path: exportPath
               });
             }
             const cfg = readConfigIni();
-            if (cfg.share_anonymized_questions !== false && msg.export_path) {
+            if (cfg.share_anonymized_questions !== false && exportPath) {
               try {
-                if (fs.existsSync(msg.export_path)) {
-                  const t = fs.readFileSync(msg.export_path, 'utf8');
+                if (fs.existsSync(exportPath)) {
+                  // The session log next to the export: its questions are
+                  // structured, while the .md also carries the copilot's answers.
+                  const { events } = readSessionEvents(path.basename(exportPath));
+                  const fromEvents = events.length ? sessionQuestionLines(events, { withChat: Boolean(getOpenRouterApiKey()) }).join('\n') : '';
+                  const t = events.length ? fromEvents : fs.readFileSync(exportPath, 'utf8');
                   if (t) {
                     const currentGoal = overlayAgentId ? loadAllAgents().find((a) => a.id === overlayAgentId) : null;
                     const compFallback = (currentGoal && currentGoal.company) || '';
-                    jevEngine.ingestSessionQuestions(getAppDataDir(), t, compFallback).then((extraction) => {
+                    jevEngine.ingestSessionQuestions(getAppDataDir(), t, compFallback, { classify: bankClassifier }).then((extraction) => {
                       if (mainWindow && !mainWindow.isDestroyed()) {
                         mainWindow.webContents.send('rtai:question-bank-updated', extraction);
                       }
@@ -2595,7 +3207,8 @@ app.whenReady().then(() => {
       overlayStatus: {
         running: isOverlayRunning(),
         mode: overlayMode || 'idle',
-        agentId: overlayAgentId || config.last_agent || (agents[0]?.id ?? '')
+        agentId: overlayAgentId || config.last_agent || (agents[0]?.id ?? ''),
+        startedAt: overlayProcess && !overlayProcess.killed ? overlayStartedAt : 0
       }
     };
   });
@@ -2674,14 +3287,9 @@ app.whenReady().then(() => {
         failed.push({ title: base, error: extracted.error });
         continue;
       }
-      const lower = base.toLowerCase();
-      let tag = defaultTag || 'doc';
-      if (lower.includes('cv') || lower.includes('curriculo') || lower.includes('resume')) tag = 'resume';
-      else if (lower.includes('vaga') || lower.includes('job') || lower.includes('jd')) tag = 'job';
-      else if (lower.includes('proj') || lower.includes('arquitetura') || lower.includes('readme')) tag = 'project';
       documents.push({
         title: base,
-        tag,
+        tag: guessDocumentTag(base, defaultTag),
         path: fp,
         source_path: fp,
         content: extracted.content
@@ -2879,6 +3487,32 @@ app.whenReady().then(() => {
     return { ok: true };
   });
 
+  ipcMain.handle('rtai:overlay-command', async (_ev, command) => sendOverlayCommand(command));
+
+  // Files dropped on the dashboard: same extraction as the file picker.
+  ipcMain.handle('rtai:import-files', async (_ev, payload) => {
+    const paths = Array.isArray(payload && payload.paths) ? payload.paths.filter((p) => typeof p === 'string' && p) : [];
+    const defaultTag = (payload && payload.tag) || 'material';
+    const documents = [];
+    const failed = [];
+    for (const fp of paths.slice(0, 25)) {
+      const base = path.basename(fp);
+      try {
+        if (!fs.statSync(fp).isFile()) throw new Error('Not a file');
+      } catch (e) {
+        failed.push({ title: base, error: e.message });
+        continue;
+      }
+      const extracted = await extractDocumentContent(fp);
+      if (!extracted.ok) {
+        failed.push({ title: base, error: extracted.error });
+        continue;
+      }
+      documents.push({ title: base, tag: guessDocumentTag(base, defaultTag), path: fp, source_path: fp, content: extracted.content });
+    }
+    return { documents, failed };
+  });
+
   ipcMain.handle('rtai:set-mode', async (_ev, on) => {
     const modeOn = Boolean(on);
     if (overlayProcess && !overlayProcess.killed && overlayProcess.stdin && overlayProcess.stdin.writable) {
@@ -2939,6 +3573,9 @@ app.whenReady().then(() => {
     return { ok: true, goal: saved, agent: saved, agents: loadAllAgents(), calendar };
   });
 
+  ipcMain.handle('rtai:evaluate-session', async (_ev, payload) => evaluateSessionWithJev(payload || {}));
+  ipcMain.handle('rtai:rebuild-question-bank', async () => rebuildQuestionBankFromSessions());
+
   ipcMain.handle('rtai:generate-debrief', async (_ev, payload) => {
     return generateSessionDebrief(payload || {});
   });
@@ -2965,7 +3602,7 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('rtai:trigger-jev-analysis', async (_ev, { transcript, companyName }) => {
-    return jevEngine.ingestSessionQuestions(getAppDataDir(), transcript, companyName);
+    return jevEngine.ingestSessionQuestions(getAppDataDir(), transcript, companyName, { classify: bankClassifier });
   });
 
   ipcMain.handle('rtai:detect-company', async (_ev, { transcript, fallbackName }) => {
@@ -3165,6 +3802,8 @@ app.whenReady().then(() => {
   createTray();
   registerStealthShortcuts();
   applyMeetingSettings();
+  // Off the startup path: the window is up before the bank is rebuilt.
+  setTimeout(() => migrateQuestionBank(), 4000).unref();
 });
 
 app.on('will-quit', () => {
@@ -3201,6 +3840,10 @@ if (process.env.RTAI_TEST_EXPORTS === '1') {
     inheritableDocuments,
     readConfigIni,
     writeConfigIni,
+    jevPairs,
+    sessionQuestionAnchors,
+    sessionQuestionLines,
+    rebuildQuestionBankFromSessions,
     pickDefaultAgentId,
     getMeetingSettings,
     applyElectronStealthMode

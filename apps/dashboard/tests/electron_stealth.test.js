@@ -2,37 +2,22 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
+const { loadRenderer, render, indexHtml, el, tags } = require('./helpers/renderer');
 
-const indexHtmlPath = path.resolve(__dirname, '../src/renderer/index.html');
-const appJsPath = path.resolve(__dirname, '../src/renderer/app.js');
 const mainJsPath = path.resolve(__dirname, '../src/main/main.js');
 const preloadJsPath = path.resolve(__dirname, '../src/preload/preload.js');
 
-test('Electron Stealth Mode: HTML contains header controls and settings panel', () => {
-  const html = fs.readFileSync(indexHtmlPath, 'utf8');
+test('Electron Stealth Mode: top bar chip and the Privacy controls for this window', () => {
+  assert.ok(/id="btnStealthChip"[^>]*data-action="toggle-stealth"[^>]*title="[^"]*Ctrl\+Alt\+S/.test(indexHtml), 'chip toggles stealth and names its shortcut');
 
-  // Top header stealth button & indicators
-  assert.ok(html.includes('id="btnTopStealthMode"'), 'btnTopStealthMode button must exist in header');
-  assert.ok(html.includes('id="labelTopStealth"'), 'labelTopStealth label must exist in header');
-  assert.ok(html.includes('id="indicatorTopStealth"'), 'indicatorTopStealth indicator dot must exist in header');
-  assert.ok(html.includes('id="iconStealthShield"'), 'iconStealthShield SVG icon must exist in header');
-
-  // Privacy & Stealth tab: Electron stealth controls
-  assert.ok(html.includes('id="badgeElectronStealth"'), 'badgeElectronStealth status badge must exist');
-  assert.ok(html.includes('id="btnQuickToggleStealth"'), 'btnQuickToggleStealth quick toggle button must exist');
-  assert.ok(html.includes('id="cfgElectronScreenProtection"'), 'cfgElectronScreenProtection checkbox must exist');
-  assert.ok(html.includes('id="cfgElectronSkipTaskbar"'), 'cfgElectronSkipTaskbar checkbox must exist');
-  assert.ok(html.includes('id="cfgElectronDisguise"'), 'cfgElectronDisguise checkbox must exist');
-
-  // Checkboxes must be wrapped in clickable labels
-  for (const id of ['cfgElectronScreenProtection', 'cfgElectronSkipTaskbar', 'cfgElectronDisguise']) {
-    const re = new RegExp(`<label[^>]*>(?:(?!</label>)[\\s\\S])*id="${id}"`);
-    assert.ok(re.test(html), `${id} must be wrapped in a clickable <label>`);
-  }
-
-  // Global hotkeys indicators
-  assert.ok(html.includes('Ctrl + Alt + S'), 'Must indicate Ctrl + Alt + S shortcut');
-  assert.ok(html.includes('Ctrl + Shift + H'), 'Must indicate Ctrl + Shift + H shortcut');
+  const { Cue } = loadRenderer({ state: { stealthState: { active: true, screenProtection: true, skipTaskbar: false, disguise: true } } });
+  const html = render(Cue, 'settings/privacy');
+  const switches = tags(html, { 'data-change': 'stealth' });
+  assert.deepStrictEqual(switches.map((s) => s['data-field']), ['active', 'screenProtection', 'skipTaskbar', 'disguise']);
+  assert.deepStrictEqual(switches.map((s) => 'checked' in s), [true, true, false, true], 'switches mirror the live stealth state');
+  // Every switch is an <input> inside a <label class="switch">: the whole control is clickable.
+  assert.strictEqual((html.match(/<label class="switch"><input type="checkbox" data-change="stealth"/g) || []).length, 4);
+  assert.ok(html.includes('Ctrl+Alt+S') && html.includes('Ctrl+Shift+H'), 'global shortcuts are named');
 });
 
 test('Electron Stealth Mode: preload.js exposes all required APIs', () => {
@@ -65,14 +50,29 @@ test('Electron Stealth Mode: main.js implements stealth logic and IPC handlers',
   assert.ok(mainJs.includes('registerStealthShortcuts'), 'main.js must have registerStealthShortcuts function');
 });
 
-test('Electron Stealth Mode: app.js contains UI updater and event listeners', () => {
-  const appJs = fs.readFileSync(appJsPath, 'utf8');
+test('Electron Stealth Mode: chip, switches and the global shortcut stay in sync', async () => {
+  const r = loadRenderer({
+    api: {
+      toggleStealthMode: async () => ({ status: { active: true } }),
+      setStealthMode: async (patch) => ({ status: { active: false, ...patch } })
+    }
+  });
+  await r.boot();
+  assert.ok(r.page('btnStealthChip').innerHTML.includes('Visível'));
 
-  assert.ok(appJs.includes('updateStealthUI'), 'app.js must define updateStealthUI');
-  assert.ok(appJs.includes('btnTopStealthMode'), 'app.js must attach click listener to btnTopStealthMode');
-  assert.ok(appJs.includes('btnQuickToggleStealth'), 'app.js must attach click listener to btnQuickToggleStealth');
-  assert.ok(appJs.includes('cfgElectronScreenProtection'), 'app.js must handle cfgElectronScreenProtection');
-  assert.ok(appJs.includes('cfgElectronSkipTaskbar'), 'app.js must handle cfgElectronSkipTaskbar');
-  assert.ok(appJs.includes('cfgElectronDisguise'), 'app.js must handle cfgElectronDisguise');
-  assert.ok(appJs.includes('onStealthModeUpdated'), 'app.js must listen for onStealthModeUpdated');
+  // Clicking the chip.
+  await r.Cue.actions['toggle-stealth']();
+  assert.strictEqual(r.called('toggleStealthMode').length, 1);
+  assert.ok(r.page('btnStealthChip').innerHTML.includes('Oculto'));
+
+  // A settings switch sends only its own field.
+  await r.Cue.changes.stealth(el({ field: 'skipTaskbar' }, { checked: true }));
+  assert.deepStrictEqual(r.called('setStealthMode'), [[{ skipTaskbar: true }]]);
+
+  // Ctrl+Alt+S in the main process republishes the state; the chip follows it.
+  const [listener] = r.calls.find(([n]) => n === 'onStealthModeUpdated')[1];
+  listener({ active: true });
+  assert.ok(r.page('btnStealthChip').innerHTML.includes('Oculto'));
+  listener({ active: false });
+  assert.ok(r.page('btnStealthChip').innerHTML.includes('Visível'));
 });

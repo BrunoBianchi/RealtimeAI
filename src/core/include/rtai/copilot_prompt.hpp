@@ -192,7 +192,7 @@ inline std::string copilot_system_prompt() {
         "- Sem métrica no contexto, o resultado é qualitativo e sem número.\n"
         "- A empresa-alvo é onde estou sendo entrevistado: nunca diga que construí produtos dela.\n"
         "- No máximo uma história por resposta; não misture fatos de projetos diferentes.\n"
-        "- Mantenha a mesma persona e não contradiga o que [Você] já falou nem as respostas já sugeridas.\n"
+        "- Mantenha a mesma persona e não contradiga o que [Você] já falou nem a MEMÓRIA DESTE ASSUNTO.\n"
         "\n"
         "IDIOMA E ESTILO:\n"
         "- Responda no idioma em que [Outros] perguntou.\n"
@@ -288,7 +288,8 @@ inline std::vector<ChatMessage> build_copilot_messages(const PromptConfig& cfg,
                                                        const std::string& trigger_text,
                                                        TriggerReason reason,
                                                        const std::string& keyword = {},
-                                                       bool allow_skip = false) {
+                                                       bool allow_skip = false,
+                                                       std::string_view answer_memory = {}) {
     std::string system = detail::with_profile(copilot_system_prompt_static(), cfg);
 
     std::string user;
@@ -305,6 +306,13 @@ inline std::vector<ChatMessage> build_copilot_messages(const PromptConfig& cfg,
         user += "\nFALAS RECENTES DO ENTREVISTADOR (podem estar picadas ou mal transcritas; a pergunta pode estar "
                 "espalhada entre elas):\n";
         user += window;
+    }
+    // Only for a follow-up on the same subject (rtai/answer_memory.hpp); kept
+    // out of `history`, so the transcript cut above never drops it.
+    if (!answer_memory.empty()) {
+        user += "\nMEMÓRIA DESTE ASSUNTO (o que eu já respondi; continue coerente com isso, sem contradizer "
+                "fatos nem recontar a mesma história do zero):\n";
+        user += answer_memory;
     }
     user += "\nGatilho: ";
     switch (reason) {

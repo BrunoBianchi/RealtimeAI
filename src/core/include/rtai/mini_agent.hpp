@@ -242,6 +242,30 @@ struct MiniAgentProfile {
 
         p.answer_language = root["answer_language"].as_string();
         p.coding_language = root["coding_language"].as_string();
+
+        // Self-heal: agent files written by older builds carry one round of
+        // cp1252 double-encoding in free-text fields ("Nubank Â· EstÃ¡gio"
+        // instead of "Nubank · Estágio"). Repair in memory; the caller
+        // rewrites the file when it persists the profile again.
+        auto heal = [](std::string& v) {
+            if (v.empty()) return;
+            if (auto fixed = text::repair_mojibake(v)) v = std::move(*fixed);
+        };
+        heal(p.name);
+        heal(p.company);
+        heal(p.role);
+        heal(p.job_description);
+        heal(p.calendar_event);
+        heal(p.company_dossier);
+        heal(p.custom_instructions);
+        heal(p.mini_compact);
+        heal(p.next_focus);
+        heal(p.playbook_name);
+        heal(p.playbook_answer_length);
+        heal(p.playbook_behavioral_structure);
+        heal(p.answer_language);
+        heal(p.coding_language);
+
         if (root["response_defaults"].is_object()) {
             const auto& rd = root["response_defaults"];
             if (p.answer_language.empty()) p.answer_language = rd["answer_language"].as_string();
@@ -288,6 +312,11 @@ struct MiniAgentProfile {
                 }
             }
         }
+        // Containers are healed after parsing (they are populated below the
+        // scalar heals above).
+        for (auto& d : p.documents) { heal(d.name); heal(d.content); }
+        for (auto& s : p.goal_memory_strengths) heal(s);
+        for (auto& s : p.goal_memory_improve) heal(s);
         if (p.id.empty()) p.id = slugify(p.name.empty() ? p.company : p.name);
         return p;
     }

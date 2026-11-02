@@ -1,7 +1,26 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('rtai', {
   getState: () => ipcRenderer.invoke('rtai:get-state'),
+  // Live view: engine events in, whitelisted commands out (answer, chat, pause...).
+  onLiveEvent: (cb) => {
+    const handler = (_event, msg) => cb(msg);
+    ipcRenderer.on('rtai:live-event', handler);
+    return () => ipcRenderer.removeListener('rtai:live-event', handler);
+  },
+  overlayCommand: (command) => ipcRenderer.invoke('rtai:overlay-command', command),
+  // Drag & drop: File objects carry no path in the renderer since Electron 32.
+  getPathForFile: (file) => {
+    try {
+      return webUtils.getPathForFile(file) || '';
+    } catch (_e) {
+      return '';
+    }
+  },
+  importFiles: (paths, tag) => ipcRenderer.invoke('rtai:import-files', { paths, tag }),
+  // JEV: per-question rubric for a saved session (cached as <id>.jev.json).
+  evaluateSession: (sessionId, agentId, force) => ipcRenderer.invoke('rtai:evaluate-session', { sessionId, agentId, force: Boolean(force) }),
+  rebuildQuestionBank: () => ipcRenderer.invoke('rtai:rebuild-question-bank'),
   saveAgent: (agent) => ipcRenderer.invoke('rtai:save-agent', agent),
   deleteAgent: (agentId) => ipcRenderer.invoke('rtai:delete-agent', agentId),
   pickFiles: (defaultTag) => ipcRenderer.invoke('rtai:pick-files', defaultTag),

@@ -13,6 +13,7 @@ add_executable(core_tests
     test_outbound_queue.cpp
     test_deepgram_stream.cpp
     test_source_pipeline.cpp
+    test_answer_memory.cpp
     test_copilot.cpp
     test_llm_protocol.cpp
     test_session_store.cpp
@@ -39,6 +40,7 @@ add_executable(core_tests
     test_question_flow.cpp
     test_question_interpretation.cpp
     test_hybrid_rag.cpp
+    test_repair_mojibake.cpp
     test_engine_deadlines.cpp
 )
 

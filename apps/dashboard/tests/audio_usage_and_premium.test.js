@@ -2,36 +2,43 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
+const { loadRenderer, render, indexHtml } = require('./helpers/renderer');
 
-const indexHtmlPath = path.resolve(__dirname, '../src/renderer/index.html');
-const appJsPath = path.resolve(__dirname, '../src/renderer/app.js');
 const mainJsPath = path.resolve(__dirname, '../src/main/main.js');
 
-test('Audio Usage & Premium: HTML contains sidebar widget and upgrade modal', () => {
-  const html = fs.readFileSync(indexHtmlPath, 'utf8');
+// A session recorded on `day` of the current month.
+function thisMonth(day, minutes) {
+  const now = new Date();
+  return { id: `s${day}`, startedAt: new Date(now.getFullYear(), now.getMonth(), day, 10).toISOString(), durationSeconds: minutes * 60 };
+}
 
-  // Sidebar usage widget elements
-  assert.ok(html.includes('id="sidebarUsageCard"'), 'Must have sidebarUsageCard');
-  assert.ok(html.includes('id="sidebarPlanBadge"'), 'Must have sidebarPlanBadge');
-  assert.ok(html.includes('id="sidebarUsageTime"'), 'Must have sidebarUsageTime');
-  assert.ok(html.includes('id="sidebarUsagePercent"'), 'Must have sidebarUsagePercent');
-  assert.ok(html.includes('id="sidebarUsageProgressBar"'), 'Must have sidebarUsageProgressBar');
-  assert.ok(html.includes('id="sidebarUsageSessions"'), 'Must have sidebarUsageSessions');
-  assert.ok(html.includes('id="btnSidebarUpgrade"'), 'Must have btnSidebarUpgrade');
-  assert.ok(html.includes('id="profilePlanBadge"'), 'Must have profilePlanBadge');
+test('Audio Usage & Premium: sidebar usage card shows real minutes against the plan limit', () => {
+  assert.ok(/id="sidebarUsage"[^>]*data-to="settings\/plan"/.test(indexHtml), 'usage card opens Settings > Plan');
+  assert.ok(indexHtml.includes('id="profilePlan"'), 'profile row shows the plan');
 
-  // Settings -> Account plan elements
-  assert.ok(html.includes('id="accountPlanBadge"'), 'Must have accountPlanBadge');
-  assert.ok(html.includes('id="accountUsageTimeLabel"'), 'Must have accountUsageTimeLabel');
-  assert.ok(html.includes('id="accountUsageProgressBar"'), 'Must have accountUsageProgressBar');
-  assert.ok(html.includes('id="btnAccountUpgrade"'), 'Must have btnAccountUpgrade');
+  const free = loadRenderer({
+    state: {
+      profile: { name: 'Ana', plan: 'free', transcriptionUsage: { limitMinutes: 300 } },
+      sessions: [thisMonth(1, 25), thisMonth(2, 20)]
+    }
+  });
+  free.Cue.renderShell();
+  const card = free.page('sidebarUsage').innerHTML;
+  assert.ok(card.includes('>45<'), 'minutes transcribed this month');
+  assert.ok(card.includes('/ 300 min'), 'monthly limit');
+  assert.ok(card.includes('255 min restantes'), 'minutes left');
+  assert.ok(card.includes('usage-ticks'), 'progress ticks while there is a limit');
+  assert.strictEqual(free.page('profilePlan').textContent, 'Plano Free');
 
-  // Modal elements
-  assert.ok(html.includes('id="modalUpgradePremium"'), 'Must have modalUpgradePremium');
-  assert.ok(html.includes('id="btnCloseUpgradeModal"'), 'Must have btnCloseUpgradeModal');
-  assert.ok(html.includes('id="toggleBillingInterval"'), 'Must have toggleBillingInterval');
-  assert.ok(html.includes('id="btnActionUpgradePremium"'), 'Must have btnActionUpgradePremium');
-  assert.ok(html.includes('id="btnSelectPlanFree"'), 'Must have btnSelectPlanFree');
+  // Premium has no monthly limit: no ticks, the count of sessions instead.
+  const pro = loadRenderer({
+    state: { profile: { plan: 'premium', transcriptionUsage: { limitMinutes: 300 } }, sessions: [thisMonth(1, 25)] }
+  });
+  pro.Cue.renderShell();
+  const proCard = pro.page('sidebarUsage').innerHTML;
+  assert.ok(proCard.includes('min transcritos') && !proCard.includes('usage-ticks'));
+  assert.ok(proCard.includes('1 sessão'));
+  assert.strictEqual(pro.page('profilePlan').textContent, 'Plano Pro');
 });
 
 test('Audio Usage & Premium: main.js provides default profile with plan and usage', () => {
@@ -43,13 +50,23 @@ test('Audio Usage & Premium: main.js provides default profile with plan and usag
   assert.ok(mainJs.includes('limitMinutes'), 'main.js should initialize limitMinutes');
 });
 
-test('Audio Usage & Premium: app.js contains renderPlanAndUsage and initPlanAndBillingEvents', () => {
-  const appJs = fs.readFileSync(appJsPath, 'utf8');
+test('Audio Usage & Premium: Settings > Plan shows the plan, the meter and usage by month', () => {
+  const { Cue } = loadRenderer({
+    state: {
+      profile: { plan: 'free', email: 'ana@example.com', transcriptionUsage: { limitMinutes: 60 } },
+      sessions: [thisMonth(1, 56)]
+    }
+  });
+  const html = render(Cue, 'settings/plan');
+  assert.ok(html.includes('60 minutos de transcrição por mês.'));
+  assert.ok(html.includes('56 de 60 min'), 'this month against the limit');
+  assert.ok(html.includes('class="bar danger"'), 'meter turns red above 90%');
+  assert.ok(html.includes('Conta: ana@example.com'));
+  assert.ok(html.includes('56 min · 1 sessão'), 'usage by month comes from the recorded sessions');
 
-  assert.ok(appJs.includes('function renderPlanAndUsage'), 'app.js should define renderPlanAndUsage');
-  assert.ok(appJs.includes('function initPlanAndBillingEvents'), 'app.js should define initPlanAndBillingEvents');
-  assert.ok(appJs.includes('renderPlanAndUsage()'), 'app.js should call renderPlanAndUsage');
-  assert.ok(appJs.includes('initPlanAndBillingEvents()'), 'app.js should call initPlanAndBillingEvents');
-  assert.ok(appJs.includes("plan: 'premium'"), 'app.js should support upgrading to premium');
-  assert.ok(appJs.includes("plan: 'free'"), 'app.js should support switching to free mock');
+  // Nothing is invented when there is no data.
+  const empty = loadRenderer({ state: { profile: { plan: 'premium' }, sessions: [] } });
+  const none = render(empty.Cue, 'settings/plan');
+  assert.ok(none.includes('Sem limite mensal de transcrição.'));
+  assert.ok(none.includes('Nenhuma sessão gravada ainda.'));
 });

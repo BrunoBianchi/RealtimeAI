@@ -1,105 +1,103 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const fs = require('node:fs');
-const path = require('node:path');
+const { loadRenderer, render, el, tags, settle } = require('./helpers/renderer');
 
-const indexHtmlPath = path.resolve(__dirname, '../src/renderer/index.html');
-const appJsPath = path.resolve(__dirname, '../src/renderer/app.js');
+test('Feature: Plan & usage come from the local profile and the recorded sessions', () => {
+  const now = new Date();
+  const thisMonth = (min) => ({ startedAt: new Date(now.getFullYear(), now.getMonth(), 1, 9).toISOString(), durationSeconds: min * 60, questionsCount: 3, suggestions: 5 });
+  const lastYear = { startedAt: new Date(now.getFullYear() - 1, now.getMonth(), 1).toISOString(), durationSeconds: 3600 };
+  const usage = (profile, sessions) => loadRenderer({ state: { profile, sessions } }).Cue.usage();
 
-test('Feature: Plan & Billing Screen (Image 1 Fidelity)', () => {
-  const html = fs.readFileSync(indexHtmlPath, 'utf8');
-  const appJs = fs.readFileSync(appJsPath, 'utf8');
+  const free = usage({ plan: 'free', transcriptionUsage: { limitMinutes: 120 } }, [thisMonth(30), thisMonth(60), lastYear]);
+  assert.strictEqual(free.planLabel, 'Free');
+  assert.strictEqual(free.usedMin, 90, 'only this month counts');
+  assert.strictEqual(free.limit, 120);
+  assert.strictEqual(free.pct, 75);
+  assert.strictEqual(free.left, 30);
+  assert.strictEqual(free.sessions, 2);
+  assert.strictEqual(free.questions, 6);
+  assert.strictEqual(free.answers, 10);
 
-  // Breadcrumb and header
-  assert.ok(html.includes('id="btnBillingHelp"'), 'Must have btnBillingHelp in Plan & Billing');
-  assert.ok(html.includes('id="billingPlanAvatar"'), 'Must have billingPlanAvatar in Plan & Billing');
-  assert.ok(html.includes('id="billingCurrentPlanName"'), 'Must have billingCurrentPlanName in Plan & Billing');
+  const pro = usage({ plan: 'premium', transcriptionUsage: { limitMinutes: 120 } }, [thisMonth(500)]);
+  assert.strictEqual(pro.planLabel, 'Pro');
+  assert.strictEqual(pro.limit, null, 'Pro has no monthly limit');
+  assert.strictEqual(pro.pct, null);
 
-  // Left column: 4 plans
-  assert.ok(html.includes('id="billingPlansRadioGroup"'), 'Must have billingPlansRadioGroup');
-  assert.ok(html.includes('data-plan-id="monthly"'), 'Must have Monthly plan card');
-  assert.ok(html.includes('data-plan-id="quarterly"'), 'Must have Quarterly plan card');
-  assert.ok(html.includes('data-plan-id="max"'), 'Must have Premium MAX plan card');
-  assert.ok(html.includes('data-plan-id="yearly"'), 'Must have Yearly plan card');
-  assert.ok(html.includes('id="linkHowPricingWorks"'), 'Must have linkHowPricingWorks');
+  const over = usage({ plan: 'free', transcriptionUsage: { limitMinutes: 60 } }, [thisMonth(90)]);
+  assert.strictEqual(over.pct, 100, 'meter is capped');
+  assert.strictEqual(over.left, 0);
 
-  // Right column: selected plan card
-  assert.ok(html.includes('id="selectedPlanTitle"'), 'Must have selectedPlanTitle');
-  assert.ok(html.includes('id="selectedPlanPrice"'), 'Must have selectedPlanPrice');
-  assert.ok(html.includes('id="selectedPlanCadenceSub"'), 'Must have selectedPlanCadenceSub');
-  assert.ok(html.includes('id="selectedPlanDiscountPill"'), 'Must have selectedPlanDiscountPill');
-  assert.ok(html.includes('id="selectedPlanBaseline"'), 'Must have selectedPlanBaseline');
-  assert.ok(html.includes('id="selectedPlanAdvantage"'), 'Must have selectedPlanAdvantage');
-  assert.ok(html.includes('id="btnBillingContinueCheckout"'), 'Must have btnBillingContinueCheckout');
-
-  // app.js interactivity
-  assert.ok(appJs.includes('billingPlansRadioGroup'), 'app.js must handle billingPlansRadioGroup');
-  assert.ok(appJs.includes('btnBillingContinueCheckout'), 'app.js must handle btnBillingContinueCheckout');
+  const unset = usage({}, []);
+  assert.strictEqual(unset.planLabel, 'Free');
+  assert.strictEqual(unset.limit, null, 'no limit set: none is invented');
 });
 
-test('Feature: Library & Playbooks Tab (Image 2 Fidelity)', () => {
-  const html = fs.readFileSync(indexHtmlPath, 'utf8');
-  const appJs = fs.readFileSync(appJsPath, 'utf8');
+test('Feature: Library (Arquivos) lists every file with its session, type and status', () => {
+  const agents = [
+    { id: 'a1', company: 'Nubank', role: 'Backend', documents: [{ title: 'cv.pdf', tag: 'resume', content: 'Go' }, { title: 'scan.pdf', tag: 'material', content: '' }] },
+    { id: 'a2', company: 'Stone', role: 'SRE', documents: [{ title: 'vaga.txt', tag: 'job', content: 'SRE' }] }
+  ];
+  const r = loadRenderer({ state: { agents } });
+  let html = render(r.Cue, 'files');
+  assert.ok(html.includes('3 arquivos'));
+  assert.ok(tags(html, { 'data-action': 'files-pick' }).length === 1 && html.includes('id="filesDrop"'), 'drop zone / picker');
+  assert.deepStrictEqual(tags(html, { 'data-change': 'files-target' }).length, 1, 'choose the session new files go to');
+  assert.ok(/data-to="session\/a2"[^>]*>Stone · SRE</.test(html), 'each file links to its session');
+  assert.strictEqual((html.match(/>Indexado</g) || []).length, 2);
+  assert.strictEqual((html.match(/>Sem texto</g) || []).length, 1, 'a scan with no readable text is flagged');
+  assert.ok(/data-change="doc-tag"[^>]*data-agent="a1" data-idx="0">[\s\S]*?<option value="resume" selected>/.test(html), 'type is editable');
 
-  // Top header with Go Live · goal and help
-  assert.ok(html.includes('id="btnLibraryGoLive"'), 'Library must have Go Live button');
-  assert.ok(html.includes('id="libraryGoLiveText"'), 'Library Go Live button must display active goal name');
-  assert.ok(html.includes('id="btnLibraryHelp"'), 'Library must have help button');
+  // Search filters by name, session or type.
+  r.S.ui.filesQuery = 'stone';
+  html = render(r.Cue, 'files');
+  assert.ok(html.includes('1 arquivo') && html.includes('vaga.txt') && !html.includes('cv.pdf'));
+  r.S.ui.filesQuery = 'zzz';
+  assert.ok(render(r.Cue, 'files').includes('Nenhum arquivo com essa busca.'));
 
-  // Subtitle links
-  assert.ok(html.includes('id="linkHowLibraryWorks"'), 'Library must have linkHowLibraryWorks');
-  assert.ok(html.includes('id="linkOpenAiDrive"'), 'Library must have linkOpenAiDrive');
-
-  // Tab action button
-  assert.ok(html.includes('id="btnLibraryNewPlaybook"'), 'Library tab bar must have btnLibraryNewPlaybook');
-
-  // Empty state for playbooks
-  assert.ok(html.includes('id="libraryPlaybooksEmptyState"'), 'Library must have libraryPlaybooksEmptyState');
-  assert.ok(html.includes('Shape how the copilot answers.'), 'Empty state must have heading');
-  assert.ok(html.includes('id="linkPlaybooksWhatPlaybookDoes"'), 'Empty state must have linkPlaybooksWhatPlaybookDoes');
-  assert.ok(html.includes('id="btnEmptyNewPlaybook"'), 'Empty state must have btnEmptyNewPlaybook');
-
-  // app.js wiring
-  assert.ok(appJs.includes('libraryPlaybooksEmptyState'), 'app.js must toggle libraryPlaybooksEmptyState');
-  assert.ok(appJs.includes('btnLibraryNewPlaybook'), 'app.js must wire btnLibraryNewPlaybook');
-  assert.ok(appJs.includes('btnEmptyNewPlaybook'), 'app.js must wire btnEmptyNewPlaybook');
+  // No session yet: the page offers to create one instead of a dead drop zone.
+  const none = render(loadRenderer().Cue, 'files');
+  assert.ok(none.includes('Crie uma sessão para anexar arquivos') && tags(none, { 'data-action': 'new-session' }).length === 1);
 });
 
-test('Feature: New Playbook Modal (Images 3 & 4 Fidelity)', () => {
-  const html = fs.readFileSync(indexHtmlPath, 'utf8');
-  const appJs = fs.readFileSync(appJsPath, 'utf8');
+test('Feature: playbooks are chosen per session and applied with their settings', async () => {
+  const pb = { name: 'Conciso', answer_length: 'Concise', behavioral_structure: 'Auto', lead_with_answer: true, name_tradeoffs: false };
+  const agent = { id: 'a1', company: 'Nubank', role: 'Backend' };
+  const r = loadRenderer({
+    state: { agents: [agent], playbooks: [pb] },
+    api: { saveAgent: async (a) => ({ ok: true, agents: [a], saved: a }) }
+  });
+  const html = render(r.Cue, 'session/a1');
+  const select = html.slice(html.indexOf('data-change="agent-playbook"'));
+  assert.ok(select.includes('<option value="Conciso"') && select.includes('<option value="Standard STAR" selected>'), 'saved playbooks plus the default');
 
-  // Header & Name
-  assert.ok(html.includes('id="modalNewPlaybook"'), 'Must have modalNewPlaybook');
-  assert.ok(html.includes('id="btnCloseNewPlaybook"'), 'Must have btnCloseNewPlaybook');
-  assert.ok(html.includes('id="linkHowPlaybooksWork"'), 'Must have linkHowPlaybooksWork');
-  assert.ok(html.includes('id="inputPlaybookName"'), 'Must have inputPlaybookName');
-  assert.ok(html.includes('id="btnPlaybookWriteYourOwn"'), 'Must have btnPlaybookWriteYourOwn');
+  await r.Cue.changes['agent-playbook'](el({ agent: 'a1' }, { value: 'Conciso' }));
+  await settle();
+  const [[saved]] = r.called('saveAgent');
+  assert.strictEqual(saved.playbook_name, 'Conciso');
+  assert.strictEqual(saved.playbook_answer_length, 'Concise');
+  assert.strictEqual(saved.playbook_lead_with_answer, true);
+  assert.ok(r.toasts().some((t) => t.text === 'Playbook "Conciso" aplicado.'));
+});
 
-  // How You Sound: Segmented length & behavioral structure & toggles
-  assert.ok(html.includes('id="btnPlaybookLenConcise"'), 'Must have btnPlaybookLenConcise');
-  assert.ok(html.includes('id="btnPlaybookLenBalanced"'), 'Must have btnPlaybookLenBalanced');
-  assert.ok(html.includes('id="btnPlaybookLenThorough"'), 'Must have btnPlaybookLenThorough');
-  assert.ok(html.includes('id="selectPlaybookStructure"'), 'Must have selectPlaybookStructure');
-  assert.ok(html.includes('id="togglePlaybookLeadAnswer"'), 'Must have togglePlaybookLeadAnswer');
-  assert.ok(html.includes('id="togglePlaybookTradeoffs"'), 'Must have togglePlaybookTradeoffs');
-
-  // When It Speaks: Surface mode & code comments
-  assert.ok(html.includes('id="linkHowCopilotSpeaks"'), 'Must have linkHowCopilotSpeaks');
-  assert.ok(html.includes('id="btnSurfaceModeAlways"'), 'Must have btnSurfaceModeAlways');
-  assert.ok(html.includes('id="btnSurfaceModeRealQuestion"'), 'Must have btnSurfaceModeRealQuestion');
-  assert.ok(html.includes('id="btnSurfaceModeOnRequest"'), 'Must have btnSurfaceModeOnRequest');
-  assert.ok(html.includes('id="togglePlaybookCodeComments"'), 'Must have togglePlaybookCodeComments');
-
-  // Preview Box & Footer
-  assert.ok(html.includes('id="playbookAnswerPreview"'), 'Must have playbookAnswerPreview');
-  assert.ok(html.includes('id="btnCancelNewPlaybook"'), 'Must have btnCancelNewPlaybook');
-  assert.ok(html.includes('id="btnSaveNewPlaybook"'), 'Must have btnSaveNewPlaybook');
-
-  // Switches use orange styling
-  assert.ok(html.includes('sh-switch-orange'), 'Toggles must use sh-switch-orange');
-
-  // app.js dynamic preview & surface mode
-  assert.ok(appJs.includes('playbookPreviewTexts'), 'app.js must support dynamic playbookPreviewTexts');
-  assert.ok(appJs.includes('btnSurfaceModeRealQuestion'), 'app.js must handle surface mode buttons');
+test('Feature: the Ctrl+K palette finds actions, sessions, files and questions', async () => {
+  const r = loadRenderer({
+    state: {
+      agents: [{ id: 'a1', company: 'Nubank', role: 'Backend', documents: [{ title: 'portfolio.pdf', tag: 'portfolio', content: 'x' }] }],
+      questionBank: { companies: [{ id: 'nu', name: 'Nubank', questions: [{ text: 'Como você escala Kafka?' }, { text: 'Segredo', locked: true }] }] }
+    }
+  });
+  r.Cue.openModal('palette');
+  const L = r.dialogs[0];
+  const list = L.querySelector('#pcList');
+  assert.ok(list.innerHTML.includes('Nova sessão') && list.innerHTML.includes('Ir para'), 'empty query: actions and destinations');
+  const search = async (q) => {
+    L.querySelector('#pcQuery').value = q;
+    await L.querySelector('#pcQuery').fire('input');
+    return list.innerHTML;
+  };
+  assert.ok((await search('nubank')).includes('Nubank · Backend'), 'sessions');
+  assert.ok((await search('portfolio')).includes('portfolio.pdf'), 'files');
+  assert.ok((await search('kafka')).includes('Como você escala Kafka?'), 'unlocked questions');
+  assert.ok(!(await search('segredo')).includes('Segredo'), 'locked questions stay hidden');
+  assert.ok((await search('xyzzy')).includes('Nada encontrado.'));
 });

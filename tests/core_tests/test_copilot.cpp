@@ -765,8 +765,8 @@ TEST(CopilotEngine, ReusesConversationAndPriorDeliveredAnswersForPersonaCoherenc
     engine.on_transcript(final_ev(AudioSource::Microphone, "Eu liderei a migração do motor PIX.", true));
     ASSERT_TRUE(eventually([&] { return col->all<TurnEvent>().size() == 2; }));
 
-    // Turn 2: Interviewer asks follow-up question -> prompt MUST contain both the conversation
-    // transcript AND the previously delivered suggestion #1 so persona & facts stay coherent.
+    // Turn 2: Interviewer asks a follow-up -> prompt MUST contain both the conversation
+    // transcript AND the answer memory (suggestion #1) so persona & facts stay coherent.
     engine.on_transcript(final_ev(AudioSource::Loopback, "E quais foram os maiores desafios técnicos dessa migração?", true));
     ASSERT_TRUE(eventually([&] { return col->all<SuggestionDoneEvent>().size() == 2; }));
     engine.stop();
@@ -776,8 +776,70 @@ TEST(CopilotEngine, ReusesConversationAndPriorDeliveredAnswersForPersonaCoherenc
     EXPECT_NE(req.messages[1].content.find("[Outros] Qual foi o principal projeto que você liderou recentemente?"), std::string::npos);
     EXPECT_NE(req.messages[1].content.find("[Você] Eu liderei a migração do motor PIX."), std::string::npos);
     EXPECT_NE(req.messages[1].content.find("[Minhas Respostas já Faladas pelo Microfone ([Você]) nesta Entrevista"), std::string::npos);
-    EXPECT_NE(req.messages[1].content.find("[Histórico de Respostas já Sugeridas pelo Copiloto nesta Sessão"), std::string::npos);
+    EXPECT_NE(req.messages[1].content.find("MEMÓRIA DESTE ASSUNTO"), std::string::npos);
     EXPECT_NE(req.messages[1].content.find("Resposta curta"), std::string::npos);
+}
+
+TEST(CopilotEngine, AnswerMemoryIsLeftOutWhenTheSubjectChanges) {
+    auto llm = fast_llm();
+    CopilotEngine engine{fast_engine_config(), llm};
+    auto col = std::make_shared<Collector>();
+    engine.add_sink([col](const EngineEvent& e) { (*col)(e); });
+    engine.start();
+
+    engine.on_transcript(final_ev(AudioSource::Loopback, "Qual foi o principal projeto que você liderou recentemente?", true));
+    ASSERT_TRUE(eventually([&] { return col->all<SuggestionDoneEvent>().size() == 1; }));
+    // The candidate answers in between (otherwise both lines are one utterance).
+    engine.on_transcript(final_ev(AudioSource::Microphone, "Eu liderei a migração do motor PIX.", true));
+    ASSERT_TRUE(eventually([&] { return col->all<TurnEvent>().size() == 2; }));
+    engine.on_transcript(final_ev(AudioSource::Loopback, "Por que você quer trabalhar no iFood?", true));
+    ASSERT_TRUE(eventually([&] { return col->all<SuggestionDoneEvent>().size() == 2; }));
+    engine.stop();
+
+    const auto req = llm->last_request();
+    ASSERT_EQ(req.messages.size(), 2u);
+    EXPECT_EQ(req.messages[1].content.find("MEMÓRIA DESTE ASSUNTO"), std::string::npos) << req.messages[1].content;
+    // The transcript itself is still there.
+    EXPECT_NE(req.messages[1].content.find("[Outros] Qual foi o principal projeto"), std::string::npos);
+}
+
+TEST(CopilotEngine, LongThreadIsCompactedByTheBackgroundModel) {
+    auto llm = fast_llm();
+    ScriptedLlmClient::Options co;
+    co.reply = "Liderei a migração do motor PIX.";
+    co.first_token_delay = 1ms;
+    co.token_delay = 0ms;
+    auto compactor = std::make_shared<ScriptedLlmClient>(co);
+    CopilotConfig cfg = fast_engine_config();
+    cfg.answer_memory.verbatim_budget_chars = 120;
+    cfg.compaction_llm = compactor;
+    cfg.compaction_model = "qwen/qwen3.6-flash";
+    CopilotEngine engine{cfg, llm};
+    auto col = std::make_shared<Collector>();
+    engine.add_sink([col](const EngineEvent& e) { (*col)(e); });
+    engine.start();
+
+    engine.on_transcript(final_ev(AudioSource::Loopback, "Qual foi o principal projeto que você liderou recentemente?", true));
+    ASSERT_TRUE(eventually([&] { return col->all<SuggestionDoneEvent>().size() == 1; }));
+    engine.on_transcript(final_ev(AudioSource::Microphone, "Eu liderei a migração do motor PIX.", true));
+    ASSERT_TRUE(eventually([&] { return col->all<TurnEvent>().size() == 2; }));
+    engine.on_transcript(final_ev(AudioSource::Loopback, "E quais foram os maiores desafios técnicos dessa migração?", true));
+    ASSERT_TRUE(eventually([&] { return col->all<SuggestionDoneEvent>().size() == 2; }));
+    // Two answers over the budget: the compactor is asked off the live path.
+    ASSERT_TRUE(eventually([&] { return compactor->last_request().model == "qwen/qwen3.6-flash"; }));
+    EXPECT_NE(compactor->last_request().messages.at(1).content.find("principal projeto"), std::string::npos);
+
+    std::this_thread::sleep_for(50ms); // let the summary land on the orchestrator
+    engine.on_transcript(final_ev(AudioSource::Microphone, "Os desafios foram a consistência e a latência.", true));
+    ASSERT_TRUE(eventually([&] { return col->all<TurnEvent>().size() == 4; }));
+    engine.on_transcript(final_ev(AudioSource::Loopback, "E como você mediu o resultado dessa migração?", true));
+    ASSERT_TRUE(eventually([&] { return col->all<SuggestionDoneEvent>().size() == 3; }));
+    engine.stop();
+
+    const LlmRequest last = llm->last_request();
+    const std::string& prompt = last.messages.at(1).content;
+    EXPECT_NE(prompt.find("Resumo do que eu já respondi sobre este assunto"), std::string::npos) << prompt;
+    EXPECT_NE(prompt.find("Liderei a migração do motor PIX."), std::string::npos);
 }
 
 TEST(MiniAgentRag, Sol61MediumConfigAndElectronDashboardSchemaCompatibility) {
