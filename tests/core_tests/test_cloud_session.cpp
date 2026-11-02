@@ -1,0 +1,172 @@
+// RealTimeAI cloud backend, client side: backend choice, the /v1/session
+// request/response contract and how it maps onto the Deepgram stream.
+#include <gtest/gtest.h>
+
+#include <map>
+#include <string>
+
+#include "rtai/cloud_session.hpp"
+#include "rtai/deepgram_protocol.hpp"
+#include "rtai/ini.hpp"
+#include "rtai/settings.hpp"
+
+using namespace rtai;
+
+namespace {
+
+Settings settings_from(const std::string& ini_text) {
+    const EnvLookup no_env = [](const char*) { return std::string(); };
+    const SecretDecoder plain = [](const std::string& v) -> std::optional<std::string> { return v; };
+    return load_settings(ini::File::parse(ini_text), no_env, plain);
+}
+
+const char* kGoodSession = R"({
+  "session_id": "sess_123",
+  "expires_at": 1900000600,
+  "refresh_after_s": 300,
+  "stt": {"url": "wss://api.deepgram.com/v1/listen", "token": "dg-temp", "model": "nova-3",
+          "extra_query": "tag=sess_123"},
+  "llm": {"url": "https://edge.example.com/v1/chat/completions", "token": "llm-temp",
+          "model": "qwen/qwen3.6-flash", "background_model": "qwen/qwen3.6-flash",
+          "fallback": {"url": "https://edge2.example.com/v1/chat/completions", "token": "fb"}},
+  "account": {"plan": "pro", "minutes_left": 512},
+  "notice": "Bem-vindo"
+})";
+
+} // namespace
+
+TEST(CloudSettings, ReadsServidorSectionAndTreatsTokenAsSecret) {
+    const Settings s = settings_from("[servidor]\nmodo = nuvem\nurl = https://api.example.com/\n"
+                                     "token = devtok\nregiao = sa-east-1\n");
+    EXPECT_EQ(s.server_mode, "nuvem");
+    EXPECT_EQ(s.server_url, "https://api.example.com/");
+    EXPECT_EQ(s.server_token, "devtok");
+    EXPECT_EQ(s.server_region, "sa-east-1");
+    EXPECT_TRUE(is_known_setting("servidor", "token"));
+    EXPECT_TRUE(is_secret_setting("servidor", "token"));
+    EXPECT_FALSE(is_secret_setting("servidor", "url"));
+    EXPECT_EQ(cloud::effective_base_url(s), "https://api.example.com");
+}
+
+TEST(CloudSettings, InvalidModeWarnsAndKeepsAuto) {
+    const Settings s = settings_from("[servidor]\nmodo = talvez\n");
+    EXPECT_EQ(s.server_mode, "auto");
+    EXPECT_FALSE(s.warnings.empty());
+}
+
+TEST(CloudBackend, AutoUsesCloudOnlyWhenSignedInAndServerKnown) {
+    Settings s;
+    s.server_url = "https://api.example.com";
+    EXPECT_EQ(cloud::choose_backend(s), cloud::Backend::Own); // not signed in
+    s.server_token = "tok";
+    EXPECT_EQ(cloud::choose_backend(s), cloud::Backend::Cloud);
+    s.server_mode = "proprio";
+    EXPECT_EQ(cloud::choose_backend(s), cloud::Backend::Own); // explicit opt-out wins
+    s.server_mode = "nuvem";
+    EXPECT_TRUE(cloud::cloud_required(s));
+    s.server_url = "nao-e-url";
+    if (std::string(cloud::kDefaultServerUrl).empty()) {
+        EXPECT_EQ(cloud::choose_backend(s), cloud::Backend::Own); // no usable server
+    }
+}
+
+TEST(CloudSession, RequestBodyCarriesVersionLanguageAndCapabilities) {
+    cloud::SessionRequest r;
+    r.app_version = "2.1.0";
+    r.language = "multi";
+    r.model = "qwen/qwen3.6-flash";
+    r.region = "auto"; // "auto" is not sent: the server decides
+    const auto body = json::Parser::parse(cloud::build_session_request(r));
+    ASSERT_TRUE(body);
+    EXPECT_EQ((*body)["api"].as_number(), 1.0);
+    EXPECT_EQ((*body)["app_version"].as_string(), "2.1.0");
+    EXPECT_EQ((*body)["language"].as_string(), "multi");
+    EXPECT_FALSE(body->has("region"));
+    EXPECT_EQ((*body)["capabilities"]["stt"].at(0).as_string(), "deepgram-ws");
+}
+
+TEST(CloudSession, ParsesAFullResponse) {
+    std::string err;
+    const auto s = cloud::parse_session(kGoodSession, err);
+    ASSERT_TRUE(s) << err;
+    EXPECT_EQ(s->session_id, "sess_123");
+    EXPECT_EQ(s->refresh_after_s, 300);
+    EXPECT_EQ(s->stt.token, "dg-temp");
+    EXPECT_EQ(s->stt_extra_query, "tag=sess_123");
+    EXPECT_EQ(s->llm.model, "qwen/qwen3.6-flash");
+    EXPECT_TRUE(s->llm_fallback.valid());
+    EXPECT_EQ(s->plan, "pro");
+    EXPECT_EQ(s->minutes_left, 512);
+    EXPECT_EQ(s->notice, "Bem-vindo");
+}
+
+TEST(CloudSession, RejectsMissingOrNonWebSocketStt) {
+    std::string err;
+    EXPECT_FALSE(cloud::parse_session(R"({"stt":{"url":"https://x/v1/listen","token":"t"}})", err));
+    EXPECT_FALSE(err.empty());
+    EXPECT_FALSE(cloud::parse_session(R"({"llm":{"url":"https://x","token":"t"}})", err));
+    EXPECT_FALSE(cloud::parse_session("not json", err));
+}
+
+TEST(CloudSession, ServerErrorMessageIsSurfaced) {
+    std::string err;
+    EXPECT_FALSE(cloud::parse_session(R"({"error":{"message":"Plano sem minutos"}})", err));
+    EXPECT_EQ(err, "Plano sem minutos");
+}
+
+TEST(CloudSession, LlmIsOptionalButABrokenFallbackIsDropped) {
+    std::string err;
+    auto s = cloud::parse_session(R"({"stt":{"url":"wss://h/v1/listen","token":"t"}})", err);
+    ASSERT_TRUE(s) << err;
+    EXPECT_FALSE(s->llm.valid()); // transcription-only plan
+
+    s = cloud::parse_session(R"({"stt":{"url":"wss://h/v1/listen","token":"t"},
+        "llm":{"url":"https://l/v1/chat/completions","token":"k",
+               "fallback":{"url":"http://insecure/v1","token":"f"}}})", err);
+    ASSERT_TRUE(s) << err;
+    EXPECT_TRUE(s->llm.valid());
+    EXPECT_FALSE(s->llm_fallback.valid());
+}
+
+TEST(CloudSession, SttTargetFeedsTheListenPath) {
+    std::string err;
+    auto s = cloud::parse_session(
+        R"({"stt":{"url":"wss://stt.example.com:8443/relay/listen?ignored=1","token":"t"}})", err);
+    ASSERT_TRUE(s) << err;
+    s->stt_extra_query = "tag=abc";
+    const auto t = cloud::stt_target(*s);
+    ASSERT_TRUE(t);
+    EXPECT_EQ(t->host, "stt.example.com");
+    EXPECT_EQ(t->port, 8443);
+    EXPECT_TRUE(t->secure);
+    EXPECT_EQ(t->path, "/relay/listen");
+
+    dg::StreamParams p;
+    p.path = t->path;
+    p.extra_query = s->stt_extra_query;
+    const std::string q = dg::build_listen_path(p);
+    EXPECT_EQ(q.rfind("/relay/listen?model=nova-3", 0), 0u) << q;
+    EXPECT_NE(q.find("&tag=abc"), std::string::npos) << q;
+}
+
+TEST(CloudSession, RefreshHappensBeforeExpiryAndNeverTooOften) {
+    cloud::Session s;
+    s.refresh_after_s = 300;
+    s.expires_at_s = 1000 + 120;                    // expires in 2 min
+    EXPECT_EQ(cloud::refresh_delay_s(s, 1000), 90); // 30 s of margin
+    s.expires_at_s = 1000 + 20;                     // nearly expired
+    EXPECT_EQ(cloud::refresh_delay_s(s, 1000), 15);
+    s.expires_at_s = 0;
+    EXPECT_EQ(cloud::refresh_delay_s(s, 1000), 300);
+}
+
+TEST(CloudSession, SessionEndBody) {
+    cloud::SessionEnd e;
+    e.duration_s = 1800;
+    e.stt_audio_s = 1500;
+    e.answers = 12;
+    const auto v = json::Parser::parse(cloud::build_session_end(e));
+    ASSERT_TRUE(v);
+    EXPECT_EQ((*v)["duration_s"].as_number(), 1800.0);
+    EXPECT_FALSE(v->has("avg_ttft_ms"));
+}

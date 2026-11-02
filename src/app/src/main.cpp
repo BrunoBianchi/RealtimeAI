@@ -32,6 +32,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <future>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -43,6 +44,8 @@
 #include "rtai/config_win.hpp"
 #include "rtai/settings.hpp"
 #include "rtai/copilot_engine.hpp"
+#include "rtai/cloud_client.hpp"
+#include "rtai/cloud_session.hpp"
 #include "rtai/deepgram_transport.hpp"
 #include "rtai/demo_conversation.hpp"
 #include "rtai/fake_transport.hpp"
@@ -150,6 +153,7 @@ struct AppConfig {
     bool console{false};
     bool save{true};
     bool open_config_only{false};
+    bool protect_only{false};       // --protect-keys: encrypt plaintext secrets and exit
     bool server{false};
     bool no_launcher{true};
     std::string agent_id;
@@ -161,6 +165,9 @@ struct AppConfig {
     fs::path session_dir;
     fs::path silero_model;
     std::vector<std::string> notes; // shown as notices after start
+    // RealTimeAI cloud: set when the session broker handed out credentials.
+    std::shared_ptr<CloudClient> cloud;
+    std::optional<cloud::Session> cloud_session;
 };
 
 fs::path exe_directory() {
@@ -186,6 +193,7 @@ AppConfig load_config(int argc, char** argv) {
         else if (a == "--server") { c.server = true; }
         else if (a == "--no-save") c.save = false;
         else if (a == "--config") c.open_config_only = true;
+        else if (a == "--protect-keys") c.protect_only = true;
         else if (a == "--no-launcher") c.no_launcher = true;
         else if (a == "--studio" || a == "--launcher") c.no_launcher = false;
         else if (a == "--agent" && i + 1 < argc) c.agent_id = argv[++i];
@@ -371,6 +379,20 @@ DeepgramStreamConfig deepgram_config(const AppConfig& cfg, AudioSource src) {
     DeepgramStreamConfig dc;
     dc.api_key = cfg.st.deepgram_key;
     dc.source = src;
+    if (cfg.cloud && cfg.cloud_session) {
+        // Straight to the STT host the server picked, with its short-lived
+        // token (no relay in the audio path). The token is re-read before
+        // every connect, so reconnects use the background-refreshed one.
+        if (const auto t = cloud::stt_target(*cfg.cloud_session)) {
+            dc.params.host = t->host;
+            dc.params.path = t->path;
+            dc.port = t->port;
+            dc.secure = t->secure;
+        }
+        if (!cfg.cloud_session->stt.model.empty()) dc.params.model = cfg.cloud_session->stt.model;
+        dc.params.extra_query = cfg.cloud_session->stt_extra_query;
+        dc.authorization = [c = cfg.cloud](bool force) { return c->stt_authorization(force); };
+    }
     dc.params.language = cfg.st.language;
     dc.params.keyterms = cfg.st.keyterms;
     if (dc.params.keyterms.size() > 50) dc.params.keyterms.resize(50); // keep the URL/keyterm budget sane
@@ -404,6 +426,11 @@ server::Hello make_hello(const AppConfig& cfg, bool llm_on, const std::string& m
     h.has_deepgram_key = !cfg.st.deepgram_key.empty();
     h.has_llm_key = !cfg.st.llm_key.empty();
     h.llm_url = cfg.st.llm_url;
+    if (cfg.cloud_session) {
+        h.backend = cloud::to_string(cloud::Backend::Cloud);
+        h.plan = cfg.cloud_session->plan;
+        h.llm_url = cfg.cloud_session->llm.url;
+    }
     h.config_path = path_utf8(cfg.config_path);
     h.app_version = rtai::build::kVersion;
     return h;
@@ -546,10 +573,10 @@ std::unique_ptr<HybridRagLoader> start_hybrid_rag(AsyncLog& log, const AppConfig
 }
 
 // No Deepgram key yet: tell the UI and only accept configuration commands.
-int run_setup_mode(const AppConfig& cfg, LineChannel& out, AsyncLog& log) {
+int run_setup_mode(const AppConfig& cfg, LineChannel& out, AsyncLog& log, const char* needs = "deepgram_key") {
     server::Hello h = make_hello(cfg, false, cfg.st.model);
     h.ready = false;
-    h.needs = "deepgram_key";
+    h.needs = needs;
     out.send(server::encode_hello(h));
     for (const auto& n : cfg.notes) {
         json::Writer w;
@@ -572,7 +599,7 @@ int run_setup_mode(const AppConfig& cfg, LineChannel& out, AsyncLog& log) {
         },
         [] { SetEvent(g_stop_event); });
     reader.start();
-    log.line("Setup mode: the Deepgram key is missing (" + path_utf8(cfg.config_path) + ")");
+    log.line(std::string("Setup mode: ") + needs + " (" + path_utf8(cfg.config_path) + ")");
     WaitForSingleObject(g_stop_event, INFINITE);
     reader.stop();
     out.send(server::encode_bye("", ""));
@@ -625,11 +652,37 @@ int run_app(AppConfig cfg) {
     }
     QpcClock clock;
 
+    // load_config already encrypted any plaintext key (the dashboard runs this
+    // right after the cloud sign-in so the device token never stays readable).
+    if (cfg.protect_only) return 0;
+
     if (cfg.open_config_only) {
         enable_per_monitor_dpi();
         open_settings_popup(cfg.config_path);
         std::cout << "Config: " << path_utf8(cfg.config_path) << "\n";
         return 0;
+    }
+
+    // ---------------- RealTimeAI cloud bootstrap ----------------
+    // One POST /v1/session, started now so its round trip overlaps the agent,
+    // RAG and audio set-up below; joined just before the transports are built.
+    std::future<std::optional<cloud::Session>> cloud_boot;
+    std::string cloud_error;
+    int cloud_http_status = 0;
+    if (!cfg.demo && cloud::choose_backend(cfg.st) == cloud::Backend::Cloud) {
+        CloudClientOptions co;
+        co.base_url = cloud::effective_base_url(cfg.st);
+        co.token = cfg.st.server_token;
+        co.request.app_version = rtai::build::kVersion;
+        co.request.language = cfg.st.language;
+        co.request.model = cfg.st.model;
+        co.request.region = cfg.st.server_region;
+        co.request.agent_id = !cfg.agent_id.empty() ? cfg.agent_id : cfg.st.last_agent;
+        cfg.cloud = std::make_shared<CloudClient>(std::move(co));
+        cloud_boot = std::async(std::launch::async, [c = cfg.cloud, &cloud_error, &cloud_http_status] {
+            return c->fetch(cloud_error, &cloud_http_status);
+        });
+        log.line("Cloud: requesting a session from " + cloud::effective_base_url(cfg.st));
     }
 
     // ---------------- Pre-Session Studio & Mini-Agent Loading ----------------
@@ -746,10 +799,42 @@ int run_app(AppConfig cfg) {
 
     const auto session_start = std::chrono::steady_clock::now();
 
-    if (!cfg.demo && cfg.st.deepgram_key.empty() && out) {
+    if (cloud_boot.valid()) {
+        const auto t0 = std::chrono::steady_clock::now();
+        cfg.cloud_session = cloud_boot.get();
+        const auto waited = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                std::chrono::steady_clock::now() - t0).count();
+        if (cfg.cloud_session && !cfg.demo) {
+            cfg.cloud->start_refresh();
+            log.line("Cloud: session " + cfg.cloud_session->session_id + " (plan " + cfg.cloud_session->plan +
+                     ", waited " + std::to_string(waited) + " ms at start-up)");
+            if (!cfg.cloud_session->notice.empty()) cfg.notes.push_back(cfg.cloud_session->notice);
+        } else {
+            cfg.cloud_session.reset();
+            cfg.cloud.reset();
+            log.line("Cloud: " + cloud_error);
+            const bool own_keys = !cfg.st.deepgram_key.empty();
+            if (!cfg.demo && (cloud::cloud_required(cfg.st) || !own_keys)) {
+                // Signed in to the cloud only: nothing to fall back to.
+                if (out) {
+                    cfg.notes.push_back("Servidor RealTimeAI: " + cloud_error);
+                    return run_setup_mode(cfg, *out, log, cloud_http_status == 401 ? "login" : "server");
+                }
+                std::cerr << "[servidor] " << cloud_error << "\n";
+                return 2;
+            }
+            if (!cfg.demo) {
+                cfg.notes.push_back("Servidor RealTimeAI indisponível (" + cloud_error +
+                                    "); usando as suas chaves próprias.");
+            }
+        }
+    }
+
+    const bool have_stt = cfg.cloud_session.has_value() || !cfg.st.deepgram_key.empty();
+    if (!cfg.demo && !have_stt && out) {
         return run_setup_mode(cfg, *out, log);
     }
-    if (!cfg.demo && cfg.st.deepgram_key.empty()) {
+    if (!cfg.demo && !have_stt) {
         enable_per_monitor_dpi();
         if (open_settings_popup(cfg.config_path)) {
             const EnvLookup env_lookup = [](const char* name) { return env(name); };
@@ -782,6 +867,31 @@ int run_app(AppConfig cfg) {
             return base;
         };
         llm = std::make_shared<ScriptedLlmClient>(so);
+    } else if (cfg.cloud_session && cfg.cloud_session->llm.valid()) {
+        // Cloud: same OpenAI-compatible SSE client, pointed at the URL the
+        // server chose (edge relay next to the provider, or the provider
+        // itself with a scoped key). Keep-alive pings keep the TLS connection
+        // warm between questions, exactly as with own keys.
+        const cloud::Session& cs = *cfg.cloud_session;
+        const ParsedUrl url = parse_url(cs.llm.url);
+        WinHttpLlmOptions lo;
+        lo.api_key = cs.llm.token;
+        lo.host = url.host;
+        lo.port = url.port;
+        lo.secure = url.secure;
+        lo.path = url.path;
+        lo.primary = LlmEndpoint{};
+        lo.fallback = LlmEndpoint{};
+        if (cs.llm_fallback.valid()) {
+            const ParsedUrl fb = parse_url(cs.llm_fallback.url);
+            lo.fallback = LlmEndpoint{fb.host, fb.path,
+                                      cs.llm_fallback.model.empty() ? cs.llm.model : cs.llm_fallback.model,
+                                      cs.llm_fallback.token};
+        }
+        lo.openrouter_provider_sort.clear(); // routing is the server's call
+        openrouter = std::make_shared<WinHttpLlmClient>(lo);
+        llm = openrouter;
+        openrouter_sol_client = openrouter;
     } else if (!cfg.st.cerebras_key.empty() || !cfg.st.llm_key.empty()) {
         const bool model_is_openrouter = cfg.st.model.find('/') != std::string::npos;
         const bool use_cerebras = !cfg.st.cerebras_key.empty() &&
@@ -852,7 +962,8 @@ int run_app(AppConfig cfg) {
     // ---------------- copilot engine ----------------
     CopilotConfig cc;
     cc.session_start = session_start;
-    cc.model = cfg.st.model;
+    cc.model = cfg.cloud_session && !cfg.cloud_session->llm.model.empty() ? cfg.cloud_session->llm.model
+                                                                         : cfg.st.model;
     cc.reasoning_effort = (cfg.st.reasoning.empty() || cfg.st.reasoning == "minimal") ? "none" : cfg.st.reasoning;
     cc.max_tokens = std::max(cfg.st.max_tokens, 1500);
     cc.web_search = nullptr;
@@ -863,6 +974,9 @@ int run_app(AppConfig cfg) {
     if (openrouter_sol_client && openrouter_sol_client != openrouter) {
         cc.compaction_llm = openrouter_sol_client;
         cc.compaction_model = MiniAgentProfile::kCompactAnalysisModel;
+    } else if (cfg.cloud_session && !cfg.cloud_session->background_model.empty()) {
+        cc.compaction_llm = openrouter;
+        cc.compaction_model = cfg.cloud_session->background_model;
     }
     cc.prompt.user_context = cfg.context_text;
     if (agent_rag) {
@@ -1445,6 +1559,19 @@ int run_app(AppConfig cfg) {
     }
     // 3) Cancel in-flight LLM calls.
     if (llm) llm->shutdown(std::chrono::milliseconds(1500));
+    // 3b) Cloud: usage report (best effort, bounded) and stop the refresher.
+    if (cfg.cloud) {
+        cloud::SessionEnd se;
+        se.duration_s = std::chrono::duration_cast<std::chrono::seconds>(
+                            std::chrono::steady_clock::now() - session_start).count();
+        for (auto& lane : lanes) {
+            if (auto* dg = dynamic_cast<DeepgramTransport*>(lane->transport.get())) {
+                se.stt_audio_s += static_cast<std::int64_t>(dg->stats().audio_bytes_sent / 32000);
+            }
+        }
+        cfg.cloud->end_session(se, std::chrono::milliseconds(1200));
+        cfg.cloud->stop();
+    }
     // 4) Persist.
     if (store) {
         store->close("normal");

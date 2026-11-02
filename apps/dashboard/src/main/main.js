@@ -17,6 +17,7 @@ const { MeetingDetector, APP_NAMES } = require('./meeting_detector');
 const { createMeetingPopup } = require('./meeting_popup');
 const { createFlagStore } = require('./feature_flags');
 const { createUpdater } = require('./updater');
+const { createCloudAccount, effectiveServerUrl } = require('./cloud_account');
 const jevEngine = require('./jev_engine');
 const companyLogoService = require('./company_logo_service');
 
@@ -192,6 +193,7 @@ function readConfigIni() {
   const agenda = ini.agenda || {};
   const stealth = ini.stealth || {};
   const sistema = ini.sistema || ini.updates || {};
+  const servidor = ini.servidor || {};
 
   // A key is never sent to the renderer in full: a plaintext one (an env var,
   // or one the engine has not encrypted yet) would show up as the field's
@@ -282,8 +284,23 @@ function readConfigIni() {
     share_anonymized_questions: (stealth.share_anonymized_questions ?? stealth.contribuir_perguntas ?? 'sim') !== 'nao' &&
                                 (stealth.share_anonymized_questions ?? stealth.contribuir_perguntas ?? 'sim') !== 'false',
     calendar_ics_url: agenda.google_ics_url || '',
-    calendar_oauth_token: agenda.google_oauth_token || ''
+    calendar_oauth_token: agenda.google_oauth_token || '',
+    // RealTimeAI cloud ([servidor]): auto = our servers when signed in,
+    // nuvem = always, proprio = only the user's own keys (open-source mode).
+    // Stored as written; the engine validates it (unknown values act as auto).
+    server_mode: servidor.modo || 'auto',
+    server_url: servidor.url || '',
+    server_region: servidor.regiao || 'auto',
+    server_url_effective: effectiveServerUrl(servidor.url || ''),
+    has_server_token: Boolean(servidor.token || process.env.RTAI_SERVER_TOKEN),
+    server_token_display: maskKey(servidor.token || '')
   };
+}
+
+// Cloud backend usable for the next session (mirrors cloud::choose_backend).
+function cloudBackendActive(cfg) {
+  const c = cfg || readConfigIni();
+  return c.server_mode !== 'proprio' && c.has_server_token && Boolean(c.server_url_effective);
 }
 
 function writeConfigIni(updates) {
@@ -351,6 +368,10 @@ function writeConfigIni(updates) {
   const shareAnonymizedQuestions = (updates.share_anonymized_questions ?? current.share_anonymized_questions) ? 'sim' : 'nao';
   const calendarIcsUrl = updates.calendar_ics_url ?? current.calendar_ics_url;
   const calendarOauth = updates.calendar_oauth_token ?? current.calendar_oauth_token;
+  const serverMode = String(updates.server_mode ?? current.server_mode ?? 'auto').trim() || 'auto';
+  const serverUrl = String(updates.server_url ?? current.server_url ?? '').trim();
+  const serverRegion = String(updates.server_region ?? current.server_region ?? 'auto').trim() || 'auto';
+  const serverToken = updates.server_token !== undefined ? pickKey(updates.server_token, raw.servidor?.token) : (raw.servidor?.token || '');
 
   const managedLines = [
     '# RealTimeAI settings (shared by the dashboard and the overlay HUD)',
@@ -442,6 +463,12 @@ function writeConfigIni(updates) {
     '[agenda]',
     `google_ics_url = ${calendarIcsUrl}`,
     `google_oauth_token = ${calendarOauth}`,
+    '',
+    '[servidor]',
+    `modo = ${serverMode}`,
+    `url = ${serverUrl}`,
+    `regiao = ${serverRegion}`,
+    `token = ${serverToken}`,
     ''
   ];
   // Keep everything the dashboard does not manage (set by the overlay's own
@@ -485,6 +512,59 @@ function writeConfigIni(updates) {
   fs.writeFileSync(current.configPath, content, 'utf8');
   return readConfigIni();
 }
+
+// The engine encrypts plaintext secrets in config.ini with DPAPI; run it
+// right after a sign-in so the device token is never left readable on disk.
+function protectConfigSecrets() {
+  const exe = getOverlayExecutablePath();
+  if (!exe || !fs.existsSync(exe)) return; // the next overlay start does it
+  try {
+    execFile(exe, ['--protect-keys'], { windowsHide: true, timeout: 15000 }, () => {});
+  } catch (_e) { /* best effort */ }
+}
+
+// The dashboard keeps its own copy of the device token (Electron safeStorage)
+// for account calls (/v1/me, logout): once the engine seals config.ini with
+// DPAPI, Node can no longer read it back from there.
+function cloudTokenPath() {
+  return path.join(getAppDataDir(), 'cloud_token.bin');
+}
+
+function readCloudToken() {
+  try {
+    const p = cloudTokenPath();
+    if (fs.existsSync(p) && safeStorage && safeStorage.isEncryptionAvailable()) {
+      return safeStorage.decryptString(fs.readFileSync(p));
+    }
+  } catch (_e) { /* fall through */ }
+  const t = (readConfigIni().rawIni.servidor || {}).token || process.env.RTAI_SERVER_TOKEN || '';
+  return t.startsWith('dpapi:') ? '' : t;
+}
+
+function saveCloudToken(token) {
+  writeConfigIni({ server_token: token || '__CLEAR__' });
+  try {
+    if (!token) fs.rmSync(cloudTokenPath(), { force: true });
+    else if (safeStorage && safeStorage.isEncryptionAvailable()) fs.writeFileSync(cloudTokenPath(), safeStorage.encryptString(token));
+  } catch (_e) { /* the engine copy is the one that matters */ }
+  if (token) protectConfigSecrets();
+}
+
+const cloudAccount = createCloudAccount({
+  getServerUrl: () => readConfigIni().server_url,
+  hasToken: () => readConfigIni().has_server_token,
+  readToken: readCloudToken,
+  saveToken: saveCloudToken,
+  openBrowser: (url) => {
+    if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+  },
+  emit: (e) => {
+    // A sign-in rewrote config.ini: hand the renderer the fresh config.
+    const payload = e.type === 'signed_in' ? { ...e, config: readConfigIni() } : e;
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('rtai:cloud-event', payload);
+  },
+  appVersion: typeof app.getVersion === 'function' ? app.getVersion() : ''
+});
 
 // ---------------------------------------------------------------------------
 // DPAPI Key Unprotector & Lightweight OpenRouter Qwen 3.6 Flash Client
@@ -2866,8 +2946,9 @@ async function startCopilotForMeeting(agentId) {
   if (!exePath || !fs.existsSync(exePath)) {
     return { ok: false, error: 'Overlay not found. Build it first: npm run build:native (scripts\\windows\\build.bat).' };
   }
-  if (!readConfigIni().has_deepgram_key) {
-    showSettingsWindow('general');
+  const cfgNow = readConfigIni();
+  if (!cfgNow.has_deepgram_key && !cloudBackendActive(cfgNow)) {
+    showSettingsWindow('account');
     return { ok: false, error: 'Add your Deepgram key first. Settings is open in the dashboard.' };
   }
   const agent = loadAllAgents().find((a) => a.id === agentId) || null;
@@ -3403,6 +3484,15 @@ app.whenReady().then(() => {
     gcalCall((g) => g.updateEvent(p && p.calendarId, p && p.eventId, (p && p.event) || {})));
   ipcMain.handle('rtai:gcal-delete-event', async (_ev, p) => gcalCall((g) => g.deleteEvent(p && p.calendarId, p && p.eventId)));
   // Provider consoles linked from Settings > Account (fixed allowlist).
+  // ---- RealTimeAI cloud account (device sign-in; docs/server-api.md) ----
+  ipcMain.handle('rtai:cloud-status', async (_ev, force) => cloudAccount.status(Boolean(force)));
+  ipcMain.handle('rtai:cloud-login', async () => cloudAccount.startLogin());
+  ipcMain.handle('rtai:cloud-cancel-login', async () => cloudAccount.cancelLogin());
+  ipcMain.handle('rtai:cloud-logout', async () => {
+    const res = await cloudAccount.logout();
+    return { ...res, config: readConfigIni() };
+  });
+
   ipcMain.handle('rtai:open-url', async (_ev, url) => {
     try {
       const u = new URL(String(url || ''));
@@ -3840,6 +3930,7 @@ if (process.env.RTAI_TEST_EXPORTS === '1') {
     inheritableDocuments,
     readConfigIni,
     writeConfigIni,
+    cloudBackendActive,
     jevPairs,
     sessionQuestionAnchors,
     sessionQuestionLines,

@@ -28,6 +28,16 @@ contextBridge.exposeInMainWorld('rtai', {
   companyRecon: (payload) => ipcRenderer.invoke('rtai:company-recon', payload),
   syncCalendar: (icsUrl) => ipcRenderer.invoke('rtai:calendar-sync', icsUrl),
   saveConfig: (config) => ipcRenderer.invoke('rtai:save-config', config),
+  // RealTimeAI cloud account: device sign-in, status, sign-out.
+  cloudStatus: (force) => ipcRenderer.invoke('rtai:cloud-status', Boolean(force)),
+  cloudLogin: () => ipcRenderer.invoke('rtai:cloud-login'),
+  cloudCancelLogin: () => ipcRenderer.invoke('rtai:cloud-cancel-login'),
+  cloudLogout: () => ipcRenderer.invoke('rtai:cloud-logout'),
+  onCloudEvent: (cb) => {
+    const handler = (_event, msg) => cb(msg);
+    ipcRenderer.on('rtai:cloud-event', handler);
+    return () => ipcRenderer.removeListener('rtai:cloud-event', handler);
+  },
   saveProfile: (profile) => ipcRenderer.invoke('rtai:save-profile', profile),
   startOverlay: (options) => ipcRenderer.invoke('rtai:start-overlay', options),
   stopOverlay: () => ipcRenderer.invoke('rtai:stop-overlay'),

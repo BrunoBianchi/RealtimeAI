@@ -41,6 +41,10 @@ Conventional Commits enforced by commitlint (husky `commit-msg` hook); release-p
 - Threading rule: producers only push into queues; the UI thread never blocks (one coalesced render per ≤16 ms). One writer thread per socket.
 - Every session writes `sessions/<YYYY-MM-DD_HH-MM-SS_xxxx>.jsonl` (append-only events: `session_start`, `turn`, `suggestion`, `jev`, `feedback`, `pause`, `link`, `notice`, `session_end`) plus a `.md` summary on exit, under `%LOCALAPPDATA%\RealTimeAI\`.
 
+### Latency
+
+Everychange need to work with the smallest latency possible that the application is looking for, we need at least < 200 ms latency 
+
 ### Engine ↔ dashboard contract
 The dashboard spawns `rtai_app.exe --no-launcher --server [--agent <id>] [--demo]` and talks JSON lines:
 - stdout (engine → UI): `hello`, `status`, `live`, `turn`, `answer_start/delta/done`, `notice`, `pause`, `level`, `mode`, `summary` (field `export`), `open_settings`, `bye`.
@@ -51,6 +55,10 @@ Both sides are defined in `src/core/include/rtai/server_protocol.hpp`; `apps/das
 - `config.ini` — shared by dashboard and engine; Portuguese section/key names (`[deepgram] idioma`, `[llm] modelo`, `[stealth] invisivel_gravacao`…). The dashboard maps them to English keys in `readConfigIni()` / `writeConfigIni()` in `main.js`; add new settings in both. The engine reads config only at start, so `rtai:save-config` restarts a running overlay.
 - `agents/<id>.json` — a "goal"/session (company, role, job description, documents with extracted text, playbook, mini_compact). `saveAgentToDisk()` normalizes and **drops unknown fields** — new agent fields must be added there.
 - `question_bank.json` (JEV engine, `jev_engine.js`), `dashboard_profile.json`, `playbooks.json`, flags files.
+
+### RealTimeAI cloud backend (`docs/server-api.md`)
+- `[servidor]` (`modo` auto/nuvem/proprio, `url`, `regiao`, `token`): signed in, the engine makes one `POST /v1/session` at start (overlapped with set-up) and gets short-lived STT/LLM credentials; audio still goes straight to Deepgram. Without a server or with `modo = proprio`, own keys as before.
+- Engine: `cloud_session.hpp` (core, tested) + `CloudClient` (`src/net`); dashboard: `cloud_account.js` (device-code sign-in) and the `account` settings tab. Default server URL: CMake `RTAI_SERVER_URL` + `BUILTIN_SERVER_URL` (keep both in sync).
 
 ### Dashboard (`apps/dashboard/`)
 - `src/main/main.js` — IPC handlers (`rtai:*`), overlay process control, config/agent/session persistence, tray, meeting detection, Google Calendar (`google_calendar.js`), updater (`updater.js`, electron-updater on GitHub releases, stable/beta), feature flags (`feature_flags.js`).

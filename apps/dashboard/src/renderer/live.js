@@ -106,6 +106,12 @@
       case 'hello':
         L.hello = msg;
         if (msg.mode !== undefined) L.transcriptionOnly = Boolean(msg.mode);
+        // Cloud backend refused the session (expired sign-in / server down).
+        if (msg.ready === false && (msg.needs === 'login' || msg.needs === 'server')) {
+          C.toast(msg.needs === 'login'
+            ? 'Entre de novo na sua conta em Configurações › Conta e servidor.'
+            : 'Servidor RealTimeAI indisponível. Tente de novo ou use suas chaves.', 'error');
+        }
         if (S.ui.pendingChat) {
           const text = S.ui.pendingChat;
           S.ui.pendingChat = '';

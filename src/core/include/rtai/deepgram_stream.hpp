@@ -26,6 +26,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -43,6 +44,12 @@ namespace rtai {
 struct DeepgramStreamConfig {
     dg::StreamParams params;
     std::string api_key;
+    // Cloud backend: returns the full Authorization header value ("Bearer
+    // <short-lived token>") right before each connect, so reconnects pick up
+    // refreshed credentials. force_refresh=true after a 401 (token expired).
+    // Must be cheap (cached value) in the normal case: it runs on the writer
+    // thread. Empty = "Token <api_key>".
+    std::function<std::string(bool force_refresh)> authorization;
     AudioSource source{AudioSource::Microphone};
     // Endpoint (params.host). Override for self-hosted Deepgram or tests.
     std::uint16_t port{443};
@@ -113,6 +120,8 @@ private:
 
     // Interruptible sleep; returns true if stop was requested.
     bool wait_for_stop(std::chrono::milliseconds d);
+    // Writer thread only: re-reads cfg_.authorization into request_.
+    void refresh_authorization(bool force);
     void wait_until_stop();
 
     [[nodiscard]] std::int64_t now_ms() const;
@@ -125,6 +134,8 @@ private:
     // Writer thread only: request_.path was downgraded to the minimal listen
     // path after Deepgram rejected an optional parameter (HTTP 400).
     bool minimal_params_{false};
+    // Writer thread only: one forced credential refresh per 401 streak.
+    bool auth_retried_{false};
     Clock::time_point epoch_;
 
     TranscriptCallback cb_; // written in open() before any thread reads it

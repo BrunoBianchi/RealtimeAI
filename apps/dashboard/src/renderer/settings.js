@@ -11,6 +11,7 @@
 
   const TABS = [
     ['general', 'Geral', 'gear'],
+    ['account', 'Conta e servidor', 'globe'],
     ['ai', 'IA e modelos', 'cpu'],
     ['audio', 'Áudio e transcrição', 'microphone'],
     ['privacy', 'Privacidade', 'shield-check'],
@@ -94,6 +95,114 @@
         `${row('Gravar sessões', 'Salva transcrição e respostas em Markdown e JSONL ao encerrar.', cfgSwitch('save_sessions', 'Gravar sessões', cfg.save_sessions !== false))}
          ${row('Pasta de dados', `<span class="mono" style="font-size:11px">${esc((cfg.configPath || '').replace(/[\\/][^\\/]+$/, '') || '%LOCALAPPDATA%\\RealTimeAI')}</span>`, '<button type="button" class="btn sm" data-action="open-path">Abrir pasta</button>')}`)}`;
   }
+
+  // ----------------------------------------------------- cloud account --
+  // RealTimeAI servers: sign in once and STT + IA work without API keys.
+  // Own keys stay available (open-source mode) and are the fallback.
+  const cloud = { status: null, loading: false, login: null, error: '' };
+
+  function account() {
+    const cfg = S.config;
+    const st = cloud.status;
+    const mode = cfg.server_mode || 'auto';
+    const available = Boolean(cfg.server_url_effective);
+    const acc = st && st.account;
+    let body;
+    if (!available) {
+      body = `<div class="muted">Esta versão não tem um servidor padrão. Informe o endereço em Avançado, ou use suas próprias chaves em IA e modelos.</div>`;
+    } else if (cloud.login) {
+      body = `<div class="stack" style="gap:10px"><span class="muted">Confirme no navegador com o código abaixo. Esta tela atualiza sozinha.</span>
+        <div class="row" style="gap:16px"><span class="metric mono" id="cloudUserCode">${esc(cloud.login.userCode || '—')}</span><span class="spinner"></span></div>
+        <span class="xs faint">${esc(cloud.login.verificationUri || '')}</span>
+        <div class="row"><button type="button" class="btn sm" data-action="cloud-open-verify">${icon('external')}Abrir de novo</button><button type="button" class="btn sm ghost" data-action="cloud-cancel">Cancelar</button></div></div>`;
+    } else if (st && st.signedIn) {
+      const plan = acc && acc.plan ? (acc.plan.label || acc.plan.id || acc.plan) : '';
+      const minutes = acc && acc.plan && acc.plan.minutes_limit
+        ? `${acc.plan.minutes_used ?? 0} de ${acc.plan.minutes_limit} min usados neste período` : '';
+      body = `<div class="row" style="gap:14px"><span class="avatar" style="width:40px;height:40px;font-size:13px">${esc(C.monogram((acc && (acc.name || acc.email)) || 'RT'))}</span>
+        <div class="stack grow" style="gap:0"><span class="strong">${esc((acc && (acc.name || acc.email)) || 'Conta conectada')}</span>
+        <span class="small faint">${esc([plan && `Plano ${plan}`, minutes].filter(Boolean).join(' · ') || st.detail || '')}</span></div>
+        <button type="button" class="btn" data-action="cloud-logout">${icon('sign-out')}Sair</button></div>`;
+    } else {
+      body = `<div class="row" style="gap:16px"><div class="stack grow" style="gap:2px"><span class="strong">Entre para usar sem chaves de API</span>
+        <span class="small faint">${esc(st && st.expired ? st.detail : 'Transcrição e respostas pelos servidores RealTimeAI, com a mesma latência.')}</span></div>
+        <button type="button" class="btn primary" data-action="cloud-login" ${cloud.loading ? 'disabled' : ''}>${cloud.loading ? '<span class="spinner"></span>' : icon('sign-out')}Entrar</button></div>`;
+    }
+    if (cloud.error) body += `<div class="xs" style="color:var(--danger);margin-top:10px">${esc(cloud.error)}</div>`;
+    const active = C.cloudActive();
+    return `
+      ${card('Conta RealTimeAI', active ? 'Próxima sessão usa os servidores RealTimeAI' : 'Próxima sessão usa as suas chaves de API', body)}
+      ${card('Onde a IA roda', 'O áudio vai direto ao provedor de transcrição; o servidor só emite credenciais temporárias',
+        `<div class="option-cards">${[
+          ['auto', 'Automático', 'Servidores RealTimeAI quando conectado; senão, suas chaves.'],
+          ['nuvem', 'Servidores RealTimeAI', 'Sempre pela sua conta. Sem conexão, a sessão não inicia.'],
+          ['proprio', 'Minhas chaves', 'Só as chaves de IA e modelos (modo open-source).']
+        ].map(([v, l, d]) => `<button type="button" class="option-card ${mode === v ? 'active' : ''}" aria-pressed="${mode === v}" data-action="cloud-mode" data-mode="${v}"><span class="t">${mode === v ? '<span class="dot"></span>' : ''}${l}</span><span class="s">${d}</span></button>`).join('')}</div>`)}
+      ${card('Avançado', 'Servidor próprio ou de testes',
+        `${row('Endereço do servidor', available && !cfg.server_url ? `Padrão: <span class="mono">${esc(cfg.server_url_effective)}</span>` : 'Qualquer servidor que implemente a API v1 do RealTimeAI.', cfgText('server_url', 'Endereço do servidor', cfg.server_url || '', cfg.server_url_effective || 'https://servidor.exemplo.com', 280))}
+         ${row('Região', 'Automático escolhe a mais próxima (menor latência).', cfgSelect('server_region', 'Região', [['auto', 'Automático'], ['sa-east-1', 'América do Sul (São Paulo)'], ['us-east-1', 'EUA (Leste)'], ['eu-west-1', 'Europa (Irlanda)']], cfg.server_region || 'auto'))}`)}`;
+  }
+
+  async function cloudRefresh(force) {
+    if (!api.cloudStatus) return;
+    const st = await C.guard(() => api.cloudStatus(force));
+    if (st) cloud.status = st;
+    C.refresh();
+  }
+
+  if (api.onCloudEvent) {
+    api.onCloudEvent(async (e) => {
+      if (e.type === 'pending') {
+        cloud.login = { userCode: e.userCode, verificationUri: e.verificationUri };
+      } else if (e.type === 'signed_in') {
+        cloud.login = null;
+        cloud.error = '';
+        C.toast('Conta conectada. A próxima sessão usa os servidores RealTimeAI.');
+        if (e.config) S.config = e.config;
+        await cloudRefresh(true);
+        return;
+      } else if (e.type === 'error') {
+        cloud.login = null;
+        cloud.error = e.error || 'Não foi possível entrar.';
+      }
+      C.refresh();
+    });
+  }
+
+  C.actions['cloud-login'] = async () => {
+    cloud.loading = true;
+    cloud.error = '';
+    C.refresh();
+    const res = await C.guard(() => api.cloudLogin(), 'Não foi possível iniciar o login.');
+    cloud.loading = false;
+    if (res && res.ok) cloud.login = { userCode: res.userCode, verificationUri: res.verificationUri };
+    else if (res) cloud.error = res.error || 'Não foi possível iniciar o login.';
+    C.refresh();
+  };
+
+  C.actions['cloud-cancel'] = async () => {
+    await C.guard(() => api.cloudCancelLogin());
+    cloud.login = null;
+    C.refresh();
+  };
+
+  C.actions['cloud-open-verify'] = async () => {
+    if (cloud.login && cloud.login.verificationUri) await C.guard(() => api.openUrl(cloud.login.verificationUri));
+  };
+
+  C.actions['cloud-logout'] = async () => {
+    const ok = await C.confirm('Sair da conta RealTimeAI?', 'As próximas sessões usam as suas chaves de API, se houver.', 'Sair');
+    if (!ok) return;
+    const res = await C.guard(() => api.cloudLogout(), 'Não foi possível sair.');
+    if (res && res.config) S.config = res.config;
+    cloud.status = null;
+    await cloudRefresh(true);
+  };
+
+  C.actions['cloud-mode'] = async (el) => {
+    await C.saveConfig({ server_mode: el.dataset.mode }, 'Preferência de servidor salva.');
+    C.refresh();
+  };
 
   function ai() {
     const cfg = S.config;
@@ -356,7 +465,7 @@
         `<div class="row"><button type="button" class="btn sm" data-action="flags-refresh">${icon('refresh')}Sincronizar</button><button type="button" class="btn sm ghost" data-action="flags-reset">Restaurar padrões</button></div>`)}`;
   }
 
-  const SECTIONS = { general, ai, audio, privacy, overlay, calendar, shortcuts, plan, updates };
+  const SECTIONS = { general, account, ai, audio, privacy, overlay, calendar, shortcuts, plan, updates };
 
   C.views.settings = function settings(parts) {
     const tab = SECTIONS[parts[0]] ? parts[0] : 'general';
@@ -372,6 +481,7 @@
 
   // Calendar data is fetched once per visit to the tab (or on Refresh).
   let gcalLoaded = false;
+  let cloudLoaded = false;
   C.afterRender.settings = (parts) => {
     const tab = parts[0] || 'general';
     if (tab === 'audio') {
@@ -379,6 +489,12 @@
       startMicMeter();
     } else {
       stopMicMeter();
+    }
+    if (tab === 'account' && !cloudLoaded) {
+      cloudLoaded = true;
+      cloudRefresh(false);
+    } else if (tab !== 'account') {
+      cloudLoaded = false;
     }
     if (tab === 'calendar' && !gcalLoaded) {
       gcalLoaded = true;

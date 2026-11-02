@@ -47,7 +47,7 @@ struct Hello {
     bool mode{false};          // Mode_State (Transcription_Only_Mode)
     std::string app_mode;      // "live" | "demo"
     bool ready{true};          // false: setup needed (see `needs`)
-    std::string needs;         // "deepgram_key" when the STT key is missing
+    std::string needs;         // "deepgram_key" (STT key missing) | "login" (cloud session refused)
     bool llm{false};
     std::string model;
     std::string language;
@@ -60,6 +60,8 @@ struct Hello {
     std::string config_path;
     std::string session_path;  // .jsonl being written, empty if not saving
     std::string app_version;   // engine build version ("2.1.0-beta.3"), lets the UI spot a mismatch
+    std::string backend;       // "nuvem" (RealTimeAI servers) | "proprio" (user's own keys)
+    std::string plan;          // cloud plan id, empty on own keys
 };
 
 inline std::string encode_hello(const Hello& h) {
@@ -83,6 +85,8 @@ inline std::string encode_hello(const Hello& h) {
         .field("config_path", h.config_path)
         .field("session_path", h.session_path)
         .field("app_version", h.app_version)
+        .field("backend", h.backend.empty() ? "proprio" : h.backend)
+        .field("plan", h.plan)
         .end_object();
     return std::move(w).str();
 }

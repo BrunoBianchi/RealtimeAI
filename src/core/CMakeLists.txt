@@ -18,4 +18,10 @@ target_link_libraries(rtai_core
     PUBLIC Threads::Threads
     PRIVATE rtai::options)
 
+# Default cloud API (cloud_session.hpp): a header-only constant, so the
+# definition is PUBLIC and reaches every consumer of the header.
+if (RTAI_SERVER_URL)
+    target_compile_definitions(rtai_core PUBLIC "RTAI_SERVER_URL=\"${RTAI_SERVER_URL}\"")
+endif()
+
 set_target_properties(rtai_core PROPERTIES FOLDER "core")

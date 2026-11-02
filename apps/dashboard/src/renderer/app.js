@@ -456,11 +456,20 @@ function recentLatency(n) {
 }
 Cue.recentLatency = recentLatency;
 
+// Signed in to the RealTimeAI servers: they provide STT and the LLM, no keys
+// needed. Mirrors cloud::choose_backend in the engine.
+function cloudActive() {
+  const c = S.config || {};
+  return c.server_mode !== 'proprio' && Boolean(c.has_server_token) && Boolean(c.server_url_effective);
+}
+Cue.cloudActive = cloudActive;
+
 function engineReady() {
   const c = S.config || {};
-  const stt = Boolean(c.has_deepgram_key);
-  const llm = Boolean(c.has_llm_key || c.has_cerebras_key || c.has_groq_key || c.has_openai_key || c.has_anthropic_key || c.has_gemini_key);
-  return { stt, llm, ok: stt && llm };
+  const cloud = cloudActive();
+  const stt = cloud || Boolean(c.has_deepgram_key);
+  const llm = cloud || Boolean(c.has_llm_key || c.has_cerebras_key || c.has_groq_key || c.has_openai_key || c.has_anthropic_key || c.has_gemini_key);
+  return { stt, llm, ok: stt && llm, cloud };
 }
 Cue.engineReady = engineReady;
 

@@ -70,6 +70,11 @@ struct Settings {
     // [calendario]
     std::string calendar_ics_url;
     std::string calendar_token;
+    // [servidor] RealTimeAI cloud (see cloud_session.hpp / docs/server-api.md).
+    std::string server_mode{"auto"}; // auto | nuvem | proprio
+    std::string server_url;          // empty = compiled default (RTAI_SERVER_URL)
+    std::string server_token;        // device token from the dashboard sign-in
+    std::string server_region;       // empty/auto = server decides
 
     // Problems found while loading (shown in the overlay/console).
     std::vector<std::string> warnings;
@@ -304,6 +309,24 @@ inline Settings load_settings(const ini::File& f, const EnvLookup& env, const Se
         secret_named("calendario", "token", "RTAI_CALENDAR_TOKEN", s.calendar_token, source);
     }
 
+    {
+        std::string mode;
+        if (str("servidor", "modo", "RTAI_SERVER_MODE", mode)) {
+            const std::string m = text::fold(text::trim(mode));
+            if (m == "auto" || m == "nuvem" || m == "cloud" || m == "proprio" || m == "own" || m == "local") {
+                s.server_mode = m;
+            } else {
+                s.warnings.push_back("[servidor] modo: use auto, nuvem or proprio");
+            }
+        }
+    }
+    str("servidor", "url", "RTAI_SERVER_URL", s.server_url);
+    str("servidor", "regiao", "RTAI_SERVER_REGION", s.server_region);
+    {
+        std::string source;
+        secret_named("servidor", "token", "RTAI_SERVER_TOKEN", s.server_token, source);
+    }
+
     if (!s.mic_enabled && !s.loopback_enabled) {
         s.warnings.push_back("[audio] microfone and audio_sistema are both off: nothing will be captured");
     }
@@ -331,6 +354,7 @@ inline bool is_known_setting(std::string_view section, std::string_view key) {
         {"stealth", "clique_atravessa"}, {"stealth", "click_through"},
         {"stealth", "invisivel_gravacao"}, {"stealth", "screen_capture"},
         {"calendario", "url_ics"}, {"calendario", "token"},
+        {"servidor", "modo"}, {"servidor", "url"}, {"servidor", "token"}, {"servidor", "regiao"},
     };
     const std::string s = ini::lower(section), k = ini::lower(key);
     for (const auto& e : known) {
@@ -342,7 +366,7 @@ inline bool is_known_setting(std::string_view section, std::string_view key) {
 inline bool is_secret_setting(std::string_view section, std::string_view key) {
     const std::string s = ini::lower(section);
     const std::string k = ini::lower(key);
-    if (s == "calendario" && k == "token") return true;
+    if ((s == "calendario" || s == "servidor") && k == "token") return true;
     return (s == "deepgram" || s == "llm") &&
            (k == "api_key" || k == "cerebras_api_key" || k == "groq_api_key");
 }
@@ -430,6 +454,18 @@ altura_max_pct = 60
 salvar = sim
 ; Empty = %LOCALAPPDATA%\RealTimeAI\sessions
 pasta =
+
+[servidor]
+; RealTimeAI servers (no API keys needed once signed in from the dashboard).
+; auto = servers when signed in, otherwise your keys above
+; nuvem = always the servers; proprio = only your keys (open-source mode)
+modo = auto
+; Empty = the official build's default server
+url =
+; auto (closest, lowest latency), sa-east-1, us-east-1, eu-west-1
+regiao = auto
+; Written by the dashboard sign-in; encrypted (dpapi:...) on the next run
+token =
 )";
 }
 

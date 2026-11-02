@@ -28,6 +28,10 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 option(RTAI_BUILD_TESTS "Build unit/integration tests" ON)
 option(RTAI_ENABLE_ONNX "Silero VAD adapter via ONNX Runtime" OFF)
 option(RTAI_ENABLE_EMBEDDINGS "Hybrid RAG: local multilingual-e5 embeddings via ONNX Runtime" OFF)
+# RealTimeAI cloud API base URL baked into official builds (e.g.
+# -DRTAI_SERVER_URL=https://api.example.com). Empty = open-source build that
+# only runs on the user's own keys unless config.ini [servidor] url is set.
+set(RTAI_SERVER_URL "" CACHE STRING "Default RealTimeAI cloud API base URL (empty = none)")
 
 include(RtaiCompilerOptions)
 include(RtaiVersion)

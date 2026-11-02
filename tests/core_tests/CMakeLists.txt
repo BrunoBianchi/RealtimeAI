@@ -19,6 +19,7 @@ add_executable(core_tests
     test_session_store.cpp
     test_text_and_ui_core.cpp
     test_settings.cpp
+    test_cloud_session.cpp
     test_ui_actions.cpp
     test_server_protocol.cpp
     test_ui_models.cpp

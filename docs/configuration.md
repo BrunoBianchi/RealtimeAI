@@ -60,6 +60,15 @@ variável/padrão.
 | `[audio] limiar_energia` | `0.01` | | Sensibilidade do VAD por energia |
 | `[overlay] largura` / `altura_max_pct` | `560` / `60` | | Tamanho do overlay |
 | `[sessao] salvar` / `pasta` | `sim` / `%LOCALAPPDATA%\RealTimeAI\sessions` | `RTAI_SESSION_DIR` | Gravação das sessões |
+| `[servidor] modo` | `auto` | `RTAI_SERVER_MODE` | `auto` (servidores RealTimeAI quando conectado), `nuvem` ou `proprio` (só suas chaves) |
+| `[servidor] url` | padrão do build | `RTAI_SERVER_URL` | Endereço da API (veja `docs/server-api.md`) |
+| `[servidor] regiao` | `auto` | `RTAI_SERVER_REGION` | Região preferida; `auto` = a mais próxima |
+| `[servidor] token` | (login do dashboard) | `RTAI_SERVER_TOKEN` | Token do dispositivo, criptografado com DPAPI |
+
+Com uma conta RealTimeAI (Configurações › Conta e servidor no dashboard), as chaves do
+Deepgram e do LLM deixam de ser obrigatórias: o app pede credenciais temporárias ao servidor
+no início de cada sessão e fala direto com os provedores. Detalhes e contrato da API em
+[`server-api.md`](server-api.md); plano de migração em [`cloud-migration.md`](cloud-migration.md).
 
 Só por variável: `RTAI_DEMO_WAV` (WAV para o modo demo) e `RTAI_CONFIG` (caminho do config).
 

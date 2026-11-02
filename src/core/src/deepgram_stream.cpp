@@ -30,6 +30,15 @@ DeepgramStream::DeepgramStream(DeepgramStreamConfig cfg,
     request_.headers.emplace_back("Authorization", "Token " + cfg_.api_key);
 }
 
+void DeepgramStream::refresh_authorization(bool force) {
+    if (!cfg_.authorization) return;
+    std::string value = cfg_.authorization(force);
+    if (value.empty()) return; // keep the last good header
+    for (auto& h : request_.headers) {
+        if (h.first == "Authorization") h.second = std::move(value);
+    }
+}
+
 DeepgramStream::~DeepgramStream() {
     close();
 }
@@ -316,6 +325,7 @@ void DeepgramStream::writer_loop() {
             WsConnectResult res;
             std::unique_ptr<IWebSocket> fresh;
             try {
+                refresh_authorization(false);
                 fresh = factory_->connect(request_, res);
             } catch (const std::exception& e) {
                 res.error = e.what();
@@ -337,6 +347,14 @@ void DeepgramStream::writer_loop() {
                         continue;
                     }
                 }
+                // Cloud: a short-lived token expired between refreshes. Get a
+                // fresh one and retry once before treating 401 as fatal.
+                if (res.http_status == 401 && cfg_.authorization && !auth_retried_) {
+                    auth_retried_ = true;
+                    refresh_authorization(true);
+                    publish(LinkState::Connecting, why + "; renewing the cloud credentials", res.http_status);
+                    continue;
+                }
                 if (!res.retryable) {
                     fatal = true;
                     publish(LinkState::Error, why, res.http_status);
@@ -350,6 +368,7 @@ void DeepgramStream::writer_loop() {
             }
 
             ws = std::move(fresh);
+            auth_retried_ = false;
             {
                 std::lock_guard<std::mutex> lk(mu_);
                 reader_done_ = false;
