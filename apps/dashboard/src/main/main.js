@@ -1069,7 +1069,7 @@ function cancelInterviewNotification(goalId) {
 // company research, job description and résumé. Cached next to the session
 // as <id>.jev.json so the review screen is stable and costs one run.
 // ---------------------------------------------------------------------------
-const JEV_VERSION = 2;
+const JEV_VERSION = 3;
 const JEV_CRITERIA = ['adequacao', 'cultura', 'estrutura', 'evidencias', 'objetividade'];
 const JEV_QUESTION_RE = /\?\s*$|^(como|por ?que|qual|quais|o que|quando|onde|quanto|me (conta|fala|diz)|conte|descreva|explique|fale|voc[eê] (pode|poderia|conseguiria|j[aá])|what|why|how|tell me|describe|can you|could you|walk me)\b/i;
 
@@ -1108,32 +1108,73 @@ function sessionBlocks(events) {
   return blocks;
 }
 
-function jevPairs(events) {
-  const blocks = sessionBlocks(events);
-  const suggestions = events.filter((e) => e.type === 'suggestion');
-  const pairs = [];
-  for (let i = 0; i < blocks.length; i++) {
-    const q = blocks[i];
-    if (q.src !== 'outros') continue;
-    const nextQ = blocks.slice(i + 1).find((b) => b.src === 'outros');
-    const answerBlocks = blocks.slice(i + 1, nextQ ? blocks.indexOf(nextQ) : blocks.length).filter((b) => b.src === 'voce');
-    const answer = answerBlocks.map((b) => b.text).join(' ').trim();
-    const end = nextQ ? nextQ.t0 : Infinity;
-    const sugg = suggestions.find((s) => Number(s.t) >= q.t0 && Number(s.t) < end && s.status === 'completed');
-    const isQuestion = Boolean(sugg && (sugg.reason === 'question' || sugg.understood)) ||
-      q.text.split(/(?<=[.?!])\s+/).some((sent) => JEV_QUESTION_RE.test(sent.trim()));
-    const words = (answer.match(/[\p{L}\p{N}']+/gu) || []).length;
-    if (!isQuestion || words < 8) continue;
-    pairs.push({
-      t: q.t0,
-      question: q.text.slice(-900),
-      understood: (sugg && sugg.understood) || '',
-      answer: answer.slice(0, 2400),
-      answerSeconds: answerBlocks.length ? Math.round((answerBlocks[answerBlocks.length - 1].t1 - answerBlocks[0].t0) / 1000) : 0,
-      copilot: sugg ? String(sugg.text || '').slice(0, 1200) : '',
-      ttftMs: sugg ? Number(sugg.ttft_ms) || null : null
-    });
+// Practice prompts wrap the interviewer's question: "Responda por áudio: ..."
+// pasted in the chat, or `Como eu responderia: "..."` from the question bank.
+const PRACTICE_PREFIX_RE = /^\s*(?:responda(?:\s+por\s+[áa]udio)?|como eu responderia|pergunta|question)\s*:\s*/i;
+const QUESTION_LEAD_RE = /^(imagine|conte|descreva|explique|fale|me (conta|conte|fala|fale|diga|diz|d[eê])|d[eê] um exemplo)\b/i;
+// Suggestions that answered something the candidate may say out loud
+// (screenshots, recaps and follow-up lists are not questions).
+const ANSWER_REASONS = new Set(['question', 'manual', 'chat', 'keyword', 'long_turn']);
+
+function questionFromTrigger(text) {
+  return String(text || '').replace(PRACTICE_PREFIX_RE, '').replace(/^["“'\s]+|["”'\s]+$/g, '').trim();
+}
+
+function looksLikeQuestion(text) {
+  const t = String(text || '').trim();
+  return /\?/.test(t) || QUESTION_LEAD_RE.test(t) || t.split(/(?<=[.?!])\s+/).some((s) => JEV_QUESTION_RE.test(s.trim()));
+}
+
+// Where the questions are in a session log, in time order: the interviewer's
+// question blocks, plus the questions the copilot received some other way
+// (pasted or typed in the chat, sent from the question bank, or asked into
+// the microphone when the call ran without system audio). A suggestion that
+// answered an interviewer block only lends it the engine's reading.
+function sessionQuestionAnchors(events) {
+  const anchors = [];
+  for (const b of sessionBlocks(events)) {
+    if (b.src === 'outros' && looksLikeQuestion(b.text)) anchors.push({ t: b.t0, end: b.t1, text: b.text, understood: '', sugg: null, from: 'interviewer' });
   }
+  for (const s of events) {
+    if (s.type !== 'suggestion' || s.status !== 'completed' || !ANSWER_REASONS.has(String(s.reason || ''))) continue;
+    const t = Number(s.t) || 0;
+    const block = anchors.find((a) => a.from === 'interviewer' && !a.sugg && t >= a.t && t <= a.end + 15000);
+    if (block) {
+      block.sugg = s;
+      block.understood = s.understood || '';
+      continue;
+    }
+    const text = questionFromTrigger(s.understood || s.trigger);
+    if (text.length < 12 || !looksLikeQuestion(text)) continue;
+    anchors.push({ t, end: t, text, understood: '', sugg: s, from: 'copilot' });
+  }
+  return anchors.sort((a, b) => a.t - b.t);
+}
+
+// Each question with what the candidate said after it, until the next one.
+function jevPairs(events) {
+  const anchors = sessionQuestionAnchors(events);
+  const turns = events.filter((e) => e.type === 'turn' && e.src === 'voce' && String(e.text || '').trim());
+  const pairs = [];
+  anchors.forEach((q, i) => {
+    const until = i + 1 < anchors.length ? anchors[i + 1].t : Infinity;
+    // A turn's t is when it closed: what closed after the question was asked.
+    const said = turns.filter((e) => Number(e.t) > q.end && Number(e.t) <= until);
+    const answer = said.map((e) => String(e.text).trim()).join(' ').trim();
+    const words = (answer.match(/[\p{L}\p{N}']+/gu) || []).length;
+    if (words < 8) return;
+    const first = said[0];
+    const last = said[said.length - 1];
+    pairs.push({
+      t: q.t,
+      question: q.text.slice(-900),
+      understood: q.understood,
+      answer: answer.slice(0, 2400),
+      answerSeconds: Math.max(0, Math.round((Number(last.t) - Number(first.t0 || first.t)) / 1000)),
+      copilot: q.sugg ? String(q.sugg.text || '').slice(0, 1200) : '',
+      ttftMs: q.sugg ? Number(q.sugg.ttft_ms) || null : null
+    });
+  });
   return pairs.slice(0, 24);
 }
 
@@ -1237,7 +1278,9 @@ async function evaluateSessionWithJev({ sessionId, agentId, force }) {
     } catch (_e) {}
   }
   const pairs = jevPairs(events);
-  if (!pairs.length) return { ok: false, error: 'Nenhuma pergunta com resposta sua foi encontrada nesta sessão.' };
+  if (!pairs.length) {
+    return { ok: false, error: 'Nenhuma pergunta com resposta falada foi encontrada: o JEV avalia o que você disse no microfone depois de cada pergunta (do entrevistador, do chat ou do banco de perguntas).' };
+  }
 
   const agent = agentId ? loadAllAgents().find((a) => a.id === agentId) : null;
   const start = events.find((e) => e.type === 'notice' && /^Active goal:/i.test(e.text || ''));
@@ -1336,30 +1379,96 @@ async function evaluateSessionWithJev({ sessionId, agentId, force }) {
 }
 
 // Interviewer text of every saved session, as the question extractor reads it.
+// JEV reads each candidate question the way a shared interview bank needs it:
+// what kind of question it is and a clear, generic wording. A question that
+// only makes sense for this candidate, or is not an interview question at all
+// (a request to the copilot, a quiz on screen, a piece of an answer), is left
+// out. Returns null without an OpenRouter key or when the call fails, and the
+// rule-based reading is used instead.
+const JEV_BANK_SYSTEM = `Você é o JEV e organiza um banco de perguntas reais de entrevista, que outros candidatos usam para treinar. Classifique cada item pelo tipo:
+- pessoal: sobre a experiência e o comportamento do candidato, pede uma história ("me conte uma vez em que você teve que assumir uma nova responsabilidade", conflito, erro, liderança, pressão, aprendizado, trabalho em equipe).
+- cultura: valores e forma de trabalhar da empresa, fit cultural.
+- motivacao: por que esta empresa ou vaga, objetivos de carreira.
+- abertura: apresentação ("fale sobre você", trajetória).
+- tecnica: conhecimento técnico, código, arquitetura, system design, dados.
+- dominio: negócio, produto, mercado.
+- salario: salário, benefícios, disponibilidade, modelo de trabalho.
+- especifica: só faz sentido para este candidato e não dá para generalizar.
+- nao_pergunta: não é pergunta de entrevista (pedido ao copiloto, conta ou exercício de tela, cumprimento, teste de áudio, trecho de resposta).
+Se a pergunta cita um projeto, empresa ou resposta do candidato mas tem uma versão genérica útil ("Você comentou que aprendeu React com protótipos; como faz isso?" -> "Como você aprende uma tecnologia nova rapidamente?"), reescreva genérica e classifique pelo tipo dela.
+"pergunta": a pergunta clara, completa e genérica, sem nomes do candidato, no idioma original. Responda SOMENTE JSON.`;
+
+async function classifyQuestionsWithJev(questions, { company } = {}) {
+  if (!Array.isArray(questions) || !questions.length || !getOpenRouterApiKey()) return null;
+  const res = await callOpenRouterJson(
+    [
+      { role: 'system', content: JEV_BANK_SYSTEM },
+      {
+        role: 'user',
+        content: `Empresa da entrevista: ${company || '(desconhecida)'}\n\n${questions
+          .map((q, i) => `#${i} ${q}`)
+          .join('\n')}\n\nDevolva {"items":[{"i":<índice>,"tipo":"pessoal|cultura|motivacao|abertura|tecnica|dominio|salario|especifica|nao_pergunta","pergunta":"<pergunta>"}]}`
+      }
+    ],
+    Math.min(3000, 400 + questions.length * 90),
+    60000
+  );
+  return res.ok && res.json && Array.isArray(res.json.items) ? res.json.items : null;
+}
+
+// The questions of a session log as lines the question extractor reads: the
+// interviewer's question blocks and, when JEV can vet them, the questions the
+// copilot got from the chat or the question bank. Copilot answers never go in.
+// "X, X" from repeated speech or scripted demos -> "X"; a trailing "." would
+// become ".?" once the extractor adds the question mark.
+function sessionQuestionLines(events, { withChat }) {
+  const dedupe = (t) => String(t).replace(/(.{12,}?)[\s,;:-]+\1/g, '$1').trim().replace(/[.\s]+$/, '');
+  const lines = [];
+  for (const a of sessionQuestionAnchors(events)) {
+    if (a.from === 'interviewer') {
+      lines.push(a.understood ? `Pergunta: "${dedupe(a.understood).replace(/"/g, "'")}"` : `Entrevistador: ${dedupe(a.text)}`);
+    } else if (withChat) {
+      lines.push(`Pergunta: "${dedupe(a.text).replace(/"/g, "'")}"`);
+    }
+  }
+  return lines;
+}
+
+const bankClassifier = (questions, ctx) => classifyQuestionsWithJev(questions, ctx);
+
 async function rebuildQuestionBankFromSessions() {
   const sessions = loadPastSessions();
   const agents = loadAllAgents();
+  const withChat = Boolean(getOpenRouterApiKey());
   const entries = [];
-  // "X, X" from repeated speech or scripted demos -> "X".
-  // A trailing "." would become ".?" once the extractor adds the question mark.
-  const dedupe = (t) => String(t).replace(/(.{12,}?)[\s,;:-]+\1/g, '$1').trim().replace(/[.\s]+$/, '');
   for (const s of sessions) {
     // Only sessions that ran with a goal: the goal names the company.
     const label = String(s.goalLabel || '');
     if (!label) continue;
     const { events } = readSessionEvents(s.id);
     if (!events.length) continue;
-    // The engine's own reading of each question is cleaner than raw speech;
-    // raw interviewer blocks are used only when it never answered.
-    const understood = events.filter((e) => e.type === 'suggestion' && e.understood).map((e) => `Pergunta: "${dedupe(e.understood).replace(/"/g, "'")}"`);
-    const lines = understood.length
-      ? understood
-      : sessionBlocks(events).filter((b) => b.src === 'outros').map((b) => `Entrevistador: ${dedupe(b.text)}`);
+    const lines = sessionQuestionLines(events, { withChat });
+    if (!lines.length) continue;
     const lower = label.toLowerCase();
     const agent = agents.find((a) => a.company && lower.includes(String(a.company).toLowerCase()));
     entries.push({ text: lines.join('\n'), company: agent ? agent.company : companyFromGoalLabel(label) });
   }
-  return jevEngine.rebuildQuestionBank(getAppDataDir(), entries);
+  return jevEngine.rebuildQuestionBank(getAppDataDir(), entries, { classify: bankClassifier });
+}
+
+// A bank built by an older version (questions taken from the copilot's
+// answers, rule-based categories) is rebuilt once from the session logs.
+async function migrateQuestionBank() {
+  try {
+    const bank = jevEngine.loadQuestionBank(getAppDataDir());
+    if (bank.version === jevEngine.QUESTION_BANK_VERSION) return;
+    const res = await rebuildQuestionBankFromSessions();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('rtai:question-bank-updated', { rebuilt: true, added: (res && res.added) || 0 });
+    }
+  } catch (err) {
+    console.warn('[question-bank] rebuild failed:', err);
+  }
 }
 
 async function generateSessionDebrief({ sessionId, goalId, agentId, transcript: providedTranscript }) {
@@ -1470,7 +1579,7 @@ async function generateSessionDebrief({ sessionId, goalId, agentId, transcript: 
   let jevExtraction = null;
   if (cfg.share_anonymized_questions !== false && transcript) {
     try {
-      jevExtraction = await jevEngine.ingestSessionQuestions(getAppDataDir(), transcript, goal.company || '');
+      jevExtraction = await jevEngine.ingestSessionQuestions(getAppDataDir(), transcript, goal.company || '', { classify: bankClassifier });
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('rtai:question-bank-updated', jevExtraction);
       }
@@ -2456,11 +2565,15 @@ function launchOverlay({ agent, demo = false, configOverrides = {} }) {
             if (cfg.share_anonymized_questions !== false && exportPath) {
               try {
                 if (fs.existsSync(exportPath)) {
-                  const t = fs.readFileSync(exportPath, 'utf8');
+                  // The session log next to the export: its questions are
+                  // structured, while the .md also carries the copilot's answers.
+                  const { events } = readSessionEvents(path.basename(exportPath));
+                  const fromEvents = events.length ? sessionQuestionLines(events, { withChat: Boolean(getOpenRouterApiKey()) }).join('\n') : '';
+                  const t = events.length ? fromEvents : fs.readFileSync(exportPath, 'utf8');
                   if (t) {
                     const currentGoal = overlayAgentId ? loadAllAgents().find((a) => a.id === overlayAgentId) : null;
                     const compFallback = (currentGoal && currentGoal.company) || '';
-                    jevEngine.ingestSessionQuestions(getAppDataDir(), t, compFallback).then((extraction) => {
+                    jevEngine.ingestSessionQuestions(getAppDataDir(), t, compFallback, { classify: bankClassifier }).then((extraction) => {
                       if (mainWindow && !mainWindow.isDestroyed()) {
                         mainWindow.webContents.send('rtai:question-bank-updated', extraction);
                       }
@@ -3489,7 +3602,7 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('rtai:trigger-jev-analysis', async (_ev, { transcript, companyName }) => {
-    return jevEngine.ingestSessionQuestions(getAppDataDir(), transcript, companyName);
+    return jevEngine.ingestSessionQuestions(getAppDataDir(), transcript, companyName, { classify: bankClassifier });
   });
 
   ipcMain.handle('rtai:detect-company', async (_ev, { transcript, fallbackName }) => {
@@ -3689,6 +3802,8 @@ app.whenReady().then(() => {
   createTray();
   registerStealthShortcuts();
   applyMeetingSettings();
+  // Off the startup path: the window is up before the bank is rebuilt.
+  setTimeout(() => migrateQuestionBank(), 4000).unref();
 });
 
 app.on('will-quit', () => {
@@ -3725,6 +3840,10 @@ if (process.env.RTAI_TEST_EXPORTS === '1') {
     inheritableDocuments,
     readConfigIni,
     writeConfigIni,
+    jevPairs,
+    sessionQuestionAnchors,
+    sessionQuestionLines,
+    rebuildQuestionBankFromSessions,
     pickDefaultAgentId,
     getMeetingSettings,
     applyElectronStealthMode

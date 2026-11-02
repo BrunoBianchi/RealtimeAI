@@ -976,6 +976,13 @@ function subscribe() {
     if (S.route.view === 'settings') refresh();
   });
   api.onQuestionBankUpdated(async (payload) => {
+    // The one-time rebuild after an update reclassifies the bank: reload it quietly.
+    if (payload && payload.rebuilt) {
+      await loadQuestionBank(true);
+      renderShell();
+      if (S.route.view === 'questions' || S.route.view === 'home') refresh();
+      return;
+    }
     if (payload && payload.questionsExtracted > 0) {
       toast(`${plural(payload.questionsExtracted, 'pergunta nova', 'perguntas novas')} no banco${payload.company ? ` (${fixText(payload.company)})` : ''}.`);
       await loadQuestionBank(true);

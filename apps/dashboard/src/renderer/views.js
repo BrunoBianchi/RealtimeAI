@@ -131,8 +131,9 @@
     </div>`;
   }
 
+  // Behavioral = the "tell me about a time..." questions about you (JEV "pessoal").
   const CAT_LABEL = {
-    Behavioral: 'Comportamental',
+    Behavioral: 'Pessoal',
     Technical: 'Técnica',
     Culture: 'Cultura',
     'Domain knowledge': 'Domínio',
