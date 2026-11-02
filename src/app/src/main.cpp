@@ -858,6 +858,12 @@ int run_app(AppConfig cfg) {
     cc.web_search = nullptr;
     cc.allow_speculative = true;
     cc.temperature = cfg.st.temperature;
+    // Answer-memory summaries go to the background client, never the live one.
+    // Without an OpenRouter key both are the same client: keep the live model.
+    if (openrouter_sol_client && openrouter_sol_client != openrouter) {
+        cc.compaction_llm = openrouter_sol_client;
+        cc.compaction_model = MiniAgentProfile::kCompactAnalysisModel;
+    }
     cc.prompt.user_context = cfg.context_text;
     if (agent_rag) {
         // Stable profile -> system message (cacheable prefix); per-question

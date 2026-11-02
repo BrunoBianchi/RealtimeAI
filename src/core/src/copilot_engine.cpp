@@ -62,10 +62,12 @@ struct InShadowDone { std::uint64_t gen; LlmResult res; std::string text; };
 // orchestrator thread (Req 8.3).
 struct InFinalize { std::int64_t t; };
 struct InFinalizeDone { bool ok; JevReport report; std::int64_t t; };
+// A background summary of the answer memory's thread (rtai/answer_memory.hpp).
+struct InCompactionDone { std::uint64_t thread; std::size_t covered; bool ok; std::string text; };
 using Input = std::variant<InTranscript, InStatus, InManual, InPause, InNotice, InLlmDone, InAction,
                            InFeedback, InClearChat, InAutoToggle, InModeToggle, InMicRms, InPtt,
                            InVadSpeculate, InVadCommitSilence, InSpeechFinal, InShadowDelta,
-                           InShadowDone, InFinalize, InFinalizeDone, InHoldDecided>;
+                           InShadowDone, InFinalize, InFinalizeDone, InHoldDecided, InCompactionDone>;
 
 // Shadow Streaming state (Req 2.1). Formalizes the implicit shadow lifecycle
 // (speculate -> commit -> abort) that today lives in shadow/promote/cancel.
@@ -79,10 +81,6 @@ enum class CommitCause : std::uint8_t { SpeechFinal, LocalSilence, Timeout, Turn
 
 constexpr std::size_t kMaxChatTurns = 8;
 constexpr std::size_t kMaxChatAnswerChars = 1500;
-// Persona memory: the last few answers are enough for coherence; more only
-// inflates the prompt (and the time to first token).
-constexpr std::size_t kMaxDeliveredAnswers = 4;
-constexpr std::size_t kMaxDeliveredAnswerChars = 400;
 // A question split by a breath pause arrives as two closed turns. When the
 // first piece already triggered an answer and the second piece follows within
 // this window (nobody else spoke), the answer is redone for the whole question.
@@ -305,7 +303,10 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
         SuggestionStartedEvent pending_start{};
     };
     std::deque<ChatTurn> chat;
-    std::deque<ChatTurn> delivered_answers_;
+    // What the copilot already answered, per subject (persona coherence).
+    AnswerMemory memory_{cfg.answer_memory};
+    std::shared_ptr<ILlmCall> compaction_call_;
+    bool compaction_in_flight_{false};
     struct Active {
         std::uint64_t id{0};
         std::shared_ptr<ILlmCall> call;
@@ -522,8 +523,53 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
 
     void handle(InClearChat&) {
         chat.clear();
-        delivered_answers_.clear();
+        memory_.clear();
     }
+
+    // Once the current thread outgrows its verbatim budget, a background model
+    // folds the older answers into a summary. It runs after an answer is done,
+    // never on the path of the next one: until it lands, the newest answers
+    // that fit are sent as they are.
+    void maybe_compact() {
+        if (compaction_in_flight_ || !memory_.needs_compaction()) return;
+        const std::shared_ptr<ILlmClient> client = cfg.compaction_llm ? cfg.compaction_llm : llm;
+        if (!client) return;
+        AnswerMemory::CompactionJob job = memory_.compaction_job();
+        LlmRequest req;
+        req.model = cfg.compaction_model.empty() ? cfg.model : cfg.compaction_model;
+        req.messages = std::move(job.messages);
+        req.max_tokens = 400;
+        req.temperature = 0.0;
+        req.reasoning_effort = "none";
+        auto buf = std::make_shared<std::string>();
+        std::weak_ptr<Impl> weak = shared_from_this();
+        LlmCallbacks cb;
+        cb.on_delta = [buf](std::string_view d) { buf->append(d); };
+        cb.on_done = [weak, buf, tid = job.thread, covered = job.covered](const LlmResult& r) {
+            if (auto self = weak.lock())
+                self->post(InCompactionDone{tid, covered, r.status == LlmStatus::Completed, std::move(*buf)});
+        };
+        compaction_in_flight_ = true;
+        try {
+            compaction_call_ = client->start(std::move(req), std::move(cb));
+        } catch (...) {
+            compaction_in_flight_ = false;
+        }
+    }
+
+    void handle(InCompactionDone& in) {
+        compaction_in_flight_ = false;
+        compaction_call_.reset();
+        if (in.ok) memory_.set_summary(in.thread, in.covered, std::move(in.text));
+        maybe_compact(); // answers that arrived meanwhile may need another pass
+    }
+
+    // The answer memory to send with a new question: empty unless it follows
+    // up on the subject of the current thread. Only the question decides: the
+    // interviewer's recent lines still hold the previous question, which
+    // would make every new subject look like a follow-up (the trigger already
+    // merges the fragments of the current question).
+    std::string memory_for(const std::string& question) const { return memory_.for_question(question).text; }
 
     void handle(InAutoToggle& in) {
         auto_answer = in.enabled;
@@ -700,7 +746,8 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
             default:                        shown = ai.text; break;
         }
         std::vector<ChatTurn> thread(chat.begin(), chat.end());
-        std::string history = render_history_with_live();
+        // Requests about the conversation itself see the whole memory.
+        std::string history = render_history(true, true);
         auto messages = build_action_messages(cfg.prompt, history, ai, thread);
         std::string question;
         if (in.reason == TriggerReason::Chat) question = ai.text;
@@ -709,37 +756,36 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
                       !ai.image_url.empty(), std::move(question));
     }
 
-    // Closed turns plus what is being said right now, the candidate's own
-    // spoken microphone turns ("[Você]"), AND the rolling memory of answers
-    // already suggested by the copilot during this session so the AI maintains
-    // strict persona coherence and situational awareness.
-    std::string render_history_with_answers(bool include_live = true) const {
-        std::string h = convo.render(cfg.prompt.max_history_chars);
+    // Closed turns plus what is being said right now and the candidate's own
+    // spoken microphone turns ("[Você]"). The transcript gets what is left of
+    // max_history_chars after the other parts, so the prompt's tail cut never
+    // drops the interviewer's lines. `with_memory` appends the whole answer
+    // memory (explicit requests about the conversation); live answers get it
+    // separately and only for follow-ups (memory_for).
+    std::string render_history(bool include_live = true, bool with_memory = false) const {
+        std::string live;
         if (include_live) {
             for (AudioSource s : {AudioSource::Loopback, AudioSource::Microphone}) {
-                const std::string live = turns.live_text(s);
-                if (!live.empty()) h += std::string("[") + speaker_tag(s) + "] " + live + " (falando)\n";
+                const std::string t = turns.live_text(s);
+                if (!t.empty()) live += std::string("[") + speaker_tag(s) + "] " + t + " (falando)\n";
             }
         }
+        std::string extra;
         const std::string my_spoken = convo.render_source(AudioSource::Microphone, 1000);
         if (!my_spoken.empty()) {
-            h += "\n[Minhas Respostas já Faladas pelo Microfone ([Você]) nesta Entrevista]:\n";
-            h += my_spoken;
+            extra += "\n[Minhas Respostas já Faladas pelo Microfone ([Você]) nesta Entrevista]:\n";
+            extra += my_spoken;
         }
-        if (!delivered_answers_.empty()) {
-            h += "\n[Histórico de Respostas já Sugeridas pelo Copiloto nesta Sessão "
-                 "(mantenha a mesma persona e coerência com o que já foi respondido)]:\n";
-            std::size_t idx = 1;
-            for (const auto& da : delivered_answers_) {
-                h += "#" + std::to_string(idx++) + " Pergunta/Gatilho: \"" + da.question + "\"\n";
-                h += "   Resposta sugerida: " + da.answer + "\n";
-            }
+        if (with_memory) {
+            const AnswerMemory::Context mem = memory_.render();
+            if (!mem.text.empty()) extra += "\n[Memória das respostas já sugeridas nesta sessão]:\n" + mem.text;
         }
+        const std::size_t budget = cfg.prompt.max_history_chars;
+        const std::size_t used = live.size() + extra.size();
+        std::string h = convo.render(budget > used + 400 ? budget - used : 400);
+        h += live;
+        h += extra;
         return h;
-    }
-
-    std::string render_history_with_live() const {
-        return render_history_with_answers(true);
     }
 
     void handle(InNotice& in) { publish(NoticeEvent{in.level, std::move(in.text), in.t}); }
@@ -858,13 +904,14 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
                     chat.push_back(ChatTurn{it->second.question, text::truncate_utf8(e.text, kMaxChatAnswerChars)});
                     while (chat.size() > kMaxChatTurns) chat.pop_front();
                 }
-                const std::string q_label = !it->second.question.empty()       ? it->second.question
-                                            : !e.interpreted_question.empty() ? e.interpreted_question
-                                                                              : it->second.trigger;
-                if (!q_label.empty()) {
-                    delivered_answers_.push_back(
-                        ChatTurn{q_label, text::truncate_utf8(e.text, kMaxDeliveredAnswerChars)});
-                    while (delivered_answers_.size() > kMaxDeliveredAnswers) delivered_answers_.pop_front();
+                // Answers the candidate may have said out loud go to the answer
+                // memory (not screenshots, recaps or follow-up lists).
+                if (answer_like) {
+                    const std::string q_label = !e.interpreted_question.empty() ? e.interpreted_question
+                                                : !it->second.question.empty() ? it->second.question
+                                                                               : it->second.trigger;
+                    memory_.add(q_label, split_interpreted_answer(e.text, true).body);
+                    maybe_compact();
                 }
             }
             meta.erase(it);
@@ -1469,8 +1516,9 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
         }
         const std::string keyword = policy.probe_keyword(c.text);
 
-        auto messages = build_copilot_messages(cfg.prompt, render_history_with_answers(),
-                                               enriched, reason, keyword, may_skip(reason));
+        const std::string history = render_history();
+        auto messages = build_copilot_messages(cfg.prompt, history, enriched, reason, keyword, may_skip(reason),
+                                               memory_for(enriched));
         const std::uint64_t sid = ++next_id;
         meta[sid] = Meta{enriched, reason, c.source, {}, grounding_of(messages), -1};
 
@@ -1708,8 +1756,9 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
             folded_trigger.find("current") != std::string::npos;
         if (cfg.web_search && asks_for_current_info && reason == TriggerReason::Manual)
             research = cfg.web_search(trigger);
-        auto messages = build_copilot_messages(cfg.prompt, render_history_with_answers(),
-                                               trigger, reason, keyword, may_skip(reason));
+        const std::string history = render_history();
+        auto messages = build_copilot_messages(cfg.prompt, history, trigger, reason, keyword, may_skip(reason),
+                                               memory_for(trigger));
         if (!research.empty()) {
             messages.back().content += "\n\nPesquisa recente na internet:\n" + research +
                                        "\nUse somente como contexto auxiliar.";
