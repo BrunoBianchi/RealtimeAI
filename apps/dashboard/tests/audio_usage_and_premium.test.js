@@ -50,23 +50,26 @@ test('Audio Usage & Premium: main.js provides default profile with plan and usag
   assert.ok(mainJs.includes('limitMinutes'), 'main.js should initialize limitMinutes');
 });
 
-test('Audio Usage & Premium: Settings > Plan shows the plan, the meter and usage by month', () => {
-  const { Cue } = loadRenderer({
-    state: {
-      profile: { plan: 'free', email: 'ana@example.com', transcriptionUsage: { limitMinutes: 60 } },
-      sessions: [thisMonth(1, 56)]
-    }
-  });
+test('Audio Usage & Premium: Settings > Plan shows the account plan, the meter and usage by month', () => {
+  const { entitlement } = require('../src/main/plans');
+  const pro = entitlement({ plan: { id: 'pro', minutes_limit: 200, minutes_used: 188, period_end: '2026-12-01' } });
+  const { Cue } = loadRenderer({ state: { auth: { signedIn: true, entitlement: pro }, sessions: [thisMonth(1, 56)] } });
   const html = render(Cue, 'settings/plan');
-  assert.ok(html.includes('60 minutos de transcrição por mês.'));
-  assert.ok(html.includes('56 de 60 min'), 'this month against the limit');
+  assert.ok(html.includes('188 de 200 min'), 'minutes of the month against the PRO limit');
+  assert.ok(html.includes('12 min restantes'));
   assert.ok(html.includes('class="bar danger"'), 'meter turns red above 90%');
-  assert.ok(html.includes('Conta: ana@example.com'));
+  assert.ok(html.includes('data-kind="portal"'), 'PRO manages the subscription');
   assert.ok(html.includes('56 min · 1 sessão'), 'usage by month comes from the recorded sessions');
 
-  // Nothing is invented when there is no data.
-  const empty = loadRenderer({ state: { profile: { plan: 'premium' }, sessions: [] } });
-  const none = render(empty.Cue, 'settings/plan');
-  assert.ok(none.includes('Sem limite mensal de transcrição.'));
-  assert.ok(none.includes('Nenhuma sessão gravada ainda.'));
+  // Free whose single session is gone: the reason and the PRO checkout.
+  const used = entitlement({ plan: { id: 'free', minutes_used: 15, sessions_used: 1 } });
+  const free = loadRenderer({ state: { auth: { signedIn: true, entitlement: used }, sessions: [] } });
+  const fh = render(free.Cue, 'settings/plan');
+  assert.ok(fh.includes('Você já usou a sessão gratuita de 15 minutos'));
+  assert.ok(fh.includes('data-kind="checkout"'), 'Assinar PRO');
+  assert.ok(fh.includes('Nenhuma sessão gravada ainda.'));
+
+  // No plan read from the server: nothing is invented.
+  const none = render(loadRenderer({ state: { sessions: [] } }).Cue, 'settings/plan');
+  assert.ok(none.includes('Não foi possível ler o plano agora.'));
 });

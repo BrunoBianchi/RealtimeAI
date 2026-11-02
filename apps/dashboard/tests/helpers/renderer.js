@@ -97,9 +97,13 @@ function makeApi(overrides, calls) {
   });
 }
 
+const SIGNED_IN = { signedIn: true, available: true };
+
 // Loads a fresh renderer.
 //   api          overrides for window.rtai methods
-//   state        merged into Cue.state after the scripts load
+//   state        merged into Cue.state after the scripts load. The user is
+//                signed in unless the test says otherwise (state.auth and
+//                api.cloudStatus), since signed out only the login screen exists
 //   prefersLight answer of matchMedia('(prefers-color-scheme: light)')
 // Returns:
 //   Cue, S       window.Cue and Cue.state
@@ -177,13 +181,13 @@ function loadRenderer({ api = {}, state = {}, prefersLight = false } = {}) {
     cancelAnimationFrame() {},
     // getState defaults to the state the test set up, as if the main process
     // held the same data, so a refreshState() keeps it.
-    rtai: makeApi({ getState: async () => ({ ...ctx.Cue.state }), ...api }, calls)
+    rtai: makeApi({ getState: async () => ({ ...ctx.Cue.state }), cloudStatus: async () => ({ ...SIGNED_IN, ...(state.auth || {}) }), ...api }, calls)
   };
   ctx.window = ctx;
   vm.createContext(ctx);
   for (const f of SCRIPTS) vm.runInContext(sources[f], ctx, { filename: f });
   const Cue = ctx.Cue;
-  deepMerge(Cue.state, state);
+  deepMerge(Cue.state, { auth: { ...SIGNED_IN }, ...state });
   return {
     Cue,
     S: Cue.state,

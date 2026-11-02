@@ -106,11 +106,16 @@
       case 'hello':
         L.hello = msg;
         if (msg.mode !== undefined) L.transcriptionOnly = Boolean(msg.mode);
-        // Cloud backend refused the session (expired sign-in / server down).
-        if (msg.ready === false && (msg.needs === 'login' || msg.needs === 'server')) {
-          C.toast(msg.needs === 'login'
-            ? 'Entre de novo na sua conta em Configurações › Conta e servidor.'
-            : 'Servidor RealTimeAI indisponível. Tente de novo ou use suas chaves.', 'error');
+        // The server refused the session: expired sign-in (locks the app
+        // again), plan without minutes, or server down.
+        if (msg.ready === false && msg.needs === 'login') {
+          C.toast('Sua sessão expirou. Entre de novo na sua conta.', 'error');
+          if (C.authRefresh) C.authRefresh(true);
+        } else if (msg.ready === false && msg.needs === 'upgrade') {
+          C.toast('Seu plano não tem minutos disponíveis. Assine o PRO para continuar.', 'error');
+          if (C.authRefresh) C.authRefresh(true).then(() => C.navigate('settings/plan'));
+        } else if (msg.ready === false && msg.needs === 'server') {
+          C.toast('Servidor RealTimeAI indisponível. Tente de novo em instantes.', 'error');
         }
         if (S.ui.pendingChat) {
           const text = S.ui.pendingChat;

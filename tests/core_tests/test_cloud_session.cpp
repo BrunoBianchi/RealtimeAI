@@ -54,20 +54,58 @@ TEST(CloudSettings, InvalidModeWarnsAndKeepsAuto) {
     EXPECT_FALSE(s.warnings.empty());
 }
 
-TEST(CloudBackend, AutoUsesCloudOnlyWhenSignedInAndServerKnown) {
+TEST(CloudBackend, SignInIsRequiredAndProprioOnlyChangesWhereAudioGoes) {
     Settings s;
     s.server_url = "https://api.example.com";
-    EXPECT_EQ(cloud::choose_backend(s), cloud::Backend::Own); // not signed in
+    EXPECT_FALSE(cloud::signed_in(s));
     s.server_token = "tok";
+    EXPECT_TRUE(cloud::signed_in(s));
     EXPECT_EQ(cloud::choose_backend(s), cloud::Backend::Cloud);
     s.server_mode = "proprio";
-    EXPECT_EQ(cloud::choose_backend(s), cloud::Backend::Own); // explicit opt-out wins
-    s.server_mode = "nuvem";
-    EXPECT_TRUE(cloud::cloud_required(s));
+    EXPECT_EQ(cloud::choose_backend(s), cloud::Backend::Own);
+    EXPECT_TRUE(cloud::signed_in(s)); // own keys still need the account (quota)
     s.server_url = "nao-e-url";
     if (std::string(cloud::kDefaultServerUrl).empty()) {
-        EXPECT_EQ(cloud::choose_backend(s), cloud::Backend::Own); // no usable server
+        EXPECT_FALSE(cloud::signed_in(s)); // no usable server
     }
+}
+
+TEST(CloudPlan, FreeIsOneSessionOf15MinutesProIs200PerMonth) {
+    EXPECT_EQ(cloud::plan_rules("free").minutes, 15);
+    EXPECT_FALSE(cloud::plan_rules("free").monthly);
+    EXPECT_EQ(cloud::plan_rules("free").max_sessions, 1);
+    EXPECT_EQ(cloud::plan_rules("PRO").minutes, 200);
+    EXPECT_TRUE(cloud::plan_rules("pro").monthly);
+    EXPECT_EQ(cloud::plan_rules("desconhecido").id, std::string("free")); // never unbounded
+}
+
+TEST(CloudPlan, SessionBudgetUsesServerValuesCappedByMinutesLeft) {
+    cloud::Session s;
+    s.plan = "free";
+    EXPECT_EQ(cloud::session_budget_s(s), 15 * 60);        // plan default
+    s.minutes_left = 10;
+    EXPECT_EQ(cloud::session_budget_s(s), 10 * 60);        // what is left wins
+    s.plan = "pro";
+    s.minutes_left = 200;
+    EXPECT_EQ(cloud::session_budget_s(s), 200 * 60);
+    s.max_session_s = 3600;
+    EXPECT_EQ(cloud::session_budget_s(s), 3600);           // server cap
+    s.minutes_left = 5;
+    EXPECT_EQ(cloud::session_budget_s(s), 300);
+    EXPECT_EQ(cloud::budget_warning_s(900), 840);          // one minute before
+    EXPECT_EQ(cloud::budget_warning_s(60), 30);
+}
+
+TEST(CloudPlan, NoMinutesLeftRefusesTheSessionAndOwnKeysNeedNoCredentials) {
+    std::string err;
+    EXPECT_FALSE(cloud::parse_session(R"({"session_id":"s","account":{"plan":"free","minutes_left":0}})", err, false));
+    EXPECT_NE(err.find("minutos"), std::string::npos);
+    auto s = cloud::parse_session(R"({"session_id":"s","account":{"plan":"pro","minutes_left":120,"max_session_s":7200}})",
+                                  err, /*require_credentials=*/false);
+    ASSERT_TRUE(s) << err;
+    EXPECT_FALSE(s->has_credentials());
+    EXPECT_EQ(s->max_session_s, 7200);
+    EXPECT_FALSE(cloud::parse_session(R"({"session_id":"s"})", err, /*require_credentials=*/true));
 }
 
 TEST(CloudSession, RequestBodyCarriesVersionLanguageAndCapabilities) {
@@ -82,6 +120,7 @@ TEST(CloudSession, RequestBodyCarriesVersionLanguageAndCapabilities) {
     EXPECT_EQ((*body)["app_version"].as_string(), "2.1.0");
     EXPECT_EQ((*body)["language"].as_string(), "multi");
     EXPECT_FALSE(body->has("region"));
+    EXPECT_TRUE((*body)["credentials"].as_bool());
     EXPECT_EQ((*body)["capabilities"]["stt"].at(0).as_string(), "deepgram-ws");
 }
 

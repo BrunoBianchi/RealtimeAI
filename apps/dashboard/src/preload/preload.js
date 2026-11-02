@@ -30,7 +30,11 @@ contextBridge.exposeInMainWorld('rtai', {
   saveConfig: (config) => ipcRenderer.invoke('rtai:save-config', config),
   // RealTimeAI cloud account: device sign-in, status, sign-out.
   cloudStatus: (force) => ipcRenderer.invoke('rtai:cloud-status', Boolean(force)),
-  cloudLogin: () => ipcRenderer.invoke('rtai:cloud-login'),
+  cloudLogin: (options) => ipcRenderer.invoke('rtai:cloud-login', options || {}),
+  cloudPasswordLogin: (creds) => ipcRenderer.invoke('rtai:cloud-password-login', creds),
+  cloudSignup: (data) => ipcRenderer.invoke('rtai:cloud-signup', data),
+  cloudResetPassword: (email) => ipcRenderer.invoke('rtai:cloud-reset-password', email),
+  cloudBilling: (kind) => ipcRenderer.invoke('rtai:cloud-billing', kind),
   cloudCancelLogin: () => ipcRenderer.invoke('rtai:cloud-cancel-login'),
   cloudLogout: () => ipcRenderer.invoke('rtai:cloud-logout'),
   onCloudEvent: (cb) => {

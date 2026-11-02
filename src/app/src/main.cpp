@@ -168,6 +168,8 @@ struct AppConfig {
     // RealTimeAI cloud: set when the session broker handed out credentials.
     std::shared_ptr<CloudClient> cloud;
     std::optional<cloud::Session> cloud_session;
+    // True when STT/LLM use the server credentials ([servidor] modo != proprio).
+    [[nodiscard]] bool cloud_credentials() const { return cloud && cloud_session && cloud_session->has_credentials(); }
 };
 
 fs::path exe_directory() {
@@ -379,7 +381,7 @@ DeepgramStreamConfig deepgram_config(const AppConfig& cfg, AudioSource src) {
     DeepgramStreamConfig dc;
     dc.api_key = cfg.st.deepgram_key;
     dc.source = src;
-    if (cfg.cloud && cfg.cloud_session) {
+    if (cfg.cloud_credentials()) {
         // Straight to the STT host the server picked, with its short-lived
         // token (no relay in the audio path). The token is re-read before
         // every connect, so reconnects use the background-refreshed one.
@@ -426,9 +428,9 @@ server::Hello make_hello(const AppConfig& cfg, bool llm_on, const std::string& m
     h.has_deepgram_key = !cfg.st.deepgram_key.empty();
     h.has_llm_key = !cfg.st.llm_key.empty();
     h.llm_url = cfg.st.llm_url;
-    if (cfg.cloud_session) {
+    if (cfg.cloud_session) h.plan = cfg.cloud_session->plan;
+    if (cfg.cloud_credentials()) {
         h.backend = cloud::to_string(cloud::Backend::Cloud);
-        h.plan = cfg.cloud_session->plan;
         h.llm_url = cfg.cloud_session->llm.url;
     }
     h.config_path = path_utf8(cfg.config_path);
@@ -666,10 +668,15 @@ int run_app(AppConfig cfg) {
     // ---------------- RealTimeAI cloud bootstrap ----------------
     // One POST /v1/session, started now so its round trip overlaps the agent,
     // RAG and audio set-up below; joined just before the transports are built.
+    // Signing in is mandatory for live sessions: this call is also where the
+    // server checks the plan (Free: one session of up to 15 min; PRO: 200 min
+    // a month). The standalone launcher starts it only after the user picks
+    // live (a demo must never spend the Free session).
     std::future<std::optional<cloud::Session>> cloud_boot;
     std::string cloud_error;
     int cloud_http_status = 0;
-    if (!cfg.demo && cloud::choose_backend(cfg.st) == cloud::Backend::Cloud) {
+    auto start_cloud_boot = [&] {
+        if (cfg.demo || cloud_boot.valid() || !cloud::signed_in(cfg.st)) return;
         CloudClientOptions co;
         co.base_url = cloud::effective_base_url(cfg.st);
         co.token = cfg.st.server_token;
@@ -678,12 +685,15 @@ int run_app(AppConfig cfg) {
         co.request.model = cfg.st.model;
         co.request.region = cfg.st.server_region;
         co.request.agent_id = !cfg.agent_id.empty() ? cfg.agent_id : cfg.st.last_agent;
+        co.request.credentials = cloud::choose_backend(cfg.st) == cloud::Backend::Cloud;
         cfg.cloud = std::make_shared<CloudClient>(std::move(co));
         cloud_boot = std::async(std::launch::async, [c = cfg.cloud, &cloud_error, &cloud_http_status] {
             return c->fetch(cloud_error, &cloud_http_status);
         });
         log.line("Cloud: requesting a session from " + cloud::effective_base_url(cfg.st));
-    }
+    };
+    const bool launcher_gui = !cfg.console && !cfg.server && !cfg.no_launcher;
+    if (!launcher_gui) start_cloud_boot();
 
     // ---------------- Pre-Session Studio & Mini-Agent Loading ----------------
     std::shared_ptr<MiniAgentRag> agent_rag;
@@ -696,6 +706,7 @@ int run_app(AppConfig cfg) {
             return 0;
         }
         cfg.demo = launch.run_demo;
+        start_cloud_boot();
         if (!launch.agent.empty()) {
             agent_rag = std::make_shared<MiniAgentRag>(launch.agent);
         }
@@ -799,6 +810,19 @@ int run_app(AppConfig cfg) {
 
     const auto session_start = std::chrono::steady_clock::now();
 
+    if (!cfg.demo && !cloud::signed_in(cfg.st)) {
+        const char* why = cloud::server_known(cfg.st)
+                              ? "Entre na sua conta RealTimeAI pelo dashboard para usar o copiloto."
+                              : "Nenhum servidor RealTimeAI configurado: informe [servidor] url e entre pelo dashboard.";
+        log.line(std::string("Cloud: ") + why);
+        if (out) {
+            cfg.notes.push_back(why);
+            return run_setup_mode(cfg, *out, log, "login");
+        }
+        std::cerr << "[servidor] " << why << "\n";
+        return 2;
+    }
+
     if (cloud_boot.valid()) {
         const auto t0 = std::chrono::steady_clock::now();
         cfg.cloud_session = cloud_boot.get();
@@ -813,24 +837,22 @@ int run_app(AppConfig cfg) {
             cfg.cloud_session.reset();
             cfg.cloud.reset();
             log.line("Cloud: " + cloud_error);
-            const bool own_keys = !cfg.st.deepgram_key.empty();
-            if (!cfg.demo && (cloud::cloud_required(cfg.st) || !own_keys)) {
-                // Signed in to the cloud only: nothing to fall back to.
+            if (!cfg.demo) {
+                // No session grant, no live session (the plan is checked there).
+                const char* needs = cloud_http_status == 401 ? "login"
+                                    : (cloud_http_status == 402 || cloud_http_status == 403) ? "upgrade"
+                                                                                             : "server";
                 if (out) {
                     cfg.notes.push_back("Servidor RealTimeAI: " + cloud_error);
-                    return run_setup_mode(cfg, *out, log, cloud_http_status == 401 ? "login" : "server");
+                    return run_setup_mode(cfg, *out, log, needs);
                 }
                 std::cerr << "[servidor] " << cloud_error << "\n";
                 return 2;
             }
-            if (!cfg.demo) {
-                cfg.notes.push_back("Servidor RealTimeAI indisponível (" + cloud_error +
-                                    "); usando as suas chaves próprias.");
-            }
         }
     }
 
-    const bool have_stt = cfg.cloud_session.has_value() || !cfg.st.deepgram_key.empty();
+    const bool have_stt = cfg.cloud_credentials() || !cfg.st.deepgram_key.empty();
     if (!cfg.demo && !have_stt && out) {
         return run_setup_mode(cfg, *out, log);
     }
@@ -867,7 +889,7 @@ int run_app(AppConfig cfg) {
             return base;
         };
         llm = std::make_shared<ScriptedLlmClient>(so);
-    } else if (cfg.cloud_session && cfg.cloud_session->llm.valid()) {
+    } else if (cfg.cloud_credentials() && cfg.cloud_session->llm.valid()) {
         // Cloud: same OpenAI-compatible SSE client, pointed at the URL the
         // server chose (edge relay next to the provider, or the provider
         // itself with a scoped key). Keep-alive pings keep the TLS connection
@@ -962,8 +984,8 @@ int run_app(AppConfig cfg) {
     // ---------------- copilot engine ----------------
     CopilotConfig cc;
     cc.session_start = session_start;
-    cc.model = cfg.cloud_session && !cfg.cloud_session->llm.model.empty() ? cfg.cloud_session->llm.model
-                                                                         : cfg.st.model;
+    cc.model = cfg.cloud_credentials() && !cfg.cloud_session->llm.model.empty() ? cfg.cloud_session->llm.model
+                                                                               : cfg.st.model;
     cc.reasoning_effort = (cfg.st.reasoning.empty() || cfg.st.reasoning == "minimal") ? "none" : cfg.st.reasoning;
     cc.max_tokens = std::max(cfg.st.max_tokens, 1500);
     cc.web_search = nullptr;
@@ -974,7 +996,7 @@ int run_app(AppConfig cfg) {
     if (openrouter_sol_client && openrouter_sol_client != openrouter) {
         cc.compaction_llm = openrouter_sol_client;
         cc.compaction_model = MiniAgentProfile::kCompactAnalysisModel;
-    } else if (cfg.cloud_session && !cfg.cloud_session->background_model.empty()) {
+    } else if (cfg.cloud_credentials() && !cfg.cloud_session->background_model.empty()) {
         cc.compaction_llm = openrouter;
         cc.compaction_model = cfg.cloud_session->background_model;
     }
@@ -1360,6 +1382,42 @@ int run_app(AppConfig cfg) {
         out->send(server::encode_hello(h));
     }
     engine->start();
+
+    // Plan limit: warn a minute before and end the session (saving it) when
+    // the budget granted by the server runs out. Waits on the stop event, so
+    // it costs nothing while the session runs and exits with it.
+    std::thread plan_guard;
+    if (cfg.cloud_session && !cfg.demo) {
+        const std::int64_t budget_s = cloud::session_budget_s(*cfg.cloud_session);
+        const std::int64_t warn_s = cloud::budget_warning_s(budget_s);
+        const cloud::PlanRules& rules = cloud::plan_rules(cfg.cloud_session->plan);
+        log.line("Plan " + std::string(rules.label) + ": this session may last " + std::to_string(budget_s / 60) +
+                 " min " + std::to_string(budget_s % 60) + " s");
+        plan_guard = std::thread([&engine, &log, session_start, budget_s, warn_s, label = std::string(rules.label)] {
+            auto wait_until = [&](std::int64_t at_s) {
+                const auto deadline = session_start + std::chrono::seconds(at_s);
+                const auto now = std::chrono::steady_clock::now();
+                const auto ms = deadline > now
+                    ? std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now).count() : 0;
+                return WaitForSingleObject(g_stop_event, static_cast<DWORD>(ms)) == WAIT_TIMEOUT;
+            };
+            if (warn_s < budget_s && wait_until(warn_s)) {
+                const std::int64_t left = budget_s - warn_s;
+                engine->notify(NoticeLevel::Warning,
+                               "Plano " + label + ": a sessão termina em " +
+                                   (left >= 60 ? std::to_string(left / 60) + " min." : std::to_string(left) + " s."));
+            }
+            if (wait_until(budget_s)) {
+                engine->notify(NoticeLevel::Warning,
+                               "Limite do plano " + label + " atingido: a sessão foi encerrada e salva." +
+                                   (label == "PRO" ? "" : " Assine o PRO para continuar."));
+                log.line("Plan limit reached: ending the session");
+                SetEvent(g_stop_event);
+                if (auto* o = g_overlay.load()) o->request_close();
+            }
+        });
+    }
+
     log.line("Config: " + path_utf8(cfg.config_path) + "");
     if (!cfg.st.deepgram_key_source.empty()) log.line("Deepgram key: " + cfg.st.deepgram_key_source);
     if (!cfg.st.llm_key_source.empty()) log.line("LLM key: " + cfg.st.llm_key_source);
@@ -1538,6 +1596,8 @@ int run_app(AppConfig cfg) {
     }
 
     // ---------------- orderly shutdown ----------------
+    SetEvent(g_stop_event); // also wakes the plan guard
+    if (plan_guard.joinable()) plan_guard.join();
     if (demo_talk) demo_talk->stop();
     // 1) Stop capture and flush/close each Deepgram stream, lanes in parallel
     //    (each close waits up to ~2 s for the server's final results).

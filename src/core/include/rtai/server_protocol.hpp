@@ -47,7 +47,7 @@ struct Hello {
     bool mode{false};          // Mode_State (Transcription_Only_Mode)
     std::string app_mode;      // "live" | "demo"
     bool ready{true};          // false: setup needed (see `needs`)
-    std::string needs;         // "deepgram_key" (STT key missing) | "login" (cloud session refused)
+    std::string needs;         // "deepgram_key" | "login" (not signed in / expired) | "upgrade" (plan used up) | "server"
     bool llm{false};
     std::string model;
     std::string language;

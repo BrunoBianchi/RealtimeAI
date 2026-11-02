@@ -297,10 +297,37 @@ function readConfigIni() {
   };
 }
 
-// Cloud backend usable for the next session (mirrors cloud::choose_backend).
+// Signed in to a RealTimeAI account (mirrors cloud::signed_in). The whole app
+// is gated on it: the renderer shows only the sign-in screen and nothing
+// starts the copilot without it.
+function isSignedIn(cfg) {
+  const c = cfg || readConfigIni();
+  return Boolean(c.has_server_token) && Boolean(c.server_url_effective);
+}
+
+// Signed in and using the server credentials (mirrors cloud::choose_backend).
 function cloudBackendActive(cfg) {
   const c = cfg || readConfigIni();
-  return c.server_mode !== 'proprio' && c.has_server_token && Boolean(c.server_url_effective);
+  return c.server_mode !== 'proprio' && isSignedIn(c);
+}
+
+const LOGIN_REQUIRED = { ok: false, needsLogin: true, error: 'Entre na sua conta RealTimeAI para usar o copiloto.' };
+
+// Before a live start: signed in, keys present when using own keys, and the
+// plan still has minutes (the engine asks the server again: this is only so
+// the user gets the reason right away instead of a failed start).
+async function checkCanStartLive() {
+  const cfg = readConfigIni();
+  if (!isSignedIn(cfg)) return LOGIN_REQUIRED;
+  if (!cloudBackendActive(cfg) && !cfg.has_deepgram_key) {
+    return { ok: false, error: 'Modo "Minhas chaves": configure a chave do Deepgram ou volte para os servidores RealTimeAI.' };
+  }
+  const st = await cloudAccount.status(false);
+  if (st && st.expired) return LOGIN_REQUIRED;
+  if (st && st.entitlement && !st.entitlement.canStart) {
+    return { ok: false, needsUpgrade: true, error: st.entitlement.reason };
+  }
+  return { ok: true };
 }
 
 function writeConfigIni(updates) {
@@ -2543,6 +2570,7 @@ function sendOverlayCommand(command) {
 }
 
 function launchOverlay({ agent, demo = false, configOverrides = {} }) {
+  if (!isSignedIn()) return LOGIN_REQUIRED; // also covers relaunches and demos
   // 1. Save the active Mini-Agent (with its RAG documents, instructions, and mini_compact)
   let savedAgent = null;
   if (agent) {
@@ -2946,10 +2974,10 @@ async function startCopilotForMeeting(agentId) {
   if (!exePath || !fs.existsSync(exePath)) {
     return { ok: false, error: 'Overlay not found. Build it first: npm run build:native (scripts\\windows\\build.bat).' };
   }
-  const cfgNow = readConfigIni();
-  if (!cfgNow.has_deepgram_key && !cloudBackendActive(cfgNow)) {
-    showSettingsWindow('account');
-    return { ok: false, error: 'Add your Deepgram key first. Settings is open in the dashboard.' };
+  const allowed = await checkCanStartLive();
+  if (!allowed.ok) {
+    showSettingsWindow(allowed.needsLogin ? 'account' : 'plan');
+    return allowed;
   }
   const agent = loadAllAgents().find((a) => a.id === agentId) || null;
   const res = launchOverlay({ agent, demo: false });
@@ -3021,6 +3049,7 @@ function onMeetingStarted(meeting) {
   const s = getMeetingSettings();
   if (!s.enabled || s.mutedApps.includes(meeting.id)) return;
   if (isOverlayRunning()) return; // the copilot is already on
+  if (!isSignedIn()) return; // the app does nothing until the user signs in
   getMeetingPopup().show(popupPayload('started', meeting));
 }
 
@@ -3486,9 +3515,14 @@ app.whenReady().then(() => {
   // Provider consoles linked from Settings > Account (fixed allowlist).
   // ---- RealTimeAI cloud account (device sign-in; docs/server-api.md) ----
   ipcMain.handle('rtai:cloud-status', async (_ev, force) => cloudAccount.status(Boolean(force)));
-  ipcMain.handle('rtai:cloud-login', async () => cloudAccount.startLogin());
+  ipcMain.handle('rtai:cloud-login', async (_ev, options) => cloudAccount.startLogin(options || {}));
+  ipcMain.handle('rtai:cloud-password-login', async (_ev, p) => cloudAccount.loginWithPassword(p && p.email, p && p.password));
+  ipcMain.handle('rtai:cloud-signup', async (_ev, p) => cloudAccount.signup(p && p.name, p && p.email, p && p.password));
+  ipcMain.handle('rtai:cloud-reset-password', async (_ev, email) => cloudAccount.resetPassword(email));
+  ipcMain.handle('rtai:cloud-billing', async (_ev, kind) => cloudAccount.billing(kind === 'portal' ? 'portal' : 'checkout'));
   ipcMain.handle('rtai:cloud-cancel-login', async () => cloudAccount.cancelLogin());
   ipcMain.handle('rtai:cloud-logout', async () => {
+    if (isOverlayRunning()) stopRunningOverlay();
     const res = await cloudAccount.logout();
     return { ...res, config: readConfigIni() };
   });
@@ -3569,7 +3603,12 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('rtai:start-overlay', async (_ev, options) => {
-    return launchOverlay(options || {});
+    const opts = options || {};
+    if (!opts.demo) {
+      const allowed = await checkCanStartLive();
+      if (!allowed.ok) return allowed;
+    }
+    return launchOverlay(opts);
   });
 
   ipcMain.handle('rtai:stop-overlay', async () => {
@@ -3931,6 +3970,9 @@ if (process.env.RTAI_TEST_EXPORTS === '1') {
     readConfigIni,
     writeConfigIni,
     cloudBackendActive,
+    isSignedIn,
+    checkCanStartLive,
+    launchOverlay,
     jevPairs,
     sessionQuestionAnchors,
     sessionQuestionLines,

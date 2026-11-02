@@ -9,6 +9,11 @@
 // per-turn path; the only network cost the cloud adds is that one bootstrap
 // call, made in parallel with audio/RAG startup, plus background refreshes.
 //
+// Signing in is mandatory: every live session starts with this call, which is
+// also where the server enforces the plan (Free: one session of up to 15 min,
+// once; PRO: 200 min per month). With [servidor] modo = proprio the server
+// only grants the session (quota) and the audio/LLM use the user's own keys.
+//
 // The full HTTP contract is documented in docs/server-api.md. Everything here
 // is parsing/validation so it stays platform-free and unit-tested; the WinHTTP
 // client lives in src/net (cloud_client.hpp).
@@ -54,10 +59,50 @@ struct Session {
     Endpoint llm;
     Endpoint llm_fallback;          // optional; used when the primary fails fast
     std::string background_model;   // summaries/compaction; empty = llm.model
-    std::string plan;               // "free", "pro"...: shown in the UI
+    std::string plan;               // "free" | "pro": shown in the UI
     std::int64_t minutes_left{-1};  // -1 = unlimited / unknown
+    std::int64_t max_session_s{-1}; // longest this session may run; -1 = plan default
     std::string notice;             // optional pt-BR message for the HUD
+    [[nodiscard]] bool has_credentials() const { return stt.valid(); }
 };
+
+// Plan rules. The server is the authority (it refuses /v1/session with 402
+// when the quota is gone and sends minutes_left/max_session_s); these are the
+// client-side defaults used when a field is missing, so a session can never
+// run unbounded.
+struct PlanRules {
+    const char* id;
+    const char* label;
+    std::int64_t minutes;         // quota per period
+    bool monthly;                 // false = lifetime (one-time trial)
+    int max_sessions;             // -1 = unlimited
+    std::int64_t max_session_min; // longest single session
+};
+
+inline constexpr PlanRules kFreePlan{"free", "Free", 15, false, 1, 15};
+inline constexpr PlanRules kProPlan{"pro", "PRO", 200, true, -1, 200};
+
+inline const PlanRules& plan_rules(std::string_view plan) {
+    const std::string p = text::fold(text::trim(plan));
+    return (p == "pro" || p == "premium") ? kProPlan : kFreePlan;
+}
+
+// Seconds this session may last: the server's max_session_s, capped by the
+// minutes left in the plan; plan default when the server sent neither.
+inline std::int64_t session_budget_s(const Session& s) {
+    const PlanRules& rules = plan_rules(s.plan);
+    std::int64_t budget = s.max_session_s > 0 ? s.max_session_s : rules.max_session_min * 60;
+    if (s.minutes_left >= 0) {
+        const std::int64_t left = s.minutes_left * 60;
+        if (left < budget) budget = left;
+    }
+    return budget < 0 ? 0 : budget;
+}
+
+// When to warn before the plan limit ends the session.
+inline std::int64_t budget_warning_s(std::int64_t budget_s) {
+    return budget_s > 120 ? budget_s - 60 : budget_s / 2;
+}
 
 enum class Backend : std::uint8_t { Own, Cloud };
 
@@ -73,21 +118,18 @@ inline std::string effective_base_url(const Settings& s) {
     return u;
 }
 
-// [servidor] modo: "proprio" never uses the cloud; "nuvem" requires it; "auto"
-// (default) uses it when signed in (token present) and a server is known.
+// A server to sign in to is known (config/env or the build default).
+inline bool server_known(const Settings& s) { return parse_url(effective_base_url(s)).ok; }
+
+// Signed in: a device token and a server. Required for any live session.
+inline bool signed_in(const Settings& s) { return !s.server_token.empty() && server_known(s); }
+
+// Where the audio and the LLM go once signed in: [servidor] modo = proprio
+// uses the user's own keys; auto/nuvem (default) use the server credentials.
 inline Backend choose_backend(const Settings& s) {
     const std::string mode = text::fold(text::trim(s.server_mode));
     if (mode == "proprio" || mode == "own" || mode == "local") return Backend::Own;
-    const bool usable = !s.server_token.empty() && parse_url(effective_base_url(s)).ok;
-    if (mode == "nuvem" || mode == "cloud") return usable ? Backend::Cloud : Backend::Own;
-    return usable ? Backend::Cloud : Backend::Own;
-}
-
-// True when the user explicitly asked for the cloud, so a failed bootstrap is
-// an error instead of a silent fallback to own keys.
-inline bool cloud_required(const Settings& s) {
-    const std::string mode = text::fold(text::trim(s.server_mode));
-    return mode == "nuvem" || mode == "cloud";
+    return Backend::Cloud;
 }
 
 struct SessionRequest {
@@ -96,7 +138,7 @@ struct SessionRequest {
     std::string model;      // preferred live model (server may override)
     std::string region;     // [servidor] regiao; empty = server decides (GeoIP/anycast)
     std::string agent_id;   // active goal, for server-side analytics only
-    bool demo{false};
+    bool credentials{true}; // false = own keys: the server only grants the session
 };
 
 inline std::string build_session_request(const SessionRequest& r) {
@@ -108,6 +150,7 @@ inline std::string build_session_request(const SessionRequest& r) {
     if (!r.model.empty()) b += ",\"model\":" + json::quote(r.model);
     if (!r.region.empty() && text::fold(r.region) != "auto") b += ",\"region\":" + json::quote(r.region);
     if (!r.agent_id.empty()) b += ",\"agent_id\":" + json::quote(r.agent_id);
+    b += r.credentials ? ",\"credentials\":true" : ",\"credentials\":false";
     b += ",\"capabilities\":{\"stt\":[\"deepgram-ws\"],\"llm\":[\"openai-chat-sse\"]}";
     b += "}";
     return b;
@@ -131,7 +174,9 @@ inline Endpoint read_endpoint(const json::Value& v) {
 
 // Parses the POST /v1/session response. Returns nullopt with a pt-BR reason in
 // `error` when anything needed to stream is missing or malformed.
-inline std::optional<Session> parse_session(std::string_view body, std::string& error) {
+// require_credentials=false (own keys): stt/llm may be absent.
+inline std::optional<Session> parse_session(std::string_view body, std::string& error,
+                                            bool require_credentials = true) {
     auto root = json::Parser::parse(body);
     if (!root || !root->is_object()) {
         error = "resposta do servidor inválida";
@@ -158,8 +203,19 @@ inline std::optional<Session> parse_session(std::string_view body, std::string& 
     s.background_model = r["llm"]["background_model"].as_string();
     s.plan = r["account"]["plan"].as_string();
     s.minutes_left = static_cast<std::int64_t>(r["account"]["minutes_left"].as_number(-1));
+    s.max_session_s = static_cast<std::int64_t>(r["account"]["max_session_s"].as_number(-1));
     s.notice = r["notice"].as_string();
 
+    if (s.minutes_left == 0) {
+        error = "seu plano não tem minutos disponíveis";
+        return std::nullopt;
+    }
+    if (!require_credentials && s.stt.url.empty()) {
+        s.stt = {};
+        s.llm = {};
+        s.llm_fallback = {};
+        return s;
+    }
     if (!s.stt.valid() || !detail::scheme_is(s.stt.url, "wss://", "ws://") || !parse_url(s.stt.url).ok) {
         error = "o servidor não enviou um endpoint de transcrição válido";
         return std::nullopt;

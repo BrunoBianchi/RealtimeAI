@@ -1,13 +1,19 @@
-// RealTimeAI cloud account (dashboard side). Signs the user in with the
-// OAuth 2.0 device authorization grant (RFC 8628): the dashboard shows a short
-// code, opens the browser on the server's page and polls until the user
-// approves. The resulting device token goes to config.ini [servidor] token,
+// RealTimeAI cloud account (dashboard side). Signing in is mandatory: the
+// dashboard shows only the sign-in screen until there is a device token.
+// Three ways in, all ending in the same device token:
+//   * Google and SSO (SAML/OIDC of the user's company): the OAuth 2.0 device
+//     authorization grant (RFC 8628) with a `provider` hint. The dashboard
+//     opens the browser on the server's page (which redirects to Google or to
+//     the company IdP) and polls until the user approves;
+//   * e-mail + password: POST /v1/auth/login (and /v1/auth/signup). The resulting device token goes to config.ini [servidor] token,
 // where the engine (rtai_app) encrypts it with DPAPI and exchanges it for
 // short-lived STT/LLM credentials at each session (POST /v1/session).
 //
 // Nothing here runs during a live session: the hot path (audio -> STT -> LLM)
 // never waits on this module. Contract: docs/server-api.md.
 'use strict';
+
+const { entitlement } = require('./plans');
 
 // Official builds set this (keep it in sync with CMake -DRTAI_SERVER_URL).
 // Empty = open-source build: sign-in is offered only when [servidor] url is set.
@@ -33,6 +39,13 @@ function describeError(code, status) {
     case 'invalid_token': return 'Sessão expirada: entre de novo na sua conta.';
     case 'network': return 'Sem conexão com o servidor RealTimeAI.';
     case 'no_server': return 'Nenhum servidor configurado.';
+    case 'invalid_credentials': return 'E-mail ou senha incorretos.';
+    case 'email_taken': return 'Já existe uma conta com este e-mail. Entre ou recupere a senha.';
+    case 'weak_password': return 'Senha fraca: use pelo menos 8 caracteres.';
+    case 'invalid_email': return 'E-mail inválido.';
+    case 'email_not_verified': return 'Confirme o seu e-mail pelo link que enviamos e entre de novo.';
+    case 'sso_not_configured': return 'SSO não está configurado para este domínio. Fale com o administrador da sua empresa.';
+    case 'rate_limited': return 'Muitas tentativas. Aguarde um pouco e tente de novo.';
     default:
       if (status === 401) return 'Sessão expirada: entre de novo na sua conta.';
       if (status === 426) return 'Versão do app muito antiga: atualize.';
@@ -109,7 +122,7 @@ function createCloudAccount(deps) {
     const r = await request('GET', '/v1/me', { token });
     let value;
     if (r.ok && r.data) {
-      value = { ...info, signedIn: true, account: r.data };
+      value = { ...info, signedIn: true, account: r.data, entitlement: entitlement(r.data) };
     } else if (r.status === 401) {
       value = { ...info, signedIn: false, expired: true, detail: describeError('invalid_token', 401) };
     } else {
@@ -120,12 +133,18 @@ function createCloudAccount(deps) {
     return value;
   }
 
-  async function startLogin() {
+  // provider: 'google' | 'sso' (login_hint = work e-mail or company domain).
+  async function startLogin(options) {
     if (!serverInfo().available) return { ok: false, error: describeError('no_server') };
+    const provider = options && ['google', 'sso'].includes(options.provider) ? options.provider : 'google';
+    const hint = String((options && options.hint) || '').trim();
+    if (provider === 'sso' && !hint) return { ok: false, error: 'Informe o e-mail corporativo ou o domínio da empresa.' };
     if (login) login.cancelled = true;
     const mine = { cancelled: false };
     login = mine;
-    const start = await request('POST', '/v1/auth/device', { body: { client_id: 'rtai-dashboard', app_version: deps.appVersion || '' } });
+    const start = await request('POST', '/v1/auth/device', {
+      body: { client_id: 'rtai-dashboard', app_version: deps.appVersion || '', provider, ...(hint ? { login_hint: hint } : {}) }
+    });
     if (!start.ok || !start.data || !start.data.device_code) {
       login = null;
       return { ok: false, error: describeError(start.error, start.status) };
@@ -167,6 +186,66 @@ function createCloudAccount(deps) {
     return { ok: true, userCode: d.user_code || '', verificationUri: d.verification_uri || verifyUrl || '', expiresIn: Number(d.expires_in) || 600 };
   }
 
+  // Token responses from password sign-in / sign-up.
+  function finishSignIn(r) {
+    if (r.ok && r.data && r.data.access_token) {
+      deps.saveToken(String(r.data.access_token));
+      cache = null;
+      emit({ type: 'signed_in', account: r.data.account || null });
+      return { ok: true, account: r.data.account || null };
+    }
+    if (r.ok && r.data && r.data.verification_required) {
+      return { ok: false, pendingVerification: true, error: describeError('email_not_verified') };
+    }
+    const msg = r.data && r.data.error && r.data.error.message;
+    return { ok: false, error: msg || describeError(r.error, r.status) };
+  }
+
+  const validEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(e || '').trim());
+
+  async function loginWithPassword(email, password) {
+    if (!serverInfo().available) return { ok: false, error: describeError('no_server') };
+    if (!validEmail(email)) return { ok: false, error: describeError('invalid_email') };
+    if (!password) return { ok: false, error: 'Informe a senha.' };
+    const r = await request('POST', '/v1/auth/login', {
+      body: { email: String(email).trim(), password: String(password), client_id: 'rtai-dashboard' }
+    });
+    return finishSignIn(r);
+  }
+
+  async function signup(name, email, password) {
+    if (!serverInfo().available) return { ok: false, error: describeError('no_server') };
+    if (!validEmail(email)) return { ok: false, error: describeError('invalid_email') };
+    if (String(password || '').length < 8) return { ok: false, error: describeError('weak_password') };
+    const r = await request('POST', '/v1/auth/signup', {
+      body: { name: String(name || '').trim(), email: String(email).trim(), password: String(password), client_id: 'rtai-dashboard' }
+    });
+    return finishSignIn(r);
+  }
+
+  async function resetPassword(email) {
+    if (!validEmail(email)) return { ok: false, error: describeError('invalid_email') };
+    const r = await request('POST', '/v1/auth/password/reset', { body: { email: String(email).trim() } });
+    // Same answer whether or not the account exists (no account enumeration).
+    return r.status === 0 ? { ok: false, error: describeError('network') } : { ok: true };
+  }
+
+  // PRO checkout / subscription management: the server returns a hosted page.
+  async function billing(kind) {
+    const token = deps.readToken();
+    if (!token) return { ok: false, error: describeError('invalid_token') };
+    const r = await request('POST', kind === 'portal' ? '/v1/billing/portal' : '/v1/billing/checkout', {
+      token,
+      body: kind === 'portal' ? {} : { plan: 'pro' }
+    });
+    if (r.ok && r.data && /^https:\/\//i.test(String(r.data.url || ''))) {
+      deps.openBrowser(r.data.url);
+      cache = null; // the plan may change once the user pays
+      return { ok: true };
+    }
+    return { ok: false, error: describeError(r.error, r.status) };
+  }
+
   function cancelLogin() {
     if (login) login.cancelled = true;
     login = null;
@@ -181,7 +260,7 @@ function createCloudAccount(deps) {
     return { ok: true };
   }
 
-  return { status, startLogin, cancelLogin, logout, serverInfo };
+  return { status, startLogin, cancelLogin, loginWithPassword, signup, resetPassword, billing, logout, serverInfo };
 }
 
 module.exports = { createCloudAccount, effectiveServerUrl, normalizeBaseUrl, describeError, BUILTIN_SERVER_URL };

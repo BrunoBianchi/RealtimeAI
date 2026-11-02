@@ -401,6 +401,28 @@ function monthSessions(ref) {
 // Minutes transcribed this calendar month, from the session files.
 function usage() {
   const list = monthSessions();
+  const ent = S.auth && S.auth.entitlement;
+  if (ent) {
+    const now = new Date();
+    const renew = ent.periodEnd ? new Date(ent.periodEnd) : new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const limit = ent.limitMinutes || null;
+    return {
+      usedMin: Math.round(ent.usedMinutes),
+      limit,
+      plan: ent.isPro ? 'pro' : 'free',
+      planLabel: ent.planLabel,
+      isPro: ent.isPro,
+      canStart: ent.canStart,
+      reason: ent.reason,
+      sessions: list.length,
+      questions: list.reduce((acc, s) => acc + (Number(s.questionsCount) || 0), 0),
+      answers: list.reduce((acc, s) => acc + (Number(s.suggestions) || Number(s.answersCount) || 0), 0),
+      pct: limit ? clamp(Math.round((ent.usedMinutes / limit) * 100), 0, 100) : null,
+      left: limit ? Math.max(0, Math.round(ent.leftMinutes)) : null,
+      renewLabel: ent.monthly ? fmtDateShort(renew) : 'não renova',
+      monthLabel: ent.monthly ? MONTHS_LONG[now.getMonth()] : 'sessão gratuita'
+    };
+  }
   const sec = list.reduce((acc, s) => acc + (Number(s.durationSeconds) || 0), 0);
   const tu = (S.profile && S.profile.transcriptionUsage) || {};
   const plan = String((S.profile && S.profile.plan) || 'free').toLowerCase();
@@ -550,6 +572,16 @@ async function startCopilot(agent, demo) {
     Cue.openModal('new-session');
     return null;
   }
+  if (isLocked()) {
+    navigate('home');
+    return null;
+  }
+  const ent = S.auth && S.auth.entitlement;
+  if (!demo && ent && !ent.canStart) {
+    toast(ent.reason, 'error');
+    navigate('settings/plan');
+    return null;
+  }
   const ready = engineReady();
   if (!demo && !ready.ok) {
     toast(!ready.stt ? 'Configure a chave de transcrição (Deepgram) primeiro.' : 'Configure uma chave de IA primeiro.', 'error');
@@ -565,6 +597,8 @@ async function startCopilot(agent, demo) {
   if (!res) return null;
   if (res.ok === false) {
     toast(res.error || 'O copiloto não iniciou.', 'error');
+    if (res.needsLogin && Cue.authRefresh) await Cue.authRefresh(true);
+    else if (res.needsUpgrade) navigate('settings/plan');
     return null;
   }
   if (Cue.liveReset) Cue.liveReset(target.id, demo);
@@ -628,9 +662,26 @@ function handleRoute() {
 }
 
 // ----------------------------------------------------------------- render --
+// Signing in is mandatory: until then only the sign-in screen exists (no
+// sidebar, no tabs, no settings). The main process enforces the same rule.
+function isLocked() {
+  return !(S.auth && S.auth.signedIn);
+}
+Cue.isLocked = isLocked;
+
+function applyLock() {
+  const locked = isLocked();
+  for (const id of ['sidebar', 'searchTrigger', 'btnUpdateChip', 'btnStealthChip', 'btnGoLive']) {
+    const el = document.getElementById(id);
+    if (el && (id !== 'btnUpdateChip' || locked)) el.hidden = locked;
+  }
+  return locked;
+}
+
 function renderView(resetScroll) {
   const host = document.getElementById('view');
-  const view = Cue.views[S.route.view] || Cue.views.home;
+  const locked = applyLock();
+  const view = locked ? Cue.views.login : Cue.views[S.route.view] || Cue.views.home;
   let html = '';
   try {
     html = view(S.route.parts);
@@ -641,7 +692,7 @@ function renderView(resetScroll) {
   host.innerHTML = html;
   hydrateIcons(host);
   if (resetScroll) document.getElementById('content').scrollTop = 0;
-  const after = Cue.afterRender[S.route.view];
+  const after = locked ? Cue.afterRender.login : Cue.afterRender[S.route.view];
   if (after) after(S.route.parts);
   renderShell();
 }
@@ -686,6 +737,11 @@ function allDocs() {
 Cue.allDocs = allDocs;
 
 function renderShell() {
+  if (applyLock()) {
+    const crumbEl = document.getElementById('crumb');
+    if (crumbEl) crumbEl.textContent = 'Entrar';
+    return;
+  }
   const running = Boolean(S.overlayStatus && S.overlayStatus.running);
   const activeAgents = S.agents.filter((a) => !a.archived);
   const qCount = S.questionBank
@@ -856,6 +912,9 @@ Cue.actions['open-url'] = async (el) => {
   if (!res || !res.ok) toast('Não foi possível abrir o link.', 'error');
 };
 
+// The only actions that work before signing in (sign-in screen + window).
+const AUTH_ACTIONS = new Set(['auth-google', 'auth-sso', 'auth-password', 'auth-signup', 'auth-mode', 'auth-reset', 'auth-cancel', 'auth-reopen', 'open-url']);
+
 function bindDelegation() {
   document.addEventListener('click', (e) => {
     const win = e.target.closest('[data-win]');
@@ -865,6 +924,7 @@ function bindDelegation() {
     }
     const el = e.target.closest('[data-action]');
     if (!el || el.disabled) return;
+    if (isLocked() && !AUTH_ACTIONS.has(el.dataset.action)) return;
     const fn = Cue.actions[el.dataset.action];
     if (!fn) return;
     if (el.tagName === 'A') e.preventDefault();
@@ -874,6 +934,7 @@ function bindDelegation() {
   document.addEventListener('change', (e) => {
     const el = e.target.closest('[data-change]');
     if (!el) return;
+    if (isLocked() && el.dataset.change !== 'auth-server') return;
     const fn = Cue.changes[el.dataset.change];
     if (fn) fn(el, e);
   });
@@ -886,6 +947,7 @@ function bindDelegation() {
   document.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();
+      if (isLocked()) return;
       Cue.openModal('palette');
       return;
     }
@@ -1009,6 +1071,7 @@ function subscribe() {
 async function boot() {
   hydrateIcons(document);
   bindDelegation();
+  if (Cue.authInit) await Cue.authInit();
   try {
     await refreshState();
   } catch (err) {

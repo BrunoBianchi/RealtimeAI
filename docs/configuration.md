@@ -60,12 +60,13 @@ variável/padrão.
 | `[audio] limiar_energia` | `0.01` | | Sensibilidade do VAD por energia |
 | `[overlay] largura` / `altura_max_pct` | `560` / `60` | | Tamanho do overlay |
 | `[sessao] salvar` / `pasta` | `sim` / `%LOCALAPPDATA%\RealTimeAI\sessions` | `RTAI_SESSION_DIR` | Gravação das sessões |
-| `[servidor] modo` | `auto` | `RTAI_SERVER_MODE` | `auto` (servidores RealTimeAI quando conectado), `nuvem` ou `proprio` (só suas chaves) |
+| `[servidor] modo` | `auto` | `RTAI_SERVER_MODE` | `auto`/`nuvem` (transcrição e IA pelos servidores RealTimeAI) ou `proprio` (suas chaves; login e cota continuam valendo) |
 | `[servidor] url` | padrão do build | `RTAI_SERVER_URL` | Endereço da API (veja `docs/server-api.md`) |
 | `[servidor] regiao` | `auto` | `RTAI_SERVER_REGION` | Região preferida; `auto` = a mais próxima |
 | `[servidor] token` | (login do dashboard) | `RTAI_SERVER_TOKEN` | Token do dispositivo, criptografado com DPAPI |
 
-Com uma conta RealTimeAI (Configurações › Conta e servidor no dashboard), as chaves do
+É preciso entrar numa conta RealTimeAI para usar o app (Google, SSO ou e-mail + senha;
+plano Free: uma sessão de até 15 minutos, uma vez; PRO: 200 minutos por mês). Com a conta, as chaves do
 Deepgram e do LLM deixam de ser obrigatórias: o app pede credenciais temporárias ao servidor
 no início de cada sessão e fala direto com os provedores. Detalhes e contrato da API em
 [`server-api.md`](server-api.md); plano de migração em [`cloud-migration.md`](cloud-migration.md).

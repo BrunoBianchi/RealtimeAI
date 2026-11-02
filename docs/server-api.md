@@ -57,7 +57,15 @@ Regras para o servidor manter isso:
 
 ## Autenticação
 
-- **Token do dispositivo**: obtido pelo login do dashboard (device code, abaixo). Longa
+O login é **obrigatório**: sem token do dispositivo o dashboard mostra só a tela de login
+(nenhuma aba ou configuração) e o engine não inicia sessão ao vivo (`hello.needs = "login"`).
+Três formas de entrar, todas terminam no mesmo token do dispositivo:
+
+- **Google** e **SSO da empresa** (SAML/OIDC): device code (RFC 8628) com `provider`; a
+  página do servidor redireciona ao Google ou ao IdP da empresa;
+- **e-mail + senha**: `POST /v1/auth/login` (conta nova: `POST /v1/auth/signup`).
+
+- **Token do dispositivo**: obtido por um dos logins acima. Longa
   duração, revogável. Fica em `config.ini [servidor] token`, criptografado com DPAPI pelo
   engine (`rtai_app --protect-keys` logo após o login) e numa cópia `cloud_token.bin`
   (Electron `safeStorage`) para o dashboard consultar a conta.
@@ -71,7 +79,11 @@ Regras para o servidor manter isso:
 
 ### `POST /v1/auth/device` — início do login (RFC 8628)
 
-Requisição: `{"client_id": "rtai-dashboard", "app_version": "2.1.0"}`
+Requisição: `{"client_id": "rtai-dashboard", "app_version": "2.1.0", "provider": "google"}`
+
+- `provider`: `google` ou `sso`. Com `sso` vai também `login_hint` (e-mail corporativo ou
+  domínio), que o servidor usa para achar o IdP da empresa. Sem SSO configurado para o
+  domínio: `400 {"error": "sso_not_configured"}`.
 
 Resposta `200`:
 
@@ -97,6 +109,29 @@ Requisição: `{"device_code": "...", "grant_type": "urn:ietf:params:oauth:grant
 - `400` `{"error": "slow_down"}`: o app soma 5 s ao intervalo.
 - `400` `{"error": "access_denied" | "expired_token"}`: encerra o login.
 
+### `POST /v1/auth/login` — e-mail + senha
+
+Requisição: `{"email": "...", "password": "...", "client_id": "rtai-dashboard"}`
+
+- `200` `{"access_token": "<token do dispositivo>", "account": {...}}`
+- `401` `{"error": "invalid_credentials"}` · `403` `{"error": "email_not_verified"}` ·
+  `429` `{"error": "rate_limited"}`
+
+### `POST /v1/auth/signup` — criar conta
+
+Requisição: `{"name": "...", "email": "...", "password": "...", "client_id": "rtai-dashboard"}`
+(o app exige senha com pelo menos 8 caracteres).
+
+- `201` `{"access_token": "...", "account": {...}}` (entra direto), ou
+- `201` `{"verification_required": true}` (o app pede para confirmar o e-mail e entrar);
+- `409` `{"error": "email_taken"}` · `400` `{"error": "weak_password" | "invalid_email"}`.
+
+Toda conta nova começa no plano **Free**.
+
+### `POST /v1/auth/password/reset` — recuperar senha
+
+Requisição: `{"email": "..."}`. Responda `204` exista ou não a conta (sem enumeração).
+
 ### `POST /v1/auth/logout` — revoga o token do dispositivo
 
 Bearer. Resposta `204`. O app apaga o token local mesmo se a chamada falhar.
@@ -109,11 +144,42 @@ Bearer. Resposta `200`:
 {
   "email": "pessoa@exemplo.com",
   "name": "Pessoa",
-  "plan": {"id": "pro", "label": "Pro", "minutes_limit": 1200, "minutes_used": 315, "period_end": "2026-12-01"}
+  "plan": {
+    "id": "pro",
+    "minutes_limit": 200,
+    "minutes_used": 115,
+    "sessions_used": 31,
+    "max_session_minutes": 200,
+    "period_end": "2026-12-01"
+  }
 }
 ```
 
-`401` = login expirado (o dashboard pede para entrar de novo).
+`401` = login expirado (o app volta para a tela de login).
+
+## Planos
+
+| Plano | Limite | Sessões | Renova |
+|---|---|---|---|
+| `free` | 15 min | **uma única**, de até 15 min | nunca (é um teste) |
+| `pro` | 200 min por mês | quantas quiser | todo mês (`period_end`) |
+
+- O servidor é a autoridade: recusa `POST /v1/session` com `402` quando o plano não tem
+  minutos (ou a sessão gratuita já foi usada) e informa em `account` quanto a sessão pode
+  durar.
+- A sessão gratuita é consumida quando o servidor concede a primeira sessão com
+  credenciais (`credentials: true`), mesmo que dure menos de 15 min.
+- O app confere antes (dashboard: `apps/dashboard/src/main/plans.js`) e durante (engine:
+  `cloud::session_budget_s`): avisa 1 min antes e encerra e salva a sessão ao atingir o
+  limite. Valores do servidor têm precedência; os do app só preenchem o que faltar.
+- `id` desconhecido = Free. `premium` é aceito como sinônimo de `pro`.
+
+### `POST /v1/billing/checkout` e `POST /v1/billing/portal` — assinatura
+
+Bearer. `checkout` recebe `{"plan": "pro"}`; `portal` recebe `{}`. Resposta `200`
+`{"url": "https://..."}` com a página hospedada (ex.: Stripe Checkout / Customer Portal),
+que o app abre no navegador. Só `https://` é aceito. Depois do pagamento, `GET /v1/me`
+passa a mostrar `pro`.
 
 ### `POST /v1/session` — credenciais da sessão (engine)
 
@@ -133,9 +199,14 @@ Requisição:
   "model": "qwen/qwen3.6-flash",
   "region": "sa-east-1",
   "agent_id": "nubank-senior",
-  "capabilities": {"stt": ["deepgram-ws"], "llm": ["openai-chat-sse"]}
+  "capabilities": {"stt": ["deepgram-ws"], "llm": ["openai-chat-sse"]},
+  "credentials": true
 }
 ```
+
+`credentials: false` quando o usuário usa as próprias chaves (`[servidor] modo = proprio`):
+o servidor só concede a sessão e o tempo (a cota vale nos dois modos) e pode omitir
+`stt`/`llm`.
 
 `region` só vai quando o usuário escolhe uma (padrão: o servidor decide). `model` é a
 preferência do usuário; o servidor pode trocar conforme o plano.
@@ -160,7 +231,7 @@ Resposta `200`:
     "background_model": "qwen/qwen3.6-flash",
     "fallback": {"url": "https://llm-iad.realtimeai.example/v1/chat/completions", "token": "...", "model": "..."}
   },
-  "account": {"plan": "pro", "minutes_left": 885},
+  "account": {"plan": "pro", "minutes_left": 85, "max_session_s": 5100},
   "notice": "Mensagem opcional mostrada no HUD"
 }
 ```
@@ -178,10 +249,14 @@ Validação no app (`cloud::parse_session`):
   o primeiro byte rápido.
 - `background_model`: resumos e compactação de memória (fora do caminho ao vivo).
 
-Erros: `401` (login expirado → o dashboard pede login), `402` (sem minutos), `403`, `426`,
-`429`, `5xx`. Com `[servidor] modo = auto` e chaves próprias configuradas, uma falha cai
-para as chaves próprias com um aviso; sem chaves, a sessão não inicia e o HUD/dashboard
-mostram o motivo.
+- `account.max_session_s`: quanto esta sessão pode durar (Free: 900 na única sessão). O
+  app encerra a sessão ao atingir `min(max_session_s, minutes_left × 60)`.
+  `minutes_left: 0` é tratado como recusa.
+
+Erros: `401` (login expirado → `hello.needs = "login"`, o app volta para o login), `402`
+(plano sem minutos / sessão gratuita já usada → `needs = "upgrade"`, o dashboard abre o
+plano), `403` (conta bloqueada → `upgrade`), `426`, `429`, `5xx` (`needs = "server"`).
+Não há mais queda para as chaves próprias: sem a concessão do servidor a sessão não inicia.
 
 ### `POST /v1/session/{session_id}/end` — fim da sessão
 
@@ -198,9 +273,8 @@ servidor (uso do Deepgram por `tag`, tokens do LLM no relay).
 
 ```ini
 [servidor]
-; auto = servidores RealTimeAI quando conectado, senão as suas chaves
-; nuvem = sempre pela conta (sem servidor, a sessão não inicia)
-; proprio = só as suas chaves (modo open-source)
+; auto / nuvem = transcrição e IA pelos servidores RealTimeAI
+; proprio = suas chaves de API (o login e a cota do plano continuam valendo)
 modo = auto
 ; vazio = servidor padrão do build oficial
 url =
@@ -215,4 +289,4 @@ Variáveis equivalentes: `RTAI_SERVER_MODE`, `RTAI_SERVER_URL`, `RTAI_SERVER_REG
 
 O servidor padrão é definido no build: `cmake --preset windows-release -DRTAI_SERVER_URL=https://api...`
 (engine) e `BUILTIN_SERVER_URL` em `apps/dashboard/src/main/cloud_account.js` (dashboard).
-Um build open-source sem esses valores só oferece login se `[servidor] url` for preenchido.
+Um build open-source sem esses valores pede o endereço do servidor na própria tela de login.

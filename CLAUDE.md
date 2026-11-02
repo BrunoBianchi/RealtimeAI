@@ -57,8 +57,10 @@ Both sides are defined in `src/core/include/rtai/server_protocol.hpp`; `apps/das
 - `question_bank.json` (JEV engine, `jev_engine.js`), `dashboard_profile.json`, `playbooks.json`, flags files.
 
 ### RealTimeAI cloud backend (`docs/server-api.md`)
-- `[servidor]` (`modo` auto/nuvem/proprio, `url`, `regiao`, `token`): signed in, the engine makes one `POST /v1/session` at start (overlapped with set-up) and gets short-lived STT/LLM credentials; audio still goes straight to Deepgram. Without a server or with `modo = proprio`, own keys as before.
-- Engine: `cloud_session.hpp` (core, tested) + `CloudClient` (`src/net`); dashboard: `cloud_account.js` (device-code sign-in) and the `account` settings tab. Default server URL: CMake `RTAI_SERVER_URL` + `BUILTIN_SERVER_URL` (keep both in sync).
+- Sign-in is mandatory (Google / SSO via device code, or e-mail + password): signed out, the renderer shows only `auth.js`'s login view (`Cue.isLocked()`, `AUTH_ACTIONS` gate in `app.js`) and `launchOverlay` refuses; the engine answers `hello.needs = "login"`.
+- Plans (`plans.js` ↔ `cloud::PlanRules`): Free = one session of up to 15 min, once; PRO = 200 min/month. The server is authoritative (`402` → `needs = "upgrade"`); the engine's plan guard ends the session at the budget.
+- `[servidor]` (`modo` auto/nuvem/proprio, `url`, `regiao`, `token`): the engine makes one `POST /v1/session` at start (overlapped with set-up) and gets short-lived STT/LLM credentials; audio still goes straight to Deepgram. `modo = proprio` uses own keys but still needs the session grant (quota).
+- Engine: `cloud_session.hpp` (core, tested) + `CloudClient` (`src/net`); dashboard: `cloud_account.js` (sign-in, billing), `plans.js`, `renderer/auth.js`, and the `account`/`plan` settings tabs. Default server URL: CMake `RTAI_SERVER_URL` + `BUILTIN_SERVER_URL` (keep both in sync).
 
 ### Dashboard (`apps/dashboard/`)
 - `src/main/main.js` — IPC handlers (`rtai:*`), overlay process control, config/agent/session persistence, tray, meeting detection, Google Calendar (`google_calendar.js`), updater (`updater.js`, electron-updater on GitHub releases, stable/beta), feature flags (`feature_flags.js`).

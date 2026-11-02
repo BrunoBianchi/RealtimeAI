@@ -97,111 +97,65 @@
   }
 
   // ----------------------------------------------------- cloud account --
-  // RealTimeAI servers: sign in once and STT + IA work without API keys.
-  // Own keys stay available (open-source mode) and are the fallback.
-  const cloud = { status: null, loading: false, login: null, error: '' };
-
+  // The RealTimeAI account is mandatory (auth.js locks the app while signed
+  // out). This tab shows who is signed in and where STT + IA run.
   function account() {
     const cfg = S.config;
-    const st = cloud.status;
+    const st = S.auth || {};
     const mode = cfg.server_mode || 'auto';
     const available = Boolean(cfg.server_url_effective);
-    const acc = st && st.account;
-    let body;
-    if (!available) {
-      body = `<div class="muted">Esta versão não tem um servidor padrão. Informe o endereço em Avançado, ou use suas próprias chaves em IA e modelos.</div>`;
-    } else if (cloud.login) {
-      body = `<div class="stack" style="gap:10px"><span class="muted">Confirme no navegador com o código abaixo. Esta tela atualiza sozinha.</span>
-        <div class="row" style="gap:16px"><span class="metric mono" id="cloudUserCode">${esc(cloud.login.userCode || '—')}</span><span class="spinner"></span></div>
-        <span class="xs faint">${esc(cloud.login.verificationUri || '')}</span>
-        <div class="row"><button type="button" class="btn sm" data-action="cloud-open-verify">${icon('external')}Abrir de novo</button><button type="button" class="btn sm ghost" data-action="cloud-cancel">Cancelar</button></div></div>`;
-    } else if (st && st.signedIn) {
-      const plan = acc && acc.plan ? (acc.plan.label || acc.plan.id || acc.plan) : '';
-      const minutes = acc && acc.plan && acc.plan.minutes_limit
-        ? `${acc.plan.minutes_used ?? 0} de ${acc.plan.minutes_limit} min usados neste período` : '';
-      body = `<div class="row" style="gap:14px"><span class="avatar" style="width:40px;height:40px;font-size:13px">${esc(C.monogram((acc && (acc.name || acc.email)) || 'RT'))}</span>
-        <div class="stack grow" style="gap:0"><span class="strong">${esc((acc && (acc.name || acc.email)) || 'Conta conectada')}</span>
-        <span class="small faint">${esc([plan && `Plano ${plan}`, minutes].filter(Boolean).join(' · ') || st.detail || '')}</span></div>
+    const acc = st.account;
+    const ent = st.entitlement;
+    const who = (acc && (acc.name || acc.email)) || 'Conta conectada';
+    const planText = ent
+      ? `Plano ${ent.planLabel} · ${Math.round(ent.usedMinutes)} de ${ent.limitMinutes} min usados${ent.monthly ? ' neste mês' : ''}`
+      : st.detail || '';
+    const body = `<div class="row" style="gap:14px"><span class="avatar" style="width:40px;height:40px;font-size:13px">${esc(C.monogram(who))}</span>
+        <div class="stack grow" style="gap:0"><span class="strong">${esc(who)}</span>
+        ${acc && acc.email && acc.name ? `<span class="small faint">${esc(acc.email)}</span>` : ''}
+        <span class="small faint">${esc(planText)}</span></div>
+        <button type="button" class="btn sm" data-action="go" data-to="settings/plan">Ver plano</button>
         <button type="button" class="btn" data-action="cloud-logout">${icon('sign-out')}Sair</button></div>`;
-    } else {
-      body = `<div class="row" style="gap:16px"><div class="stack grow" style="gap:2px"><span class="strong">Entre para usar sem chaves de API</span>
-        <span class="small faint">${esc(st && st.expired ? st.detail : 'Transcrição e respostas pelos servidores RealTimeAI, com a mesma latência.')}</span></div>
-        <button type="button" class="btn primary" data-action="cloud-login" ${cloud.loading ? 'disabled' : ''}>${cloud.loading ? '<span class="spinner"></span>' : icon('sign-out')}Entrar</button></div>`;
-    }
-    if (cloud.error) body += `<div class="xs" style="color:var(--danger);margin-top:10px">${esc(cloud.error)}</div>`;
     const active = C.cloudActive();
     return `
       ${card('Conta RealTimeAI', active ? 'Próxima sessão usa os servidores RealTimeAI' : 'Próxima sessão usa as suas chaves de API', body)}
-      ${card('Onde a IA roda', 'O áudio vai direto ao provedor de transcrição; o servidor só emite credenciais temporárias',
+      ${card('Onde a IA roda', 'O áudio vai direto ao provedor de transcrição; o servidor só emite credenciais temporárias. Os minutos do plano contam nos dois modos.',
         `<div class="option-cards">${[
-          ['auto', 'Automático', 'Servidores RealTimeAI quando conectado; senão, suas chaves.'],
-          ['nuvem', 'Servidores RealTimeAI', 'Sempre pela sua conta. Sem conexão, a sessão não inicia.'],
-          ['proprio', 'Minhas chaves', 'Só as chaves de IA e modelos (modo open-source).']
-        ].map(([v, l, d]) => `<button type="button" class="option-card ${mode === v ? 'active' : ''}" aria-pressed="${mode === v}" data-action="cloud-mode" data-mode="${v}"><span class="t">${mode === v ? '<span class="dot"></span>' : ''}${l}</span><span class="s">${d}</span></button>`).join('')}</div>`)}
+          ['auto', 'Servidores RealTimeAI', 'Transcrição e respostas pela sua conta, sem chaves de API.'],
+          ['proprio', 'Minhas chaves', 'Usa as chaves de IA e modelos (modo open-source).']
+        ].map(([v, l, d]) => {
+          const on = v === 'proprio' ? mode === 'proprio' : mode !== 'proprio';
+          return `<button type="button" class="option-card ${on ? 'active' : ''}" aria-pressed="${on}" data-action="cloud-mode" data-mode="${v}"><span class="t">${on ? '<span class="dot"></span>' : ''}${l}</span><span class="s">${d}</span></button>`;
+        }).join('')}</div>`)}
       ${card('Avançado', 'Servidor próprio ou de testes',
         `${row('Endereço do servidor', available && !cfg.server_url ? `Padrão: <span class="mono">${esc(cfg.server_url_effective)}</span>` : 'Qualquer servidor que implemente a API v1 do RealTimeAI.', cfgText('server_url', 'Endereço do servidor', cfg.server_url || '', cfg.server_url_effective || 'https://servidor.exemplo.com', 280))}
          ${row('Região', 'Automático escolhe a mais próxima (menor latência).', cfgSelect('server_region', 'Região', [['auto', 'Automático'], ['sa-east-1', 'América do Sul (São Paulo)'], ['us-east-1', 'EUA (Leste)'], ['eu-west-1', 'Europa (Irlanda)']], cfg.server_region || 'auto'))}`)}`;
   }
 
-  async function cloudRefresh(force) {
-    if (!api.cloudStatus) return;
-    const st = await C.guard(() => api.cloudStatus(force));
-    if (st) cloud.status = st;
-    C.refresh();
-  }
-
-  if (api.onCloudEvent) {
-    api.onCloudEvent(async (e) => {
-      if (e.type === 'pending') {
-        cloud.login = { userCode: e.userCode, verificationUri: e.verificationUri };
-      } else if (e.type === 'signed_in') {
-        cloud.login = null;
-        cloud.error = '';
-        C.toast('Conta conectada. A próxima sessão usa os servidores RealTimeAI.');
-        if (e.config) S.config = e.config;
-        await cloudRefresh(true);
-        return;
-      } else if (e.type === 'error') {
-        cloud.login = null;
-        cloud.error = e.error || 'Não foi possível entrar.';
-      }
-      C.refresh();
-    });
-  }
-
-  C.actions['cloud-login'] = async () => {
-    cloud.loading = true;
-    cloud.error = '';
-    C.refresh();
-    const res = await C.guard(() => api.cloudLogin(), 'Não foi possível iniciar o login.');
-    cloud.loading = false;
-    if (res && res.ok) cloud.login = { userCode: res.userCode, verificationUri: res.verificationUri };
-    else if (res) cloud.error = res.error || 'Não foi possível iniciar o login.';
-    C.refresh();
-  };
-
-  C.actions['cloud-cancel'] = async () => {
-    await C.guard(() => api.cloudCancelLogin());
-    cloud.login = null;
-    C.refresh();
-  };
-
-  C.actions['cloud-open-verify'] = async () => {
-    if (cloud.login && cloud.login.verificationUri) await C.guard(() => api.openUrl(cloud.login.verificationUri));
-  };
-
   C.actions['cloud-logout'] = async () => {
-    const ok = await C.confirm('Sair da conta RealTimeAI?', 'As próximas sessões usam as suas chaves de API, se houver.', 'Sair');
+    const ok = await C.confirm('Sair da conta RealTimeAI?', 'O Cue fica bloqueado até você entrar de novo. Uma sessão ao vivo em andamento é encerrada.', 'Sair');
     if (!ok) return;
     const res = await C.guard(() => api.cloudLogout(), 'Não foi possível sair.');
     if (res && res.config) S.config = res.config;
-    cloud.status = null;
-    await cloudRefresh(true);
+    S.auth = { signedIn: false };
+    await C.authRefresh(true);
   };
 
   C.actions['cloud-mode'] = async (el) => {
     await C.saveConfig({ server_mode: el.dataset.mode }, 'Preferência de servidor salva.');
     C.refresh();
+  };
+
+  C.actions['cloud-billing'] = async (el) => {
+    const kind = el.dataset.kind === 'portal' ? 'portal' : 'checkout';
+    const res = await C.guard(() => api.cloudBilling(kind), 'Não foi possível abrir a página de pagamento.');
+    if (res && res.ok) C.toast(kind === 'portal' ? 'Abrimos a sua assinatura no navegador.' : 'Conclua a assinatura no navegador. O plano atualiza sozinho.');
+    else if (res) C.toast(res.error || 'Não foi possível abrir a página de pagamento.', 'error');
+  };
+
+  C.actions['plan-refresh'] = async () => {
+    await C.authRefresh(true);
+    C.toast('Plano atualizado.');
   };
 
   function ai() {
@@ -398,9 +352,27 @@
     ).join('');
   }
 
+  // Account plan from the server (S.auth.entitlement): Free = one session of up
+  // to 15 min, once; PRO = 200 min per month.
+  function planCard(u) {
+    const ent = S.auth && S.auth.entitlement;
+    if (!ent) return card('Plano atual', '', '<div class="muted">Não foi possível ler o plano agora.</div>', `<button type="button" class="btn sm" data-action="plan-refresh">${icon('refresh')}Atualizar</button>`);
+    const tone = u.pct > 90 ? 'danger' : u.pct > 70 ? 'warn' : '';
+    const sub = ent.isPro
+      ? `${ent.limitMinutes} minutos por mês · renova em ${esc(u.renewLabel)}`
+      : ent.sessionsUsed >= 1 ? 'Sessão gratuita já usada' : 'Uma sessão gratuita de até 15 minutos';
+    const action = ent.isPro
+      ? `<button type="button" class="btn" data-action="cloud-billing" data-kind="portal">${icon('external')}Gerenciar assinatura</button>`
+      : `<button type="button" class="btn primary" data-action="cloud-billing" data-kind="checkout">Assinar PRO</button>`;
+    return card('Plano atual', 'Da sua conta RealTimeAI',
+      `<div class="row" style="gap:16px"><span class="metric">${esc(ent.planLabel)}</span><span class="muted grow">${sub}</span>${action}</div>
+       <div class="meter-row" style="margin-top:14px"><div class="lbl"><span>${u.usedMin} de ${u.limit} min ${ent.isPro ? `em ${esc(u.monthLabel)}` : 'usados'}</span><span class="num">${u.left} min restantes</span></div>${C.pctBar(u.pct, tone)}</div>
+       ${ent.canStart ? '' : `<div class="small" role="alert" style="color:var(--danger);margin-top:12px">${esc(ent.reason)}</div>`}`,
+      `<button type="button" class="btn sm ghost" data-action="plan-refresh">${icon('refresh')}Atualizar</button>`);
+  }
+
   function plan() {
     const u = C.usage();
-    const p = S.profile || {};
     const byMonth = {};
     for (const s of S.sessions) {
       const d = C.sessionDate(s);
@@ -413,10 +385,12 @@
     const months = Object.entries(byMonth).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 6);
     const max = Math.max(1, ...months.map(([, v]) => v.sec));
     return `
-      ${card('Plano atual', 'Definido no perfil local deste computador',
-        `<div class="row" style="gap:16px"><span class="metric">${esc(u.planLabel)}</span><span class="muted grow">${u.limit ? `${u.limit} minutos de transcrição por mês.` : 'Sem limite mensal de transcrição.'}</span></div>
-         ${u.limit ? `<div class="meter-row" style="margin-top:14px"><div class="lbl"><span>${u.usedMin} de ${u.limit} min em ${esc(u.monthLabel)}</span><span class="num">${u.left} min restantes</span></div>${C.pctBar(u.pct, u.pct > 90 ? 'danger' : u.pct > 70 ? 'warn' : '')}</div>` : ''}
-         ${p.email ? `<div class="xs faint" style="margin-top:12px">Conta: ${esc(p.email)}</div>` : ''}`)}
+      ${planCard(u)}
+      ${card('Planos', 'O servidor confere o limite a cada sessão; ao acabar, a sessão é encerrada.',
+        `<div class="option-cards">
+          <div class="option-card ${u.isPro ? '' : 'active'}"><span class="t">${u.isPro ? '' : '<span class="dot"></span>'}Free</span><span class="s">Uma única sessão de até 15 minutos, para experimentar. Não renova.</span></div>
+          <div class="option-card ${u.isPro ? 'active' : ''}"><span class="t">${u.isPro ? '<span class="dot"></span>' : ''}PRO</span><span class="s">Até 200 minutos por mês, em quantas sessões quiser. Renova todo mês.</span></div>
+        </div>`)}
       ${card('Uso por mês', 'Calculado a partir das sessões gravadas',
         months.length
           ? months.map(([key, v]) => `<div class="meter-row" style="padding:8px 0"><div class="lbl"><span>${esc(C.MONTHS_LONG[v.d.getMonth()])} ${v.d.getFullYear()}</span><span class="num">${Math.round(v.sec / 60)} min · ${plural(v.n, 'sessão', 'sessões')}</span></div>${C.pctBar((v.sec / max) * 100, 'thick')}</div>`).join('')
@@ -481,7 +455,6 @@
 
   // Calendar data is fetched once per visit to the tab (or on Refresh).
   let gcalLoaded = false;
-  let cloudLoaded = false;
   C.afterRender.settings = (parts) => {
     const tab = parts[0] || 'general';
     if (tab === 'audio') {
@@ -489,12 +462,6 @@
       startMicMeter();
     } else {
       stopMicMeter();
-    }
-    if (tab === 'account' && !cloudLoaded) {
-      cloudLoaded = true;
-      cloudRefresh(false);
-    } else if (tab !== 'account') {
-      cloudLoaded = false;
     }
     if (tab === 'calendar' && !gcalLoaded) {
       gcalLoaded = true;
