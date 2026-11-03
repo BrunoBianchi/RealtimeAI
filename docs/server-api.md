@@ -12,7 +12,7 @@ Implementação do lado do cliente:
 | Cliente HTTP do engine (bootstrap, renovação, fim de sessão) | `src/net/include/rtai/cloud_client.hpp`, `src/net/src/cloud_client.cpp` |
 | Ligação no engine | `src/app/src/main.cpp` (seção "RealTimeAI cloud bootstrap") |
 | Login e conta no dashboard | `apps/dashboard/src/main/cloud_account.js`, aba **Conta e servidor** |
-| Servidor local para testes | `backend/` em Go, roda no Docker (`npm run backend`, veja `backend/README.md`) |
+| Servidor local para testes | `../backend/` em Go, fora deste repositório, roda no Docker (`npm run backend`, veja `../backend/README.md`) |
 | Testes | `tests/core_tests/test_cloud_session.cpp`, `test_deepgram_stream.cpp`, `apps/dashboard/tests/cloud_account.test.js` |
 
 ## Princípio: corretor de credenciais, não proxy de mídia

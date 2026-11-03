@@ -1,6 +1,6 @@
 'use strict';
-// Development wiring for the local RealTimeAI server (backend/ at the repo
-// root, a Go service run with Docker). Running from source with no server
+// Development wiring for the local RealTimeAI server (backend/ next to the repo
+// folder, a Go service run with Docker). Running from source with no server
 // configured, the dashboard and the engine it spawns use
 // http://localhost:8787, and the dashboard starts the container itself if
 // nothing answers there. Packaged builds never do this. RTAI_LOCAL_BACKEND=0
@@ -12,7 +12,7 @@ const http = require('http');
 const { spawn } = require('child_process');
 
 const DEFAULT_URL = 'http://localhost:8787';
-const COMPOSE_FILE = path.join('backend', 'docker-compose.yml');
+const COMPOSE_FILE = path.join('..', 'backend', 'docker-compose.yml');
 
 function isLoopbackUrl(url) {
   try {

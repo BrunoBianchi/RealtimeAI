@@ -3302,7 +3302,7 @@ function createWindow() {
 }
 
 // Running from source: use (and start, with Docker) the local RealTimeAI
-// server in backend/ unless a server is configured. The engine inherits the env var.
+// server in ../backend/ unless a server is configured. The engine inherits the env var.
 let localBackendHandle = null;
 function startLocalBackendForDev() {
   const configured = readConfigIni().server_url;

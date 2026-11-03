@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Runs a Go command for backend/ (e.g. `node scripts/backend-go.mjs test ./...`)
+// Runs a Go command for ../backend/ (e.g. `node scripts/backend-go.mjs test ./...`)
 // with the local Go toolchain when there is one, otherwise in the golang Docker
 // image with cached modules and build output.
 import { spawnSync } from 'node:child_process';
@@ -8,11 +8,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const GO_IMAGE = 'golang:1.26-alpine';
-const backend = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'backend');
+const backend = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'backend');
 const args = process.argv.slice(2);
-// backend/ is git-ignored (kept local): nothing to do in a clone without it.
+// backend/ lives next to this repo, outside it: nothing to do in a clone without it.
 if (!fs.existsSync(path.join(backend, 'go.mod'))) {
-  console.log('backend/: not in this checkout, skipped');
+  console.log('../backend/: not found next to this repo, skipped');
   process.exit(0);
 }
 if (!args.length) {

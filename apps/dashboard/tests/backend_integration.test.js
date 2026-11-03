@@ -16,8 +16,8 @@ const jevEngine = require('../src/main/jev_engine');
 const pdfText = require('../src/main/pdf_text');
 
 const MAIN = fs.readFileSync(path.join(__dirname, '..', 'src', 'main', 'main.js'), 'utf8');
-// backend/ is git-ignored (kept local): a clone without it skips the launcher tests.
-const NO_BACKEND = !fs.existsSync(path.join(__dirname, '..', '..', '..', 'backend', 'docker-compose.yml')) && 'backend/ is not in this checkout';
+// backend/ lives next to this repo, outside it: a clone without it skips the launcher tests.
+const NO_BACKEND = !fs.existsSync(path.join(__dirname, '..', '..', '..', '..', 'backend', 'docker-compose.yml')) && '../backend/ is not next to this repo';
 
 function account({ token = 'dev-tok', url = 'http://localhost:8787', reply = () => ({ status: 200, body: {} }) } = {}) {
   const calls = [];
