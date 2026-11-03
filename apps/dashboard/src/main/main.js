@@ -3295,9 +3295,9 @@ function createWindow() {
   }
 }
 
-// Running from source: use (and start) the local RealTimeAI server in
-// backend/ unless a server is configured. The engine inherits the env var.
-let localBackendChild = null;
+// Running from source: use (and start, with Docker) the local RealTimeAI
+// server in backend/ unless a server is configured. The engine inherits the env var.
+let localBackendHandle = null;
 function startLocalBackendForDev() {
   const configured = readConfigIni().server_url;
   const devUrl = localBackend.devServerUrl({ packaged: app.isPackaged, repoRoot: REPO_ROOT, configuredUrl: configured });
@@ -3305,7 +3305,7 @@ function startLocalBackendForDev() {
   const url = effectiveServerUrl(configured);
   if (app.isPackaged || process.env.RTAI_LOCAL_BACKEND === '0' || !localBackend.isLoopbackUrl(url)) return;
   localBackend.ensureLocalBackend({ url, repoRoot: REPO_ROOT }).then((r) => {
-    localBackendChild = r.child;
+    localBackendHandle = r;
     if (r.started) console.log(`[backend] local server ${r.ready ? 'ready' : 'starting'} at ${url}`);
     // The renderer may have asked before the server was up: refresh the account.
     if (r.ready && mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('rtai:cloud-event', { type: 'server_ready' });
@@ -3994,9 +3994,9 @@ app.whenReady().then(() => {
 });
 
 app.on('will-quit', () => {
-  if (localBackendChild) {
-    try { localBackendChild.kill(); } catch (_e) {}
-    localBackendChild = null;
+  if (localBackendHandle) {
+    localBackendHandle.stop(); // stops the container only if this app started it
+    localBackendHandle = null;
   }
   if (globalShortcut && typeof globalShortcut.unregisterAll === 'function') {
     try { globalShortcut.unregisterAll(); } catch (_e) {}

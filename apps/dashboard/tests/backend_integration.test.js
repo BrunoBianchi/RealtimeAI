@@ -16,6 +16,8 @@ const jevEngine = require('../src/main/jev_engine');
 const pdfText = require('../src/main/pdf_text');
 
 const MAIN = fs.readFileSync(path.join(__dirname, '..', 'src', 'main', 'main.js'), 'utf8');
+// backend/ is git-ignored (kept local): a clone without it skips the launcher tests.
+const NO_BACKEND = !fs.existsSync(path.join(__dirname, '..', '..', '..', 'backend', 'docker-compose.yml')) && 'backend/ is not in this checkout';
 
 function account({ token = 'dev-tok', url = 'http://localhost:8787', reply = () => ({ status: 200, body: {} }) } = {}) {
   const calls = [];
@@ -65,7 +67,7 @@ test('main process: AI, research, calendar and question sharing go to the server
   assert.match(MAIN, /startLocalBackendForDev\(\);/);
 });
 
-test('local backend: dev default URL only from source, never over an explicit server', () => {
+test('local backend: dev default URL only from source, never over an explicit server', { skip: NO_BACKEND }, () => {
   const repoRoot = path.join(__dirname, '..', '..', '..');
   assert.strictEqual(localBackend.devServerUrl({ packaged: false, env: {}, repoRoot }), 'http://localhost:8787');
   assert.strictEqual(localBackend.devServerUrl({ packaged: true, env: {}, repoRoot }), '');
@@ -78,8 +80,9 @@ test('local backend: dev default URL only from source, never over an explicit se
   assert.ok(!localBackend.isLoopbackUrl('http://localhost.evil.com'));
 });
 
-test('local backend: reuses a running server, otherwise starts backend/index.js as Node', async (t) => {
+test('local backend: reuses a running server, otherwise starts the Go server with docker compose', { skip: NO_BACKEND }, async (t) => {
   const repoRoot = path.join(__dirname, '..', '..', '..');
+  const quiet = { log() {}, warn() {} };
   const up = http.createServer((req, res) => res.end(req.url === '/health' ? '{"ok":true}' : ''));
   await new Promise((r) => up.listen(0, '127.0.0.1', r));
   t.after(() => up.close());
@@ -87,8 +90,11 @@ test('local backend: reuses a running server, otherwise starts backend/index.js 
   let spawned = 0;
   const running = await localBackend.ensureLocalBackend({ url, repoRoot, spawnImpl: () => { spawned += 1; } });
   assert.deepStrictEqual([running.started, running.ready, spawned], [false, true, 0]);
+  running.stop(); // a server this app did not start is left alone
+  assert.strictEqual(spawned, 0);
 
-  // Nothing listening: spawn with ELECTRON_RUN_AS_NODE and the URL's port.
+  // Nothing listening: `docker compose up -d --build` with the URL's port, then
+  // `docker compose stop` on quit.
   const free = http.createServer();
   await new Promise((r) => free.listen(0, '127.0.0.1', r));
   const port = free.address().port;
@@ -96,21 +102,36 @@ test('local backend: reuses a running server, otherwise starts backend/index.js 
   const seen = [];
   let late = null;
   const fakeSpawn = (exe, args, opts) => {
-    seen.push({ exe, args, env: opts.env });
+    seen.push({ exe, args, env: opts.env, detached: Boolean(opts.detached) });
     const child = new EventEmitter();
-    child.exitCode = null;
     child.stdout = new EventEmitter();
     child.stderr = new EventEmitter();
-    late = http.createServer((req, res) => res.end('{}'));
-    late.listen(port, '127.0.0.1');
+    child.unref = () => {};
+    if (args.includes('up')) {
+      late = http.createServer((req, res) => res.end('{}'));
+      late.listen(port, '127.0.0.1', () => child.emit('exit', 0));
+    }
     return child;
   };
   t.after(() => late && late.close());
-  const started = await localBackend.ensureLocalBackend({ url: `http://127.0.0.1:${port}`, repoRoot, execPath: 'electron.exe', spawnImpl: fakeSpawn, log: { log() {}, warn() {} } });
+  const started = await localBackend.ensureLocalBackend({ url: `http://127.0.0.1:${port}`, repoRoot, spawnImpl: fakeSpawn, log: quiet });
   assert.deepStrictEqual([started.started, started.ready], [true, true]);
-  assert.strictEqual(seen[0].exe, 'electron.exe');
-  assert.ok(seen[0].args[0].endsWith(path.join('backend', 'index.js')));
-  assert.deepStrictEqual([seen[0].env.ELECTRON_RUN_AS_NODE, seen[0].env.PORT], ['1', String(port)]);
+  assert.strictEqual(seen[0].exe, 'docker');
+  assert.deepStrictEqual(seen[0].args.slice(0, 2), ['compose', '-f']);
+  assert.ok(seen[0].args[2].endsWith(path.join('backend', 'docker-compose.yml')));
+  assert.deepStrictEqual(seen[0].args.slice(3), ['up', '-d', '--build']);
+  assert.deepStrictEqual([seen[0].env.PORT, seen[0].env.PUBLIC_URL], [String(port), `http://127.0.0.1:${port}`]);
+  started.stop();
+  assert.deepStrictEqual([seen[1].args.at(-1), seen[1].detached], ['stop', true]);
+
+  // Docker missing or failing: no crash, nothing ready.
+  const failing = () => {
+    const child = new EventEmitter();
+    setImmediate(() => child.emit('error', new Error('spawn docker ENOENT')));
+    return child;
+  };
+  const noDocker = await localBackend.ensureLocalBackend({ url: `http://127.0.0.1:${port + 1}`, repoRoot, spawnImpl: failing, log: quiet });
+  assert.deepStrictEqual([noDocker.started, noDocker.ready], [false, false]);
 
   const remote = await localBackend.ensureLocalBackend({ url: 'https://api.example.com', repoRoot, spawnImpl: () => assert.fail('never for a remote server') });
   assert.strictEqual(remote.ready, false);
