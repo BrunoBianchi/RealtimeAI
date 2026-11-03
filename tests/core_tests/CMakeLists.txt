@@ -51,6 +51,7 @@ target_include_directories(core_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(core_tests PRIVATE
     rtai::options
     rtai::core
+    rtai::test_support
     GTest::gtest
     GTest::gtest_main
 )

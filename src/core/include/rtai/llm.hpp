@@ -1,5 +1,5 @@
 // Pure core: streaming LLM client abstraction. The copilot engine depends on
-// this; Windows provides WinHttpLlmClient (OpenRouter), tests/demo use
+// this; Windows provides WinHttpLlmClient (OpenRouter), tests use
 // ScriptedLlmClient.
 #pragma once
 

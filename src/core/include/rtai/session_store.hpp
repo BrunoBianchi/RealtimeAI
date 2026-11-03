@@ -31,7 +31,7 @@ namespace rtai {
 struct SessionMeta {
     std::string id;
     std::string started_at; // ISO-8601 local time with offset
-    std::string mode;       // "live" | "demo"
+    std::string mode;       // "live"
     std::string stt_model;
     std::string language;
     std::string llm_model;

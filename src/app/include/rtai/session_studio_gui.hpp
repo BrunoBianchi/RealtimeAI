@@ -676,7 +676,6 @@ inline std::string load_document_text_for_rag(const fs::path& file_path) {
 
 struct SessionLaunchResult {
     bool proceed{false};
-    bool run_demo{false};
     MiniAgentProfile agent;
 };
 
@@ -698,7 +697,6 @@ enum StudioId : int {
 
     // Top bar controls
     kStFullscreenBtn,
-    kStStartDemoBtn,
     kStStartLiveBtn,
 
     // Hero card quick-action links (Tab 0)
@@ -765,7 +763,6 @@ struct StudioState {
     Settings* st{nullptr};
     Settings owned_st;
     bool settings_only_mode{false};
-    bool initial_demo{false};
     bool settings_saved{false};
 
     GuiFonts fonts;
@@ -791,7 +788,6 @@ struct StudioState {
 
     // Top bar HWNDs
     HWND btn_fullscreen{nullptr};
-    HWND btn_demo{nullptr};
     HWND btn_launch{nullptr};
 
     // Tab 0 (Goals) HWNDs
@@ -958,10 +954,6 @@ inline void relayout_studio(StudioState* s, int W, int H) {
     if (s->btn_launch) {
         MoveWindow(s->btn_launch, right_x - 178, 9, 178, 34, FALSE);
         right_x -= 188;
-    }
-    if (s->btn_demo) {
-        MoveWindow(s->btn_demo, right_x - 146, 9, 146, 34, FALSE);
-        right_x -= 156;
     }
     if (s->btn_fullscreen) {
         MoveWindow(s->btn_fullscreen, right_x - 148, 9, 148, 34, FALSE);
@@ -1462,8 +1454,6 @@ inline LRESULT CALLBACK studio_wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM l
             // ---- Top Bar Controls ----
             s->btn_fullscreen = make_modern_btn(hwnd, kStFullscreenBtn, L"⛶ Full screen (F11)",
                                                 0, 0, 148, 34, s->fonts.body, BtnKind::Secondary);
-            s->btn_demo       = make_modern_btn(hwnd, kStStartDemoBtn,  L"🧪 Try demo",
-                                                0, 0, 146, 34, s->fonts.body, BtnKind::Secondary);
             s->btn_launch     = make_modern_btn(hwnd, kStStartLiveBtn,  L"🚀 Start copilot",
                                                 0, 0, 178, 34, s->fonts.bold, BtnKind::PrimaryCoral);
 
@@ -1933,29 +1923,10 @@ inline LRESULT CALLBACK studio_wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM l
                 return 0;
             }
 
-            // Launch Session (Demo or Live HUD)
-            if (id == kStStartDemoBtn || id == kStStartLiveBtn) {
+            // Launch the live HUD
+            if (id == kStStartLiveBtn) {
                 sync_agent_from_ui(s);
                 save_settings_from_studio(s);
-                const bool want_demo = (id == kStStartDemoBtn) || (s->initial_demo && (!s->st || s->st->deepgram_key.empty()));
-                if (!want_demo && s->st && s->st->deepgram_key.empty()) {
-                    const int resp = MessageBoxW(
-                        hwnd,
-                        L"The Deepgram key is not set yet, so live transcription is off.\n\n"
-                        L"Open Settings now to paste your key?\n"
-                        L"(Click 'No' to start in Demo mode with your goal.)",
-                        L"RealTimeAI — Set up Deepgram",
-                        MB_YESNOCANCEL | MB_ICONQUESTION);
-                    if (resp == IDYES) {
-                        switch_studio_tab(s, kTabSettings);
-                        SetFocus(s->deepgram_key);
-                        return 0;
-                    }
-                    if (resp == IDCANCEL) return 0;
-                    s->result.run_demo = true;
-                } else {
-                    s->result.run_demo = want_demo;
-                }
                 std::error_code ec;
                 fs::create_directories(s->agents_dir, ec);
                 wincfg::write_file_atomic(s->agents_dir / widen_utf8(s->current_agent.id + ".json"),
@@ -1986,7 +1957,6 @@ inline SessionLaunchResult open_session_studio_gui(const fs::path& app_dir,
                                                    const fs::path& config_path,
                                                    Settings& st,
                                                    const EnvLookup& env_fn = {},
-                                                   bool initial_demo = false,
                                                    int start_tab = kTabGoals,
                                                    bool settings_only = false) {
     static const wchar_t kClass[] = L"RealTimeAI.DesktopStudio.v3";
@@ -1999,7 +1969,7 @@ inline SessionLaunchResult open_session_studio_gui(const fs::path& app_dir,
         wc.hbrBackground = nullptr;
         wc.lpszClassName = kClass;
         if (!RegisterClassW(&wc) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
-            return SessionLaunchResult{true, initial_demo, {}};
+            return SessionLaunchResult{true, {}};
         }
         registered = true;
     }
@@ -2010,7 +1980,6 @@ inline SessionLaunchResult open_session_studio_gui(const fs::path& app_dir,
     state.config_path = config_path;
     state.env_fn = env_fn;
     state.st = &st;
-    state.initial_demo = initial_demo;
     state.active_tab = start_tab;
     state.settings_only_mode = settings_only;
 
@@ -2031,7 +2000,7 @@ inline SessionLaunchResult open_session_studio_gui(const fs::path& app_dir,
                                 std::max(0, sx), std::max(0, sy), win_w, win_h,
                                 nullptr, nullptr, GetModuleHandleW(nullptr), &state);
     if (!hwnd) {
-        return SessionLaunchResult{true, false, {}};
+        return SessionLaunchResult{true, {}};
     }
 
     ShowWindow(hwnd, SW_SHOW);
@@ -2056,7 +2025,7 @@ inline bool open_settings_gui(const fs::path& config_path, const EnvLookup& env_
     const ini::File file = ini::File::parse(wincfg::read_file(config_path));
     Settings st = load_settings(file, env_fn, [](const std::string& v) { return wincfg::unprotect(v); });
     const fs::path app_dir = config_path.parent_path();
-    open_session_studio_gui(app_dir, config_path, st, env_fn, false, kTabSettings, true);
+    open_session_studio_gui(app_dir, config_path, st, env_fn, kTabSettings, true);
     return true;
 }
 

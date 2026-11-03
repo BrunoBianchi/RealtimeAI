@@ -5,7 +5,6 @@ find_package(Threads REQUIRED)
 
 add_library(rtai_core STATIC
     src/resampler.cpp
-    src/wav_file_source.cpp
     src/deepgram_stream.cpp
     src/copilot_engine.cpp
     src/session_store.cpp

@@ -470,7 +470,7 @@ std::string SessionStore::render_markdown(const std::vector<json::Value>& record
     std::string md = "# Session " + title + "\n\n";
     if (!started_at.empty()) md += "- Started: " + started_at + "\n";
     md += "- Duration: " + fmt_clock(duration) + "\n";
-    if (!mode.empty()) md += "- Mode: " + std::string(mode == "demo" ? "demo" : "live") + "\n";
+    if (!mode.empty()) md += "- Mode: " + mode + "\n";
     if (!stt.empty()) md += "- STT: " + stt + (lang.empty() ? "" : " (" + lang + ")") + "\n";
     md += "- LLM: " + (llm.empty() ? std::string("off") : llm) + "\n";
     if (!ended) md += "- Ended: not recorded\n";

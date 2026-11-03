@@ -64,8 +64,7 @@ scripts\windows\package.bat     :: instalador: dist\RealTimeAI-Setup-<versão>.e
   próxima release: quando ela sair, o app instalado se atualiza sozinho. `package.bat 2.1.0-beta.2` usa
   uma versão explícita.
 
-Sem chaves de API, `scripts\windows\run-demo.bat` abre o HUD com uma conversa roteirizada.
-Para usar ao vivo, configure as chaves do Deepgram e do LLM no dashboard (Settings) ou no
+Para usar, entre na sua conta ou escolha o modo local e configure as chaves do Deepgram e do LLM no dashboard (Settings) ou no
 `%LOCALAPPDATA%\RealTimeAI\config.ini` (ver [docs/configuration.md](docs/configuration.md)).
 O modelo de embeddings do RAG híbrido é baixado uma vez com
 `scripts\windows\download-embeddings-model.bat`.

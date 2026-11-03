@@ -2,15 +2,12 @@
 
 ## Linha de comando
 
-- `scripts\windows\run-demo.bat`: sem microfone, sem rede e sem chaves. Abre o HUD com uma conversa de
-  vendas roteirizada dos dois lados (objeção de preço, pergunta de prazo), sugestões em
-  streaming, e as ações de chat/tela/resumo respondidas por um LLM local de demonstração.
 - `scripts\windows\run-live.bat`: captura real. Sem a chave do Deepgram o app abre o `config.ini` no
   Bloco de Notas e encerra; com a chave do OpenRouter as sugestões ficam ativas.
 - `rtai_app.exe --config`: abre (e cria, se não existir) o `config.ini` e sai.
 - `rtai_app.exe --config-file C:\caminho\outro.ini`: usa outro arquivo de configuração
   (também via variável `RTAI_CONFIG`).
-- `rtai_app.exe --console`: sem overlay, tudo impresso no console (vale para `--demo`).
+- `rtai_app.exe --console`: sem overlay, tudo impresso no console.
 - `rtai_app.exe --no-save`: não grava a sessão.
 - `rtai_app.exe --server`: motor sem HUD, para clientes externos (outra UI, automação,
   testes): eventos em JSON por linha no stdout e comandos no stdin
@@ -71,7 +68,7 @@ Deepgram e do LLM deixam de ser obrigatórias: o app pede credenciais temporári
 no início de cada sessão e fala direto com os provedores. Detalhes e contrato da API em
 [`server-api.md`](server-api.md); plano de migração em [`cloud-migration.md`](cloud-migration.md).
 
-Só por variável: `RTAI_DEMO_WAV` (WAV para o modo demo) e `RTAI_CONFIG` (caminho do config).
+Só por variável: `RTAI_CONFIG` (caminho do config).
 
 ## Atalhos globais
 

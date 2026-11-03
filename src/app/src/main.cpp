@@ -4,14 +4,12 @@
 //   (default)   Live: WASAPI mic ("Você") + loopback ("Outros") -> VAD ->
 //               Deepgram Nova-3 (resilient WebSocket) -> copilot engine ->
 //               OpenRouter suggestions -> overlay HUD + session files.
-//   --demo      No hardware/network: scripted two-sided conversation +
-//               scripted LLM, same engine/overlay/persistence. Good for UI checks.
 //   --console   No overlay: transcript, suggestions and link status are
-//               printed to the console (works with --demo too).
+//               printed to the console.
 //   --no-save   Don't write session files.
 //   --server    Headless engine for an external client: no overlay, JSON
 //               lines on stdout (events) and stdin (commands), logs on
-//               stderr. See rtai/server_protocol.hpp. Works with --demo.
+//               stderr. See rtai/server_protocol.hpp.
 //
 // Configuration: %LOCALAPPDATA%\RealTimeAI\config.ini (created on first run,
 // API keys encrypted with DPAPI). Environment variables (DEEPGRAM_API_KEY,
@@ -48,15 +46,12 @@
 #include "rtai/cloud_session.hpp"
 #include "rtai/deepgram_transport.hpp"
 #include "rtai/delayed_llm.hpp"
-#include "rtai/demo_conversation.hpp"
-#include "rtai/fake_transport.hpp"
-#include "rtai/fake_vad.hpp"
+#include "rtai/energy_vad.hpp"
 #include "rtai/latency.hpp"
 #include "rtai/line_channel.hpp"
 #include "rtai/low_latency_win.hpp"
 #include "rtai/overlay_window.hpp"
 #include "rtai/qpc_clock.hpp"
-#include "rtai/scripted_llm.hpp"
 #include "rtai/server_protocol.hpp"
 #include "rtai/session_store.hpp"
 #include "rtai/source_pipeline.hpp"
@@ -65,7 +60,6 @@
 #include "rtai/url.hpp"
 #include "rtai/version.hpp"
 #include "rtai/wasapi_capture.hpp"
-#include "rtai/wav_file_source.hpp"
 #include "rtai/winhttp_llm_client.hpp"
 #include "rtai/web_search.hpp"
 #include "rtai/mini_agent.hpp"
@@ -122,7 +116,10 @@ fs::path path_from_utf8(const std::string& s) {
     return fs::path(std::u8string(s.begin(), s.end()));
 }
 
+// %LOCALAPPDATA% first, like the dashboard (main.js), so both always share
+// one data folder; the known folder only when the variable is missing.
 fs::path local_app_dir() {
+    if (const std::wstring v = wenv(L"LOCALAPPDATA"); !v.empty()) return fs::path(v) / L"RealTimeAI";
     PWSTR path = nullptr;
     fs::path out;
     if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &path)) && path) {
@@ -150,7 +147,6 @@ std::string read_text_file(const fs::path& p, std::size_t max_bytes) {
 // ---------------------------------------------------------------------------
 
 struct AppConfig {
-    bool demo{false};
     bool console{false};
     bool save{true};
     bool open_config_only{false};
@@ -191,8 +187,7 @@ AppConfig load_config(int argc, char** argv) {
     std::string config_override;
     for (int i = 1; i < argc; ++i) {
         const std::string a = argv[i];
-        if (a == "--demo") c.demo = true;
-        else if (a == "--console" || a == "--no-overlay") c.console = true;
+        if (a == "--console" || a == "--no-overlay") c.console = true;
         else if (a == "--server") { c.server = true; }
         else if (a == "--no-save") c.save = false;
         else if (a == "--config") c.open_config_only = true;
@@ -336,8 +331,7 @@ void enable_per_monitor_dpi() {
     }
 }
 
-// The demo feeds a synthetic tone, which Silero (correctly) rejects as
-// non-speech, so the demo always uses the energy gate.
+// Silero when available, else the loudness gate (energy_threshold).
 std::unique_ptr<IVadGate> make_vad(AsyncLog& log, const AppConfig& cfg, bool allow_silero = true) {
 #ifdef RTAI_HAVE_ONNX
     std::error_code ec;
@@ -359,9 +353,7 @@ std::unique_ptr<IVadGate> make_vad(AsyncLog& log, const AppConfig& cfg, bool all
     (void)log;
     (void)allow_silero;
 #endif
-    auto fake = std::make_unique<FakeVadGate>(512);
-    fake->set_energy_mode(static_cast<float>(cfg.st.energy_threshold));
-    return fake;
+    return std::make_unique<EnergyVadGate>(512, static_cast<float>(cfg.st.energy_threshold));
 }
 
 // ---------------------------------------------------------------------------
@@ -419,7 +411,7 @@ DeepgramStreamConfig deepgram_config(const AppConfig& cfg, AudioSource src) {
 server::Hello make_hello(const AppConfig& cfg, bool llm_on, const std::string& model, bool transcription_mode = false) {
     server::Hello h;
     h.mode = transcription_mode;
-    h.app_mode = cfg.demo ? "demo" : "live";
+    h.app_mode = "live";
     h.llm = llm_on;
     h.model = model;
     h.language = cfg.st.language;
@@ -672,13 +664,12 @@ int run_app(AppConfig cfg) {
     // RAG and audio set-up below; joined just before the transports are built.
     // Signing in is mandatory for live sessions: this call is also where the
     // server checks the plan (Free: one session of up to 15 min; PRO: 200 min
-    // a month). The standalone launcher starts it only after the user picks
-    // live (a demo must never spend the Free session).
+    // a month). The standalone launcher starts it once the user confirms.
     std::future<std::optional<cloud::Session>> cloud_boot;
     std::string cloud_error;
     int cloud_http_status = 0;
     auto start_cloud_boot = [&] {
-        if (cfg.demo || cloud_boot.valid() || cloud::local_mode(cfg.st) || !cloud::signed_in(cfg.st)) return;
+        if (cloud_boot.valid() || cloud::local_mode(cfg.st) || !cloud::signed_in(cfg.st)) return;
         CloudClientOptions co;
         co.base_url = cloud::effective_base_url(cfg.st);
         co.token = cfg.st.server_token;
@@ -703,11 +694,10 @@ int run_app(AppConfig cfg) {
     if (!cfg.console && !cfg.server && !cfg.no_launcher) {
         enable_per_monitor_dpi();
         const EnvLookup env_lookup = [](const char* name) { return env(name); };
-        auto launch = gui::open_session_studio_gui(cfg.app_dir, cfg.config_path, cfg.st, env_lookup, cfg.demo);
+        auto launch = gui::open_session_studio_gui(cfg.app_dir, cfg.config_path, cfg.st, env_lookup);
         if (!launch.proceed) {
             return 0;
         }
-        cfg.demo = launch.run_demo;
         start_cloud_boot();
         if (!launch.agent.empty()) {
             agent_rag = std::make_shared<MiniAgentRag>(launch.agent);
@@ -808,13 +798,13 @@ int run_app(AppConfig cfg) {
     }
 
     std::unique_ptr<HybridRagLoader> hybrid_rag;
-    if (agent_rag && !cfg.demo) hybrid_rag = start_hybrid_rag(log, cfg, *agent_rag);
+    if (agent_rag) hybrid_rag = start_hybrid_rag(log, cfg, *agent_rag);
 
     const auto session_start = std::chrono::steady_clock::now();
 
     // Local mode ([servidor] modo = local): no account, no server call, the
     // user's own keys only.
-    if (!cfg.demo && !cloud::local_mode(cfg.st) && !cloud::signed_in(cfg.st)) {
+    if (!cloud::local_mode(cfg.st) && !cloud::signed_in(cfg.st)) {
         const char* why = cloud::server_known(cfg.st)
                               ? "Sign in to your RealTimeAI account in the dashboard to use the copilot."
                               : "No RealTimeAI server configured: set [servidor] url and sign in from the dashboard.";
@@ -832,7 +822,7 @@ int run_app(AppConfig cfg) {
         cfg.cloud_session = cloud_boot.get();
         const auto waited = std::chrono::duration_cast<std::chrono::milliseconds>(
                                 std::chrono::steady_clock::now() - t0).count();
-        if (cfg.cloud_session && !cfg.demo) {
+        if (cfg.cloud_session) {
             cfg.cloud->start_refresh();
             log.line("Cloud: session " + cfg.cloud_session->session_id + " (plan " + cfg.cloud_session->plan +
                      ", waited " + std::to_string(waited) + " ms at start-up)");
@@ -841,26 +831,24 @@ int run_app(AppConfig cfg) {
             cfg.cloud_session.reset();
             cfg.cloud.reset();
             log.line("Cloud: " + cloud_error);
-            if (!cfg.demo) {
-                // No session grant, no live session (the plan is checked there).
-                const char* needs = cloud_http_status == 401 ? "login"
-                                    : (cloud_http_status == 402 || cloud_http_status == 403) ? "upgrade"
-                                                                                             : "server";
-                if (out) {
-                    cfg.notes.push_back("Servidor RealTimeAI: " + cloud_error);
-                    return run_setup_mode(cfg, *out, log, needs);
-                }
-                std::cerr << "[servidor] " << cloud_error << "\n";
-                return 2;
+            // No session grant, no live session (the plan is checked there).
+            const char* needs = cloud_http_status == 401 ? "login"
+                                : (cloud_http_status == 402 || cloud_http_status == 403) ? "upgrade"
+                                                                                         : "server";
+            if (out) {
+                cfg.notes.push_back("Servidor RealTimeAI: " + cloud_error);
+                return run_setup_mode(cfg, *out, log, needs);
             }
+            std::cerr << "[servidor] " << cloud_error << "\n";
+            return 2;
         }
     }
 
     const bool have_stt = cfg.cloud_credentials() || !cfg.st.deepgram_key.empty();
-    if (!cfg.demo && !have_stt && out) {
+    if (!have_stt && out) {
         return run_setup_mode(cfg, *out, log);
     }
-    if (!cfg.demo && !have_stt) {
+    if (!have_stt) {
         enable_per_monitor_dpi();
         if (open_settings_popup(cfg.config_path)) {
             const EnvLookup env_lookup = [](const char* name) { return env(name); };
@@ -877,23 +865,7 @@ int run_app(AppConfig cfg) {
     std::shared_ptr<WinHttpLlmClient> openrouter;
     std::shared_ptr<WinHttpLlmClient> openrouter_sol_client;
     bool llm_on_openrouter = false; // live answers go to openrouter.ai
-    if (cfg.demo) {
-        ScriptedLlmClient::Options so;
-        so.reply_for = [agent_rag](const LlmRequest& r) {
-            std::string base = demo_reply_for(r);
-            if (agent_rag && !base.empty()) {
-                const auto& p = agent_rag->profile();
-                std::string header;
-                if (!p.company.empty() || !p.role.empty()) {
-                    header = "**[Active context: " + (p.company.empty() ? p.name : p.company) +
-                             (p.role.empty() ? "" : " · " + p.role) + "]**\n";
-                }
-                return header + base;
-            }
-            return base;
-        };
-        llm = std::make_shared<ScriptedLlmClient>(so);
-    } else if (cfg.cloud_credentials() && cfg.cloud_session->llm.valid()) {
+    if (cfg.cloud_credentials() && cfg.cloud_session->llm.valid()) {
         // Cloud: same OpenAI-compatible SSE client, pointed at the URL the
         // server chose (edge relay next to the provider, or the provider
         // itself with a scoped key). Keep-alive pings keep the TLS connection
@@ -987,7 +959,7 @@ int run_app(AppConfig cfg) {
 
     // Local mode has no plan: every live answer waits a little before going
     // out. The HUD says so, and the dashboard shows the difference to PRO.
-    if (llm && !cfg.demo && cloud::local_mode(cfg.st)) {
+    if (llm && cloud::local_mode(cfg.st)) {
         llm = std::make_shared<DelayedLlmClient>(llm, std::chrono::milliseconds(cloud::kLocalAnswerDelayMs));
         cfg.notes.push_back("Local mode: answers start about " + std::to_string(cloud::kLocalAnswerDelayMs) +
                             " ms later than with PRO.");
@@ -1057,7 +1029,7 @@ int run_app(AppConfig cfg) {
     // (fingerprint), so a session with the same goal starts with it ready.
     std::shared_ptr<ILlmCall> deep_compact_call;
     auto deep_compact_buf = std::make_shared<std::string>();
-    if (agent_rag && openrouter_sol_client && !cfg.demo &&
+    if (agent_rag && openrouter_sol_client &&
         (!agent_rag->profile().documents.empty() || !agent_rag->profile().company_dossier.empty()) &&
         !agent_rag->mini_compact_is_current()) {
         LlmRequest dreq;
@@ -1124,7 +1096,7 @@ int run_app(AppConfig cfg) {
         sc.session_start = session_start;
         store = std::make_unique<SessionStore>(sc);
         SessionMeta meta;
-        meta.mode = cfg.demo ? "demo" : "live";
+        meta.mode = "live";
         meta.stt_model = "nova-3";
         meta.language = cfg.st.language;
         meta.llm_model = llm ? cc.model : std::string();
@@ -1194,7 +1166,7 @@ int run_app(AppConfig cfg) {
             log.line("Transcript exported: " + export_str);
         }
 
-        if (!openrouter_sol_client || cfg.demo) {
+        if (!openrouter_sol_client) {
             if (out) out->send(server::encode_summary(false, "", export_str));
             if (written) {
                 engine->notify(NoticeLevel::Info, "Transcript exported to: " + export_str);
@@ -1261,11 +1233,7 @@ int run_app(AppConfig cfg) {
 
     // ---------------- lanes ----------------
     std::vector<std::unique_ptr<Lane>> lanes;
-    // Scripted two-sided conversation for --demo (drives the UI without
-    // audio); paused flags per source apply to it as well.
-    std::unique_ptr<DemoConversation> demo_talk;
     std::atomic<bool> src_paused[2] = {false, false};
-    std::atomic<bool> demo_speaking[2] = {false, false};
     auto set_paused = [&lanes, &src_paused, engine](bool paused, int src) {
         for (auto& l : lanes) {
             if (l->pipe && (src < 0 || static_cast<int>(l->pipe->source()) == src)) l->pipe->set_paused(paused);
@@ -1276,7 +1244,7 @@ int run_app(AppConfig cfg) {
         engine->set_paused(paused, src);
     };
     // Audio meters (UI thread of the overlay and the --server meter thread).
-    auto snapshot_levels = [&lanes, &src_paused, &demo_talk, &demo_speaking]() {
+    auto snapshot_levels = [&lanes, &src_paused]() {
         server::Levels lv;
         for (auto& l : lanes) {
             if (!l->pipe || !l->started) continue;
@@ -1284,18 +1252,6 @@ int run_app(AppConfig cfg) {
             (mic ? lv.voce : lv.outros) = l->pipe->level();
             (mic ? lv.voce_speaking : lv.outros_speaking) = l->pipe->speaking();
             (mic ? lv.voce_active : lv.outros_active) = !src_paused[static_cast<int>(l->pipe->source())].load();
-        }
-        if (demo_talk) {
-            const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                                std::chrono::steady_clock::now().time_since_epoch()).count();
-            for (int i = 0; i < 2; ++i) {
-                const bool on = demo_speaking[i].load() && !src_paused[i].load();
-                const float wobble = 0.5f + 0.5f * std::sin(static_cast<float>(ms) / 90.0f + static_cast<float>(i * 2));
-                const float lvl = on ? 0.45f + 0.4f * wobble : 0.03f;
-                (i == 0 ? lv.voce : lv.outros) = lvl;
-                (i == 0 ? lv.voce_speaking : lv.outros_speaking) = on;
-                (i == 0 ? lv.voce_active : lv.outros_active) = !src_paused[i].load();
-            }
         }
         return lv;
     };
@@ -1309,7 +1265,7 @@ int run_app(AppConfig cfg) {
         fs::create_directories(cfg.app_dir, ec);
         oo.settings_file = (cfg.app_dir / L"overlay.ini").wstring();
         oo.session_start = session_start;
-        oo.mode_label = cfg.demo ? "DEMO" : "LIVE";
+        oo.mode_label = "LIVE";
         if (agent_rag && !agent_rag->profile().company.empty()) {
             oo.mode_label += " · " + agent_rag->profile().company;
         } else if (agent_rag && !agent_rag->profile().name.empty()) {
@@ -1318,8 +1274,8 @@ int run_app(AppConfig cfg) {
         oo.llm_enabled = llm != nullptr;
         oo.llm_model = cc.model;
         oo.width_dip = static_cast<float>(cfg.st.overlay_width);
-        oo.mic_enabled = cfg.demo || cfg.st.mic_enabled;
-        oo.system_audio_enabled = cfg.demo || cfg.st.loopback_enabled;
+        oo.mic_enabled = cfg.st.mic_enabled;
+        oo.system_audio_enabled = cfg.st.loopback_enabled;
         oo.auto_answer_on = cfg.st.auto_suggest;
         oo.transcription_only_on = engine->transcription_only();
         oo.max_height_fraction = static_cast<float>(cfg.st.overlay_max_height_pct) / 100.0f;
@@ -1401,7 +1357,7 @@ int run_app(AppConfig cfg) {
     // the budget granted by the server runs out. Waits on the stop event, so
     // it costs nothing while the session runs and exits with it.
     std::thread plan_guard;
-    if (cfg.cloud_session && !cfg.demo) {
+    if (cfg.cloud_session) {
         const std::int64_t budget_s = cloud::session_budget_s(*cfg.cloud_session);
         const std::int64_t warn_s = cloud::budget_warning_s(budget_s);
         const cloud::PlanRules& rules = cloud::plan_rules(cfg.cloud_session->plan);
@@ -1451,48 +1407,30 @@ int run_app(AppConfig cfg) {
         });
     }
 
-    if (cfg.demo) {
-        for (AudioSource s : {AudioSource::Microphone, AudioSource::Loopback}) {
-            TransportStatus st;
-            st.source = s;
-            st.state = LinkState::Connected;
-            st.detail = "demo (no network)";
-            engine->on_link_status(st);
-        }
-        demo_talk = std::make_unique<DemoConversation>();
+    for (AudioSource s : {AudioSource::Microphone, AudioSource::Loopback}) {
+        if (s == AudioSource::Microphone && !cfg.st.mic_enabled) continue;
+        if (s == AudioSource::Loopback && !cfg.st.loopback_enabled) continue;
+        auto lane = std::make_unique<Lane>();
+        lane->name = s == AudioSource::Microphone ? "mic/You" : "loopback/Others";
+        auto wasapi = std::make_unique<WasapiCaptureSource>(s, s == AudioSource::Loopback);
         std::weak_ptr<CopilotEngine> weak = engine;
-        demo_talk->start(
-            [weak, &src_paused](const TranscriptEvent& ev) {
-                if (src_paused[static_cast<int>(ev.source)].load()) return;
-                if (auto e = weak.lock()) e->on_transcript(ev);
-            },
-            [&demo_speaking](AudioSource s, bool on) { demo_speaking[static_cast<int>(s)].store(on); });
-    } else {
-        for (AudioSource s : {AudioSource::Microphone, AudioSource::Loopback}) {
-            if (s == AudioSource::Microphone && !cfg.st.mic_enabled) continue;
-            if (s == AudioSource::Loopback && !cfg.st.loopback_enabled) continue;
-            auto lane = std::make_unique<Lane>();
-            lane->name = s == AudioSource::Microphone ? "mic/You" : "loopback/Others";
-            auto wasapi = std::make_unique<WasapiCaptureSource>(s, s == AudioSource::Loopback);
-            std::weak_ptr<CopilotEngine> weak = engine;
-            const std::string who = s == AudioSource::Microphone ? "Microphone: " : "System audio: ";
-            wasapi->set_status_callback([weak, who](const std::string& msg) {
-                if (auto e = weak.lock()) e->notify(NoticeLevel::Warning, who + msg);
-            });
-            // Local acoustic VAD on the capture thread (Req 1.5/1.6): the lanes
-            // are torn down before the engine below, so this raw pointer stays
-            // valid for the capture thread's lifetime. The engine methods only
-            // enqueue + notify, so the capture thread never blocks.
-            wasapi->set_engine(engine.get());
-            lane->capture = std::move(wasapi);
-            lane->vad = make_vad(log, cfg);
-            auto tx = std::make_unique<DeepgramTransport>(deepgram_config(cfg, s), clock);
-            tx->set_status_callback([weak](const TransportStatus& st) {
-                if (auto e = weak.lock()) e->on_link_status(st);
-            });
-            lane->transport = std::move(tx);
-            lanes.push_back(std::move(lane));
-        }
+        const std::string who = s == AudioSource::Microphone ? "Microphone: " : "System audio: ";
+        wasapi->set_status_callback([weak, who](const std::string& msg) {
+            if (auto e = weak.lock()) e->notify(NoticeLevel::Warning, who + msg);
+        });
+        // Local acoustic VAD on the capture thread (Req 1.5/1.6): the lanes
+        // are torn down before the engine below, so this raw pointer stays
+        // valid for the capture thread's lifetime. The engine methods only
+        // enqueue + notify, so the capture thread never blocks.
+        wasapi->set_engine(engine.get());
+        lane->capture = std::move(wasapi);
+        lane->vad = make_vad(log, cfg);
+        auto tx = std::make_unique<DeepgramTransport>(deepgram_config(cfg, s), clock);
+        tx->set_status_callback([weak](const TransportStatus& st) {
+            if (auto e = weak.lock()) e->on_link_status(st);
+        });
+        lane->transport = std::move(tx);
+        lanes.push_back(std::move(lane));
     }
 
     for (auto& lane : lanes) {
@@ -1524,8 +1462,7 @@ int run_app(AppConfig cfg) {
         }
     }
 
-    log.line(cfg.demo ? "== RealTimeAI demo (no hardware/network) =="
-                      : "== RealTimeAI live: You = microphone, Others = system audio ==");
+    log.line("== RealTimeAI live: You = microphone, Others = system audio ==");
     if (store) log.line("Session: " + path_utf8(store->jsonl_path()));
 
     // ---------------- main loop ----------------
@@ -1589,16 +1526,10 @@ int run_app(AppConfig cfg) {
         reader.stop();
         meters_on = false;
         meters.join();
-        if (demo_talk) demo_talk->stop();
     } else if (overlay) {
         log.line("Overlay on. Ctrl+Alt+Enter answers, Ctrl+Alt+S screen, Ctrl+Alt+K chat, Ctrl+Alt+Q quits.");
         overlay->run();
         g_overlay.store(nullptr);
-    } else if (cfg.demo) {
-        // Console demo: wait for the WAV to finish and the suggestion to stream.
-        while (demo_talk && !demo_talk->finished() && WaitForSingleObject(g_stop_event, 100) == WAIT_TIMEOUT) {
-        }
-        WaitForSingleObject(g_stop_event, 4000);
     } else {
         log.line("Press Enter (or Ctrl+C) to quit.");
         std::thread([] {
@@ -1612,7 +1543,6 @@ int run_app(AppConfig cfg) {
     // ---------------- orderly shutdown ----------------
     SetEvent(g_stop_event); // also wakes the plan guard
     if (plan_guard.joinable()) plan_guard.join();
-    if (demo_talk) demo_talk->stop();
     // 1) Stop capture and flush/close each Deepgram stream, lanes in parallel
     //    (each close waits up to ~2 s for the server's final results).
     std::vector<std::thread> stoppers;
