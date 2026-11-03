@@ -18,6 +18,9 @@ const Cue = (window.Cue = {
 
 // ------------------------------------------------------------------ state --
 const S = (Cue.state = {
+  // Interface language (i18n.js): the resolved locale and the Windows
+  // display languages it was picked from.
+  lang: { locale: 'en', systemLanguages: [], supported: ['en'] },
   config: {},
   agents: [],
   sessions: [],
@@ -97,8 +100,48 @@ Cue.monogram = monogram;
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MONTHS_EN = [MONTHS.slice(), MONTHS_LONG.slice()];
 Cue.MONTHS = MONTHS;
 Cue.MONTHS_LONG = MONTHS_LONG;
+
+// ------------------------------------------------------------- language --
+const I18n = window.CueI18n || { t: (s, v) => String(s).replace(/\{(\w+)\}/g, (m, k) => (v && v[k] !== undefined ? v[k] : m)), has: (l) => l === 'en', apply: () => 'en' };
+const t = (text, vars) => I18n.t(text, vars);
+Cue.t = t;
+
+// The locale to show: the Language setting, or the first Windows display
+// language with a catalog (mirrors resolveUiLocale in main/ui_locale.js).
+function resolveLocale() {
+  const pref = String((S.config && S.config.ui_language) || 'auto');
+  if (pref !== 'auto' && I18n.has(pref)) return pref;
+  for (const tag of S.lang.systemLanguages || []) {
+    const lang = String(tag).toLowerCase().split(/[-_]/)[0];
+    const hit = (S.lang.supported || []).find((l) => l.toLowerCase().split('-')[0] === lang);
+    if (hit && I18n.has(hit)) return hit;
+  }
+  return 'en';
+}
+
+// Applies the language to the whole page: month names from Intl, the
+// automatic translation of rendered text, and a fresh render.
+function applyLocale(rerender) {
+  const locale = I18n.apply(resolveLocale(), document);
+  S.lang.locale = locale;
+  const names = (opts) => Array.from({ length: 12 }, (_, i) => {
+    try {
+      return new Intl.DateTimeFormat(locale, opts).format(new Date(2020, i, 15)).replace(/\.$/, '');
+    } catch (_e) {
+      return '';
+    }
+  });
+  const short = locale === 'en' ? MONTHS_EN[0] : names({ month: 'short' });
+  const long = locale === 'en' ? MONTHS_EN[1] : names({ month: 'long' });
+  if (short.every(Boolean)) MONTHS.splice(0, 12, ...short);
+  if (long.every(Boolean)) MONTHS_LONG.splice(0, 12, ...long);
+  if (rerender && typeof renderView === 'function') renderView(false);
+  return locale;
+}
+Cue.applyLocale = applyLocale;
 
 function pad2(n) {
   return String(n).padStart(2, '0');
@@ -118,7 +161,7 @@ Cue.dayDiff = dayDiff;
 
 function fmtDateShort(d) {
   if (!d || Number.isNaN(d.getTime())) return '—';
-  return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
+  return t('{m} {d}', { m: MONTHS[d.getMonth()], d: d.getDate() });
 }
 Cue.fmtDateShort = fmtDateShort;
 
@@ -159,16 +202,16 @@ function fmtKb(chars) {
 Cue.fmtKb = fmtKb;
 
 function relDays(n) {
-  if (n === 0) return 'Today';
-  if (n === 1) return 'Tomorrow';
-  if (n === -1) return 'Yesterday';
-  if (n > 1) return `In ${n} days`;
-  return `${-n} days ago`;
+  if (n === 0) return t('Today');
+  if (n === 1) return t('Tomorrow');
+  if (n === -1) return t('Yesterday');
+  if (n > 1) return t('In {n} days', { n });
+  return t('{n} days ago', { n: -n });
 }
 Cue.relDays = relDays;
 
 function plural(n, one, many) {
-  return `${n} ${n === 1 ? one : many}`;
+  return t(`{n} ${n === 1 ? one : many}`, { n });
 }
 Cue.plural = plural;
 
@@ -321,7 +364,7 @@ Cue.docIcon = docIcon;
 
 // How much of the material the copilot reads is in place for this goal.
 // Weights match what the engine uses: résumé first, then the job, company
-// context, extra files, the answer playbook and a debrief from practice.
+// context, extra files, a first recorded session and its debrief.
 function readiness(a) {
   if (!a) return { pct: 0, items: [] };
   const docs = Array.isArray(a.documents) ? a.documents : [];
@@ -331,7 +374,7 @@ function readiness(a) {
     { key: 'job', label: 'Job description', done: Boolean((a.job_description || '').trim()) || docs.some((d) => docTag(d) === 'job'), w: 20 },
     { key: 'research', label: 'Company research', done: Boolean((a.company_research || a.company_dossier || '').trim()), w: 15 },
     { key: 'extra', label: 'Extra material (projects, portfolio)', done: docs.filter((d) => docTag(d) !== 'resume').length > 0, w: 10 },
-    { key: 'practice', label: 'Practice run done', done: Boolean(cs.practice_run), w: 15 },
+    { key: 'practice', label: 'First session recorded', done: Boolean(cs.practice_run) || (S.sessions || []).some((s) => s.agentId === a.id), w: 15 },
     { key: 'debrief', label: 'Debrief generated', done: Boolean(cs.debrief_read) || (a.goal_memory_strengths || []).length > 0, w: 10 }
   ];
   const pct = items.reduce((acc, i) => acc + (i.done ? i.w : 0), 0);
@@ -419,7 +462,7 @@ function usage() {
       answers: list.reduce((acc, s) => acc + (Number(s.suggestions) || Number(s.answersCount) || 0), 0),
       pct: limit ? clamp(Math.round((ent.usedMinutes / limit) * 100), 0, 100) : null,
       left: limit ? Math.max(0, Math.round(ent.leftMinutes)) : null,
-      renewLabel: ent.monthly ? fmtDateShort(renew) : 'does not renew',
+      renewLabel: ent.monthly ? fmtDateShort(renew) : '',
       monthLabel: ent.monthly ? MONTHS_LONG[now.getMonth()] : 'free session'
     };
   }
@@ -579,6 +622,7 @@ async function refreshState() {
   S.themeState = st.themeState || S.themeState;
   S.overlayStatus = st.overlayStatus || S.overlayStatus;
   S.stealthState = st.stealthState || S.stealthState;
+  if (st.ui) S.lang = { ...S.lang, ...st.ui };
   return st;
 }
 Cue.refreshState = refreshState;
@@ -597,14 +641,15 @@ async function saveConfig(patch, message) {
   const res = await guard(() => api.saveConfig(patch), 'Could not save the settings.');
   if (!res) return null;
   if (res.config) S.config = res.config;
+  if ('ui_language' in patch) applyLocale(true);
   if (message) toast(res.overlayRestarted ? `${message} The copilot restarted.` : message);
   renderShell();
   return res;
 }
 Cue.saveConfig = saveConfig;
 
-// Starts the native copilot (HUD) for a goal. demo = practice run.
-async function startCopilot(agent, demo) {
+// Starts the native copilot (HUD) for a goal.
+async function startCopilot(agent) {
   const target = agent || activeAgent();
   if (!target) {
     toast('Create a session before starting the copilot.');
@@ -616,21 +661,21 @@ async function startCopilot(agent, demo) {
     return null;
   }
   const ent = S.auth && S.auth.entitlement;
-  if (!demo && ent && !ent.canStart) {
+  if (ent && !ent.canStart) {
     toast(ent.reason, 'error');
     navigate('settings/plan');
     return null;
   }
   const ready = engineReady();
-  if (!demo && !ready.ok) {
+  if (!ready.ok) {
     toast(!ready.stt ? 'Set up the transcription key (Deepgram) first.' : 'Set up an AI key first.', 'error');
     navigate('settings/ai');
     return null;
   }
   S.activeAgentId = target.id;
-  toast(demo ? `Starting practice: ${agentTitle(target)}` : `Starting copilot: ${agentTitle(target)}`);
+  toast(`Starting copilot: ${agentTitle(target)}`);
   const res = await guard(
-    () => api.startOverlay({ agent: target, demo: Boolean(demo), configOverrides: {} }),
+    () => api.startOverlay({ agent: target, configOverrides: {} }),
     'Could not start the copilot.'
   );
   if (!res) return null;
@@ -641,7 +686,7 @@ async function startCopilot(agent, demo) {
     else if (res.needsUpgrade) navigate('settings/plan');
     return null;
   }
-  if (Cue.liveReset) Cue.liveReset(target.id, demo);
+  if (Cue.liveReset) Cue.liveReset(target.id);
   await refreshState();
   if (res.agent) S.activeAgentId = res.agent.id;
   navigate('live');
@@ -713,7 +758,7 @@ function applyLock() {
   const locked = isLocked();
   const app = document.getElementById('app');
   if (app) app.classList.toggle('locked', locked);
-  for (const id of ['sidebar', 'searchTrigger', 'btnUpdateChip', 'btnStealthChip', 'btnGoLive']) {
+  for (const id of ['sidebar', 'searchTrigger', 'btnUpdateChip', 'btnTour', 'btnStealthChip', 'btnGoLive']) {
     const el = document.getElementById(id);
     if (el && (id !== 'btnUpdateChip' || locked)) el.hidden = locked;
   }
@@ -737,6 +782,8 @@ function renderView(resetScroll) {
   const after = locked ? Cue.afterRender.login : Cue.afterRender[S.route.view];
   if (after) after(S.route.parts);
   renderShell();
+  // First visit of a page: its guided tour (tour.js).
+  if (Cue.onViewRendered) Cue.onViewRendered();
 }
 Cue.renderView = renderView;
 
@@ -812,7 +859,7 @@ function renderShell() {
     if (S.route.view === 'sessions' && S.ui.sessTab === 'past') label = 'History';
     if (S.route.view === 'session') {
       const a = agentById(S.route.parts[0]);
-      if (a) label = `Sessions / ${agentTitle(a)}`;
+      if (a) label = `${t('Sessions')} / ${agentTitle(a)}`;
     }
     crumb.textContent = label;
   }
@@ -824,7 +871,7 @@ function renderShell() {
   if (pill && pillLabel) {
     if (running) {
       pill.className = 'pill danger';
-      pillLabel.textContent = S.overlayStatus.mode === 'demo' ? 'Practice' : 'Live';
+      pillLabel.textContent = 'Live';
       pill.title = 'The copilot is running';
     } else if (ready.ok) {
       pill.className = 'pill ok';
@@ -871,7 +918,7 @@ function renderShell() {
       <div class="row between"><span class="eyebrow">Usage this month</span><span class="pill">${esc(u.planLabel)}</span></div>
       <div class="row" style="align-items:baseline;gap:6px"><span style="font-size:22px;font-weight:600;letter-spacing:-.03em;line-height:1">${u.usedMin}</span><span class="num">${u.limit ? `/ ${u.limit} min` : 'min transcribed'}</span></div>
       ${u.limit ? `<div class="usage-ticks">${ticks}</div>` : ''}
-      <div class="row between faint" style="font-size:11.5px"><span>${u.limit ? `${u.left} min left` : plural(u.sessions, 'session', 'sessions')}</span><span class="nowrap">${u.limit ? `Renews ${esc(u.renewLabel)}` : esc(u.monthLabel)}</span></div>`);
+      <div class="row between faint" style="font-size:11.5px"><span>${u.limit ? `${u.left} min left` : plural(u.sessions, 'session', 'sessions')}</span><span class="nowrap">${u.limit ? (u.renewLabel ? `Renews on ${esc(u.renewLabel)}` : 'Does not renew') : esc(u.monthLabel)}</span></div>`);
   }
 
   // Profile
@@ -891,7 +938,7 @@ function renderShell() {
       live.className = 'btn live';
       // The clock span is ticked in place (tickLiveClock) so the pulse
       // animation is not restarted every second.
-      setHtml(live, `<span class="dot" style="background:#fff;animation:pulse 1.4s infinite"></span>${S.overlayStatus.mode === 'demo' ? 'Practice' : 'Live'} <span class="mono" id="btnGoLiveClock" style="font-size:11px;opacity:.85"></span>`);
+      setHtml(live, `<span class="dot" style="background:#fff;animation:pulse 1.4s infinite"></span>${'Live'} <span class="mono" id="btnGoLiveClock" style="font-size:11px;opacity:.85"></span>`);
       tickLiveClock();
     } else {
       live.className = 'btn raised';
@@ -956,7 +1003,7 @@ Cue.actions['toggle-stealth'] = async () => {
   }
 };
 
-Cue.actions['start-copilot'] = (el) => startCopilot(agentById(el.dataset.agent) || activeAgent(), el.dataset.demo === '1');
+Cue.actions['start-copilot'] = (el) => startCopilot(agentById(el.dataset.agent) || activeAgent());
 Cue.actions['stop-copilot'] = () => stopCopilot();
 
 // Local mode -> account: back to the sign-in screen, on "Create account".
@@ -1141,6 +1188,7 @@ async function boot() {
     toast('Could not read the local data.', 'error');
   }
   applyTheme();
+  applyLocale(false);
   S.activeAgentId = (S.overlayStatus && S.overlayStatus.agentId) || S.config.last_agent || '';
   subscribe();
 

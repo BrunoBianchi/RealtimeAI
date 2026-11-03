@@ -28,14 +28,14 @@ function workspace(agent = AGENT, state = {}) {
 
 const actions = (html) => tags(html, { 'data-action': true }).map((t) => t['data-action']);
 
-test('Task 5.1 / Property 1: header of a session (back, title, date, edit, schedule, simulate, go live)', () => {
+test('Task 5.1 / Property 1: header of a session (back, title, date, edit, schedule, go live)', () => {
   const { html } = workspace();
   assert.ok(/data-action="go" data-to="sessions"/.test(html), 'back to Sessões');
   assert.ok(html.includes('Nubank · Backend Engineer'));
   assert.ok(html.includes('Jan 10 · 10:00'), 'interview date and time');
   for (const a of ['edit-session', 'open-scheduler', 'start-copilot']) assert.ok(actions(html).includes(a), a);
   const starts = tags(html, { 'data-action': 'start-copilot' });
-  assert.deepStrictEqual(starts.map((s) => s['data-demo'] || ''), ['1', ''], 'Simular (demo) and Iniciar ao vivo');
+  assert.deepStrictEqual(starts.map((s) => s['data-demo'] || ''), [''], 'only a real session: no scripted practice');
   assert.ok(html.includes('Reschedule'), 'scheduled: Reschedule');
 
   // While this session is live the button jumps to the live view instead.
@@ -87,7 +87,7 @@ test('Task 5.1 / Property 2: playbook and scheduler dialogs', async () => {
 
 test('Task 5.1 / Property 3: readiness, context and memory sections', () => {
   const { html } = workspace();
-  assert.ok(html.includes('>Preparo<') && html.includes('>50%<'), 'résumé (30) + job (20)');
+  assert.ok(html.includes('>Prep<') && html.includes('>50%<'), 'résumé (30) + job (20)');
   assert.strictEqual((html.match(/class="check-item done"/g) || []).length, 2);
   assert.strictEqual((html.match(/class="check-item /g) || []).length, 6);
   for (const id of ['ctxJob', 'ctxResearch', 'ctxInstr']) assert.ok(html.includes(`id="${id}"`), id);

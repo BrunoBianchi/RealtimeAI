@@ -112,7 +112,7 @@
             <label class="field">Company<input class="input" id="nsCompany" value="${esc(st.company)}" placeholder="E.g. Nubank or nubank.com.br"/></label>
             <div class="form-grid" style="gap:8px"><label class="field">Date<input class="input" type="date" id="nsDate" value="${esc(st.date)}"/></label><label class="field">Time<input class="input" type="time" id="nsTime" value="${esc(st.time)}"/></label></div>
           </div>
-          <div class="field">Formato
+          <div class="field">Format
             <div class="row wrap" style="gap:4px">${C.FORMATS.map((f) => `<button type="button" class="filter-chip ${st.format === f ? 'active' : ''}" data-ns-format="${esc(f)}">${esc(f)}</button>`).join('')}</div>
           </div>
           <label class="field">Job description <span class="hint">optional, helps the copilot a lot</span><textarea class="textarea" id="nsJob" rows="3" placeholder="Paste the job description">${esc(st.job)}</textarea></label>

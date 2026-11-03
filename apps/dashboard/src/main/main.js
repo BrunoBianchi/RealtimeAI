@@ -18,6 +18,7 @@ const { createMeetingPopup } = require('./meeting_popup');
 const { createFlagStore } = require('./feature_flags');
 const { createUpdater } = require('./updater');
 const { createCloudAccount, effectiveServerUrl } = require('./cloud_account');
+const { normalizeUiLanguage, resolveUiLocale, systemLanguages, SUPPORTED: UI_LOCALES } = require('./ui_locale');
 const localBackend = require('./local_backend');
 const jevEngine = require('./jev_engine');
 const companyLogoService = require('./company_logo_service');
@@ -40,7 +41,7 @@ let updater = null;
 
 // One dashboard at a time: it lives in the tray and watches for meetings, so a
 // second launch just brings the first one forward.
-const gotSingleInstanceLock = process.argv.includes('--capture-screenshots') ||
+const gotSingleInstanceLock =
   typeof app.requestSingleInstanceLock !== 'function' || app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
   app.quit();
@@ -299,6 +300,8 @@ function readConfigIni() {
     auto_update: (sistema.auto_update ?? sistema.atualizacao_automatica ?? 'sim') !== 'nao' &&
                  (sistema.auto_update ?? sistema.atualizacao_automatica ?? 'sim') !== 'false',
     update_channel: (sistema.update_channel || sistema.canal || 'stable') === 'beta' ? 'beta' : 'stable',
+    // Interface language: auto = follow Windows (see ui_locale.js), or a locale.
+    ui_language: normalizeUiLanguage(sistema.idioma_interface || sistema.ui_language || 'auto'),
     process_disguise: stealth.process_disguise || (stealth.electron_disguise === 'sim' ? 'settings' : 'none'),
     interface_opacity: parseFloat(stealth.interface_opacity || stealth.electron_opacity || '1.0'),
     share_anonymized_questions: (stealth.share_anonymized_questions ?? stealth.contribuir_perguntas ?? 'sim') !== 'nao' &&
@@ -433,6 +436,7 @@ function writeConfigIni(updates) {
   const electronOpacity = String(updates.electron_opacity ?? current.electron_opacity ?? '1.0');
   const autoUpdate = (updates.auto_update ?? current.auto_update) ? 'sim' : 'nao';
   const updateChannel = (updates.update_channel ?? current.update_channel) === 'beta' ? 'beta' : 'stable';
+  const uiLanguage = normalizeUiLanguage(updates.ui_language ?? current.ui_language ?? 'auto');
   const processDisguise = updates.process_disguise ?? current.process_disguise ?? 'none';
   const interfaceOpacity = String(updates.interface_opacity ?? current.interface_opacity ?? '1.0');
   const shareAnonymizedQuestions = (updates.share_anonymized_questions ?? current.share_anonymized_questions) ? 'sim' : 'nao';
@@ -529,6 +533,7 @@ function writeConfigIni(updates) {
     '[sistema]',
     `auto_update = ${autoUpdate}`,
     `update_channel = ${updateChannel}`,
+    `idioma_interface = ${uiLanguage}`,
     '',
     '[agenda]',
     `google_ics_url = ${calendarIcsUrl}`,
@@ -996,6 +1001,34 @@ function healAgentStrings(ag) {
   }
   return changed;
 }
+// Older versions created an empty "My first goal" on first launch. Removed
+// unless the user filled it in or recorded a session with it.
+const STARTER_GOAL_ID = 'my-first-goal';
+function removeUntouchedStarterGoal() {
+  const filePath = path.join(getAppDataDir(), 'agents', `${STARTER_GOAL_ID}.json`);
+  if (!fs.existsSync(filePath)) return false;
+  let g;
+  try {
+    g = JSON.parse(fs.readFileSync(filePath, 'utf8').replace(/^﻿/, ''));
+  } catch (_e) {
+    return false;
+  }
+  const filled = ['company', 'role', 'job_description', 'company_research', 'interview_date', 'mini_compact']
+    .some((k) => String(g[k] || '').trim()) || (g.documents || []).length > 0;
+  if (filled) return false;
+  const sessionsDir = path.join(getAppDataDir(), 'sessions');
+  const used = fs.existsSync(sessionsDir) && fs.readdirSync(sessionsDir).some((f) => {
+    try {
+      return /.(jsonl|md)$/.test(f) && fs.readFileSync(path.join(sessionsDir, f), 'utf8').includes(STARTER_GOAL_ID);
+    } catch (_e) {
+      return false;
+    }
+  });
+  if (used) return false;
+  fs.unlinkSync(filePath);
+  return true;
+}
+
 function loadAllAgents() {
   const agentsDir = path.join(getAppDataDir(), 'agents');
   const files = fs.readdirSync(agentsDir).filter((f) => f.endsWith('.json'));
@@ -1657,7 +1690,9 @@ async function generateSessionDebrief({ sessionId, goalId, agentId, transcript: 
     }
   }
 
-  const company = goal.company || 'the company';
+  // Nothing recorded, nothing to judge: no generic praise or advice.
+  if (!transcript) return { ok: false, error: 'This session has no transcript to analyze.' };
+
   const role = goal.role || 'the role';
 
   // Extract substantive questions asked in this session via JEV
@@ -1698,11 +1733,8 @@ async function generateSessionDebrief({ sessionId, goalId, agentId, transcript: 
   if (extractedQuestions.length > 0) {
     const categories = [...new Set(extractedQuestions.map((q) => q.subCategory || q.category))].join(', ');
     dynamicStrengths.push(`Addressed ${extractedQuestions.length} substantive ${extractedQuestions.length === 1 ? 'question' : 'questions'} across ${categories} for ${role}.`);
-  } else {
-    dynamicStrengths.push(`Maintained structured technical fundamentals and precise communication for ${role} at ${company}.`);
   }
 
-  const newStrength = dynamicStrengths[0] || `Clear technical stance for ${role} at ${company}.`;
   const newImprove = dynamicImprovements[0] || `Bring up metrics and trade-offs on your own to strengthen the answer.`;
 
   if (!goal.goal_memory) goal.goal_memory = { strengths: [], improve: [] };
@@ -2631,8 +2663,8 @@ function sendOverlayCommand(command) {
   }
 }
 
-function launchOverlay({ agent, demo = false, configOverrides = {} }) {
-  if (!canUseApp()) return LOGIN_REQUIRED; // also covers relaunches and demos
+function launchOverlay({ agent, configOverrides = {} }) {
+  if (!canUseApp()) return LOGIN_REQUIRED; // also covers relaunches
   // 1. Save the active Mini-Agent (with its RAG documents, instructions, and mini_compact)
   let savedAgent = null;
   if (agent) {
@@ -2656,11 +2688,7 @@ function launchOverlay({ agent, demo = false, configOverrides = {} }) {
   if (savedAgent && savedAgent.id) {
     args.push('--agent', savedAgent.id);
   }
-  if (demo) {
-    args.push('--demo');
-  }
-
-  overlayMode = demo ? 'demo' : 'live';
+  overlayMode = 'live';
   overlayAgentId = savedAgent ? savedAgent.id : '';
 
   overlayStartedAt = Date.now();
@@ -3043,7 +3071,7 @@ async function startCopilotForMeeting(agentId) {
     return allowed;
   }
   const agent = loadAllAgents().find((a) => a.id === agentId) || null;
-  const res = launchOverlay({ agent, demo: false });
+  const res = launchOverlay({ agent });
   return { ok: Boolean(res && res.ok), error: res && res.error };
 }
 
@@ -3216,6 +3244,10 @@ function showSettingsWindow(section) {
   else send();
 }
 
+// The whole dashboard (text, spacing, icons, tour popovers) is drawn 10%
+// larger than its CSS pixels.
+const UI_ZOOM = 1.1;
+
 function createWindow() {
   const initialTheme = getThemeState();
   if (initialTheme && initialTheme.preference) {
@@ -3224,8 +3256,9 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 920,
-    minWidth: 1024,
-    minHeight: 680,
+    // At UI_ZOOM these leave about the same CSS space as 1024x680 did at 100%.
+    minWidth: 1100,
+    minHeight: 720,
     frame: false,
     backgroundColor: initialTheme.resolved === 'dark' ? '#0D0D10' : '#FFFFFF',
     title: 'RealTimeAI — Copilot Studio',
@@ -3233,10 +3266,18 @@ function createWindow() {
     webPreferences: {
       preload: path.join(PRELOAD_DIR, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      zoomFactor: UI_ZOOM
     }
   });
 
+  // Electron resets the zoom of file:// pages on loads and on some hash
+  // (router) navigations, so put it back after each of them.
+  const keepZoom = () => {
+    const wc = mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents : null;
+    if (wc && wc.getZoomFactor() !== UI_ZOOM) wc.setZoomFactor(UI_ZOOM);
+  };
+  for (const ev of ['did-finish-load', 'did-navigate', 'did-navigate-in-page']) mainWindow.webContents.on(ev, keepZoom);
   const loadPromise = mainWindow.loadFile(path.join(RENDERER_DIR, 'index.html'));
   applyElectronStealthMode();
 
@@ -3257,67 +3298,6 @@ function createWindow() {
     mainWindow.setFullScreen(true);
   } else if (process.argv.includes('--maximize')) {
     mainWindow.maximize();
-  }
-
-  const capIdx = process.argv.indexOf('--capture-screenshots');
-  if (capIdx >= 0 && process.argv[capIdx + 1]) {
-    const outDir = process.argv[capIdx + 1];
-    loadPromise.then(async () => {
-      try {
-        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-        await wait(2400);
-
-        await mainWindow.webContents.executeJavaScript(`applyTheme('dark', 'dark'); switchView('goals'); window.scrollTo(0, 0);`);
-        await wait(700);
-        const imgGoals = await mainWindow.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, '01_goals.png'), imgGoals.toPNG());
-
-        await mainWindow.webContents.executeJavaScript(`document.querySelector('main')?.scrollTo(0, 600);`);
-        await wait(500);
-        const imgGoalsBottom = await mainWindow.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, '02_goals_bottom.png'), imgGoalsBottom.toPNG());
-
-        await mainWindow.webContents.executeJavaScript(`document.querySelector('[data-fq-index="0"]')?.click();`);
-        await wait(500);
-        const imgModalQ = await mainWindow.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, '03_modal_question_practice.png'), imgModalQ.toPNG());
-        await mainWindow.webContents.executeJavaScript(`document.getElementById('modalQuestionPractice')?.classList.remove('open');`);
-        await wait(200);
-
-        await mainWindow.webContents.executeJavaScript(`document.querySelector('[data-sim-idx="0"]')?.click();`);
-        await wait(500);
-        const imgModalRep = await mainWindow.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, '04_modal_session_report.png'), imgModalRep.toPNG());
-        await mainWindow.webContents.executeJavaScript(`document.getElementById('modalSessionReport')?.classList.remove('open');`);
-        await wait(200);
-
-        await mainWindow.webContents.executeJavaScript(`switchView('library'); switchLibraryTab('resumes'); document.querySelector('main')?.scrollTo(0, 0);`);
-        await wait(600);
-        const imgLibResumes = await mainWindow.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, '05_library_resumes.png'), imgLibResumes.toPNG());
-
-        await mainWindow.webContents.executeJavaScript(`switchView('library'); switchLibraryTab('playbooks');`);
-        await wait(600);
-        const imgLibPlaybooks = await mainWindow.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, '06_library_playbooks.png'), imgLibPlaybooks.toPNG());
-
-        await mainWindow.webContents.executeJavaScript(`switchView('settings'); document.querySelector('main')?.scrollTo(0, 0);`);
-        await wait(600);
-        const imgSettings = await mainWindow.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, '07_settings.png'), imgSettings.toPNG());
-
-        await mainWindow.webContents.executeJavaScript(`switchView('history'); document.querySelector('main')?.scrollTo(0, 0);`);
-        await wait(600);
-        const imgHistory = await mainWindow.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, '08_history.png'), imgHistory.toPNG());
-      } catch (err) {
-        console.error('Capture error:', err);
-      } finally {
-        if (process.argv.includes('--exit-after-capture')) {
-          app.quit();
-        }
-      }
-    });
   }
 }
 
@@ -3351,23 +3331,9 @@ app.whenReady().then(() => {
       callback(isBundledUi((details && details.requestingUrl) || (webContents && webContents.getURL())));
     });
   }
-  // Ensure at least one rich starter Mini-Agent exists if agents folder is empty
-  const existingAgents = loadAllAgents();
-  if (existingAgents.length === 0) {
-    saveAgentToDisk({
-      id: 'my-first-goal',
-      name: 'My first goal',
-      session_type: 'interview',
-      company: '',
-      role: '',
-      job_description: '',
-      extra_instructions: 'Answer in the first person, using STAR for behavioral questions.',
-      company_research: '',
-      // No sample resume: an invented one would be inherited by new goals
-      // and told by the copilot as the candidate's real experience.
-      documents: []
-    });
-  }
+  // A fresh install starts empty: no starter goal. Older versions created an
+  // empty "My first goal"; it goes away while still untouched.
+  removeUntouchedStarterGoal();
 
   ipcMain.handle('rtai:get-state', async () => {
     const config = readConfigIni();
@@ -3378,6 +3344,8 @@ app.whenReady().then(() => {
     return {
       appDataDir: getAppDataDir(),
       overlayExePath: getOverlayExecutablePath(),
+      // Interface language: the setting resolved against the Windows languages.
+      ui: { locale: resolveUiLocale(config.ui_language, systemLanguages(app)), systemLanguages: systemLanguages(app), supported: UI_LOCALES },
       config,
       stealthState: {
         active: Boolean(config.electron_stealth),
@@ -3435,7 +3403,7 @@ app.whenReady().then(() => {
       'playbook_lead_with_answer', 'playbook_name_tradeoffs', 'answer_language', 'coding_language'];
     const changed = before && answerKeys.some((k) => String(before[k] ?? '') !== String(saved[k] ?? ''));
     if (changed && isOverlayRunning() && overlayAgentId === saved.id) {
-      launchOverlay({ agent: saved, demo: overlayMode === 'demo' });
+      launchOverlay({ agent: saved });
       overlayRestarted = true;
     }
     return {
@@ -3518,43 +3486,8 @@ app.whenReady().then(() => {
         }
       } catch (_e) {}
     }
-    // Provide realistic upcoming interview events if no external .ics feed returned VEVENTs
-    return {
-      ok: true,
-      source: 'template',
-      events: [
-        {
-          id: 'entrevista-system-design',
-          summary: 'Technical & System Design Interview — Senior Software Engineer',
-          company: 'Nubank',
-          role: 'Senior Software Engineer',
-          date: 'Today · 15:00 - 16:00',
-          location: 'Google Meet',
-          description:
-            'Technical chat about distributed architecture, low latency, microservice resilience and culture fit (STAR).'
-        },
-        {
-          id: 'entrevista-hiring-manager',
-          summary: 'Hiring Manager & Culture Fit — Staff AI Engineer',
-          company: 'Mercado Livre',
-          role: 'Staff AI & Backend Engineer',
-          date: 'Tomorrow · 10:30 - 11:30',
-          location: 'Zoom',
-          description:
-            'Technical leadership, real-time AI projects, RAG, decisions under pressure and alignment with the company principles.'
-        },
-        {
-          id: 'call-arquitetura-cliente',
-          summary: 'Architecture & Technical Scope Presentation',
-          company: 'Enterprise Client',
-          role: 'Tech Lead / Solutions Architect',
-          date: 'Friday · 14:00 - 14:45',
-          location: 'Microsoft Teams',
-          description:
-            'Non-functional requirements, SLA, DPAPI security, rollout roadmap and ROI.'
-        }
-      ]
-    };
+    // Only real events: an empty or unreachable feed shows nothing.
+    return { ok: true, source: 'none', events: [] };
   });
 
   // ---- Google Calendar ----------------------------------------------------
@@ -3656,8 +3589,10 @@ app.whenReady().then(() => {
     }
     // The overlay reads config.ini only at start: any real change while it
     // runs (keys, language, models, audio, stealth...) restarts it.
+    // The interface language is dashboard-only: it never restarts the copilot.
+    const dashboardOnly = configUpdates && Object.keys(configUpdates).every((k) => k === 'ui_language');
     const changed = before !== JSON.stringify(updated.rawIni);
-    const shouldRelaunch = configUpdates && (
+    const shouldRelaunch = configUpdates && !dashboardOnly && (
       (changed && isOverlayRunning()) ||
       (configUpdates.model && isOverlayRunning()) ||
       (isOverlayRunning() && (
@@ -3674,7 +3609,6 @@ app.whenReady().then(() => {
       const currentAgent = agents.find((a) => a.id === (overlayAgentId || updated.last_agent)) || agents[0] || null;
       launchOverlay({
         agent: currentAgent,
-        demo: overlayMode === 'demo',
         configOverrides: { ...configUpdates }
       });
       overlayRestarted = true;
@@ -3686,13 +3620,12 @@ app.whenReady().then(() => {
     return { profile: saveUserProfile(profile || {}) };
   });
 
+  // Always a real session: there is no scripted demo.
   ipcMain.handle('rtai:start-overlay', async (_ev, options) => {
-    const opts = options || {};
-    if (!opts.demo) {
-      const allowed = await checkCanStartLive();
-      if (!allowed.ok) return allowed;
-    }
-    return launchOverlay(opts);
+    const { agent, configOverrides } = options || {};
+    const allowed = await checkCanStartLive();
+    if (!allowed.ok) return allowed;
+    return launchOverlay({ agent, configOverrides });
   });
 
   ipcMain.handle('rtai:stop-overlay', async () => {
@@ -4049,6 +3982,7 @@ if (process.env.RTAI_TEST_EXPORTS === '1') {
   module.exports = {
     saveAgentToDisk,
     loadAllAgents,
+    removeUntouchedStarterGoal,
     generateSessionDebrief,
     loadPastSessions,
     extractDocumentContent,

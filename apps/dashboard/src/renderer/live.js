@@ -21,10 +21,9 @@
     question: 'Question'
   };
 
-  function fresh(agentId, demo) {
+  function fresh(agentId) {
     return {
       agentId: agentId || '',
-      demo: Boolean(demo),
       hello: null,
       link: { voce: '', outros: '' },
       levels: { voce: 0, outros: 0, voce_speaking: false, outros_speaking: false },
@@ -39,11 +38,11 @@
       ended: false
     };
   }
-  S.live = fresh('', false);
+  S.live = fresh('');
 
-  C.liveReset = (agentId, demo) => {
+  C.liveReset = (agentId) => {
     const keepMode = S.live.transcriptionOnly;
-    S.live = fresh(agentId, demo);
+    S.live = fresh(agentId);
     S.live.transcriptionOnly = keepMode;
   };
 
@@ -209,7 +208,7 @@
   };
 
   C.liveOnStatus = (st) => {
-    if (st.running && S.live.ended) C.liveReset(st.agentId, st.mode === 'demo');
+    if (st.running && S.live.ended) C.liveReset(st.agentId);
     if (st.running && !S.live.agentId) S.live.agentId = st.agentId || '';
     if (S.route.view === 'live') mark('all');
   };
@@ -325,16 +324,16 @@
       ['Microphone (you)', cfg.mic_enabled !== false, 'settings/audio'],
       ['System audio (interviewer)', cfg.loopback_enabled !== false, 'settings/audio']
     ];
-    return `<div class="stack gap-24">
+    return `<div class="stack gap-24" data-tour="live-start">
       <div class="stack gap-4"><span class="eyebrow">Ready to start</span><span class="answer-q">Open the call and start the copilot.</span><span class="muted" style="font-size:13.5px">The floating panel (HUD) appears over the meeting; this screen mirrors the transcript and answers in real time.</span></div>
       ${agents.length
         ? `<label class="field">Session<select class="select" data-change="live-agent">${C.opts(agents.map((x) => [x.id, C.agentTitle(x)]), a ? a.id : '')}</select></label>
-           <div class="row wrap"><button type="button" class="btn primary lg" data-action="start-copilot" data-agent="${esc(a ? a.id : '')}">${icon('play')}Go live</button><button type="button" class="btn lg" data-action="start-copilot" data-agent="${esc(a ? a.id : '')}" data-demo="1">${icon('robot')}Practice interview</button></div>`
+           <div class="row wrap"><button type="button" class="btn primary lg" data-action="start-copilot" data-agent="${esc(a ? a.id : '')}">${icon('play')}Go live</button></div>`
         : `<div class="row"><button type="button" class="btn primary lg" data-action="new-session">${icon('plus')}Create session</button></div>`}
-      <div class="inset" style="gap:0">${checks
+      <div class="inset" style="gap:0" data-tour="live-checks">${checks
         .map(([label, ok, to]) => `<div class="check-item ${ok ? 'done' : ''}"><span class="mark">${icon('check')}</span><span class="label grow">${esc(label)}</span>${ok ? '<span class="num">ok</span>' : `<a class="small" data-action="go" data-to="${to}">Set up</a>`}</div>`)
         .join('')}</div>
-      <div class="stack gap-8"><span class="eyebrow">HUD shortcuts</span><div class="row wrap" style="gap:6px">
+      <div class="stack gap-8" data-tour="live-shortcuts"><span class="eyebrow">HUD shortcuts</span><div class="row wrap" style="gap:6px">
         ${[['Ctrl Alt Enter', 'answer'], ['Ctrl Alt M', 'transcription only'], ['Ctrl Alt H', 'hide'], ['Ctrl Alt Q', 'stop']].map(([k, l]) => `<span class="chip"><span class="kbd">${k}</span>${l}</span>`).join('')}
         <a class="small muted" data-action="go" data-to="settings/shortcuts">All shortcuts →</a></div></div>
     </div>`;
@@ -372,7 +371,7 @@
     const src = (key, label, ic) => {
       const paused = L.paused[key];
       return `<button type="button" class="chip btn-chip" data-action="live-pause" data-src="${key}" ${!running ? 'disabled' : ''} title="${paused ? 'Resume' : 'Pause'} ${label.toLowerCase()}">
-        <span class="level-bars" id="lvl-${key}">${bars(0)}</span>${icon(paused ? (key === 'voce' ? 'microphone-slash' : 'speaker-slash') : ic)}${label}${paused ? ' · pausado' : running && !linkOk(key) ? ' · conectando' : ''}</button>`;
+        <span class="level-bars" id="lvl-${key}">${bars(0)}</span>${icon(paused ? (key === 'voce' ? 'microphone-slash' : 'speaker-slash') : ic)}${label}${paused ? ' · paused' : running && !linkOk(key) ? ' · connecting' : ''}</button>`;
     };
     const tabs = [
       ['answer', 'Answer'],
@@ -386,14 +385,14 @@
           <div class="live-bar">
             <span class="dot ${running ? 'danger live' : 'off'}"></span>
             <span class="mono" style="font-size:12px" id="liveClock">${since}</span>
-            <span class="small faint truncate">${running ? (S.overlayStatus.mode === 'demo' ? 'Practice' : 'Live') : L.ended ? 'Session ended' : 'Stopped'}</span>
+            <span class="small faint truncate">${running ? 'Live' : L.ended ? 'Session ended' : 'Stopped'}</span>
             ${running
               ? `<button type="button" class="btn sm danger ml-auto" data-action="stop-copilot">${icon('stop')}Stop</button>`
               : `<button type="button" class="btn sm primary ml-auto" data-action="start-copilot" data-agent="${esc(a ? a.id : '')}" ${a ? '' : 'disabled'}>${icon('play')}Start listening</button>`}
           </div>
           <div class="row wrap" style="padding:10px 16px 0;gap:6px">${src('outros', 'Interviewer', 'speaker')}${src('voce', 'You', 'microphone')}</div>
           <div class="row between" style="padding:12px 16px 4px"><span class="eyebrow">Live transcript</span><span class="eyebrow">${plural(L.transcript.length, 'turn', 'turns')}</span></div>
-          <div class="live-scroll" id="liveTranscript">${transcriptHtml()}</div>
+          <div class="live-scroll" id="liveTranscript" data-tour="live-transcript">${transcriptHtml()}</div>
           <div class="live-ctx">
             <div class="row between"><span class="eyebrow">Context</span>${a ? `<a class="small muted" data-action="go" data-to="session/${esc(a.id)}">Edit</a>` : ''}</div>
             ${a
@@ -406,15 +405,15 @@
         <div class="live-col">
           <div class="live-bar">
             <div class="segmented sm">${tabs.map(([id, label]) => `<button type="button" class="${S.ui.liveTab === id ? 'active' : ''}" data-action="live-tab" data-tab="${id}">${esc(label)}</button>`).join('')}</div>
-            <label class="row small muted ml-auto" style="cursor:pointer" title="Ctrl+Alt+M no HUD">${C.sw(`data-change="live-mode" ${running ? '' : 'disabled'}`, L.transcriptionOnly, !running)}Transcription only</label>
+            <label class="row small muted ml-auto" style="cursor:pointer" title="Ctrl+Alt+M in the HUD">${C.sw(`data-change="live-mode" ${running ? '' : 'disabled'}`, L.transcriptionOnly, !running)}Transcription only</label>
             <span class="row" style="gap:2px" id="liveAnswerNav">${answerNavHtml()}</span>
           </div>
-          <div class="answer-pane" id="liveAnswer">${answerHtml()}</div>
+          <div class="answer-pane" id="liveAnswer" data-tour="live-answer">${answerHtml()}</div>
           ${S.ui.liveTab === 'answer' ? '' : ''}
           <div class="live-foot" id="liveFoot">${footHtml()}</div>
           <div class="chat-row">
             <input class="input" id="liveChat" placeholder="${running ? 'Ask the copilot (e.g. how do I explain this project?)' : 'Start the copilot to chat'}" ${running ? '' : 'disabled'} data-input="noop"/>
-            <button type="button" class="btn primary" data-action="live-chat" ${running ? '' : 'disabled'}>${icon('send')}Enviar</button>
+            <button type="button" class="btn primary" data-action="live-chat" ${running ? '' : 'disabled'}>${icon('send')}Send</button>
           </div>
           <div id="liveNotices" hidden></div>
         </div>

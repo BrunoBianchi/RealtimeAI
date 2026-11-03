@@ -470,11 +470,15 @@ html[data-theme='light'] ::-webkit-scrollbar-thumb {
   overflow: hidden;
 }
 
+/* Breadcrumb | search (centred, like the page) | actions. */
 .topbar {
-  display: flex;
+  display: grid;
+  /* Side columns never shrink below their content, so a narrow window
+     squeezes the search instead of overlapping the buttons. */
+  grid-template-columns: minmax(auto, 1fr) minmax(0, 440px) minmax(auto, 1fr);
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px 10px 32px;
+  gap: 16px;
+  padding: 10px 12px 10px clamp(20px, 2.5vw, 32px);
   border-bottom: 1px solid var(--border-subtle);
   -webkit-app-region: drag;
   min-height: 53px;
@@ -502,14 +506,13 @@ html[data-theme='light'] ::-webkit-scrollbar-thumb {
 }
 
 .search-trigger {
+  grid-column: 2;
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 1;
+  width: 100%;
   min-width: 0;
-  max-width: 380px;
-  margin-left: 24px;
-  padding: 6px 10px;
+  padding: 7px 12px;
   border-radius: var(--radius);
   background: var(--surface-raised);
   border: 1px solid var(--border-muted);
@@ -540,7 +543,8 @@ html[data-theme='light'] ::-webkit-scrollbar-thumb {
 }
 
 .topbar-actions {
-  margin-left: auto;
+  grid-column: 3;
+  justify-self: end;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -581,12 +585,15 @@ html[data-theme='light'] ::-webkit-scrollbar-thumb {
   overflow-x: hidden;
 }
 
+/* Pages sit centred in the content area, with side margins that grow with the
+   window, so wide screens don't leave all the empty space on the right. */
 .page {
-  padding: 32px 32px 56px;
+  padding: 40px clamp(24px, 4vw, 56px) 72px;
+  margin-inline: auto;
   display: flex;
   flex-direction: column;
-  gap: 32px;
-  max-width: 1200px;
+  gap: 28px;
+  max-width: 1240px;
   width: 100%;
   animation: rise 0.18s ease-out;
 }
@@ -803,10 +810,10 @@ html[data-theme='light'] ::-webkit-scrollbar-thumb {
   border-radius: var(--radius-lg);
   background: var(--surface-card);
   border: 1px solid var(--border-subtle);
-  padding: 20px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   min-width: 0;
 }
 
@@ -833,7 +840,9 @@ html[data-theme='light'] ::-webkit-scrollbar-thumb {
 }
 
 .card-head .s {
+  margin-top: 2px;
   font-size: 12px;
+  line-height: 1.5;
   color: var(--text-tertiary);
 }
 
@@ -2420,14 +2429,14 @@ button.status-chip:hover {
 /* ------------------------------------------------------------- settings -- */
 .settings-layout {
   display: grid;
-  grid-template-columns: 200px minmax(0, 1fr);
-  gap: 32px;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 48px;
   align-items: start;
 }
 
 .settings-nav {
   position: sticky;
-  top: 0;
+  top: 24px;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -2436,16 +2445,17 @@ button.status-chip:hover {
 .settings-section {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
   min-width: 0;
+  max-width: 880px;
 }
 
 .set-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(200px, 300px);
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+  gap: 32px;
   align-items: center;
-  padding: 14px 0;
+  padding: 16px 0;
   border-top: 1px solid var(--border-subtle);
 }
 
@@ -2695,12 +2705,13 @@ button.status-chip:hover {
 .banner {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: 14px;
+  padding: 14px 18px;
   border-radius: var(--radius-lg);
   border: 1px solid var(--accent-border);
   background: var(--accent-soft);
   font-size: 13px;
+  line-height: 1.5;
 }
 
 .banner.warn {
@@ -2763,13 +2774,35 @@ button.status-chip:hover {
   .live-grid {
     grid-template-columns: 1fr;
   }
+  /* Keep the side menu next to the content; just narrower. */
+  .settings-layout {
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 28px;
+  }
+  .set-row {
+    grid-template-columns: minmax(0, 1fr) minmax(180px, 260px);
+    gap: 20px;
+  }
+  .search-trigger .kbd {
+    display: none;
+  }
+}
+
+/* Narrow windows: the settings menu becomes a scrolling row of tabs. */
+@media (max-width: 860px) {
   .settings-layout {
     grid-template-columns: 1fr;
+    gap: 20px;
   }
   .settings-nav {
     position: static;
     flex-direction: row;
-    flex-wrap: wrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .settings-nav .nav-item {
+    width: auto;
+    flex: none;
   }
 }
 
@@ -3268,3 +3301,70 @@ table.compare td.strong {
   color: var(--accent);
   font-weight: 600;
 }
+
+/* Guided tour (tour.js on driver.js): the popover in the app's own tokens. */
+.driver-popover.cue-tour {
+  background: var(--surface-overlay);
+  color: var(--text-body);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-pop);
+  font-family: var(--font-sans);
+  padding: 18px 18px 14px;
+  max-width: 340px;
+  min-width: 260px;
+}
+.driver-popover.cue-tour .driver-popover-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-strong);
+  line-height: 1.35;
+}
+.driver-popover.cue-tour .driver-popover-description {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  margin-top: 6px;
+}
+.driver-popover.cue-tour .driver-popover-footer {
+  margin-top: 16px;
+  align-items: center;
+}
+.driver-popover.cue-tour .driver-popover-progress-text {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.driver-popover.cue-tour .driver-popover-footer button {
+  font: 500 12.5px var(--font-sans);
+  text-shadow: none;
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  border: 1px solid var(--border-muted);
+  background: var(--surface-raised);
+  color: var(--text);
+}
+.driver-popover.cue-tour .driver-popover-footer button:hover {
+  background: var(--surface-active);
+}
+.driver-popover.cue-tour .driver-popover-next-btn {
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+  border-color: transparent;
+}
+.driver-popover.cue-tour .driver-popover-next-btn:hover {
+  background: var(--btn-primary-hover);
+}
+.driver-popover.cue-tour .driver-popover-btn-disabled {
+  opacity: 0.4;
+}
+.driver-popover.cue-tour .driver-popover-close-btn {
+  color: var(--text-faint);
+}
+.driver-popover.cue-tour .driver-popover-close-btn:hover {
+  color: var(--text);
+}
+.driver-popover.cue-tour .driver-popover-arrow-side-left.driver-popover-arrow { border-left-color: var(--surface-overlay); }
+.driver-popover.cue-tour .driver-popover-arrow-side-right.driver-popover-arrow { border-right-color: var(--surface-overlay); }
+.driver-popover.cue-tour .driver-popover-arrow-side-top.driver-popover-arrow { border-top-color: var(--surface-overlay); }
+.driver-popover.cue-tour .driver-popover-arrow-side-bottom.driver-popover-arrow { border-bottom-color: var(--surface-overlay); }

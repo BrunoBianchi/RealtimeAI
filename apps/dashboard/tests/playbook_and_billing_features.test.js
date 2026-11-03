@@ -43,8 +43,8 @@ test('Feature: Library (Arquivos) lists every file with its session, type and st
   assert.ok(tags(html, { 'data-action': 'files-pick' }).length === 1 && html.includes('id="filesDrop"'), 'drop zone / picker');
   assert.deepStrictEqual(tags(html, { 'data-change': 'files-target' }).length, 1, 'choose the session new files go to');
   assert.ok(/data-to="session\/a2"[^>]*>Stone · SRE</.test(html), 'each file links to its session');
-  assert.strictEqual((html.match(/>Indexado</g) || []).length, 2);
-  assert.strictEqual((html.match(/>Sem texto</g) || []).length, 1, 'a scan with no readable text is flagged');
+  assert.strictEqual((html.match(/>Indexed</g) || []).length, 2);
+  assert.strictEqual((html.match(/>No text</g) || []).length, 1, 'a scan with no readable text is flagged');
   assert.ok(/data-change="doc-tag"[^>]*data-agent="a1" data-idx="0">[\s\S]*?<option value="resume" selected>/.test(html), 'type is editable');
 
   // Search filters by name, session or type.

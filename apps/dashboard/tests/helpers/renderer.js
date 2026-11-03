@@ -64,6 +64,7 @@ function stubElement() {
     blur() {},
     scrollIntoView() {},
     setAttribute() {},
+    removeAttribute() {},
     getAttribute: () => null,
     closest: () => null
   };
@@ -115,6 +116,7 @@ const SIGNED_IN = { signedIn: true, available: true };
 //   page(id)     the element with that id in index.html (null if none)
 //   boot()       runs the DOMContentLoaded handlers (subscriptions, routing)
 //   dispatch()   sends a document event to the delegated listeners
+//   window       the page's global (to install fakes such as window.driver)
 function loadRenderer({ api = {}, state = {}, prefersLight = false } = {}) {
   const calls = [];
   const layers = [];
@@ -201,6 +203,7 @@ function loadRenderer({ api = {}, state = {}, prefersLight = false } = {}) {
     page,
     document,
     location,
+    window: ctx,
     boot: () => Promise.all((winListeners.DOMContentLoaded || []).map((fn) => fn())),
     dispatch: (type, event) => (docListeners[type] || []).forEach((fn) => fn(event))
   };

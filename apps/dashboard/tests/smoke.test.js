@@ -2,8 +2,9 @@ const test = require('node:test');
 const assert = require('node:assert');
 const { loadRenderer, indexHtml, el } = require('./helpers/renderer');
 
-test('Task 10.1: Go Live, demo and window controls are wired (Requirements: 6.1, 6.2)', async () => {
-  // Go Live in the top bar opens the live view; a session starts live or as a demo.
+test('Task 10.1: Go Live and window controls are wired (Requirements: 6.1, 6.2)', async () => {
+  // Go Live in the top bar opens the live view; a session always starts live
+  // (the scripted demo is a developer tool, never started from the app).
   assert.ok(/id="btnGoLive"[^>]*data-action="go"[^>]*data-to="live"/.test(indexHtml));
   const agent = { id: 'a1', company: 'Nubank', role: 'Backend' };
   const r = loadRenderer({
@@ -13,7 +14,7 @@ test('Task 10.1: Go Live, demo and window controls are wired (Requirements: 6.1,
   await r.boot();
   await r.Cue.actions['start-copilot'](el({ agent: 'a1', demo: '1' }));
   const [[start]] = r.called('startOverlay');
-  assert.strictEqual(start.demo, true, 'Simular starts the scripted demo');
+  assert.strictEqual(start.demo, undefined, 'never the scripted demo, even if asked');
   assert.strictEqual(r.S.route.view, 'live', 'starting jumps to the live view');
 
   // Frameless window: the three controls in the top bar go to the main process.

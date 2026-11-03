@@ -60,11 +60,37 @@
     return `<input class="input sm" style="width:${width || 260}px" type="text" value="${esc(value)}" placeholder="${esc(placeholder || '')}" data-change="cfg" data-key="${key}" data-type="text" data-label="${esc(label)}"/>`;
   }
 
+  // data-card: a stable anchor for the guided tour (tour.js), from the English title.
+  const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   function card(title, sub, body, right) {
-    return `<section class="card"><div class="card-head"><div class="stack" style="gap:0"><span class="t">${title}</span>${sub ? `<span class="s">${sub}</span>` : ''}</div>${right || ''}</div><div>${body}</div></section>`;
+    return `<section class="card" data-card="${slug(title)}"><div class="card-head"><div class="stack" style="gap:0"><span class="t">${title}</span>${sub ? `<span class="s">${sub}</span>` : ''}</div>${right || ''}</div><div>${body}</div></section>`;
   }
 
   // ----------------------------------------------------------- sections --
+  // Interface language: Automatic follows the Windows display language
+  // (resolved in main/ui_locale.js). Language names are shown in their own
+  // language, so the list is never translated.
+  const LANGUAGE_NAMES = { en: 'English', 'pt-BR': 'Português (Brasil)' };
+
+  function languageName(tag) {
+    if (LANGUAGE_NAMES[tag]) return LANGUAGE_NAMES[tag];
+    try {
+      return new Intl.DisplayNames([tag], { type: 'language' }).of(tag) || tag;
+    } catch (_e) {
+      return tag;
+    }
+  }
+
+  function languageRow() {
+    const lang = S.lang || {};
+    const value = (S.config && S.config.ui_language) || 'auto';
+    const windows = (lang.systemLanguages || [])[0];
+    const auto = `${C.t('Automatic')}${windows ? ` · Windows: ${languageName(windows)}` : ''}`;
+    const list = [['auto', auto], ...(lang.supported || ['en']).map((l) => [l, languageName(l)])];
+    return `<div class="txt"><span class="t">Language</span><span class="s">Automatic uses the Windows display language. Answers keep their own language setting in AI and models.</span></div>
+      <div class="ctl" data-no-i18n><select class="select sm" data-change="cfg" data-key="ui_language" data-type="text" data-label="${esc(C.t('Language'))}">${C.opts(list, value)}</select></div>`;
+  }
+
   function general() {
     const p = S.profile || {};
     const pref = (S.themeState && S.themeState.preference) || 'dark';
@@ -85,7 +111,8 @@
       ${card('Appearance', '',
         `<div class="option-cards">${[['dark', 'Dark', 'moon'], ['light', 'Light', 'sun'], ['system', 'System', 'monitor']]
           .map(([v, l, ic]) => `<button type="button" class="option-card ${pref === v ? 'active' : ''}" aria-pressed="${pref === v}" data-action="set-theme" data-theme="${v}"><span class="t">${icon(ic)}${l}</span><span class="s">${v === 'system' ? 'Follows Windows' : `${l} theme`}</span></button>`)
-          .join('')}</div>`)}
+          .join('')}</div>
+         <div class="set-row" style="margin-top:8px">${languageRow()}</div>`)}
       ${card('Meeting detection', esc(meetingStatus),
         `${row('Alert when a meeting starts', 'A popup offers to start the copilot with the right session.', m ? C.sw('data-change="meeting" data-field="enabled"', m.enabled, !m.supported) : '')}
          ${row('Keep in the tray when closed', 'Cue keeps watching for meetings with the window closed.', m ? C.sw('data-change="meeting" data-field="keepInTray"', m.keepInTray, !m.enabled) : '')}
@@ -93,7 +120,10 @@
          ${row('Test the alert', 'Shows the popup as if a meeting had started.', '<button type="button" class="btn sm" data-action="meeting-test">Show popup</button>')}`)}
       ${card('Local data', 'Everything stays on this machine: sessions, files and settings',
         `${row('Record sessions', 'Saves the transcript and answers as Markdown and JSONL when stopping.', cfgSwitch('save_sessions', 'Record sessions', cfg.save_sessions !== false))}
-         ${row('Data folder', `<span class="mono" style="font-size:11px">${esc((cfg.configPath || '').replace(/[\\/][^\\/]+$/, '') || '%LOCALAPPDATA%\\RealTimeAI')}</span>`, '<button type="button" class="btn sm" data-action="open-path">Open folder</button>')}`)}`;
+         ${row('Data folder', `<span class="mono" style="font-size:11px">${esc((cfg.configPath || '').replace(/[\\/][^\\/]+$/, '') || '%LOCALAPPDATA%\\RealTimeAI')}</span>`, '<button type="button" class="btn sm" data-action="open-path">Open folder</button>')}`)}
+      ${card('Guided tour', 'Step-by-step popups that show how to set up and use each part of the app',
+        `${row('Set up the copilot', 'Keys, audio, privacy and the floating panel, one screen at a time.', `<button type="button" class="btn sm" data-action="start-setup-tour">${icon('play')}Start</button>`)}
+         ${row('Show every tour again', 'Each screen shows its tour again the next time it opens. The ? button in the top bar replays the current one.', '<button type="button" class="btn sm" data-action="tour-reset">Restart tours</button>')}`)}`;
   }
 
   // ----------------------------------------------------- cloud account --
@@ -260,7 +290,7 @@
       `${row('Width', 'In pixels.', cfgNumber('overlay_width', 'HUD width', cfg.overlay_width ?? 620, 360, 1400, 10))}
        ${row('Max height', 'Percentage of the screen height.', cfgNumber('overlay_max_height_pct', 'Max height', cfg.overlay_max_height_pct ?? 92, 30, 100, 1))}`)}
       ${card('Copilot', S.overlayStatus.running ? 'Running now' : 'Stopped',
-        `${row('Status', S.overlayStatus.running ? `${S.overlayStatus.mode === 'demo' ? 'Practice' : 'Live'} since ${C.fmtTime(new Date(S.overlayStatus.startedAt || Date.now()))}` : 'The HUD opens when you start a session.', S.overlayStatus.running ? '<button type="button" class="btn sm danger" data-action="stop-copilot">Stop</button>' : '<button type="button" class="btn sm" data-action="go" data-to="live">Go to Live</button>')}`)}`;
+        `${row('Status', S.overlayStatus.running ? `Live since ${C.fmtTime(new Date(S.overlayStatus.startedAt || Date.now()))}` : 'The HUD opens when you start a session.', S.overlayStatus.running ? '<button type="button" class="btn sm danger" data-action="stop-copilot">Stop</button>' : '<button type="button" class="btn sm" data-action="go" data-to="live">Go to Live</button>')}`)}`;
   }
 
   function calendar() {
@@ -327,11 +357,11 @@
     if (!ev || !ev.start) return '';
     if (ev.allDay) {
       const d = new Date(`${ev.start}T00:00:00`);
-      return `${d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })} · all day`;
+      return `${d.toLocaleDateString(C.state.lang.locale, { weekday: 'short', day: 'numeric', month: 'short' })} · all day`;
     }
     const d = new Date(ev.start);
     if (Number.isNaN(d.getTime())) return ev.start;
-    return d.toLocaleString('en-US', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleString(C.state.lang.locale, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   }
 
   const SHORTCUTS = [
@@ -404,7 +434,7 @@
       ['Google Calendar', '—', '—', 'Included']
     ];
     return `
-      ${C.proAd('card', 'You are on local mode')}
+      ${C.proAd('card', 'You are in local mode')}
       ${card('Compare', 'Local mode is free and open source; PRO adds the cloud.',
         `<div style="overflow-x:auto"><table class="compare"><thead><tr><th></th><th>Local</th><th>Free</th><th>PRO</th></tr></thead><tbody>
           ${rows.map(([k, ...v]) => `<tr><th scope="row">${esc(k)}</th>${v.map((x, i) => `<td class="${i === 2 ? 'strong' : ''}">${esc(x)}</td>`).join('')}</tr>`).join('')}
@@ -470,7 +500,7 @@
           ${st.releaseNotes && ['available', 'downloading', 'downloaded'].includes(status) ? `<div class="inset" style="margin-bottom:14px"><span class="eyebrow">What's new</span><div class="md sm">${C.md(st.releaseNotes)}</div></div>` : ''}
           ${row('Channel', 'Beta gets new features first, with more risk.', `<div class="segmented">${[['stable', 'Stable'], ['beta', 'Beta']].map(([val, label]) => `<button type="button" class="${channel === val ? 'active' : ''}" data-action="update-channel" data-channel="${val}">${label}</button>`).join('')}</div>`)}
           ${row('Update automatically', 'Downloads in the background and installs on restart.', cfgSwitch('auto_update', 'Automatic updates', cfg.auto_update !== false))}`)}
-      ${card('Experimental features', esc(`Install ID ${String(flags.installId || '').slice(0, 8)} · last sync ${flags.lastFetch ? new Date(flags.lastFetch).toLocaleString('en-US') : 'never'}${flags.lastError ? ` · ${flags.lastError}` : ''}`),
+      ${card('Experimental features', esc(`Install ID ${String(flags.installId || '').slice(0, 8)} · last sync ${flags.lastFetch ? new Date(flags.lastFetch).toLocaleString(C.state.lang.locale) : 'never'}${flags.lastError ? ` · ${flags.lastError}` : ''}`),
         flagList.length
           ? flagList.map((f) => {
               const val = f.source === 'override' ? (f.enabled ? f.variant || 'on' : 'off') : 'default';
@@ -645,7 +675,7 @@
     } else {
       val = el.value.trim().replace(/[\r\n]+/g, ' ');
     }
-    const msg = el.dataset.type === 'bool' ? `${label}: ${val ? 'ligado' : 'desligado'}.` : `${label} salvo.`;
+    const msg = el.dataset.type === 'bool' ? `${label}: ${val ? 'on' : 'off'}.` : `${label} saved.`;
     await C.saveConfig({ [key]: val }, msg);
     if (['model', 'save_sessions', 'auto_update'].includes(key)) C.refresh();
   };

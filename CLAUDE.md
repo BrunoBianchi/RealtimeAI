@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-RealTimeAI is a Windows real-time interview/meeting copilot: a native C++20 engine with a Direct2D HUD (`src/`) plus an Electron dashboard (`apps/dashboard/`). User-facing strings (dashboard, HUD, engine notices and errors) are in English; keep new ones in English. LLM prompts, Portuguese question/filler detection, speaker tags ("Você"/"Outros"), config.ini keys and the demo script stay in Portuguese on purpose.
+RealTimeAI is a Windows real-time interview/meeting copilot: a native C++20 engine with a Direct2D HUD (`src/`) plus an Electron dashboard (`apps/dashboard/`). User-facing strings (dashboard, HUD, engine notices and errors) are in English; keep new ones in English. LLM prompts, Portuguese question/filler detection, speaker tags ("Você"/"Outros") and config.ini keys stay in Portuguese on purpose.
 
 ## Commands
 
@@ -20,7 +20,7 @@ Root (`package.json`):
 | `npm run build:css` | rebuild `apps/dashboard/src/renderer/styles.css` |
 | `npm run check:secrets` / `npm run flags:validate` | secret scan / validate `apps/dashboard/flags.json` |
 
-Windows helper scripts (`scripts/windows/`): `setup-dev.bat` (once), `dev.bat` (incremental native build + dashboard from source; `--skip` to skip rebuild), `build.bat`, `package.bat` (NSIS installer into `dist/`), `run-demo.bat` (HUD with a scripted conversation, no API keys).
+Windows helper scripts (`scripts/windows/`): `setup-dev.bat` (once), `dev.bat` (incremental native build + dashboard from source; `--skip` to skip rebuild), `build.bat`, `package.bat` (NSIS installer into `dist/`).
 
 CMake presets: `windows-release` (default, hybrid RAG with ONNX), `windows-debug`, `windows-lean` (no ONNX Runtime), `linux` and `linux-tsan` (core library + tests only; `rtai_core` has no `<windows.h>`).
 
@@ -48,7 +48,7 @@ Conventional Commits enforced by commitlint (husky `commit-msg` hook); release-p
 Everychange need to work with the smallest latency possible that the application is looking for, we need at least < 200 ms latency 
 
 ### Engine ↔ dashboard contract
-The dashboard spawns `rtai_app.exe --no-launcher --server [--agent <id>] [--demo]` and talks JSON lines:
+The dashboard spawns `rtai_app.exe --no-launcher --server [--agent <id>]` and talks JSON lines:
 - stdout (engine → UI): `hello`, `status`, `live`, `turn`, `answer_start/delta/done`, `notice`, `pause`, `level`, `mode`, `summary` (field `export`), `open_settings`, `bye`.
 - stdin (UI → engine): `answer`, `chat`, `recap`, `followup`, `pause`, `rate`, `clear_chat`, `set_mode`, `set_config`, `quit`.
 Both sides are defined in `src/core/include/rtai/server_protocol.hpp`; `apps/dashboard/src/main/main.js` (`launchOverlay`, `LIVE_EVENT_TYPES`, `sendOverlayCommand`) forwards events to the renderer as `rtai:live-event`. Change both ends together.
@@ -72,4 +72,7 @@ Both sides are defined in `src/core/include/rtai/server_protocol.hpp`; `apps/das
 - `src/preload/preload.js` — the only renderer API (`window.rtai`).
 - `src/renderer/` — no framework. `app.js` holds state (`Cue.state`), hash router (`#/home`, `#/sessions[/past]`, `#/session/<id>`, `#/review/<sessionId>`, `#/files`, `#/questions`, `#/live`, `#/settings/<tab>`), shell rendering and event delegation (`data-action` / `data-change` / `data-input` → `Cue.actions/changes/inputs`). Views register on `window.Cue` from `views.js`, `live.js`, `settings.js`, `modals.js`; icons are inline SVG in `icons.js`. Views render from real data only; missing values show "—".
 - Window is frameless: the top bar is the drag region and hosts the `data-win` controls.
+- Interface language (i18n): English is the source text in the views; `renderer/i18n.js` translates rendered text nodes and `placeholder`/`title`/`aria-label` automatically (MutationObserver) from `renderer/locales/<locale>.js` (exact strings + `{placeholder}` templates; `{n}`/`{d}`/`{total}`/`{used}`/`{limit}` match numbers only). Use `Cue.t('In {n} days', { n })` for text built in code. User content (`textarea`, `pre`, `code`, `.md`, `[data-no-i18n]`) is never translated. The locale is `[sistema] idioma_interface` (`auto` = the Windows display language via `main/ui_locale.js`; dashboard-only, it never restarts the copilot). After adding UI text, run `npm run i18n:check` and add the Portuguese entry (the `tests/i18n.test.js` coverage test fails otherwise). New locale: a catalog file, a `<script>` in `index.html`, and `SUPPORTED` in `ui_locale.js`.
+- First run is empty: no starter goal, no sample data and no scripted demo: `rtai:start-overlay` always starts a real session, and test doubles (scripted LLM, fake transport/VAD, WAV source) live only in `tests/support/` (`rtai::test_support`), which `rtai_app` does not link. Never add placeholder or invented content; views show "—" or an empty state.
+- Guided tours: `renderer/tour.js` on driver.js (vendored in `renderer/vendor/driver/`, same version as `package.json`; copy `node_modules/driver.js/dist/driver.js.iife.js` + `driver.css` when upgrading). Steps point at `[data-tour]` anchors in the views and `[data-card]` (slug of the English title) on settings cards; `welcome` runs on the first unlocked visit, each page's tour on its first visit, progress in `dashboard_profile.json` `tours_seen`. New UI worth explaining gets a step; `tests/first_run_and_tour.test.js` checks every anchor exists, and tour text goes through the i18n catalogs like any other string.
 - Tests in `apps/dashboard/tests/` mix main-process logic tests with tests that grep the renderer source for specific IDs/strings; after renderer changes, update the latter rather than reintroducing old markup.

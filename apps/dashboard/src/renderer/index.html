@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cue — Interview Copilot</title>
     <link rel="icon" type="image/png" href="../../assets/icon.png" />
+    <link rel="stylesheet" href="vendor/driver/driver.css" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -47,6 +48,7 @@
           </button>
           <div class="topbar-actions">
             <button type="button" class="btn raised" id="btnUpdateChip" data-action="go" data-to="settings/updates" hidden></button>
+            <button type="button" class="btn raised icon-only" id="btnTour" data-action="start-tour" title="Guided tour of this screen"><span data-icon="question"></span></button>
             <button type="button" class="btn raised" id="btnStealthChip" data-action="toggle-stealth" title="Hide the panel from recordings and screen sharing (Ctrl+Alt+S)"></button>
             <button type="button" class="btn raised" id="btnGoLive" data-action="go" data-to="live"></button>
             <div class="win-controls">
@@ -66,6 +68,8 @@
     <div id="modalRoot"></div>
     <div class="toasts" id="toasts" aria-live="polite"></div>
 
+    <script src="i18n.js"></script>
+    <script src="locales/pt-BR.js"></script>
     <script src="icons.js"></script>
     <script src="app.js"></script>
     <script src="views.js"></script>
@@ -73,5 +77,7 @@
     <script src="settings.js"></script>
     <script src="modals.js"></script>
     <script src="auth.js"></script>
+    <script src="vendor/driver/driver.iife.js"></script>
+    <script src="tour.js"></script>
   </body>
 </html>

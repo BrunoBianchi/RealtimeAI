@@ -27,6 +27,7 @@
     "check:secrets": "node scripts/check-secrets.mjs --all",
     "check:staged": "node scripts/check-secrets.mjs --staged",
     "flags:validate": "node scripts/validate-flags.mjs",
+    "i18n:check": "node scripts/i18n-check.mjs",
     "version:next": "node scripts/version.mjs --json --pre beta",
     "version:notes": "node scripts/version.mjs notes",
     "commitlint": "commitlint --edit"

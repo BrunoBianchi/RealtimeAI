@@ -64,14 +64,14 @@
         <span>${icon('bell')}${esc(reminder)}</span>
       </div>
       <div class="meter-row">
-        <div class="lbl small"><span class="faint">Preparo</span><span class="num" style="color:var(--text)">${r.pct}%</span></div>
+        <div class="lbl small"><span class="faint">Prep</span><span class="num" style="color:var(--text)">${r.pct}%</span></div>
         ${pctBar(r.pct)}
       </div>
       <div class="cal-actions">
         ${today
           ? `<button type="button" class="btn primary flex1" data-action="start-copilot" data-agent="${esc(a.id)}">${icon('video')}Join the room</button>`
-          : `<button type="button" class="btn flex1" data-action="start-copilot" data-agent="${esc(a.id)}" data-demo="1">${icon('play')}Practice</button>`}
-        <button type="button" class="btn flex1" data-action="go" data-to="session/${esc(a.id)}">${icon('folder')}Contexto</button>
+          : ''}
+        <button type="button" class="btn flex1" data-action="go" data-to="session/${esc(a.id)}">${icon('folder')}Context</button>
       </div>
     </div>`;
   }
@@ -195,7 +195,7 @@
       : '';
 
     const liveBanner = running
-      ? `<div class="banner">${icon('broadcast')}<span class="grow">Copilot ${S.overlayStatus.mode === 'demo' ? 'in practice' : 'live'}${C.agentById(S.overlayStatus.agentId) ? ` · ${esc(C.agentTitle(C.agentById(S.overlayStatus.agentId)))}` : ''}</span><button type="button" class="btn sm" data-action="go" data-to="live">Open live panel</button><button type="button" class="btn sm danger" data-action="stop-copilot">${icon('stop')}Stop</button></div>`
+      ? `<div class="banner">${icon('broadcast')}<span class="grow">Copilot live${C.agentById(S.overlayStatus.agentId) ? ` · ${esc(C.agentTitle(C.agentById(S.overlayStatus.agentId)))}` : ''}</span><button type="button" class="btn sm" data-action="go" data-to="live">Open live panel</button><button type="button" class="btn sm danger" data-action="stop-copilot">${icon('stop')}Stop</button></div>`
       : '';
 
     return `<div class="page">
@@ -208,7 +208,7 @@
       )}
       ${liveBanner}${setupBanner}${C.proAd('card', 'Get more with Cue PRO')}
 
-      <section class="card" style="gap:16px">
+      <section class="card" data-tour="home-upcoming" style="gap:16px">
         <div class="row top" style="gap:12px">
           <span class="icon-tile">${icon('calendar')}</span>
           <div class="stack gap-4 grow" style="gap:0"><span class="h2">Upcoming interviews</span><span class="small faint">${gconn ? `Synced with Google Calendar${S.gcal.status.email ? ` · ${esc(S.gcal.status.email)}` : ''}` : 'Dates set in your sessions'}</span></div>
@@ -239,18 +239,18 @@
           <div class="stack gap-4"><span class="metric">${u.usedMin}<span class="unit"> ${u.limit ? `/ ${u.limit} min` : 'min'}</span></span><span class="muted" style="font-size:13px">Transcribed in ${esc(u.monthLabel)}</span></div>
           ${u.limit ? pctBar(u.pct) : ''}
           <div class="kv"><div><span class="k">Sessions</span><span class="v">${u.sessions}</span></div><div><span class="k">Questions</span><span class="v">${u.questions}</span></div></div>
-          <div class="card-foot"><span>${u.limit ? `Renews on ${esc(u.renewLabel)}` : `${esc(u.monthLabel)} cycle`}</span><span style="color:var(--text-secondary)">${u.limit ? `${u.left} min left` : `${u.answers} answers`}</span></div>
+          <div class="card-foot"><span>${u.limit ? (u.renewLabel ? `Renews on ${esc(u.renewLabel)}` : 'Does not renew') : `${esc(u.monthLabel)} cycle`}</span><span style="color:var(--text-secondary)">${u.limit ? `${u.left} min left` : `${u.answers} answers`}</span></div>
         </div>
       </section>
 
       <section class="stack gap-16">
-        <div class="card tight">
+        <div class="card tight" data-tour="home-sessions">
           <div class="card-head"><div class="stack gap-4" style="gap:0"><span class="t">Sessions in preparation</span><span class="s">Context the copilot uses live</span></div><a class="small muted nowrap" data-action="go" data-to="sessions">View all (${agents.length})</a></div>
           ${prep.length
             ? prep
                 .map(({ a, r }) => `<button type="button" class="list-row" data-action="go" data-to="session/${esc(a.id)}">
                   ${monoTile(C.agentCompany(a) || a.name, companyLogo(C.agentCompany(a)))}
-                  <span class="stack grow" style="gap:0"><span class="truncate" style="font-size:13.5px;font-weight:500">${esc(C.agentTitle(a))}</span><span class="small faint">${plural((a.documents || []).length, 'documento vinculado', 'documentos vinculados')}</span></span>
+                  <span class="stack grow" style="gap:0"><span class="truncate" style="font-size:13.5px;font-weight:500">${esc(C.agentTitle(a))}</span><span class="small faint">${plural((a.documents || []).length, 'linked document', 'linked documents')}</span></span>
                   ${pctBar(r.pct, 'w96')}
                   <span class="num" style="color:var(--text-secondary);width:34px;text-align:right">${r.pct}%</span>
                   ${icon('caret-right', 'faint')}
@@ -334,7 +334,7 @@
       });
     const cols = 'grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) 130px 190px';
     return `<div class="card flush">
-      <div class="table-head" style="${cols}"><span>Vaga</span><span>Formato</span><span>Data</span><span>Preparo</span><span></span></div>
+      <div class="table-head" style="${cols}"><span>Role</span><span>Format</span><span>Date</span><span>Prep</span><span></span></div>
       ${sorted
         .map(({ a, iv, r }) => `<div class="table-row clickable" style="${cols}" data-action="go" data-to="session/${esc(a.id)}">
           <div class="row" style="gap:12px;min-width:0">${monoTile(C.agentCompany(a) || a.name, companyLogo(C.agentCompany(a)))}<div class="stack" style="gap:1px;min-width:0"><span class="strong truncate">${esc(C.agentRole(a) || a.name)}${a.archived ? ' <span class="tag">Archived</span>' : ''}</span><span class="truncate faint" style="font-size:12.5px">${esc(C.agentCompany(a) || '—')} · ${plural((a.documents || []).length, 'file', 'files')}</span></div></div>
@@ -342,7 +342,6 @@
           <span class="mono" style="font-size:12px;color:var(--text-secondary)">${iv ? `${esc(C.fmtDateShort(iv.at))}${iv.hasTime ? ` · ${esc(iv.time)}` : ''}${iv.days < 0 ? ' <span class="faint">(passou)</span>' : ''}` : '—'}</span>
           <div class="row">${pctBar(r.pct, 'neutral grow')}<span class="num" style="color:var(--text-secondary);width:32px;text-align:right">${r.pct}%</span></div>
           <div class="row" style="justify-content:flex-end">
-            <button type="button" class="btn sm" data-action="start-copilot" data-agent="${esc(a.id)}" data-demo="1" data-stop="1" title="Practice with training questions">${icon('robot')}Practice</button>
             <button type="button" class="btn sm" data-action="start-copilot" data-agent="${esc(a.id)}" data-stop="1">${icon('play')}Start</button>
           </div>
         </div>`)
@@ -398,14 +397,13 @@
             <div class="cal-meta" style="font-size:12.5px">
               <span>${icon('calendar')}<span class="mono" style="font-size:12px">${iv ? `${esc(C.fmtDateShort(iv.at))}${iv.hasTime ? ` · ${esc(iv.time)}` : ''} · ${esc(C.relDays(iv.days).toLowerCase())}` : 'No date'}</span></span>
               <span>${icon('users')}${esc(formatOf(a))}</span>
-              <span>${icon('flag')}${esc(fixText(a.stage || 'Active') === 'Active' ? 'Em andamento' : fixText(a.stage))}</span>
+              <span>${icon('flag')}${esc(fixText(a.stage || 'Active') === 'Active' ? 'In progress' : fixText(a.stage))}</span>
             </div>
           </div>
         </div>
-        <div class="row wrap">
+        <div class="row wrap" data-tour="session-actions">
           <button type="button" class="btn" data-action="edit-session" data-agent="${esc(a.id)}">${icon('pencil')}Edit</button>
           <button type="button" class="btn" data-action="open-scheduler" data-agent="${esc(a.id)}">${icon('calendar')}${iv ? 'Reschedule' : 'Schedule'}</button>
-          <button type="button" class="btn" data-action="start-copilot" data-agent="${esc(a.id)}" data-demo="1">${icon('robot')}Practice</button>
           ${running
             ? `<button type="button" class="btn live" data-action="go" data-to="live">${icon('broadcast')}Live now</button>`
             : `<button type="button" class="btn primary" data-action="start-copilot" data-agent="${esc(a.id)}">${icon('play')}Go live</button>`}
@@ -413,14 +411,14 @@
       </section>
 
       <section class="grid-2">
-        <div class="card">
-          <div class="row between"><span class="eyebrow">Preparo</span><span class="num" style="color:var(--text)">${r.pct}%</span></div>
+        <div class="card" data-tour="session-prep">
+          <div class="row between"><span class="eyebrow">Prep</span><span class="num" style="color:var(--text)">${r.pct}%</span></div>
           ${pctBar(r.pct, 'thick')}
           <div class="checklist">${r.items
             .map((i) => `<div class="check-item ${i.done ? 'done' : ''}"><span class="mark">${icon('check')}</span><span class="label grow">${esc(i.label)}</span><span class="num">+${i.w}</span></div>`)
             .join('')}</div>
         </div>
-        <div class="card">
+        <div class="card" data-tour="session-answers">
           <div class="row between"><span class="eyebrow">Copilot answers</span>${a.playbook_name ? `<span class="pill">${esc(fixText(a.playbook_name))}</span>` : ''}</div>
           <label class="field">Playbook (answer structure and length)
             <div class="row"><select class="select" data-change="agent-playbook" data-agent="${esc(a.id)}">${C.opts(pbNames.map((n) => [n, fixText(n)]), a.playbook_name || 'Standard STAR')}</select><button type="button" class="btn icon-only" data-action="new-playbook" data-agent="${esc(a.id)}" title="New playbook">${icon('plus')}</button></div>
@@ -433,7 +431,7 @@
         </div>
       </section>
 
-      <section class="card">
+      <section class="card" data-tour="session-context">
         <div class="card-head"><div class="stack" style="gap:0"><span class="t">Job context</span><span class="s">The copilot reads this before every answer</span></div><button type="button" class="btn sm" data-action="save-context" data-agent="${esc(a.id)}">${icon('check')}Save context</button></div>
         <label class="field">Job description<textarea class="textarea" id="ctxJob" rows="6" placeholder="Paste the job description here">${esc(fixText(a.job_description || ''))}</textarea></label>
         <label class="field"><span class="row between">Company research<button type="button" class="link-btn" data-action="company-recon" data-agent="${esc(a.id)}">${icon('sparkle')}Research automatically</button></span><textarea class="textarea" id="ctxResearch" rows="6" placeholder="Product, culture, recent news, stack…">${esc(research)}</textarea></label>
@@ -441,7 +439,7 @@
       </section>
 
       <section class="grid-2">
-        <div class="card tight">
+        <div class="card tight" data-tour="session-files">
           <div class="card-head"><div class="stack" style="gap:0"><span class="t">Linked files</span><span class="s">${plural(docs.length, 'file', 'files')} in this session context</span></div>
             <div class="row"><button type="button" class="btn sm" data-action="paste-doc" data-agent="${esc(a.id)}">${icon('note')}Paste text</button><button type="button" class="btn sm" data-action="add-docs" data-agent="${esc(a.id)}" data-tag="material">${icon('upload')}Add</button></div></div>
           ${!docs.some((d) => C.docTag(d) === 'resume') ? `<button type="button" class="dropzone" data-action="add-docs" data-agent="${esc(a.id)}" data-tag="resume" style="padding:20px">${icon('file-text')}<span style="font-size:13px">Attach your resume</span><span class="num">It is the main source for the answers</span></button>` : ''}
@@ -453,7 +451,7 @@
                 .join('')
             : ''}
         </div>
-        <div class="card tight">
+        <div class="card tight" data-tour="session-memory">
           <div class="card-head"><div class="stack" style="gap:0"><span class="t">Copilot memory</span><span class="s">Learnings from the debriefs for this job</span></div></div>
           ${a.next_focus ? `<div class="inset"><span class="eyebrow">Next focus</span><span style="font-size:13px">${esc(fixText(a.next_focus).replace(/^Focus on:\s*/i, ''))}</span></div>` : ''}
           ${(mem.strengths || []).length || (mem.improve || []).length
@@ -476,7 +474,7 @@
       </section>
 
       <section class="row wrap" style="justify-content:flex-end">
-        <button type="button" class="btn" data-action="archive-session" data-agent="${esc(a.id)}">${icon('tray')}${a.archived ? 'Desarquivar' : 'Arquivar'}</button>
+        <button type="button" class="btn" data-action="archive-session" data-agent="${esc(a.id)}">${icon('tray')}${a.archived ? 'Unarchive' : 'Archive'}</button>
         <button type="button" class="btn danger" data-action="delete-session" data-agent="${esc(a.id)}">${icon('trash')}Delete session</button>
       </section>
     </div>`;
@@ -904,7 +902,6 @@
         <div class="row wrap">
           <button type="button" class="btn" data-action="open-path" data-path="${esc(s.fullPath || '')}">${icon('download')}Open file</button>
           ${agent ? `<button type="button" class="btn" data-action="gen-debrief" data-session="${esc(s.id)}" data-agent="${esc(agent.id)}">${icon('sparkle')}Save debrief</button>` : ''}
-          ${agent ? `<button type="button" class="btn primary" data-action="start-copilot" data-agent="${esc(agent.id)}" data-demo="1">${icon('refresh')}Practice again</button>` : ''}
         </div>
       </section>`;
 
@@ -996,7 +993,7 @@
       ${head('Files', 'Resume, job description and portfolio give the answers context.', `<button type="button" class="btn" data-action="paste-doc" data-agent="${esc(target ? target.id : '')}">${icon('note')}Paste text</button>`)}
       ${agents.length
         ? `<div class="row wrap"><span class="small muted">Link new files to</span><select class="select sm" style="width:auto;min-width:260px" data-change="files-target">${C.opts(agents.map((a) => [a.id, C.agentTitle(a)]), target ? target.id : '')}</select></div>
-           <button type="button" class="dropzone" id="filesDrop" data-action="files-pick">
+           <button type="button" class="dropzone" id="filesDrop" data-tour="files-drop" data-action="files-pick">
              ${icon('upload')}
              <span style="font-size:14px">Drag files or <u>choose from your computer</u></span>
              <span class="num">PDF · DOCX · TXT · MD · code</span>
@@ -1006,7 +1003,7 @@
         <div class="search-box">${icon('magnifying-glass')}<input type="text" placeholder="Search file or session" value="${esc(S.ui.filesQuery)}" data-input="files-query"/></div>
         <span class="num">${plural(rows.length, 'file', 'files')}</span>
       </div>
-      <div class="card flush" id="filesTable">
+      <div class="card flush" id="filesTable" data-tour="files-table">
         <div class="table-head" style="${cols}"><span></span><span>Name</span><span>Type</span><span>Session</span><span style="text-align:right">Size</span><span>Status</span><span></span></div>
         ${rows.length
           ? rows
@@ -1018,7 +1015,7 @@
                   <span><select class="select sm" data-change="doc-tag" data-agent="${esc(a.id)}" data-idx="${idx}">${C.opts(Object.entries(C.TAG_LABEL), C.docTag(d))}</select></span>
                   <a class="truncate small muted" data-action="go" data-to="session/${esc(a.id)}">${esc(C.agentTitle(a))}</a>
                   <span class="num" style="text-align:right">${esc(C.fmtKb((d.content || '').length))}</span>
-                  <span class="row small" style="gap:6px;color:${hasText ? 'var(--accent)' : 'var(--warning)'}"><span class="dot sm" style="background:currentColor"></span>${hasText ? 'Indexado' : 'Sem texto'}</span>
+                  <span class="row small" style="gap:6px;color:${hasText ? 'var(--accent)' : 'var(--warning)'}"><span class="dot sm" style="background:currentColor"></span>${hasText ? 'Indexed' : 'No text'}</span>
                   <span class="row" style="gap:2px;justify-content:flex-end"><button type="button" class="icon-btn" title="Preview" data-action="preview-doc" data-agent="${esc(a.id)}" data-idx="${idx}">${icon('eye')}</button><button type="button" class="icon-btn danger" title="Remove" data-action="remove-doc" data-agent="${esc(a.id)}" data-idx="${idx}">${icon('x')}</button></span>
                 </div>`;
               })
@@ -1130,7 +1127,7 @@
     return `<div class="page tight">
       ${head('Question bank', 'Questions interviewers asked in your recorded sessions, by company and topic.',
         `<span class="status-chip"><span class="mono" style="font-size:12px">${all.length}</span><span class="faint">questions</span></span><span class="status-chip"><span class="mono" style="font-size:12px">${companies.length}</span><span class="faint">companies</span></span><button type="button" class="btn" data-action="q-rebuild" ${rebuilding ? 'disabled' : ''} title="Reads all recorded sessions again">${rebuilding ? '<span class="spinner"></span>Rebuilding…' : `${icon('refresh')}Rebuild`}</button>`)}
-      <div class="banner ${share ? '' : 'warn'}">${icon('shield-check')}<span class="grow">${share ? 'At the end of each session, the interviewer questions are anonymized, validated and added here. Your answers never leave your computer.' : 'Question collection is off: new sessions do not feed the bank.'}</span>${C.sw('data-change="share-questions" aria-label="Collect questions"', share)}</div>
+      <div class="banner ${share ? '' : 'warn'}" data-tour="questions-source">${icon('shield-check')}<span class="grow">${share ? 'At the end of each session, the interviewer questions are anonymized, validated and added here. Your answers never leave your computer.' : 'Question collection is off: new sessions do not feed the bank.'}</span>${C.sw('data-change="share-questions" aria-label="Collect questions"', share)}</div>
       ${companies.length
         ? `<nav class="tabs">
             <button type="button" class="${coFilter === 'all' ? 'active' : ''}" data-action="q-company" data-id="all">All<span class="num">${all.length}</span></button>
@@ -1138,7 +1135,7 @@
               .map((c) => `<button type="button" class="${coFilter === c.id ? 'active' : ''}" data-action="q-company" data-id="${esc(c.id)}">${c.logo ? `<span class="mono-tile xs" style="padding:0;width:20px"><img src="${esc(c.logo)}" alt=""/></span>` : `<span class="mono-tile xs">${esc(c.monogram || C.monogram(c.name))}</span>`}${esc(fixText(c.name))}<span class="num">${(c.questions || []).length}</span></button>`)
               .join('')}
           </nav>
-          <section class="row wrap" style="gap:12px">
+          <section class="row wrap" style="gap:12px" data-tour="questions-filters">
             <div class="search-box">${icon('magnifying-glass')}<input type="text" placeholder="Search question or topic" value="${esc(S.ui.qQuery)}" data-input="q-query"/></div>
             <div class="row wrap" style="gap:4px">
               <button type="button" class="filter-chip ${S.ui.qCat === 'all' ? 'active' : ''}" data-action="q-cat" data-cat="all">All</button>
@@ -1275,6 +1272,6 @@
     }
     const match = S.agents.find((a) => x.companies.some((c) => C.norm(c.name) === C.norm(C.agentCompany(a)))) || C.activeAgent();
     S.ui.pendingChat = `Como eu responderia: "${text}"`;
-    await C.startCopilot(match, true);
+    await C.startCopilot(match);
   };
 })();
