@@ -51,6 +51,8 @@ function describeError(code, status) {
     case 'email_not_verified': return 'Confirm your e-mail with the link we sent, then sign in again.';
     case 'sso_not_configured': return 'SSO is not set up for this domain. Contact your company administrator.';
     case 'rate_limited': return 'Too many attempts. Wait a moment and try again.';
+    case 'signin_unavailable': return 'Google and SSO sign-in are not available yet. Sign in with e-mail and password.';
+    case 'billing_unavailable': return 'Upgrades are not available yet. Try again later.';
     default:
       if (status === 401) return 'Session expired: sign in to your account again.';
       if (status === 426) return 'App version too old: please update.';
