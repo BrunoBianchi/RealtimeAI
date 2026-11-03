@@ -206,7 +206,7 @@
          <button type="button" class="status-chip" data-action="go" data-to="settings/privacy">${icon('shield-check')}${cfg.save_sessions === false ? 'Not recording' : 'Local recording'}<span class="vsep">|</span><span class="sub">${stealthOn ? 'Hidden' : 'Visible'} in captures</span></button>`,
         true
       )}
-      ${liveBanner}${setupBanner}
+      ${liveBanner}${setupBanner}${C.proAd('card', 'Get more with Cue PRO')}
 
       <section class="card" style="gap:16px">
         <div class="row top" style="gap:12px">

@@ -47,6 +47,7 @@
 #include "rtai/cloud_client.hpp"
 #include "rtai/cloud_session.hpp"
 #include "rtai/deepgram_transport.hpp"
+#include "rtai/delayed_llm.hpp"
 #include "rtai/demo_conversation.hpp"
 #include "rtai/fake_transport.hpp"
 #include "rtai/fake_vad.hpp"
@@ -429,6 +430,7 @@ server::Hello make_hello(const AppConfig& cfg, bool llm_on, const std::string& m
     h.has_llm_key = !cfg.st.llm_key.empty();
     h.llm_url = cfg.st.llm_url;
     if (cfg.cloud_session) h.plan = cfg.cloud_session->plan;
+    if (cloud::local_mode(cfg.st)) h.backend = cloud::to_string(cloud::Backend::Local);
     if (cfg.cloud_credentials()) {
         h.backend = cloud::to_string(cloud::Backend::Cloud);
         h.llm_url = cfg.cloud_session->llm.url;
@@ -676,7 +678,7 @@ int run_app(AppConfig cfg) {
     std::string cloud_error;
     int cloud_http_status = 0;
     auto start_cloud_boot = [&] {
-        if (cfg.demo || cloud_boot.valid() || !cloud::signed_in(cfg.st)) return;
+        if (cfg.demo || cloud_boot.valid() || cloud::local_mode(cfg.st) || !cloud::signed_in(cfg.st)) return;
         CloudClientOptions co;
         co.base_url = cloud::effective_base_url(cfg.st);
         co.token = cfg.st.server_token;
@@ -810,7 +812,9 @@ int run_app(AppConfig cfg) {
 
     const auto session_start = std::chrono::steady_clock::now();
 
-    if (!cfg.demo && !cloud::signed_in(cfg.st)) {
+    // Local mode ([servidor] modo = local): no account, no server call, the
+    // user's own keys only.
+    if (!cfg.demo && !cloud::local_mode(cfg.st) && !cloud::signed_in(cfg.st)) {
         const char* why = cloud::server_known(cfg.st)
                               ? "Sign in to your RealTimeAI account in the dashboard to use the copilot."
                               : "No RealTimeAI server configured: set [servidor] url and sign in from the dashboard.";
@@ -979,6 +983,16 @@ int run_app(AppConfig cfg) {
         } else {
             openrouter_sol_client = openrouter;
         }
+    }
+
+    // Local mode has no plan: every live answer waits a little before going
+    // out. The HUD says so, and the dashboard shows the difference to PRO.
+    if (llm && !cfg.demo && cloud::local_mode(cfg.st)) {
+        llm = std::make_shared<DelayedLlmClient>(llm, std::chrono::milliseconds(cloud::kLocalAnswerDelayMs));
+        cfg.notes.push_back("Local mode: answers start about " + std::to_string(cloud::kLocalAnswerDelayMs) +
+                            " ms later than with PRO.");
+        log.line("Local mode: no account, own keys, +" + std::to_string(cloud::kLocalAnswerDelayMs) +
+                 " ms per answer");
     }
 
     // ---------------- copilot engine ----------------

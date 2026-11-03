@@ -298,6 +298,8 @@ servidor (uso do Deepgram por `tag`, tokens do LLM no relay).
 [servidor]
 ; auto / nuvem = transcrição e IA pelos servidores RealTimeAI
 ; proprio = suas chaves de API (o login e a cota do plano continuam valendo)
+; local = suas chaves, sem conta e sem nenhuma chamada a este servidor
+;         (modo open-source; cada resposta espera +500 ms, recursos PRO desligados)
 modo = auto
 ; vazio = servidor padrão do build oficial
 url =

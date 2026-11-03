@@ -104,11 +104,23 @@ inline std::int64_t budget_warning_s(std::int64_t budget_s) {
     return budget_s > 120 ? budget_s - 60 : budget_s / 2;
 }
 
-enum class Backend : std::uint8_t { Own, Cloud };
+// Own: the user's keys, session still granted (and counted) by the server.
+// Cloud: server credentials. Local: no account and no server at all
+// ([servidor] modo = local, the open-source mode).
+enum class Backend : std::uint8_t { Own, Cloud, Local };
 
 constexpr const char* to_string(Backend b) noexcept {
-    return b == Backend::Cloud ? "nuvem" : "proprio";
+    switch (b) {
+        case Backend::Cloud: return "nuvem";
+        case Backend::Local: return "local";
+        case Backend::Own:   break;
+    }
+    return "proprio";
 }
+
+// Extra wait before each answer in local mode (no plan). Shown to the user in
+// the dashboard and the HUD; PRO answers start without it.
+inline constexpr int kLocalAnswerDelayMs = 500;
 
 // Base URL actually used: config/env value, else the compiled default.
 // Trailing slashes are dropped so paths can be appended.
@@ -124,13 +136,17 @@ inline bool server_known(const Settings& s) { return parse_url(effective_base_ur
 // Signed in: a device token and a server. Required for any live session.
 inline bool signed_in(const Settings& s) { return !s.server_token.empty() && server_known(s); }
 
-// Where the audio and the LLM go once signed in: [servidor] modo = proprio
-// uses the user's own keys; auto/nuvem (default) use the server credentials.
+// Where the audio and the LLM go: [servidor] modo = local skips the server
+// entirely; proprio uses the user's own keys once signed in; auto/nuvem
+// (default) use the server credentials.
 inline Backend choose_backend(const Settings& s) {
     const std::string mode = text::fold(text::trim(s.server_mode));
-    if (mode == "proprio" || mode == "own" || mode == "local") return Backend::Own;
+    if (mode == "local" || mode == "offline") return Backend::Local;
+    if (mode == "proprio" || mode == "own") return Backend::Own;
     return Backend::Cloud;
 }
+
+inline bool local_mode(const Settings& s) { return choose_backend(s) == Backend::Local; }
 
 struct SessionRequest {
     std::string app_version;

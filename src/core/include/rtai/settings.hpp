@@ -313,10 +313,11 @@ inline Settings load_settings(const ini::File& f, const EnvLookup& env, const Se
         std::string mode;
         if (str("servidor", "modo", "RTAI_SERVER_MODE", mode)) {
             const std::string m = text::fold(text::trim(mode));
-            if (m == "auto" || m == "nuvem" || m == "cloud" || m == "proprio" || m == "own" || m == "local") {
+            if (m == "auto" || m == "nuvem" || m == "cloud" || m == "proprio" || m == "own" || m == "local" ||
+                m == "offline") {
                 s.server_mode = m;
             } else {
-                s.warnings.push_back("[servidor] modo: use auto, nuvem or proprio");
+                s.warnings.push_back("[servidor] modo: use auto, nuvem, proprio or local");
             }
         }
     }
@@ -458,7 +459,8 @@ pasta =
 [servidor]
 ; RealTimeAI servers (no API keys needed once signed in from the dashboard).
 ; auto = servers when signed in, otherwise your keys above
-; nuvem = always the servers; proprio = only your keys (open-source mode)
+; nuvem = always the servers; proprio = your keys, signed in (plan minutes count)
+; local = your keys, no account and no server (open-source mode, answers ~0.5 s slower)
 modo = auto
 ; Empty = the official build's default server
 url =

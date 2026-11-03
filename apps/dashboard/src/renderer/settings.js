@@ -99,7 +99,20 @@
   // ----------------------------------------------------- cloud account --
   // The RealTimeAI account is mandatory (auth.js locks the app while signed
   // out). This tab shows who is signed in and where STT + IA run.
+  // Local mode: no account. Says what that means and how to get PRO.
+  function localAccount() {
+    return `
+      ${card('Local mode', 'No account: transcription and answers use your own API keys, straight from this computer.',
+        `<div class="row" style="gap:14px"><span class="avatar" style="width:40px;height:40px;font-size:13px">${icon('key')}</span>
+          <div class="stack grow" style="gap:0"><span class="strong">Running locally</span>
+          <span class="small faint">Nothing goes to the RealTimeAI servers. Answers start ${C.LOCAL_ANSWER_DELAY_MS} ms later than with PRO.</span></div>
+          <button type="button" class="btn" data-action="go" data-to="settings/ai">${icon('key')}API keys</button>
+          <button type="button" class="btn primary" data-action="go-pro">Sign in or create account</button></div>`)}
+      ${C.proAd('card', 'What PRO adds')}`;
+  }
+
   function account() {
+    if (C.localMode()) return localAccount();
     const cfg = S.config;
     const st = S.auth || {};
     const mode = cfg.server_mode || 'auto';
@@ -163,6 +176,7 @@
     const cur = cfg.model || 'qwen/qwen3.6-flash';
     const known = MODELS.some((m) => m.id === cur || m.alt === cur);
     return `
+      ${C.proAd('banner', `Local mode adds ${C.LOCAL_ANSWER_DELAY_MS} ms before each answer.`)}
       ${card('Answer model', `Current: ${esc(C.modelLabel(cur))} via ${esc(C.providerFor(cur))}`,
         `<div class="option-cards">${MODELS.map((m) => {
           const active = cur === m.id || cur === m.alt;
@@ -250,6 +264,12 @@
   }
 
   function calendar() {
+    // Google Calendar is a PRO feature: local mode only shows what it does.
+    if (C.localMode()) {
+      return `${card('Google Calendar', 'Available with Cue PRO',
+        `<div class="empty boxed">${icon('lock')}<span class="t">Your interviews, straight from Google Calendar</span><span>Upcoming interviews appear on the home screen with a reminder to go live. Sign in with PRO to connect your calendar.</span><button type="button" class="btn primary sm" data-action="go-pro">Get PRO</button></div>`)}
+        ${C.proAd('card')}`;
+    }
     const g = S.gcal;
     const st = g.status;
     const configured = Boolean(st && st.configured);
@@ -371,7 +391,29 @@
       `<button type="button" class="btn sm ghost" data-action="plan-refresh">${icon('refresh')}Refresh</button>`);
   }
 
+  // Local mode next to the account plans: what each one gets.
+  function localPlan() {
+    const d = C.LOCAL_ANSWER_DELAY_MS;
+    const rows = [
+      ['Account', 'Not needed', 'Required', 'Required'],
+      ['API keys', 'Your own', 'Not needed', 'Not needed'],
+      ['Live minutes', 'Pay your providers', '15 min, once', '200 min / month'],
+      ['Answer speed', `+${d} ms per answer`, 'Instant', 'Instant'],
+      ['Cloud backup of files', '—', '—', 'Included'],
+      ['Sync across devices', '—', '—', 'Included'],
+      ['Google Calendar', '—', '—', 'Included']
+    ];
+    return `
+      ${C.proAd('card', 'You are on local mode')}
+      ${card('Compare', 'Local mode is free and open source; PRO adds the cloud.',
+        `<div style="overflow-x:auto"><table class="compare"><thead><tr><th></th><th>Local</th><th>Free</th><th>PRO</th></tr></thead><tbody>
+          ${rows.map(([k, ...v]) => `<tr><th scope="row">${esc(k)}</th>${v.map((x, i) => `<td class="${i === 2 ? 'strong' : ''}">${esc(x)}</td>`).join('')}</tr>`).join('')}
+        </tbody></table></div>`,
+        '<button type="button" class="btn sm primary" data-action="go-pro">Get PRO</button>')}`;
+  }
+
   function plan() {
+    if (C.localMode()) return localPlan();
     const u = C.usage();
     const byMonth = {};
     for (const s of S.sessions) {

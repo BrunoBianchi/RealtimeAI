@@ -3154,3 +3154,117 @@ button.status-chip:hover {
     gap: 20px;
   }
 }
+
+/* ---------------------------------------------------------- local mode -- */
+/* "Continue locally" on the sign-in screen and the PRO ads shown in local mode. */
+.auth-local {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.auth-local-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+.banner.pro-ad .strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.pro-ad-card {
+  border-color: var(--accent-border);
+  background:
+    radial-gradient(60% 120% at 0% 0%, var(--accent-soft), transparent 70%),
+    var(--surface-card);
+}
+
+.pro-ad-card > .row > .icon,
+.banner.pro-ad > .icon {
+  color: var(--accent);
+}
+
+.pro-perks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pro-perk {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.pro-perk > .icon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--accent);
+}
+
+.pro-perk .t {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.pro-perk .s {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.pro-mini {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: left;
+}
+
+.pro-mini > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.pro-mini .icon {
+  color: var(--accent);
+}
+
+table.compare {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+table.compare th,
+table.compare td {
+  padding: 9px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+table.compare thead th {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+table.compare tbody th {
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+table.compare td.strong {
+  color: var(--accent);
+  font-weight: 600;
+}

@@ -325,19 +325,42 @@ function isSignedIn(cfg) {
   return Boolean(c.has_server_token) && Boolean(c.server_url_effective);
 }
 
+// Local mode ([servidor] modo = local, mirrors cloud::local_mode): no
+// account and no server, only the user's own keys. The app is usable, with
+// the PRO features (cloud backup, sync, Google Calendar) shown as ads.
+function isLocalMode(cfg) {
+  const c = cfg || readConfigIni();
+  return ['local', 'offline'].includes(String(c.server_mode || '').trim().toLowerCase());
+}
+
+// The app is unlocked when signed in or in local mode.
+function canUseApp(cfg) {
+  const c = cfg || readConfigIni();
+  return isSignedIn(c) || isLocalMode(c);
+}
+
 // Signed in and using the server credentials (mirrors cloud::choose_backend).
 function cloudBackendActive(cfg) {
   const c = cfg || readConfigIni();
-  return c.server_mode !== 'proprio' && isSignedIn(c);
+  return c.server_mode !== 'proprio' && !isLocalMode(c) && isSignedIn(c);
 }
 
-const LOGIN_REQUIRED = { ok: false, needsLogin: true, error: 'Sign in to your RealTimeAI account to use the copilot.' };
+const LOGIN_REQUIRED = { ok: false, needsLogin: true, error: 'Sign in to your RealTimeAI account, or continue locally with your own API keys.' };
+
+function hasOwnAiKey(c) {
+  return Boolean(c.has_llm_key || c.has_cerebras_key || c.has_groq_key || c.has_openai_key || c.has_anthropic_key || c.has_gemini_key);
+}
 
 // Before a live start: signed in, keys present when using own keys, and the
 // plan still has minutes (the engine asks the server again: this is only so
 // the user gets the reason right away instead of a failed start).
 async function checkCanStartLive() {
   const cfg = readConfigIni();
+  if (isLocalMode(cfg)) {
+    if (!cfg.has_deepgram_key) return { ok: false, needsKeys: true, error: 'Local mode: add your Deepgram key in AI and models.' };
+    if (!hasOwnAiKey(cfg)) return { ok: false, needsKeys: true, error: 'Local mode: add an AI key (OpenRouter, Cerebras…) in AI and models.' };
+    return { ok: true };
+  }
   if (!isSignedIn(cfg)) return LOGIN_REQUIRED;
   if (!cloudBackendActive(cfg) && !cfg.has_deepgram_key) {
     return { ok: false, error: '"My keys" mode: set the Deepgram key or switch back to the RealTimeAI servers.' };
@@ -589,7 +612,9 @@ function readCloudToken() {
 }
 
 function saveCloudToken(token) {
-  writeConfigIni({ server_token: token || '__CLEAR__' });
+  // Signing in leaves local mode: the account's plan takes over.
+  const leaveLocal = token && isLocalMode() ? { server_mode: 'auto' } : {};
+  writeConfigIni({ server_token: token || '__CLEAR__', ...leaveLocal });
   try {
     if (!token) fs.rmSync(cloudTokenPath(), { force: true });
     else if (safeStorage && safeStorage.isEncryptionAvailable()) fs.writeFileSync(cloudTokenPath(), safeStorage.encryptString(token));
@@ -664,6 +689,7 @@ function aiTarget(title = 'RealTimeAI Studio') {
   const direct = ownKey
     ? { url: OPENROUTER_CHAT_URL, headers: { Authorization: `Bearer ${ownKey}`, 'HTTP-Referer': 'https://realtimeai.local', 'X-Title': title } }
     : null;
+  if (isLocalMode(cfg)) return direct; // never the server in local mode
   if (cfg.server_mode === 'proprio' && direct) return direct;
   return (isSignedIn(cfg) && cloudAccount.aiEndpoint()) || direct;
 }
@@ -2606,7 +2632,7 @@ function sendOverlayCommand(command) {
 }
 
 function launchOverlay({ agent, demo = false, configOverrides = {} }) {
-  if (!isSignedIn()) return LOGIN_REQUIRED; // also covers relaunches and demos
+  if (!canUseApp()) return LOGIN_REQUIRED; // also covers relaunches and demos
   // 1. Save the active Mini-Agent (with its RAG documents, instructions, and mini_compact)
   let savedAgent = null;
   if (agent) {
@@ -3013,7 +3039,7 @@ async function startCopilotForMeeting(agentId) {
   }
   const allowed = await checkCanStartLive();
   if (!allowed.ok) {
-    showSettingsWindow(allowed.needsLogin ? 'account' : 'plan');
+    showSettingsWindow(allowed.needsLogin ? 'account' : allowed.needsKeys ? 'ai' : 'plan');
     return allowed;
   }
   const agent = loadAllAgents().find((a) => a.id === agentId) || null;
@@ -3086,7 +3112,7 @@ function onMeetingStarted(meeting) {
   const s = getMeetingSettings();
   if (!s.enabled || s.mutedApps.includes(meeting.id)) return;
   if (isOverlayRunning()) return; // the copilot is already on
-  if (!isSignedIn()) return; // the app does nothing until the user signs in
+  if (!canUseApp()) return; // the app does nothing until the user signs in (or goes local)
   getMeetingPopup().show(popupPayload('started', meeting));
 }
 
@@ -4032,6 +4058,8 @@ if (process.env.RTAI_TEST_EXPORTS === '1') {
     readConfigIni,
     writeConfigIni,
     cloudBackendActive,
+    isLocalMode,
+    canUseApp,
     isSignedIn,
     checkCanStartLive,
     launchOverlay,

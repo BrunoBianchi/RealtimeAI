@@ -478,13 +478,52 @@ function recentLatency(n) {
 }
 Cue.recentLatency = recentLatency;
 
+// Local mode ([servidor] modo = local): no account, no server, the user's own
+// keys. Mirrors cloud::local_mode in the engine.
+function localMode() {
+  const m = String((S.config && S.config.server_mode) || '').trim().toLowerCase();
+  return m === 'local' || m === 'offline';
+}
+Cue.localMode = localMode;
+
+// Extra wait per answer in local mode (cloud::kLocalAnswerDelayMs in the
+// engine; keep both in sync).
+const LOCAL_ANSWER_DELAY_MS = 500;
+Cue.LOCAL_ANSWER_DELAY_MS = LOCAL_ANSWER_DELAY_MS;
+
 // Signed in to the RealTimeAI servers: they provide STT and the LLM, no keys
 // needed. Mirrors cloud::choose_backend in the engine.
 function cloudActive() {
   const c = S.config || {};
-  return c.server_mode !== 'proprio' && Boolean(c.has_server_token) && Boolean(c.server_url_effective);
+  return c.server_mode !== 'proprio' && !localMode() && Boolean(c.has_server_token) && Boolean(c.server_url_effective);
 }
 Cue.cloudActive = cloudActive;
+
+// What PRO adds over local mode. Shown as ads everywhere in local mode.
+const PRO_PERKS = [
+  ['cloud', 'Cloud backup of your files', 'Sessions, CVs and documents saved to your account.'],
+  ['arrows-clockwise', 'Sync across devices', 'The same sessions and question bank on every computer.'],
+  ['calendar', 'Google Calendar', 'Interviews show up on their own, with a reminder to go live.'],
+  ['lightning', 'Faster answers', `No ${LOCAL_ANSWER_DELAY_MS} ms wait: answers start right away.`]
+];
+Cue.PRO_PERKS = PRO_PERKS;
+
+// PRO ad for local mode. kind: 'banner' (one line), 'card' (perk list),
+// 'compact' (sidebar). Empty outside local mode.
+function proAd(kind = 'banner', title) {
+  if (!localMode()) return '';
+  const cta = '<button type="button" class="btn sm primary" data-action="go-pro">Get PRO</button>';
+  if (kind === 'banner') {
+    return `<div class="banner pro-ad">${icon('sparkle')}<span class="grow"><span class="strong">${esc(title || 'You are in local mode.')}</span> PRO adds cloud backup, sync across devices, Google Calendar and answers ${LOCAL_ANSWER_DELAY_MS} ms faster.</span>${cta}</div>`;
+  }
+  const perks = PRO_PERKS.map(([ic, t, s]) => `<li class="pro-perk">${icon(ic)}<span class="stack" style="gap:0"><span class="t">${esc(t)}</span><span class="s">${esc(s)}</span></span></li>`).join('');
+  return `<section class="card pro-ad-card" style="gap:12px">
+      <div class="row" style="gap:10px">${icon('sparkle')}<span class="strong grow">${esc(title || 'Unlock Cue PRO')}</span><span class="pill">Local mode</span></div>
+      <ul class="pro-perks">${perks}</ul>
+      <div class="row" style="gap:8px"><span class="small faint grow">Local mode keeps working with your own keys, with a ${LOCAL_ANSWER_DELAY_MS} ms wait before each answer.</span>${cta}</div>
+    </section>`;
+}
+Cue.proAd = proAd;
 
 function engineReady() {
   const c = S.config || {};
@@ -598,6 +637,7 @@ async function startCopilot(agent, demo) {
   if (res.ok === false) {
     toast(res.error || 'The copilot did not start.', 'error');
     if (res.needsLogin && Cue.authRefresh) await Cue.authRefresh(true);
+    if (res.needsKeys) navigate('settings/ai');
     else if (res.needsUpgrade) navigate('settings/plan');
     return null;
   }
@@ -662,10 +702,10 @@ function handleRoute() {
 }
 
 // ----------------------------------------------------------------- render --
-// Signing in is mandatory: until then only the sign-in screen exists (no
-// sidebar, no tabs, no settings). The main process enforces the same rule.
+// Until the user signs in or picks local mode, only the sign-in screen exists
+// (no sidebar, no tabs, no settings). The main process enforces the same rule.
 function isLocked() {
-  return !(S.auth && S.auth.signedIn);
+  return !(S.auth && S.auth.signedIn) && !localMode();
 }
 Cue.isLocked = isLocked;
 
@@ -811,7 +851,17 @@ function renderShell() {
   // Usage card
   const u = usage();
   const card = document.getElementById('sidebarUsage');
-  if (card) {
+  if (card && localMode()) {
+    // Local mode: the usage card becomes the PRO ad.
+    card.dataset.action = 'go-pro';
+    card.removeAttribute('data-to');
+    setHtml(card, `
+      <div class="row between"><span class="eyebrow">Local mode</span><span class="pill">${icon('sparkle')}PRO</span></div>
+      <div class="pro-mini">${PRO_PERKS.map(([ic, t]) => `<span>${icon(ic)}${esc(t)}</span>`).join('')}</div>
+      <div class="row between faint" style="font-size:11.5px"><span>Answers +${LOCAL_ANSWER_DELAY_MS} ms</span><span class="nowrap strong">Get PRO →</span></div>`);
+  } else if (card) {
+    card.dataset.action = 'go';
+    card.dataset.to = 'settings/plan';
     const ticks = Array.from({ length: 12 }, (_, i) => {
       if (u.pct == null) return '<span></span>';
       const filled = (u.pct / 100) * 12;
@@ -832,7 +882,7 @@ function renderShell() {
   };
   setText('profileInitials', monogram(name || 'You'));
   setText('profileName', name || 'Set up profile');
-  setText('profilePlan', `${u.planLabel} plan`);
+  setText('profilePlan', localMode() ? 'Local mode' : `${u.planLabel} plan`);
 
   // Top bar: live button, stealth, update chip
   const live = document.getElementById('btnGoLive');
@@ -908,6 +958,16 @@ Cue.actions['toggle-stealth'] = async () => {
 
 Cue.actions['start-copilot'] = (el) => startCopilot(agentById(el.dataset.agent) || activeAgent(), el.dataset.demo === '1');
 Cue.actions['stop-copilot'] = () => stopCopilot();
+
+// Local mode -> account: back to the sign-in screen, on "Create account".
+// Local sessions and keys stay; the account's plan applies once signed in.
+Cue.actions['go-pro'] = async () => {
+  const ok = await Cue.confirm('Get Cue PRO', 'Create an account or sign in to get PRO. Your local sessions, files and keys stay on this computer.', 'Continue');
+  if (!ok) return;
+  if (Cue.authMode) Cue.authMode('signup');
+  await saveConfig({ server_mode: 'auto' });
+  navigate('home', true);
+};
 Cue.actions['open-path'] = (el) => api.openExternalPath(el.dataset.path || undefined);
 Cue.actions['open-url'] = async (el) => {
   const res = await api.openUrl(el.dataset.url);
@@ -915,7 +975,7 @@ Cue.actions['open-url'] = async (el) => {
 };
 
 // The only actions that work before signing in (sign-in screen + window).
-const AUTH_ACTIONS = new Set(['auth-google', 'auth-sso', 'auth-password', 'auth-signup', 'auth-mode', 'auth-reset', 'auth-cancel', 'auth-reopen', 'open-url']);
+const AUTH_ACTIONS = new Set(['auth-google', 'auth-sso', 'auth-password', 'auth-signup', 'auth-mode', 'auth-reset', 'auth-cancel', 'auth-reopen', 'auth-local', 'open-url']);
 
 function bindDelegation() {
   document.addEventListener('click', (e) => {

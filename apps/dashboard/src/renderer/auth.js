@@ -1,8 +1,9 @@
-// Cue dashboard — sign-in. Signing in is mandatory: while S.auth.signedIn is
-// false, app.js renders only this screen (no sidebar, tabs or settings) and
-// ignores every other action. Three ways in, all handled by the main process
-// (cloud_account.js): Google and company SSO through the browser (device
-// code), or e-mail + password (with sign-up and password reset).
+// Cue dashboard — sign-in. Until the user signs in or picks local mode,
+// app.js renders only this screen (no sidebar, tabs or settings) and ignores
+// every other action. Ways in, handled by the main process (cloud_account.js):
+// Google and company SSO through the browser (device code), e-mail + password
+// (with sign-up and password reset), or "Continue locally" ([servidor]
+// modo = local: own API keys, no account, PRO features shown as ads).
 'use strict';
 
 (function () {
@@ -75,6 +76,15 @@
       </div></div>`;
   }
 
+  // Local mode: no account and no server, only the user's own API keys.
+  function localBlock() {
+    return `<div class="auth-local">
+      <div class="auth-divider">or</div>
+      <button type="button" class="auth-btn" data-action="auth-local" ${dis()}>${icon('key')}Continue locally with my API keys</button>
+      <p class="auth-local-note">No account and nothing sent to our servers. Answers start ${C.LOCAL_ANSWER_DELAY_MS} ms later than with PRO, and cloud backup, sync and Google Calendar stay off.</p>
+    </div>`;
+  }
+
   const TITLES = { signin: 'Welcome to Cue', signup: 'Create your account', reset: 'Reset your password', sso: 'Single sign-on' };
   const SUBS = {
     signin: 'Your real-time interview copilot. Sign in to continue.',
@@ -99,6 +109,7 @@
           ${A.error ? `<div class="auth-msg error" role="alert">${esc(A.error)}</div>` : ''}
           ${A.info ? `<div class="auth-msg info" role="status">${esc(A.info)}</div>` : ''}
         </div>
+        ${A.pending ? '' : localBlock()}
         <p class="auth-foot">By continuing you agree to the RealTimeAI Terms and Privacy Policy.</p>
       </section></div>`;
   };
@@ -189,6 +200,13 @@
     await authRefresh(true);
   };
 
+  // Opens the sign-in screen on a given form (used by "Get PRO").
+  C.authMode = (mode) => {
+    A.mode = TITLES[mode] ? mode : 'signin';
+    A.error = '';
+    A.info = '';
+  };
+
   C.actions['auth-mode'] = (el) => {
     A.mode = el.dataset.mode || 'signin';
     A.error = '';
@@ -206,6 +224,15 @@
     else A.error = (res && res.error) || 'Could not start signing in.';
     C.refresh();
   }
+
+  C.actions['auth-local'] = async () => {
+    A.error = '';
+    A.info = '';
+    const res = await C.saveConfig({ server_mode: 'local' });
+    if (!res) return;
+    C.navigate('settings/ai', true);
+    C.toast('Local mode. Add your Deepgram key and an AI key to start.');
+  };
 
   C.actions['auth-google'] = () => browserLogin('google');
   C.actions['auth-sso'] = () => browserLogin('sso');

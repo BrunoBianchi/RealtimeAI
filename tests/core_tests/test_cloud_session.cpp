@@ -70,6 +70,22 @@ TEST(CloudBackend, SignInIsRequiredAndProprioOnlyChangesWhereAudioGoes) {
     }
 }
 
+TEST(CloudBackend, LocalModeNeedsNoAccountOrServer) {
+    Settings s;
+    s.server_mode = "local";
+    EXPECT_EQ(cloud::choose_backend(s), cloud::Backend::Local);
+    EXPECT_TRUE(cloud::local_mode(s));
+    EXPECT_STREQ(cloud::to_string(cloud::Backend::Local), "local");
+    s.server_mode = "Offline";
+    EXPECT_TRUE(cloud::local_mode(s));
+    s.server_mode = "proprio";
+    EXPECT_FALSE(cloud::local_mode(s));
+    s.server_mode = "auto";
+    EXPECT_FALSE(cloud::local_mode(s));
+    EXPECT_GT(cloud::kLocalAnswerDelayMs, 0);
+    EXPECT_LE(cloud::kLocalAnswerDelayMs, 1000); // "a little" slower, not unusable
+}
+
 TEST(CloudPlan, FreeIsOneSessionOf15MinutesProIs200PerMonth) {
     EXPECT_EQ(cloud::plan_rules("free").minutes, 15);
     EXPECT_FALSE(cloud::plan_rules("free").monthly);
