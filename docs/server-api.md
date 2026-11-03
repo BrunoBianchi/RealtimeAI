@@ -12,6 +12,7 @@ Implementação do lado do cliente:
 | Cliente HTTP do engine (bootstrap, renovação, fim de sessão) | `src/net/include/rtai/cloud_client.hpp`, `src/net/src/cloud_client.cpp` |
 | Ligação no engine | `src/app/src/main.cpp` (seção "RealTimeAI cloud bootstrap") |
 | Login e conta no dashboard | `apps/dashboard/src/main/cloud_account.js`, aba **Conta e servidor** |
+| Servidor local para testes | `backend/` (`npm run backend`, veja `backend/README.md`) |
 | Testes | `tests/core_tests/test_cloud_session.cpp`, `test_deepgram_stream.cpp`, `apps/dashboard/tests/cloud_account.test.js` |
 
 ## Princípio: corretor de credenciais, não proxy de mídia
@@ -257,6 +258,28 @@ Erros: `401` (login expirado → `hello.needs = "login"`, o app volta para o log
 (plano sem minutos / sessão gratuita já usada → `needs = "upgrade"`, o dashboard abre o
 plano), `403` (conta bloqueada → `upgrade`), `426`, `429`, `5xx` (`needs = "server"`).
 Não há mais queda para as chaves próprias: sem a concessão do servidor a sessão não inicia.
+
+### Recursos do dashboard (fora do caminho ao vivo)
+
+Todos com Bearer do token do dispositivo. Com login, o app não precisa de chave nenhuma
+para eles; no modo **chaves próprias** com chave do OpenRouter, a IA vai direto ao provedor.
+
+- `POST /v1/ai/chat/completions`: mesmo formato do OpenAI `chat/completions` (com ou sem
+  `stream`). Avaliação JEV, compactação de memória, debriefs e OCR de PDF escaneado.
+- `POST /v1/research/company` `{"company", "role", "job_description"}` →
+  `200 {"ok": true, "source": "ai" | "web", "dossier": "..."}`. O servidor busca o site
+  oficial (só hosts públicos), resultados da web e Wikipedia, e escreve o dossiê.
+- `GET /v1/integrations/google` → `{"client_id", "type": "installed"}` (ou `404
+  not_configured`). `POST /v1/integrations/google/token` recebe `grant_type`
+  (`authorization_code` com `code`, `redirect_uri` de loopback e `code_verifier`, ou
+  `refresh_token`) e devolve a resposta do Google: o segredo do cliente OAuth fica no servidor.
+- `POST /v1/questions` `{"company", "questions": [{"text", "category", "subCategory"}]}`
+  (com "Compartilhar perguntas anonimizadas" ligado) e `GET /v1/questions?company=` →
+  `{"company", "questions": [{"text", "category", "subCategory", "reports", "last"}]}`.
+  O servidor remove e-mails, links e números e conta um voto por conta.
+
+`GET /v1/me` informa o que o servidor oferece em `features`
+(`ai`, `research`, `community_questions`, `google_calendar`).
 
 ### `POST /v1/session/{session_id}/end` — fim da sessão
 
