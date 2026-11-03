@@ -1,6 +1,6 @@
 @echo off
 rem ---------------------------------------------------------------------------
-rem INSTALLER: builds everything and creates dist\RealTimeAI-Setup-<version>.exe,
+rem INSTALLER: builds everything and creates dist\Cue-Setup-<version>.exe,
 rem the same one-click installer the releases ship (Start menu shortcut,
 rem uninstaller, auto-update).
 rem   scripts\windows\package.bat                 version 2.1.0-local.<date-time>
@@ -46,10 +46,10 @@ call npx electron-builder --win nsis --x64 --publish never -c.extraMetadata.vers
 popd
 
 if not exist dist mkdir dist
-copy /Y "apps\dashboard\release\RealTimeAI-Setup-%VERSION%.exe" dist\ >nul || goto :failed
+copy /Y "apps\dashboard\release\Cue-Setup-%VERSION%.exe" dist\ >nul || goto :failed
 echo.
-echo Installer ready: dist\RealTimeAI-Setup-%VERSION%.exe
-explorer /select,"%CD%\dist\RealTimeAI-Setup-%VERSION%.exe"
+echo Installer ready: dist\Cue-Setup-%VERSION%.exe
+explorer /select,"%CD%\dist\Cue-Setup-%VERSION%.exe"
 goto :end
 
 :failed

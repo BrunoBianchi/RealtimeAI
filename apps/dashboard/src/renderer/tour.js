@@ -48,7 +48,7 @@
         { route: 'settings/general', element: card('appearance'), title: 'Theme and language', text: 'Dark, light or the Windows theme. The interface language follows Windows by default; change it here.' },
         m.local
           ? { route: 'settings/account', element: card('local-mode'), title: 'Local mode', text: 'No account and no server: transcription and answers use your own keys, with a 500 ms wait before each answer.' }
-          : { route: 'settings/account', element: card('where-the-ai-runs'), title: 'Where the AI runs', text: 'RealTimeAI servers need no keys. “My keys” uses your own provider keys instead.' },
+          : { route: 'settings/account', element: card('where-the-ai-runs'), title: 'Where the AI runs', text: 'Cue servers need no keys. “My keys” uses your own provider keys instead.' },
         { route: 'settings/ai', element: card('api-keys'), title: 'API keys', text: m.local ? 'Required in local mode: a Deepgram key for transcription and one AI key (OpenRouter is the simplest). Windows encrypts them on this computer.' : 'Only needed with “My keys”: a Deepgram key for transcription and one AI key. Windows encrypts them on this computer.' },
         { route: 'settings/ai', element: card('answer-model'), title: 'Answer model', text: 'Fast has the lowest latency and suits most interviews. Ultra reasons more for system design and code.' },
         { route: 'settings/ai', element: card('behavior'), title: 'How it answers', text: 'Automatic suggestions, the language answers are written in and how long they are.' },

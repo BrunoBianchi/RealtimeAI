@@ -58,7 +58,7 @@ jobs:
         shell: pwsh
         run: |
           $v = (& build/bin/Release/rtai_app.exe --version | Out-String).Trim()
-          if ($v -ne "RealTimeAI ${{ inputs.version }}") { throw "rtai_app --version says '$v'" }
+          if ($v -ne "Cue ${{ inputs.version }}") { throw "rtai_app --version says '$v'" }
           (Get-Item build/bin/Release/rtai_app.exe).VersionInfo | Format-List ProductVersion, FileVersion
 
       - uses: actions/setup-node@v7
@@ -137,7 +137,7 @@ jobs:
           $env:GH_TOKEN = $env:GITHUB_TOKEN
           gh release view "v$version" --repo "${{ github.repository }}" *> $null
           if ($LASTEXITCODE -ne 0) {
-            $flags = @("v$version", "--repo", "${{ github.repository }}", "--verify-tag", "--title", "RealTimeAI $version", "--notes-file", "assets/release-notes.md")
+            $flags = @("v$version", "--repo", "${{ github.repository }}", "--verify-tag", "--title", "Cue $version", "--notes-file", "assets/release-notes.md")
             if ($beta) { $flags += "--prerelease" } else { $flags += "--latest" }
             gh release create @flags
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -150,7 +150,7 @@ jobs:
             $env:GH_TOKEN = $env:RELEASES_TOKEN
             gh release view "v$version" --repo "$env:RELEASES_REPO" *> $null
             if ($LASTEXITCODE -ne 0) {
-              $rFlags = @("v$version", "--repo", "$env:RELEASES_REPO", "--title", "RealTimeAI $version", "--notes-file", "assets/release-notes.md")
+              $rFlags = @("v$version", "--repo", "$env:RELEASES_REPO", "--title", "Cue $version", "--notes-file", "assets/release-notes.md")
               if ($beta) { $rFlags += "--prerelease" } else { $rFlags += "--latest" }
               gh release create @rFlags
             }

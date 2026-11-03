@@ -67,7 +67,7 @@ function createMeetingPopup(deps) {
       skipTaskbar: true,
       alwaysOnTop: true,
       show: false,
-      title: 'RealTimeAI',
+      title: 'Cue',
       backgroundColor: '#00000000',
       webPreferences: {
         preload: preloadPath,

@@ -33,7 +33,7 @@
     const cfg = S.config || {};
     const st = S.auth || {};
     if (st.available || cfg.server_url_effective) return '';
-    return `<div class="auth-server"><span>This build has no RealTimeAI server configured. Enter its address to sign in.</span>
+    return `<div class="auth-server"><span>This build has no Cue server configured. Enter its address to sign in.</span>
       <input class="input sm" type="text" value="${esc(cfg.server_url || '')}" placeholder="https://server.example.com" data-change="auth-server" aria-label="Server address"/></div>`;
   }
 
@@ -110,7 +110,7 @@
           ${A.info ? `<div class="auth-msg info" role="status">${esc(A.info)}</div>` : ''}
         </div>
         ${A.pending ? '' : localBlock()}
-        <p class="auth-foot">By continuing you agree to the RealTimeAI Terms and Privacy Policy.</p>
+        <p class="auth-foot">By continuing you agree to the Cue Terms and Privacy Policy.</p>
       </section></div>`;
   };
 

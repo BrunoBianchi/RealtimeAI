@@ -105,26 +105,39 @@
     const H = 120;
     const y = (v) => ((hi - v) / (hi - lo || 1)) * H;
     const xy = pts.map((p, i) => [(i * W) / (pts.length - 1), y(p.v)]);
-    const line = xy.map(([px, py]) => `${px.toFixed(1)},${py.toFixed(1)}`).join(' ');
-    const area = `M0 ${H} ${xy.map(([px, py]) => `L${px.toFixed(1)} ${py.toFixed(1)}`).join(' ')} L${W} ${H} Z`;
+    // Smooth curve with horizontal tangents: it never overshoots the real values.
+    const curve = xy
+      .map(([px, py], i) => {
+        if (!i) return `M${px.toFixed(1)} ${py.toFixed(1)}`;
+        const [qx, qy] = xy[i - 1];
+        const cx = ((qx + px) / 2).toFixed(1);
+        return `C${cx} ${qy.toFixed(1)} ${cx} ${py.toFixed(1)} ${px.toFixed(1)} ${py.toFixed(1)}`;
+      })
+      .join(' ');
+    const area = `${curve} L${W} ${H} L0 ${H} Z`;
     const avg = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
     const grid = ticks.map((t) => `<line x1="0" y1="${y(t).toFixed(1)}" x2="${W}" y2="${y(t).toFixed(1)}" stroke="var(--border-subtle)" stroke-dasharray="3 4" vector-effect="non-scaling-stroke"/>`).join('');
     const avgLine = `<line x1="0" y1="${y(avg).toFixed(1)}" x2="${W}" y2="${y(avg).toFixed(1)}" stroke="var(--text-faint)" stroke-dasharray="1 3" vector-effect="non-scaling-stroke"/>`;
+    // HTML over the stretched SVG, so the points stay round at any width.
     const dots = xy
-      .map(([px, py], i) => `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="3" fill="var(--accent)" stroke="var(--surface-raised)" stroke-width="1.5" vector-effect="non-scaling-stroke"><title>${esc(C.fmtDateShort(pts[i].d))} ${esc(C.fmtTime(pts[i].d))} · ${esc(C.sessionTitle(pts[i].s))}: ${Math.round(pts[i].v)} ms</title></circle>`)
+      .map(([px, py], i) => {
+        const x = (px / W) * 100;
+        const tip = `${C.fmtDateShort(pts[i].d)} ${C.fmtTime(pts[i].d)} · ${C.sessionTitle(pts[i].s)}: ${Math.round(pts[i].v)} ms`;
+        const side = x < 25 ? ' tip-start' : x > 75 ? ' tip-end' : '';
+        return `<span class="chart-dot${side}" style="left:${x.toFixed(2)}%;top:${((py / H) * 100).toFixed(2)}%" role="img" aria-label="${esc(tip)}"><span class="chart-tip">${esc(tip)}</span></span>`;
+      })
       .join('');
     const mid = pts[Math.floor((pts.length - 1) / 2)];
     const best = Math.min(...vals);
     return `<div class="chart-box">
       <div class="chart-wrap">
-        <div class="chart-y">${ticks.map((t) => `<span>${t}</span>`).join('')}</div>
-        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="First-token latency per session, in milliseconds">
-          <defs><linearGradient id="latArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".18"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
+        <div class="chart-y">${ticks.map((t) => `<span style="top:${((y(t) / H) * 100).toFixed(2)}%">${t}</span>`).join('')}</div>
+        <div class="chart-plot"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="First-token latency per session, in milliseconds">
+          <defs><linearGradient id="latArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".22"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
           ${grid}${avgLine}
           <path d="${area}" fill="url(#latArea)"/>
-          <polyline points="${line}" fill="none" stroke="var(--accent)" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>
-          ${dots}
-        </svg>
+          <path d="${curve}" fill="none" stroke="var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>${dots}</div>
       </div>
       <div class="chart-axis" style="padding-left:52px"><span>${esc(C.fmtDateShort(pts[0].d))}</span><span>${esc(C.fmtDateShort(mid.d))}</span><span style="color:var(--text-secondary)">${esc(C.fmtDateShort(pts[pts.length - 1].d))}</span></div>
       <div class="chart-foot"><span>Average <b>${avg} ms</b></span><span>Best <b>${Math.round(best)} ms</b></span><span>Last <b>${Math.round(vals[vals.length - 1])} ms</b></span><span>${plural(pts.length, 'session', 'sessions')} · ms</span></div>

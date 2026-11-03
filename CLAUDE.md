@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-RealTimeAI is a Windows real-time interview/meeting copilot: a native C++20 engine with a Direct2D HUD (`src/`) plus an Electron dashboard (`apps/dashboard/`). User-facing strings (dashboard, HUD, engine notices and errors) are in English; keep new ones in English. LLM prompts, Portuguese question/filler detection, speaker tags ("Você"/"Outros") and config.ini keys stay in Portuguese on purpose.
+Cue is a Windows real-time interview/meeting copilot: a native C++20 engine with a Direct2D HUD (`src/`) plus an Electron dashboard (`apps/dashboard/`). User-facing strings (dashboard, HUD, engine notices and errors) are in English; keep new ones in English. LLM prompts, Portuguese question/filler detection, speaker tags ("Você"/"Outros") and config.ini keys stay in Portuguese on purpose.
 
 ## Commands
 
@@ -12,7 +12,7 @@ Root (`package.json`):
 |---|---|
 | `npm run setup` | install root + dashboard deps |
 | `npm run dev` | run the dashboard from source (`apps/dashboard`, `npm start`) |
-| `npm run backend` | local RealTimeAI server (`../backend/`, Go, run with Docker; see its README). `backend:docker` / `backend:docker:down` run it detached. `npm run dev` starts the container by itself when no server is configured (`local_backend.js`; `RTAI_LOCAL_BACKEND=0` turns it off) |
+| `npm run backend` | local Cue server (`../backend/`, Go, run with Docker; see its README). `backend:docker` / `backend:docker:down` run it detached. `npm run dev` starts the container by itself when no server is configured (`local_backend.js`; `RTAI_LOCAL_BACKEND=0` turns it off) |
 | `npm run test:backend` / `lint:backend` | `go test` / `go vet` for `../backend/` (`scripts/backend-go.mjs`: local Go, else the `golang` Docker image) |
 | `npm run build:native` | `cmake --preset windows-release` + build |
 | `npm run test:native` | `ctest --preset windows-release` |
@@ -41,7 +41,7 @@ Conventional Commits enforced by commitlint (husky `commit-msg` hook); release-p
 - `core/` — all logic, platform-free and unit-tested: `CopilotEngine` (single thread owns state: turns, trigger policy, context), Deepgram stream protocol/backoff/reconnect, VAD, prompt building, SSE/LLM parsing, RAG (BM25 + optional e5 embeddings fused by RRF), `SessionStore`, and `server_protocol.hpp`.
 - `net/` (WinHTTP WebSocket/HTTPS), `deepgram/`, `audio_wasapi/` (mic = "Você", loopback = "Outros"), `overlay/` (Win32 + Direct2D HUD), `vad_onnx/` and `embed_onnx/` (optional ONNX), `app/` (the `rtai_app` executable: wiring, config, lifecycle).
 - Threading rule: producers only push into queues; the UI thread never blocks (one coalesced render per ≤16 ms). One writer thread per socket.
-- Every session writes `sessions/<YYYY-MM-DD_HH-MM-SS_xxxx>.jsonl` (append-only events: `session_start`, `turn`, `suggestion`, `jev`, `feedback`, `pause`, `link`, `notice`, `session_end`) plus a `.md` summary on exit, under `%LOCALAPPDATA%\RealTimeAI\`.
+- Every session writes `sessions/<YYYY-MM-DD_HH-MM-SS_xxxx>.jsonl` (append-only events: `session_start`, `turn`, `suggestion`, `jev`, `feedback`, `pause`, `link`, `notice`, `session_end`) plus a `.md` summary on exit, under `%LOCALAPPDATA%\Cue\`.
 
 ### Latency
 
@@ -53,15 +53,15 @@ The dashboard spawns `rtai_app.exe --no-launcher --server [--agent <id>]` and ta
 - stdin (UI → engine): `answer`, `chat`, `recap`, `followup`, `pause`, `rate`, `clear_chat`, `set_mode`, `set_config`, `quit`.
 Both sides are defined in `src/core/include/rtai/server_protocol.hpp`; `apps/dashboard/src/main/main.js` (`launchOverlay`, `LIVE_EVENT_TYPES`, `sendOverlayCommand`) forwards events to the renderer as `rtai:live-event`. Change both ends together.
 
-### Shared state on disk (`%LOCALAPPDATA%\RealTimeAI\`)
+### Shared state on disk (`%LOCALAPPDATA%\Cue\`)
 - `config.ini` — shared by dashboard and engine; Portuguese section/key names (`[deepgram] idioma`, `[llm] modelo`, `[stealth] invisivel_gravacao`…). The dashboard maps them to English keys in `readConfigIni()` / `writeConfigIni()` in `main.js`; add new settings in both. The engine reads config only at start, so `rtai:save-config` restarts a running overlay.
 - `agents/<id>.json` — a "goal"/session (company, role, job description, documents with extracted text, playbook, mini_compact). `saveAgentToDisk()` normalizes and **drops unknown fields** — new agent fields must be added there.
 - `question_bank.json` (JEV engine, `jev_engine.js`), `dashboard_profile.json`, `playbooks.json`, flags files.
 
-### RealTimeAI cloud backend (`docs/server-api.md`)
+### Cue cloud backend (`docs/server-api.md`)
 - Sign-in (Google / SSO via device code, or e-mail + password) or local mode is required: otherwise the renderer shows only `auth.js`'s login view (`Cue.isLocked()`, `AUTH_ACTIONS` gate in `app.js`) and `launchOverlay` refuses (`canUseApp()` in `main.js`); the engine answers `hello.needs = "login"`.
 - Local mode (`[servidor] modo = local`, "Continue locally" on the login view): no account and no server call at all, the user's own keys only (`cloud::local_mode`, `isLocalMode()` / `Cue.localMode()`). PRO features (cloud backup, sync across devices, Google Calendar) are shown as ads (`Cue.proAd`) and every live answer waits `cloud::kLocalAnswerDelayMs` (`DelayedLlmClient`, mirrored by `LOCAL_ANSWER_DELAY_MS` in `app.js`; keep both in sync and keep the delay disclosed in the UI).
-- Plans (`plans.js` ↔ `cloud::PlanRules`): Free = one session of up to 15 min, once; PRO = 200 min/month. The server is authoritative (`402` → `needs = "upgrade"`); the engine's plan guard ends the session at the budget.
+- Plans (`plans.js` ↔ `cloud::PlanRules`): Free = one session of up to 15 min, once; PRO = $15, 200 min/month; token packs (1 token = 1 minute, `credit_minutes`, never expire) are spent after the plan's minutes. The server is authoritative (`402` → `needs = "upgrade"`); the engine's plan guard ends the session at the budget.
 - `[servidor]` (`modo` auto/nuvem/proprio, `url`, `regiao`, `token`): the engine makes one `POST /v1/session` at start (overlapped with set-up) and gets short-lived STT/LLM credentials; audio still goes straight to Deepgram. `modo = proprio` uses own keys but still needs the session grant (quota).
 - Engine: `cloud_session.hpp` (core, tested) + `CloudClient` (`src/net`); dashboard: `cloud_account.js` (sign-in, billing), `plans.js`, `renderer/auth.js`, and the `account`/`plan` settings tabs. Default server URL: CMake `RTAI_SERVER_URL` + `BUILTIN_SERVER_URL` (keep both in sync).
 - `../backend/` — next to this repo, outside git, kept only on the developer's machine (tests skip without it) — local implementation of this API (Go, stdlib `net/http` + `golang.org/x/crypto`/`x/text`, `cmd/server` + `internal/*`, distroless Docker image): accounts, device sign-in pages, plans, test billing, Deepgram grants, SSE LLM relay (mock without a key), dashboard AI relay, company research, Google Calendar token broker, community question bank. Keep it in step with `docs/server-api.md`. Security rules there: tokens and one-time links are stored as SHA-256 hashes, passwords as argon2id, browser forms go through `http.CrossOriginProtection`, pages use `html/template` with a nonce CSP, and research fetches go through `research.SafeGet` (public addresses only, checked at dial time).

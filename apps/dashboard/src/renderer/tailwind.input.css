@@ -53,7 +53,7 @@
   --radius: 7px;
   --radius-md: 8px;
   --radius-lg: 10px;
-  --sidebar-w: 240px;
+  --sidebar-w: 288px;
 }
 
 html[data-theme='light'] {
@@ -274,12 +274,13 @@ html[data-theme='light'] ::-webkit-scrollbar-thumb {
   width: 28px;
   height: 28px;
   border-radius: 7px;
-  background: var(--surface-overlay);
-  border: 1px solid var(--border-strong);
+  /* The logo: the same in both themes, and the same as the app icon. */
+  background: #1c1e24;
+  border: 1px solid rgba(255, 255, 255, 0.18);
   display: grid;
   place-items: center;
   font-size: 15px;
-  color: var(--text);
+  color: #ffffff;
 }
 
 .brand-name {
@@ -1968,11 +1969,80 @@ button.status-chip:hover {
   min-width: 0;
 }
 
+/* Stretches to the box; the points are HTML on top, so they stay round. */
 .chart-box svg {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: 140px;
+  height: 100%;
   display: block;
   overflow: visible;
+}
+
+.chart-plot {
+  position: relative;
+  height: 220px;
+  min-width: 0;
+}
+
+.chart-dot {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+}
+
+.chart-dot::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--surface-raised);
+  transition: transform 0.12s ease;
+}
+
+.chart-dot:hover {
+  z-index: 2;
+}
+
+.chart-dot:hover::before {
+  transform: scale(1.35);
+}
+
+.chart-tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 260px;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  background: var(--surface-overlay);
+  border: 1px solid var(--border-muted);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  font-size: 11.5px;
+  color: var(--text);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.chart-dot:hover .chart-tip {
+  opacity: 1;
+}
+
+.chart-dot.tip-start .chart-tip {
+  left: 0;
+  transform: none;
+}
+
+.chart-dot.tip-end .chart-tip {
+  left: auto;
+  right: 0;
+  transform: none;
 }
 
 .chart-axis {
@@ -2666,15 +2736,17 @@ button.status-chip:hover {
 }
 
 .chart-y {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  position: relative;
+  height: 220px;
   font-family: var(--font-mono);
   font-size: 10px;
   color: var(--text-faint);
-  text-align: right;
-  height: 140px;
-  padding: 2px 0;
+}
+
+.chart-y span {
+  position: absolute;
+  right: 0;
+  transform: translateY(-50%);
 }
 
 .level-ticks {

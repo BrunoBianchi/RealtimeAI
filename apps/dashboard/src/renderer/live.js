@@ -114,7 +114,7 @@
           C.toast('Your plan has no minutes left. Upgrade to PRO to continue.', 'error');
           if (C.authRefresh) C.authRefresh(true).then(() => C.navigate('settings/plan'));
         } else if (msg.ready === false && msg.needs === 'server') {
-          C.toast('RealTimeAI server unavailable. Try again in a moment.', 'error');
+          C.toast('Cue server unavailable. Try again in a moment.', 'error');
         }
         if (S.ui.pendingChat) {
           const text = S.ui.pendingChat;

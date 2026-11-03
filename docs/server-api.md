@@ -1,6 +1,6 @@
-# API do servidor RealTimeAI (v1)
+# API do servidor Cue (v1)
 
-Contrato entre o app (engine `rtai_app` + dashboard) e os servidores RealTimeAI. O app
+Contrato entre o app (engine `rtai_app` + dashboard) e os servidores Cue. O app
 continua open-source e funciona sem servidor (modo **chaves próprias**); com uma conta, o
 usuário não precisa de chave nenhuma (modo **nuvem**).
 
@@ -10,7 +10,7 @@ Implementação do lado do cliente:
 |---|---|
 | Contrato puro (parse/validação, escolha do backend) | `src/core/include/rtai/cloud_session.hpp` |
 | Cliente HTTP do engine (bootstrap, renovação, fim de sessão) | `src/net/include/rtai/cloud_client.hpp`, `src/net/src/cloud_client.cpp` |
-| Ligação no engine | `src/app/src/main.cpp` (seção "RealTimeAI cloud bootstrap") |
+| Ligação no engine | `src/app/src/main.cpp` (seção "Cue cloud bootstrap") |
 | Login e conta no dashboard | `apps/dashboard/src/main/cloud_account.js`, aba **Conta e servidor** |
 | Servidor local para testes | `../backend/` em Go, fora deste repositório, roda no Docker (`npm run backend`, veja `../backend/README.md`) |
 | Testes | `tests/core_tests/test_cloud_session.cpp`, `test_deepgram_stream.cpp`, `apps/dashboard/tests/cloud_account.test.js` |
@@ -19,7 +19,7 @@ Implementação do lado do cliente:
 
 ```
               (1x por sessão, em paralelo com o start do áudio)
- rtai_app ── POST /v1/session ──────────────► API RealTimeAI
+ rtai_app ── POST /v1/session ──────────────► API Cue
     │        ◄── stt{url,token} llm{url,token} ──┘   (tokens de curta duração)
     │
     ├── WebSocket de áudio ──────────────────► Deepgram (direto, token temporário)
@@ -163,7 +163,11 @@ Bearer. Resposta `200`:
 | Plano | Limite | Sessões | Renova |
 |---|---|---|---|
 | `free` | 15 min | **uma única**, de até 15 min | nunca (é um teste) |
-| `pro` | 200 min por mês | quantas quiser | todo mês (`period_end`) |
+| `pro` | US$ 15/mês, 200 min (tokens) por mês | quantas quiser | todo mês (`period_end`) |
+
+Tokens avulsos: 1 token = 1 minuto, nunca expiram e são gastos depois dos minutos do plano.
+Pacotes: `tokens_60` (US$ 6), `tokens_150` (US$ 13), `tokens_400` (US$ 32). O saldo vem em
+`plan.credit_minutes` de `GET /v1/me`, e `minutes_left`/`max_session_s` da sessão já o incluem.
 
 - O servidor é a autoridade: recusa `POST /v1/session` com `402` quando o plano não tem
   minutos (ou a sessão gratuita já foi usada) e informa em `account` quanto a sessão pode
@@ -177,7 +181,7 @@ Bearer. Resposta `200`:
 
 ### `POST /v1/billing/checkout` e `POST /v1/billing/portal` — assinatura
 
-Bearer. `checkout` recebe `{"plan": "pro"}`; `portal` recebe `{}`. Resposta `200`
+Bearer. `checkout` recebe `{"plan": "pro"}` ou `{"pack": "tokens_60"}` (pacote inexistente: `400 unknown_pack`); `portal` recebe `{}`. Resposta `200`
 `{"url": "https://..."}` com a página hospedada (ex.: Stripe Checkout / Customer Portal),
 que o app abre no navegador. Só `https://` é aceito. Depois do pagamento, `GET /v1/me`
 passa a mostrar `pro`.
@@ -296,7 +300,7 @@ servidor (uso do Deepgram por `tag`, tokens do LLM no relay).
 
 ```ini
 [servidor]
-; auto / nuvem = transcrição e IA pelos servidores RealTimeAI
+; auto / nuvem = transcrição e IA pelos servidores Cue
 ; proprio = suas chaves de API (o login e a cota do plano continuam valendo)
 ; local = suas chaves, sem conta e sem nenhuma chamada a este servidor
 ;         (modo open-source; cada resposta espera +500 ms, recursos PRO desligados)

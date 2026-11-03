@@ -265,7 +265,7 @@ function looksScanned(result) {
 // OCR / reading through OpenRouter's file-parser (mistral-ocr): used only for
 // PDFs without a text layer. One call at upload time, never during the live
 // interview. Resolves to '' on any failure.
-// `target`: an OpenRouter key, or { url, headers } (the RealTimeAI server relay).
+// `target`: an OpenRouter key, or { url, headers } (the Cue server relay).
 function ocrPdfWithOpenRouter(buffer, filename, target, httpsModule, model = 'qwen/qwen3.6-flash', timeoutMs = 90000, httpModule = null) {
   if (!target || !buffer || !buffer.length) return Promise.resolve('');
   const endpoint = typeof target === 'string'

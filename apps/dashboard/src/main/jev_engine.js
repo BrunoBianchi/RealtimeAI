@@ -876,7 +876,7 @@ async function ingestSessionQuestions(appDataDir, transcriptText, companyName = 
 
 /**
  * Adds questions other candidates reported for the same company (from the
- * RealTimeAI server's community bank) to a company already in the local bank.
+ * Cue server's community bank) to a company already in the local bank.
  * questions: [{ text, category, subCategory, reports }]. Returns { added }.
  */
 function mergeCommunityQuestions(appDataDir, companyName, questions) {

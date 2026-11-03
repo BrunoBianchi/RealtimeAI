@@ -1,4 +1,4 @@
-﻿// RealTimeAI: visible, consented real-time meeting copilot.
+﻿// Cue: visible, consented real-time meeting copilot.
 //
 // Modes:
 //   (default)   Live: WASAPI mic ("Você") + loopback ("Outros") -> VAD ->
@@ -14,7 +14,7 @@
 // Configuration: %LOCALAPPDATA%\RealTimeAI\config.ini (created on first run,
 // API keys encrypted with DPAPI). Environment variables (DEEPGRAM_API_KEY,
 // OPENROUTER_API_KEY, RTAI_*) are used when a config field is empty.
-//   --config             open config.ini in Notepad and exit
+//   --config             open the dashboard on Settings and exit
 //   --config-file PATH   use another config file (or RTAI_CONFIG)
 //   --version            print the build version and exit
 #include <windows.h>
@@ -63,7 +63,7 @@
 #include "rtai/winhttp_llm_client.hpp"
 #include "rtai/web_search.hpp"
 #include "rtai/mini_agent.hpp"
-#include "rtai/session_studio_gui.hpp"
+#include "rtai/dashboard_launch.hpp"
 #include "rtai/transcript_export.hpp"
 
 #include <fstream>
@@ -152,7 +152,6 @@ struct AppConfig {
     bool open_config_only{false};
     bool protect_only{false};       // --protect-keys: encrypt plaintext secrets and exit
     bool server{false};
-    bool no_launcher{true};
     std::string agent_id;
     fs::path config_path;
     Settings st;                    // everything from config.ini / env
@@ -162,7 +161,7 @@ struct AppConfig {
     fs::path session_dir;
     fs::path silero_model;
     std::vector<std::string> notes; // shown as notices after start
-    // RealTimeAI cloud: set when the session broker handed out credentials.
+    // Cue cloud: set when the session broker handed out credentials.
     std::shared_ptr<CloudClient> cloud;
     std::optional<cloud::Session> cloud_session;
     // True when STT/LLM use the server credentials ([servidor] modo != proprio).
@@ -192,8 +191,7 @@ AppConfig load_config(int argc, char** argv) {
         else if (a == "--no-save") c.save = false;
         else if (a == "--config") c.open_config_only = true;
         else if (a == "--protect-keys") c.protect_only = true;
-        else if (a == "--no-launcher") c.no_launcher = true;
-        else if (a == "--studio" || a == "--launcher") c.no_launcher = false;
+        else if (a == "--no-launcher") {}  // Older launchers still pass it.
         else if (a == "--agent" && i + 1 < argc) c.agent_id = argv[++i];
         else if (a == "--config-file" && i + 1 < argc) config_override = argv[++i];
     }
@@ -454,8 +452,10 @@ bool handle_config_command(const AppConfig& cfg, const server::Command& c, LineC
     return false;
 }
 
-bool open_settings_popup(const fs::path& path) {
-    return gui::open_settings_gui(path, [](const char* name) { return env(name); });
+// The dashboard is the one place to configure the app. Without one on this
+// machine, the config file itself is the fallback.
+void open_settings_ui(const fs::path& path) {
+    if (!dashboard::open_settings()) wincfg::open_in_notepad(path);
 }
 
 // ---------------------------------------------------------------------------
@@ -640,7 +640,7 @@ int run_app(AppConfig cfg) {
     AsyncLog log(cfg.server ? stderr : stdout);
     std::FILE* log_file = open_log_file(cfg.app_dir);
     if (log_file) log.set_tee(log_file);
-    log.line(std::string("RealTimeAI ") + rtai::build::kVersion);
+    log.line(std::string("Cue ") + rtai::build::kVersion);
     // --server: protocol lines only on stdout, written by one thread.
     std::unique_ptr<LineChannel> out;
     if (cfg.server) {
@@ -653,13 +653,12 @@ int run_app(AppConfig cfg) {
     if (cfg.protect_only) return 0;
 
     if (cfg.open_config_only) {
-        enable_per_monitor_dpi();
-        open_settings_popup(cfg.config_path);
+        open_settings_ui(cfg.config_path);
         std::cout << "Config: " << path_utf8(cfg.config_path) << "\n";
         return 0;
     }
 
-    // ---------------- RealTimeAI cloud bootstrap ----------------
+    // ---------------- Cue cloud bootstrap ----------------
     // One POST /v1/session, started now so its round trip overlaps the agent,
     // RAG and audio set-up below; joined just before the transports are built.
     // Signing in is mandatory for live sessions: this call is also where the
@@ -685,24 +684,12 @@ int run_app(AppConfig cfg) {
         });
         log.line("Cloud: requesting a session from " + cloud::effective_base_url(cfg.st));
     };
-    const bool launcher_gui = !cfg.console && !cfg.server && !cfg.no_launcher;
-    if (!launcher_gui) start_cloud_boot();
+    start_cloud_boot();
 
-    // ---------------- Pre-Session Studio & Mini-Agent Loading ----------------
+    // ---------------- Mini-Agent Loading ----------------
     std::shared_ptr<MiniAgentRag> agent_rag;
     fs::path loaded_agent_path;
-    if (!cfg.console && !cfg.server && !cfg.no_launcher) {
-        enable_per_monitor_dpi();
-        const EnvLookup env_lookup = [](const char* name) { return env(name); };
-        auto launch = gui::open_session_studio_gui(cfg.app_dir, cfg.config_path, cfg.st, env_lookup);
-        if (!launch.proceed) {
-            return 0;
-        }
-        start_cloud_boot();
-        if (!launch.agent.empty()) {
-            agent_rag = std::make_shared<MiniAgentRag>(launch.agent);
-        }
-    } else {
+    {
         // Load the Mini-Agent configured by the Electron Dashboard (via --agent <id>,
         // config.ini [sessao] ultimo_agente, or the newest .json in %LOCALAPPDATA%\RealTimeAI\agents).
         const fs::path agents_dir = cfg.app_dir / L"agents";
@@ -806,8 +793,8 @@ int run_app(AppConfig cfg) {
     // user's own keys only.
     if (!cloud::local_mode(cfg.st) && !cloud::signed_in(cfg.st)) {
         const char* why = cloud::server_known(cfg.st)
-                              ? "Sign in to your RealTimeAI account in the dashboard to use the copilot."
-                              : "No RealTimeAI server configured: set [servidor] url and sign in from the dashboard.";
+                              ? "Sign in to your Cue account in the dashboard to use the copilot."
+                              : "No Cue server configured: set [servidor] url and sign in from the dashboard.";
         log.line(std::string("Cloud: ") + why);
         if (out) {
             cfg.notes.push_back(why);
@@ -836,7 +823,7 @@ int run_app(AppConfig cfg) {
                                 : (cloud_http_status == 402 || cloud_http_status == 403) ? "upgrade"
                                                                                          : "server";
             if (out) {
-                cfg.notes.push_back("Servidor RealTimeAI: " + cloud_error);
+                cfg.notes.push_back("Servidor Cue: " + cloud_error);
                 return run_setup_mode(cfg, *out, log, needs);
             }
             std::cerr << "[servidor] " << cloud_error << "\n";
@@ -849,15 +836,9 @@ int run_app(AppConfig cfg) {
         return run_setup_mode(cfg, *out, log);
     }
     if (!have_stt) {
-        enable_per_monitor_dpi();
-        if (open_settings_popup(cfg.config_path)) {
-            const EnvLookup env_lookup = [](const char* name) { return env(name); };
-            const ini::File file = ini::File::parse(wincfg::read_file(cfg.config_path));
-            cfg.st = load_settings(file, env_lookup, [](const std::string& v) { return wincfg::unprotect(v); });
-        }
-        if (cfg.st.deepgram_key.empty()) {
-            return 2;
-        }
+        // Keys are added in the dashboard, which starts the engine again.
+        open_settings_ui(cfg.config_path);
+        return 2;
     }
 
     // ---------------- LLM ----------------
@@ -1321,17 +1302,14 @@ int run_app(AppConfig cfg) {
             }
             engine->request_action(TriggerReason::Chat, prompt);
         };
-        ocb.on_open_config = [path = cfg.config_path, engine, o = out.get()] {
+        ocb.on_open_config = [path = cfg.config_path, o = out.get()] {
             // Launched by the dashboard: its Settings page is the one place to
             // configure everything, so ask it to come forward there.
             if (o) {
                 o->send(server::encode_simple("open_settings", "section", "general"));
                 return;
             }
-            if (open_settings_popup(path)) {
-                engine->notify(NoticeLevel::Info,
-                               "Settings saved. Restart the app to apply the new keys.");
-            }
+            open_settings_ui(path);
         };
         overlay = std::make_unique<OverlayWindow>(oo, ocb);
         std::string err;
@@ -1462,7 +1440,7 @@ int run_app(AppConfig cfg) {
         }
     }
 
-    log.line("== RealTimeAI live: You = microphone, Others = system audio ==");
+    log.line("== Cue live: You = microphone, Others = system audio ==");
     if (store) log.line("Session: " + path_utf8(store->jsonl_path()));
 
     // ---------------- main loop ----------------
@@ -1611,7 +1589,7 @@ int run_app(AppConfig cfg) {
 int main(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         if (std::string_view(argv[i]) == "--version") {
-            std::cout << "RealTimeAI " << rtai::build::kVersion << "\n";
+            std::cout << "Cue " << rtai::build::kVersion << "\n";
             return 0;
         }
     }

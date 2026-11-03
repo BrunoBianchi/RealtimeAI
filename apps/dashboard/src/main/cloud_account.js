@@ -1,4 +1,4 @@
-// RealTimeAI cloud account (dashboard side). Signing in is mandatory: the
+// Cue cloud account (dashboard side). Signing in is mandatory: the
 // dashboard shows only the sign-in screen until there is a device token.
 // Three ways in, all ending in the same device token:
 //   * Google and SSO (SAML/OIDC of the user's company): the OAuth 2.0 device
@@ -42,7 +42,7 @@ function describeError(code, status) {
     case 'access_denied': return 'Access denied in the browser.';
     case 'expired_token': return 'The code expired. Try signing in again.';
     case 'invalid_token': return 'Session expired: sign in to your account again.';
-    case 'network': return 'No connection to the RealTimeAI server.';
+    case 'network': return 'No connection to the Cue server.';
     case 'no_server': return 'No server configured.';
     case 'invalid_credentials': return 'Wrong e-mail or password.';
     case 'email_taken': return 'An account with this e-mail already exists. Sign in or reset the password.';
@@ -258,12 +258,12 @@ function createCloudAccount(deps) {
   }
 
   // PRO checkout / subscription management: the server returns a hosted page.
-  async function billing(kind) {
+  async function billing(kind, pack) {
     const token = deps.readToken();
     if (!token) return { ok: false, error: describeError('invalid_token') };
     const r = await request('POST', kind === 'portal' ? '/v1/billing/portal' : '/v1/billing/checkout', {
       token,
-      body: kind === 'portal' ? {} : { plan: 'pro' }
+      body: kind === 'portal' ? {} : pack ? { pack: String(pack) } : { plan: 'pro' }
     });
     if (r.ok && r.data && billingUrlAllowed(String(r.data.url || ''))) {
       deps.openBrowser(r.data.url);

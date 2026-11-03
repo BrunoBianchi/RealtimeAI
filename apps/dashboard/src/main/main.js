@@ -20,6 +20,7 @@ const { createUpdater } = require('./updater');
 const { createCloudAccount, effectiveServerUrl } = require('./cloud_account');
 const { normalizeUiLanguage, resolveUiLocale, systemLanguages, SUPPORTED: UI_LOCALES } = require('./ui_locale');
 const localBackend = require('./local_backend');
+const { settingsSectionFromArgv } = require('./launch_args');
 const jevEngine = require('./jev_engine');
 const companyLogoService = require('./company_logo_service');
 
@@ -41,12 +42,23 @@ let updater = null;
 
 // One dashboard at a time: it lives in the tray and watches for meetings, so a
 // second launch just brings the first one forward.
+// Windows shows this ID as the name on notifications, so it is the app's name.
+// The packaged app also keeps the profile it had before its rename, so sign-ins
+// and preferences survive.
+if (typeof app.setAppUserModelId === 'function') app.setAppUserModelId('Cue');
+if (app.isPackaged) app.setPath('userData', path.join(app.getPath('appData'), 'RealTimeAI'));
+
 const gotSingleInstanceLock =
   typeof app.requestSingleInstanceLock !== 'function' || app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
   app.quit();
 } else {
-  app.on('second-instance', () => {
+  app.on('second-instance', (_event, argv) => {
+    const section = settingsSectionFromArgv(argv);
+    if (section) {
+      showSettingsWindow(section);
+      return;
+    }
     if (!app.isPackaged && mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.reloadIgnoringCache();
     }
@@ -102,7 +114,7 @@ function getAppDataDir() {
 
 // Google Calendar (see google_calendar.js). The OAuth client file is looked up
 // in the app data folder, next to this file and in the project folder; without
-// one, a signed-in app uses the RealTimeAI server's client (it does the token
+// one, a signed-in app uses the Cue server's client (it does the token
 // exchanges, so the client secret stays on the server).
 let googleCalendar = null;
 let googleBroker = { client: null, at: 0 };
@@ -308,7 +320,7 @@ function readConfigIni() {
                                 (stealth.share_anonymized_questions ?? stealth.contribuir_perguntas ?? 'sim') !== 'false',
     calendar_ics_url: agenda.google_ics_url || '',
     calendar_oauth_token: agenda.google_oauth_token || '',
-    // RealTimeAI cloud ([servidor]): auto = our servers when signed in,
+    // Cue cloud ([servidor]): auto = our servers when signed in,
     // nuvem = always, proprio = only the user's own keys (open-source mode).
     // Stored as written; the engine validates it (unknown values act as auto).
     server_mode: servidor.modo || 'auto',
@@ -320,7 +332,7 @@ function readConfigIni() {
   };
 }
 
-// Signed in to a RealTimeAI account (mirrors cloud::signed_in). The whole app
+// Signed in to a Cue account (mirrors cloud::signed_in). The whole app
 // is gated on it: the renderer shows only the sign-in screen and nothing
 // starts the copilot without it.
 function isSignedIn(cfg) {
@@ -348,7 +360,7 @@ function cloudBackendActive(cfg) {
   return c.server_mode !== 'proprio' && !isLocalMode(c) && isSignedIn(c);
 }
 
-const LOGIN_REQUIRED = { ok: false, needsLogin: true, error: 'Sign in to your RealTimeAI account, or continue locally with your own API keys.' };
+const LOGIN_REQUIRED = { ok: false, needsLogin: true, error: 'Sign in to your Cue account, or continue locally with your own API keys.' };
 
 function hasOwnAiKey(c) {
   return Boolean(c.has_llm_key || c.has_cerebras_key || c.has_groq_key || c.has_openai_key || c.has_anthropic_key || c.has_gemini_key);
@@ -366,7 +378,7 @@ async function checkCanStartLive() {
   }
   if (!isSignedIn(cfg)) return LOGIN_REQUIRED;
   if (!cloudBackendActive(cfg) && !cfg.has_deepgram_key) {
-    return { ok: false, error: '"My keys" mode: set the Deepgram key or switch back to the RealTimeAI servers.' };
+    return { ok: false, error: '"My keys" mode: set the Deepgram key or switch back to the Cue servers.' };
   }
   const st = await cloudAccount.status(false);
   if (st && st.expired) return LOGIN_REQUIRED;
@@ -448,7 +460,7 @@ function writeConfigIni(updates) {
   const serverToken = updates.server_token !== undefined ? pickKey(updates.server_token, raw.servidor?.token) : (raw.servidor?.token || '');
 
   const managedLines = [
-    '# RealTimeAI settings (shared by the dashboard and the overlay HUD)',
+    '# Cue settings (shared by the dashboard and the overlay HUD)',
     '# Plain-text keys are encrypted automatically with Windows DPAPI by the overlay.',
     '',
     '[deepgram]',
@@ -685,10 +697,10 @@ function getOpenRouterApiKey() {
 }
 
 // Where the dashboard's own AI calls go (compaction, JEV, dossier, OCR):
-// the RealTimeAI server when signed in, so no key is needed, or OpenRouter
+// the Cue server when signed in, so no key is needed, or OpenRouter
 // with the user's key in "My keys" mode. null when neither is available.
 const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
-function aiTarget(title = 'RealTimeAI Studio') {
+function aiTarget(title = 'Cue Studio') {
   const cfg = readConfigIni();
   const ownKey = getOpenRouterApiKey();
   const direct = ownKey
@@ -726,7 +738,7 @@ function aiPost(target, payload, timeoutMs) {
 }
 
 function callOpenRouterSol61(messagesOrSystem, userOrMaxTokens = 1800, maybeMaxTokens = 1800) {
-  const target = aiTarget('RealTimeAI Studio');
+  const target = aiTarget('Cue Studio');
   if (!target) return Promise.resolve('');
 
   let messages;
@@ -1243,7 +1255,7 @@ function scheduleInterviewNotification(goal) {
         if (Notification.isSupported()) {
           new Notification({
             title: `Interview in 1 hour: ${goal.name}`,
-            body: `Your interview with ${goal.company || goal.name} starts at ${ni.time}. Open RealTimeAI to review the Prep tab.`
+            body: `Your interview with ${goal.company || goal.name} starts at ${ni.time}. Open Cue to review the Prep tab.`
           }).show();
         }
       }, delayMs);
@@ -1375,8 +1387,8 @@ function jevPairs(events) {
 }
 
 function callOpenRouterJson(messages, maxTokens, timeoutMs) {
-  const target = aiTarget('RealTimeAI JEV');
-  if (!target) return Promise.resolve({ ok: false, error: 'Sign in to your RealTimeAI account (or set the OpenRouter key) to use the JEV evaluation.' });
+  const target = aiTarget('Cue JEV');
+  if (!target) return Promise.resolve({ ok: false, error: 'Sign in to your Cue account (or set the OpenRouter key) to use the JEV evaluation.' });
   const payload = JSON.stringify({
     model: SOL_ANALYSIS_MODEL,
     messages,
@@ -1607,7 +1619,7 @@ function sessionQuestionLines(events, { withChat }) {
 const bankClassifier = (questions, ctx) => classifyQuestionsWithJev(questions, ctx);
 
 // "Share anonymized questions": after a session, the generalist questions JEV
-// kept go to the RealTimeAI community bank, and the questions other candidates
+// kept go to the Cue community bank, and the questions other candidates
 // reported for that company come back into the local bank. Never blocks.
 async function shareSessionQuestions(extraction) {
   try {
@@ -2199,7 +2211,7 @@ async function searchDuckDuckGoHtml(query) {
   }
 }
 
-// Company research runs on the RealTimeAI server when signed in (scraping +
+// Company research runs on the Cue server when signed in (scraping +
 // dossier, no keys on this machine); the local version stays for offline use.
 async function runCompanyRecon(input) {
   const { company, role, job_description } = input || {};
@@ -2915,7 +2927,9 @@ function popupPayload(kind, meeting) {
 
 function notify(title, body) {
   try {
-    if (Notification && Notification.isSupported()) new Notification({ title, body }).show();
+    if (Notification && Notification.isSupported()) {
+      new Notification({ title, body, icon: path.join(APP_ROOT, 'assets', 'icon.png') }).show();
+    }
   } catch (_e) {}
 }
 
@@ -3002,7 +3016,7 @@ function applyElectronStealthMode(overrides = {}) {
 
     try {
       if (typeof mainWindow.setTitle === 'function') {
-        let title = 'RealTimeAI — Copilot Studio';
+        let title = 'Cue — Interview Copilot';
         if (activeDisguise === 'settings') title = 'Settings';
         else if (activeDisguise === 'cmd') title = 'Command Prompt';
         else if (activeDisguise === 'taskmgr') title = 'Task Manager';
@@ -3119,7 +3133,7 @@ function getMeetingPopup() {
       const m = payload && payload.meeting;
       if (reason === 'mute' && m && m.id && m.via !== 'test') {
         saveMeetingSettings({ mutedApps: [...getMeetingSettings().mutedApps, m.id] });
-        notify(`RealTimeAI won't ask for ${m.name} again`, 'Turn it back on in Settings > General > Meeting detection.');
+        notify(`Cue won't ask for ${m.name} again`, 'Turn it back on in Settings > General > Meeting detection.');
       }
     },
     onOpenDashboard: () => showMainWindow()
@@ -3171,7 +3185,7 @@ function refreshTrayMenu() {
   const stealthActive = Boolean(cfg.electron_stealth);
 
   const items = [
-    { label: 'Open RealTimeAI', click: () => showMainWindow() },
+    { label: 'Open Cue', click: () => showMainWindow() },
     {
       label: stealthActive ? '🛡️ Stealth Mode (Active)' : '🛡️ Stealth Mode (Off)',
       type: 'checkbox',
@@ -3203,13 +3217,13 @@ function refreshTrayMenu() {
     { label: 'Detect meetings', type: 'checkbox', checked: s.enabled, click: (item) => saveMeetingSettings({ enabled: item.checked }) },
     { label: 'Show a test popup', click: () => showTestMeetingPopup() },
     { type: 'separator' },
-    { label: 'Quit RealTimeAI', click: () => { isQuitting = true; app.quit(); } }
+    { label: 'Quit Cue', click: () => { isQuitting = true; app.quit(); } }
   );
   try {
     tray.setContextMenu(Menu.buildFromTemplate(items));
     const stealthPrefix = stealthActive ? '🛡️ [Stealth] ' : '';
-    tray.setToolTip(running ? `${stealthPrefix}RealTimeAI · copilot on`
-      : active.length ? `${stealthPrefix}RealTimeAI · ${active[0].name} detected` : `${stealthPrefix}RealTimeAI`);
+    tray.setToolTip(running ? `${stealthPrefix}Cue · copilot on`
+      : active.length ? `${stealthPrefix}Cue · ${active[0].name} detected` : `${stealthPrefix}Cue`);
   } catch (_e) {}
 }
 
@@ -3261,7 +3275,7 @@ function createWindow() {
     minHeight: 720,
     frame: false,
     backgroundColor: initialTheme.resolved === 'dark' ? '#0D0D10' : '#FFFFFF',
-    title: 'RealTimeAI — Copilot Studio',
+    title: 'Cue — Interview Copilot',
     icon: path.join(APP_ROOT, 'assets', 'icon.png'),
     webPreferences: {
       preload: path.join(PRELOAD_DIR, 'preload.js'),
@@ -3289,7 +3303,11 @@ function createWindow() {
     mainWindow.hide();
     if (!trayHintShown) {
       trayHintShown = true;
-      notify('RealTimeAI is still running', 'It waits in the tray and pops up when a meeting starts. Right-click the tray icon to quit.');
+      const pt = resolveUiLocale(readConfigIni().ui_language, systemLanguages(app)).startsWith('pt');
+      notify(
+        pt ? 'O Cue continua ativo' : 'Cue is still running',
+        pt ? 'Ele fica na bandeja e avisa quando uma reunião começar.' : 'It stays in the tray and lets you know when a meeting starts.'
+      );
     }
   });
 
@@ -3299,9 +3317,12 @@ function createWindow() {
   } else if (process.argv.includes('--maximize')) {
     mainWindow.maximize();
   }
+
+  const settingsSection = settingsSectionFromArgv(process.argv);
+  if (settingsSection) showSettingsWindow(settingsSection);
 }
 
-// Running from source: use (and start, with Docker) the local RealTimeAI
+// Running from source: use (and start, with Docker) the local Cue
 // server in ../backend/ unless a server is configured. The engine inherits the env var.
 let localBackendHandle = null;
 function startLocalBackendForDev() {
@@ -3530,13 +3551,13 @@ app.whenReady().then(() => {
     gcalCall((g) => g.updateEvent(p && p.calendarId, p && p.eventId, (p && p.event) || {})));
   ipcMain.handle('rtai:gcal-delete-event', async (_ev, p) => gcalCall((g) => g.deleteEvent(p && p.calendarId, p && p.eventId)));
   // Provider consoles linked from Settings > Account (fixed allowlist).
-  // ---- RealTimeAI cloud account (device sign-in; docs/server-api.md) ----
+  // ---- Cue cloud account (device sign-in; docs/server-api.md) ----
   ipcMain.handle('rtai:cloud-status', async (_ev, force) => cloudAccount.status(Boolean(force)));
   ipcMain.handle('rtai:cloud-login', async (_ev, options) => cloudAccount.startLogin(options || {}));
   ipcMain.handle('rtai:cloud-password-login', async (_ev, p) => cloudAccount.loginWithPassword(p && p.email, p && p.password));
   ipcMain.handle('rtai:cloud-signup', async (_ev, p) => cloudAccount.signup(p && p.name, p && p.email, p && p.password));
   ipcMain.handle('rtai:cloud-reset-password', async (_ev, email) => cloudAccount.resetPassword(email));
-  ipcMain.handle('rtai:cloud-billing', async (_ev, kind) => cloudAccount.billing(kind === 'portal' ? 'portal' : 'checkout'));
+  ipcMain.handle('rtai:cloud-billing', async (_ev, kind, pack) => cloudAccount.billing(kind === 'portal' ? 'portal' : 'checkout', pack));
   ipcMain.handle('rtai:cloud-cancel-login', async () => cloudAccount.cancelLogin());
   ipcMain.handle('rtai:cloud-logout', async () => {
     if (isOverlayRunning()) stopRunningOverlay();
@@ -3921,7 +3942,7 @@ app.whenReady().then(() => {
   ipcMain.handle('rtai:set-process-disguise', async (_ev, disguise) => {
     const valid = ['none', 'settings', 'cmd', 'taskmgr'].includes(disguise) ? disguise : 'none';
     writeConfigIni({ process_disguise: valid });
-    let title = 'RealTimeAI — Copilot Studio';
+    let title = 'Cue — Interview Copilot';
     if (valid === 'settings') title = 'Settings';
     else if (valid === 'cmd') title = 'Command Prompt';
     else if (valid === 'taskmgr') title = 'Task Manager';

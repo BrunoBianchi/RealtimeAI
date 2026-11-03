@@ -2,7 +2,7 @@
   "name": "realtimeai-dashboard",
   "version": "2.0.0",
   "private": true,
-  "description": "RealTimeAI: interview copilot dashboard, session manager and overlay control",
+  "description": "Cue: interview copilot dashboard, session manager and overlay control",
   "author": {
     "name": "Bruno Raiado Bianchi"
   },

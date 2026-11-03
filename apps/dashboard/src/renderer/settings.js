@@ -127,7 +127,7 @@
   }
 
   // ----------------------------------------------------- cloud account --
-  // The RealTimeAI account is mandatory (auth.js locks the app while signed
+  // The Cue account is mandatory (auth.js locks the app while signed
   // out). This tab shows who is signed in and where STT + IA run.
   // Local mode: no account. Says what that means and how to get PRO.
   function localAccount() {
@@ -135,7 +135,7 @@
       ${card('Local mode', 'No account: transcription and answers use your own API keys, straight from this computer.',
         `<div class="row" style="gap:14px"><span class="avatar" style="width:40px;height:40px;font-size:13px">${icon('key')}</span>
           <div class="stack grow" style="gap:0"><span class="strong">Running locally</span>
-          <span class="small faint">Nothing goes to the RealTimeAI servers. Answers start ${C.LOCAL_ANSWER_DELAY_MS} ms later than with PRO.</span></div>
+          <span class="small faint">Nothing goes to the Cue servers. Answers start ${C.LOCAL_ANSWER_DELAY_MS} ms later than with PRO.</span></div>
           <button type="button" class="btn" data-action="go" data-to="settings/ai">${icon('key')}API keys</button>
           <button type="button" class="btn primary" data-action="go-pro">Sign in or create account</button></div>`)}
       ${C.proAd('card', 'What PRO adds')}`;
@@ -161,22 +161,22 @@
         <button type="button" class="btn" data-action="cloud-logout">${icon('sign-out')}Sign out</button></div>`;
     const active = C.cloudActive();
     return `
-      ${card('RealTimeAI account', active ? 'Next session uses the RealTimeAI servers' : 'Next session uses your API keys', body)}
+      ${card('Cue account', active ? 'Next session uses the Cue servers' : 'Next session uses your API keys', body)}
       ${card('Where the AI runs', 'Audio goes straight to the transcription provider; the server only issues temporary credentials. Plan minutes count in both modes.',
         `<div class="option-cards">${[
-          ['auto', 'RealTimeAI servers', 'Transcription and answers through your account, no API keys.'],
+          ['auto', 'Cue servers', 'Transcription and answers through your account, no API keys.'],
           ['proprio', 'My keys', 'Uses the keys in AI and models (open-source mode).']
         ].map(([v, l, d]) => {
           const on = v === 'proprio' ? mode === 'proprio' : mode !== 'proprio';
           return `<button type="button" class="option-card ${on ? 'active' : ''}" aria-pressed="${on}" data-action="cloud-mode" data-mode="${v}"><span class="t">${on ? '<span class="dot"></span>' : ''}${l}</span><span class="s">${d}</span></button>`;
         }).join('')}</div>`)}
       ${card('Advanced', 'Your own or a test server',
-        `${row('Server address', available && !cfg.server_url ? `Default: <span class="mono">${esc(cfg.server_url_effective)}</span>` : 'Any server that implements the RealTimeAI v1 API.', cfgText('server_url', 'Server address', cfg.server_url || '', cfg.server_url_effective || 'https://server.example.com', 280))}
+        `${row('Server address', available && !cfg.server_url ? `Default: <span class="mono">${esc(cfg.server_url_effective)}</span>` : 'Any server that implements the Cue v1 API.', cfgText('server_url', 'Server address', cfg.server_url || '', cfg.server_url_effective || 'https://server.example.com', 280))}
          ${row('Region', 'Automatic picks the closest one (lowest latency).', cfgSelect('server_region', 'Region', [['auto', 'Automatic'], ['sa-east-1', 'South America (São Paulo)'], ['us-east-1', 'US (East)'], ['eu-west-1', 'Europe (Ireland)']], cfg.server_region || 'auto'))}`)}`;
   }
 
   C.actions['cloud-logout'] = async () => {
-    const ok = await C.confirm('Sign out of RealTimeAI?', 'Cue stays locked until you sign in again. A live session in progress is stopped.', 'Sign out');
+    const ok = await C.confirm('Sign out of Cue?', 'Cue stays locked until you sign in again. A live session in progress is stopped.', 'Sign out');
     if (!ok) return;
     const res = await C.guard(() => api.cloudLogout(), 'Could not sign out.');
     if (res && res.config) S.config = res.config;
@@ -191,8 +191,9 @@
 
   C.actions['cloud-billing'] = async (el) => {
     const kind = el.dataset.kind === 'portal' ? 'portal' : 'checkout';
-    const res = await C.guard(() => api.cloudBilling(kind), 'Could not open the payment page.');
-    if (res && res.ok) C.toast(kind === 'portal' ? 'Your subscription opened in the browser.' : 'Finish subscribing in the browser. The plan updates on its own.');
+    const res = await C.guard(() => api.cloudBilling(kind, el.dataset.pack), 'Could not open the payment page.');
+    if (res && res.ok && el.dataset.pack) C.toast('Finish your purchase in the browser.');
+    else if (res && res.ok) C.toast(kind === 'portal' ? 'Your subscription opened in the browser.' : 'Finish subscribing in the browser. The plan updates on its own.');
     else if (res) C.toast(res.error || 'Could not open the payment page.', 'error');
   };
 
@@ -272,7 +273,7 @@
          ${row('Discreet title', 'Changes the window title to "Settings".', C.sw('data-change="stealth" data-field="disguise"', st.disguise ?? cfg.electron_disguise))}
          <div class="set-row"><div class="txt"><span class="t">Window opacity</span><span class="s">Makes the panel translucent over other windows.</span></div><div class="ctl" style="gap:10px"><input type="range" min="40" max="100" step="5" value="${opacity}" data-input="opacity" data-change="opacity-save" style="width:180px;accent-color:var(--accent)"/><span class="num" id="opacityLabel" style="width:40px;text-align:right">${opacity}%</span></div></div>
          <div class="set-row stacked"><div class="txt"><span class="t">Process name</span><span class="s">How Cue appears in Task Manager.</span></div>
-           <div class="option-cards">${[['none', 'RealTimeAI', 'Normal'], ['settings', 'Settings', 'Windows Settings'], ['cmd', 'Command Prompt', 'cmd.exe'], ['taskmgr', 'Task Manager', 'Task Manager']]
+           <div class="option-cards">${[['none', 'Cue', 'Normal'], ['settings', 'Settings', 'Windows Settings'], ['cmd', 'Command Prompt', 'cmd.exe'], ['taskmgr', 'Task Manager', 'Task Manager']]
              .map(([v, t, s]) => `<button type="button" class="option-card ${disguise === v ? 'active' : ''}" aria-pressed="${disguise === v}" data-action="set-disguise" data-mode="${v}" data-label="${esc(t)}"><span class="t">${esc(t)}</span><span class="s">${esc(s)}</span></button>`)
              .join('')}</div></div>`)}
       ${card('Floating panel (HUD)', 'What the interviewer does not see during the call',
@@ -309,7 +310,7 @@
     let dot = 'off';
     if (configured && !connected) {
       title = 'Ready to connect';
-      detail = st.lastError || (st.brokered ? 'Ready to connect through your RealTimeAI account.' : `OAuth client: ${st.clientType === 'web' ? 'web application' : 'desktop app'}${st.projectId ? ` (${st.projectId})` : ''}`);
+      detail = st.lastError || (st.brokered ? 'Ready to connect through your Cue account.' : `OAuth client: ${st.clientType === 'web' ? 'web application' : 'desktop app'}${st.projectId ? ` (${st.projectId})` : ''}`);
       dot = 'warn';
     } else if (connected) {
       title = 'Connected';
@@ -404,6 +405,27 @@
 
   // Account plan from the server (S.auth.entitlement): Free = one session of up
   // to 15 min, once; PRO = 200 min per month.
+  // Prices in US dollars; main/plans.js and the server hold the same catalog.
+  const PRO_PRICE = 15;
+  const PRO_MINUTES = 200;
+  const TOKEN_PACKS = [
+    { id: 'tokens_60', minutes: 60, price: 6 },
+    { id: 'tokens_150', minutes: 150, price: 13 },
+    { id: 'tokens_400', minutes: 400, price: 32 }
+  ];
+  const perMinute = (price, minutes) => `$${(price / minutes).toFixed(3).replace(/0$/, '')}`;
+
+  function tokenPacks() {
+    return card('Buy tokens', 'One token is one live minute. No subscription, and they never expire.',
+      `<div class="option-cards" style="grid-template-columns:repeat(3,minmax(0,1fr))">${TOKEN_PACKS.map((p) => `
+        <div class="option-card"><span class="t">${p.minutes} tokens</span>
+          <span class="metric">$${p.price}</span>
+          <span class="s">${perMinute(p.price, p.minutes)} per minute</span>
+          <button type="button" class="btn sm" style="margin-top:10px" data-action="cloud-billing" data-kind="checkout" data-pack="${p.id}">Buy</button></div>`).join('')}
+      </div>
+      <div class="small muted" style="margin-top:12px">PRO includes ${PRO_MINUTES} tokens every month for $${PRO_PRICE}: ${perMinute(PRO_PRICE, PRO_MINUTES)} per minute, the lowest price. Purchased tokens are used after the plan's minutes.</div>`);
+  }
+
   function planCard(u) {
     const ent = S.auth && S.auth.entitlement;
     if (!ent) return card('Current plan', '', '<div class="muted">Could not read the plan right now.</div>', `<button type="button" class="btn sm" data-action="plan-refresh">${icon('refresh')}Refresh</button>`);
@@ -414,9 +436,10 @@
     const action = ent.isPro
       ? `<button type="button" class="btn" data-action="cloud-billing" data-kind="portal">${icon('external')}Manage subscription</button>`
       : `<button type="button" class="btn primary" data-action="cloud-billing" data-kind="checkout">Upgrade to PRO</button>`;
-    return card('Current plan', 'From your RealTimeAI account',
+    return card('Current plan', 'From your Cue account',
       `<div class="row" style="gap:16px"><span class="metric">${esc(ent.planLabel)}</span><span class="muted grow">${sub}</span>${action}</div>
        <div class="meter-row" style="margin-top:14px"><div class="lbl"><span>${u.usedMin} of ${u.limit} min ${ent.isPro ? `in ${esc(u.monthLabel)}` : 'used'}</span><span class="num">${u.left} min left</span></div>${C.pctBar(u.pct, tone)}</div>
+       ${ent.creditMinutes > 0 ? `<div class="small muted" style="margin-top:10px"><span class="num">${Math.round(ent.creditMinutes)}</span> <span>purchased tokens, they never expire</span></div>` : ''}
        ${ent.canStart ? '' : `<div class="small" role="alert" style="color:var(--danger);margin-top:12px">${esc(ent.reason)}</div>`}`,
       `<button type="button" class="btn sm ghost" data-action="plan-refresh">${icon('refresh')}Refresh</button>`);
   }
@@ -427,7 +450,9 @@
     const rows = [
       ['Account', 'Not needed', 'Required', 'Required'],
       ['API keys', 'Your own', 'Not needed', 'Not needed'],
-      ['Live minutes', 'Pay your providers', '15 min, once', '200 min / month'],
+      ['Price', 'Free', 'Free', `$${PRO_PRICE} / month`],
+      ['Live minutes', 'Pay your providers', '15 min, once', '200 tokens / month'],
+      ['Extra tokens', '—', 'From $0.08 per minute', 'From $0.08 per minute'],
       ['Answer speed', `+${d} ms per answer`, 'Instant', 'Instant'],
       ['Cloud backup of files', '—', '—', 'Included'],
       ['Sync across devices', '—', '—', 'Included'],
@@ -458,11 +483,12 @@
     const max = Math.max(1, ...months.map(([, v]) => v.sec));
     return `
       ${planCard(u)}
-      ${card('Plans', 'The server checks the limit on every session; when it runs out, the session ends.',
+      ${card('Plans', 'One token is one live minute. The server checks the limit on every session; when it runs out, the session ends.',
         `<div class="option-cards">
           <div class="option-card ${u.isPro ? '' : 'active'}"><span class="t">${u.isPro ? '' : '<span class="dot"></span>'}Free</span><span class="s">A single session of up to 15 minutes to try it out. Does not renew.</span></div>
-          <div class="option-card ${u.isPro ? 'active' : ''}"><span class="t">${u.isPro ? '<span class="dot"></span>' : ''}PRO</span><span class="s">Up to 200 minutes per month, across as many sessions as you like. Renews monthly.</span></div>
+          <div class="option-card ${u.isPro ? 'active' : ''}"><span class="t">${u.isPro ? '<span class="dot"></span>' : ''}PRO</span><span class="metric">$${PRO_PRICE}</span><span class="s">Per month. Includes ${PRO_MINUTES} tokens a month, across as many sessions as you like.</span></div>
         </div>`)}
+      ${tokenPacks()}
       ${card('Usage by month', 'Calculated from recorded sessions',
         months.length
           ? months.map(([key, v]) => `<div class="meter-row" style="padding:8px 0"><div class="lbl"><span>${esc(C.MONTHS_LONG[v.d.getMonth()])} ${v.d.getFullYear()}</span><span class="num">${Math.round(v.sec / 60)} min · ${plural(v.n, 'session', 'sessions')}</span></div>${C.pctBar((v.sec / max) * 100, 'thick')}</div>`).join('')

@@ -70,7 +70,7 @@ struct Settings {
     // [calendario]
     std::string calendar_ics_url;
     std::string calendar_token;
-    // [servidor] RealTimeAI cloud (see cloud_session.hpp / docs/server-api.md).
+    // [servidor] Cue cloud (see cloud_session.hpp / docs/server-api.md).
     std::string server_mode{"auto"}; // auto | nuvem | proprio
     std::string server_url;          // empty = compiled default (RTAI_SERVER_URL)
     std::string server_token;        // device token from the dashboard sign-in
@@ -374,7 +374,7 @@ inline bool is_secret_setting(std::string_view section, std::string_view key) {
 
 inline std::string default_config_text() {
     return R"(; ============================================================================
-; RealTimeAI settings
+; Cue settings
 ; ============================================================================
 ; Edit and save; changes apply the next time the app opens
 ; (Ctrl+Alt+Q closes it, then open it again). Ctrl+Alt+O opens this file.
@@ -457,7 +457,7 @@ salvar = sim
 pasta =
 
 [servidor]
-; RealTimeAI servers (no API keys needed once signed in from the dashboard).
+; Cue servers (no API keys needed once signed in from the dashboard).
 ; auto = servers when signed in, otherwise your keys above
 ; nuvem = always the servers; proprio = your keys, signed in (plan minutes count)
 ; local = your keys, no account and no server (open-source mode, answers ~0.5 s slower)

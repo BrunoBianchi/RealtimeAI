@@ -34,7 +34,7 @@ contextBridge.exposeInMainWorld('rtai', {
   cloudPasswordLogin: (creds) => ipcRenderer.invoke('rtai:cloud-password-login', creds),
   cloudSignup: (data) => ipcRenderer.invoke('rtai:cloud-signup', data),
   cloudResetPassword: (email) => ipcRenderer.invoke('rtai:cloud-reset-password', email),
-  cloudBilling: (kind) => ipcRenderer.invoke('rtai:cloud-billing', kind),
+  cloudBilling: (kind, pack) => ipcRenderer.invoke('rtai:cloud-billing', kind, pack),
   cloudCancelLogin: () => ipcRenderer.invoke('rtai:cloud-cancel-login'),
   cloudLogout: () => ipcRenderer.invoke('rtai:cloud-logout'),
   onCloudEvent: (cb) => {

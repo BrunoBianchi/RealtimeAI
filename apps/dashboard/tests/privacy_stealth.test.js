@@ -22,7 +22,7 @@ test('Privacy & Stealth: the HUD card has the 4 functional toggles', () => {
 
   // Brand integrity: no third-party names anywhere in the page.
   for (const src of [indexHtml, ...Object.values(sources)]) assert.ok(!src.includes('InterviewCoder'));
-  assert.ok(html.includes('RealTimeAI'), 'the process-name option shows the real app name');
+  assert.ok(html.includes('Cue'), 'the process-name option shows the real app name');
 });
 
 test('Privacy & Stealth: a toggle saves its key as a boolean and says so', async () => {

@@ -461,7 +461,7 @@ function usage() {
       questions: list.reduce((acc, s) => acc + (Number(s.questionsCount) || 0), 0),
       answers: list.reduce((acc, s) => acc + (Number(s.suggestions) || Number(s.answersCount) || 0), 0),
       pct: limit ? clamp(Math.round((ent.usedMinutes / limit) * 100), 0, 100) : null,
-      left: limit ? Math.max(0, Math.round(ent.leftMinutes)) : null,
+      left: limit ? Math.max(0, Math.round(ent.leftMinutes + (ent.creditMinutes || 0))) : null,
       renewLabel: ent.monthly ? fmtDateShort(renew) : '',
       monthLabel: ent.monthly ? MONTHS_LONG[now.getMonth()] : 'free session'
     };
@@ -534,7 +534,7 @@ Cue.localMode = localMode;
 const LOCAL_ANSWER_DELAY_MS = 500;
 Cue.LOCAL_ANSWER_DELAY_MS = LOCAL_ANSWER_DELAY_MS;
 
-// Signed in to the RealTimeAI servers: they provide STT and the LLM, no keys
+// Signed in to the Cue servers: they provide STT and the LLM, no keys
 // needed. Mirrors cloud::choose_backend in the engine.
 function cloudActive() {
   const c = S.config || {};
