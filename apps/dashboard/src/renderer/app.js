@@ -898,6 +898,7 @@ function renderShell() {
   // Usage card
   const u = usage();
   const card = document.getElementById('sidebarUsage');
+  if (card) card.classList.toggle('pro-ad', localMode());
   if (card && localMode()) {
     // Local mode: the usage card becomes the PRO ad.
     card.dataset.action = 'go-pro';
@@ -905,7 +906,7 @@ function renderShell() {
     setHtml(card, `
       <div class="row between"><span class="eyebrow">Local mode</span><span class="pill">${icon('sparkle')}PRO</span></div>
       <div class="pro-mini">${PRO_PERKS.map(([ic, t]) => `<span>${icon(ic)}${esc(t)}</span>`).join('')}</div>
-      <div class="row between faint" style="font-size:11.5px"><span>Answers +${LOCAL_ANSWER_DELAY_MS} ms</span><span class="nowrap strong">Get PRO →</span></div>`);
+      <div class="pro-ad-foot"><span class="pro-ad-note">Answers +${LOCAL_ANSWER_DELAY_MS} ms</span><span class="pro-ad-cta">Get PRO →</span></div>`);
   } else if (card) {
     card.dataset.action = 'go';
     card.dataset.to = 'settings/plan';
