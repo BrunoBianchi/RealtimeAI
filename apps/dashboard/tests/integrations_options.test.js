@@ -55,7 +55,7 @@ test('Integrations & Options: meeting detection and Google Calendar have their o
   });
   const general = render(Cue, 'settings/general');
   assert.deepStrictEqual(tags(general, { 'data-change': 'meeting' }).map((t) => t['data-field']), ['enabled', 'keepInTray']);
-  assert.ok(general.includes('Observando Meet, Teams, Zoom, Discord, Slack e outros.'));
+  assert.ok(general.includes('Watching Meet, Teams, Zoom, Discord, Slack and others.'));
   const calendar = render(Cue, 'settings/calendar');
   assert.ok(tags(calendar, { 'data-action': 'gcal-connect' }).length === 1, 'configured client: Conectar');
 });

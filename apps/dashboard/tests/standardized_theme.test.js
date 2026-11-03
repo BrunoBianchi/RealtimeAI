@@ -13,7 +13,7 @@ test('Standardized Default Theme: HTML and Core defaults to Dark theme', () => {
   const popupHtml = fs.readFileSync(popupHtmlPath, 'utf8');
 
   // Root HTML starts dark (no flash of the light theme before boot).
-  assert.ok(/<html lang="pt-BR" data-theme="dark">/.test(indexHtml), 'index.html must start with data-theme="dark"');
+  assert.ok(/<html lang="en" data-theme="dark">/.test(indexHtml), 'index.html must start with data-theme="dark"');
   // Meeting popup must default to dark
   assert.ok(popupHtml.includes('data-theme="dark"'), 'meeting_popup.html must have data-theme="dark"');
   // main.js getThemeState must fall back to "dark"

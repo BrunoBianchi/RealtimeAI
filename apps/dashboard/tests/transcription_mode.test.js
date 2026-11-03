@@ -75,7 +75,7 @@ test('Task 9.3: UI presence for Transcription Only toggle and Session Summary mo
   const r = loadRenderer({ state: { agents: [{ id: 'a1', company: 'Nubank' }], activeAgentId: 'a1' } });
   r.Cue.openModal('summary', { ok: true, text: '## Resumo\n- Falou de **Kafka**', export_path: 'C:/RealTimeAI/sessions/s1.md' });
   const html = r.modals.last;
-  assert.ok(html.includes('Resumo da sessão') && html.includes('<strong>Kafka</strong>'));
+  assert.ok(html.includes('Session summary') && html.includes('<strong>Kafka</strong>'));
   assert.ok(html.includes('data-action="open-path" data-path="C:/RealTimeAI/sessions/s1.md"'), 'opens the exported file');
   assert.ok(html.includes('id="smDebrief"'), 'can save a debrief to the session');
   assert.ok(/data-to="sessions\/past"/.test(html), 'goes to the history');
@@ -91,11 +91,11 @@ test('Feature: transcription-only-mode, Property 1: Toggle solicita o valor opos
     assert.strictEqual(r.S.live.transcriptionOnly, mirror, 'the mirror waits for the engine to confirm');
   }
   // The engine refuses (not running): the checkbox goes back.
-  const r = loadRenderer({ api: { setMode: async () => ({ ok: false, error: 'O copiloto não está rodando.' }) } });
+  const r = loadRenderer({ api: { setMode: async () => ({ ok: false, error: 'The copilot is not running.' }) } });
   const box = el({}, { checked: true });
   await r.Cue.changes['live-mode'](box);
   assert.strictEqual(box.checked, false);
-  assert.deepStrictEqual(r.toasts(), [{ text: 'O copiloto não está rodando.', error: true }]);
+  assert.deepStrictEqual(r.toasts(), [{ text: 'The copilot is not running.', error: true }]);
 });
 
 test('Feature: transcription-only-mode, Property 2: O espelho segue a última republicação recebida', async () => {
@@ -116,7 +116,7 @@ test('Feature: transcription-only-mode, Requirements 5.4, 5.5: Comportamento de 
 
   onSummary(null);
   onSummary({ ok: false, text: '', export_path: 'C:/fake/path.txt' });
-  assert.deepStrictEqual(r.toasts(), [{ text: 'O resumo não pôde ser gerado; a transcrição foi salva.', error: true }]);
+  assert.deepStrictEqual(r.toasts(), [{ text: 'The summary could not be generated; the transcript was saved.', error: true }]);
   assert.strictEqual(r.dialogs.length, 0, 'no dialog for a failed summary');
 
   onSummary({ ok: true, text: '## Resumo da Sessão', export_path: 'C:/fake/path.txt' });

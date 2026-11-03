@@ -379,6 +379,10 @@ function createGoogleCalendar(opts = {}) {
   const timeZone = opts.timeZone || defaultTimeZone();
   const connectTimeoutMs = opts.connectTimeoutMs || CONNECT_TIMEOUT_MS;
   const store = tokenStore(dataDir, opts.safeStorage || null);
+  // opts.broker: the RealTimeAI server holds the OAuth client. client() gives
+  // its public client id (or null); token(params) does the code/refresh
+  // exchange there, so no client secret is needed on this machine.
+  const broker = opts.broker || null;
   let lastError = '';
   let connecting = null;
 
@@ -398,6 +402,10 @@ function createGoogleCalendar(opts = {}) {
         const c = parseClientJson(fs.readFileSync(file, 'utf8'));
         if (c) return { ...c, source: file };
       } catch (_e) {}
+    }
+    const b = broker && broker.client();
+    if (b && b.client_id) {
+      return { type: 'installed', clientId: String(b.client_id), clientSecret: '', redirectUris: [], projectId: '', source: 'RealTimeAI server', brokered: true };
     }
     return null;
   }
@@ -434,6 +442,7 @@ function createGoogleCalendar(opts = {}) {
       configured: Boolean(client),
       clientType: client ? client.type : '',
       clientSource: client ? client.source : '',
+      brokered: Boolean(client && client.brokered),
       projectId: client ? client.projectId : '',
       redirectUri: client && client.type === 'web' ? redirect.uri : '',
       connected: Boolean(tok && tok.refresh_token),
@@ -480,7 +489,12 @@ function createGoogleCalendar(opts = {}) {
     }
   }
 
-  function tokenRequest(client, params) {
+  async function tokenRequest(client, params) {
+    if (client.brokered) {
+      const r = await broker.token(params);
+      if (r.status === 0) throw new GcalError('network', 'Could not reach the RealTimeAI server.');
+      return { status: r.status, ok: r.ok, body: r.data };
+    }
     const form = new URLSearchParams({ client_id: client.clientId, ...params });
     if (client.clientSecret) form.set('client_secret', client.clientSecret);
     return httpJson(TOKEN_ENDPOINT, {

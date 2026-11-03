@@ -34,14 +34,14 @@ test('the calendar settings follow the connection state and the form has every f
   const actions = (html) => tags(html, { 'data-action': true }).map((t) => t['data-action']);
 
   const none = at({ configured: false, connected: false });
-  assert.ok(none.includes('Não configurado') && actions(none).includes('gcal-import') && !actions(none).includes('gcal-connect'));
+  assert.ok(none.includes('Not set up') && actions(none).includes('gcal-import') && !actions(none).includes('gcal-connect'));
 
   const ready = at({ configured: true, connected: false, redirectUri: 'http://127.0.0.1:53682/' });
   assert.ok(actions(ready).includes('gcal-connect'));
   assert.ok(ready.includes('http://127.0.0.1:53682/') && actions(ready).includes('copy-text'), 'redirect URI to register, with copy');
 
   const on = at({ configured: true, connected: true, email: 'ana@example.com', calendarId: 'work', reminderMin: 30 });
-  assert.ok(on.includes('Conta: ana@example.com') && actions(on).includes('gcal-disconnect'));
+  assert.ok(on.includes('Account: ana@example.com') && actions(on).includes('gcal-disconnect'));
   assert.deepStrictEqual(tags(on, { 'data-change': 'gcal-setting' }).map((t) => t['data-field']), ['autoSync', 'calendarId', 'reminderMin']);
   assert.ok(on.includes('<option value="work" selected>Trabalho</option>'), 'saved calendar selected');
   assert.ok(on.includes('<option value="30" selected>'), 'saved reminder selected');
@@ -50,7 +50,7 @@ test('the calendar settings follow the connection state and the form has every f
   assert.ok(read.length >= 5);
   for (const id of read) assert.ok(on.includes(`id="${id}"`), `form must have #${id}`);
   assert.ok(actions(on).includes('gcal-create') && actions(on).includes('gcal-refresh'));
-  assert.ok(on.includes('Nada nos próximos 14 dias.'), 'empty list says so');
+  assert.ok(on.includes('Nothing in the next 14 days.'), 'empty list says so');
 });
 
 test('scheduling and clearing an interview keep its Google Calendar event in step', async () => {
@@ -64,7 +64,7 @@ test('scheduling and clearing an interview keep its Google Calendar event in ste
     api: { scheduleInterview: async () => ({ ok: true, agents: [], calendar: { ok: true } }) }
   });
   r.Cue.openModal('scheduler', 'a1');
-  assert.ok(r.modals.last.includes('Adicionar ao Google Calendar') && r.modals.last.includes('id="scGcal" checked'));
+  assert.ok(r.modals.last.includes('Add to Google Calendar') && r.modals.last.includes('id="scGcal" checked'));
   const dlg = r.dialogs[0];
   dlg.querySelector('#scAgent').value = 'a1';
   dlg.querySelector('#scDate').value = '2099-03-10';
@@ -72,7 +72,7 @@ test('scheduling and clearing an interview keep its Google Calendar event in ste
   dlg.querySelector('#scGcal').checked = false;
   await dlg.querySelector('#scSave').fire('click');
   assert.deepStrictEqual(r.called('scheduleInterview'), [[{ goalId: 'a1', date: '2099-03-10', time: '14:30', calendar: false }]]);
-  assert.ok(r.toasts().some((t) => t.text.startsWith('Entrevista em 10 mar às 14:30.')));
+  assert.ok(r.toasts().some((t) => t.text.startsWith('Interview on Mar 10 at 14:30.')));
 
   const offline = loadRenderer({ state: { agents: [{ id: 'a1', company: 'Nubank' }], gcal: { status: { connected: false } } } });
   offline.Cue.openModal('scheduler', 'a1');

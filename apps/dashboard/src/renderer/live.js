@@ -10,15 +10,15 @@
   const { esc, icon, fixText, plural } = C;
 
   const REASON = {
-    auto: 'Automática',
+    auto: 'Automatic',
     manual: 'Manual',
     chat: 'Chat',
-    recap: 'Resumo',
+    recap: 'Recap',
     followup: 'Follow-up',
     follow_up: 'Follow-up',
-    screenshot: 'Tela',
-    keyword: 'Palavra-chave',
-    question: 'Pergunta'
+    screenshot: 'Screen',
+    keyword: 'Keyword',
+    question: 'Question'
   };
 
   function fresh(agentId, demo) {
@@ -109,13 +109,13 @@
         // The server refused the session: expired sign-in (locks the app
         // again), plan without minutes, or server down.
         if (msg.ready === false && msg.needs === 'login') {
-          C.toast('Sua sessão expirou. Entre de novo na sua conta.', 'error');
+          C.toast('Your session expired. Sign in to your account again.', 'error');
           if (C.authRefresh) C.authRefresh(true);
         } else if (msg.ready === false && msg.needs === 'upgrade') {
-          C.toast('Seu plano não tem minutos disponíveis. Assine o PRO para continuar.', 'error');
+          C.toast('Your plan has no minutes left. Upgrade to PRO to continue.', 'error');
           if (C.authRefresh) C.authRefresh(true).then(() => C.navigate('settings/plan'));
         } else if (msg.ready === false && msg.needs === 'server') {
-          C.toast('Servidor RealTimeAI indisponível. Tente de novo em instantes.', 'error');
+          C.toast('RealTimeAI server unavailable. Try again in a moment.', 'error');
         }
         if (S.ui.pendingChat) {
           const text = S.ui.pendingChat;
@@ -242,7 +242,7 @@
     const items = L.transcript.slice(-120);
     const partials = partialsHtml();
     if (!items.length && !partials) {
-      return `<div class="empty" style="padding:48px 0">${icon('microphone')}<span>${S.overlayStatus.running ? 'Ouvindo… as falas aparecem aqui.' : 'Inicie a escuta para transcrever.'}</span></div>`;
+      return `<div class="empty" style="padding:48px 0">${icon('microphone')}<span>${S.overlayStatus.running ? 'Listening… speech shows up here.' : 'Start listening to transcribe.'}</span></div>`;
     }
     return items.map((t) => bubble(t.src, t.text, C.fmtClock(t.t), false)).join('') +
       `<div class="live-partials" style="display:contents">${partials}</div>`;
@@ -256,7 +256,7 @@
   function bubble(src, text, time, partial) {
     const you = src === 'voce';
     return `<div class="bubble ${you ? 'you' : ''} ${partial ? 'partial' : ''}">
-      <span class="meta"><span class="who">${you ? 'Você' : 'Entrevistador'}</span>${time ? `<span class="num" style="color:var(--text-faint)">${time}</span>` : ''}</span>
+      <span class="meta"><span class="who">${you ? 'You' : 'Interviewer'}</span>${time ? `<span class="num" style="color:var(--text-faint)">${time}</span>` : ''}</span>
       <span class="txt">${esc(text)}</span>
     </div>`;
   }
@@ -270,11 +270,11 @@
 
   function answerNavHtml() {
     const L = S.live;
-    if (!L.answers.length) return '<span class="num">Sem respostas ainda</span>';
+    if (!L.answers.length) return '<span class="num">No answers yet</span>';
     const { idx } = currentAnswer();
-    return `<button type="button" class="icon-btn" data-action="live-prev" ${idx === 0 ? 'disabled' : ''} title="Anterior">${icon('caret-left')}</button>
+    return `<button type="button" class="icon-btn" data-action="live-prev" ${idx === 0 ? 'disabled' : ''} title="Previous">${icon('caret-left')}</button>
       <span class="num">${idx + 1} / ${L.answers.length}</span>
-      <button type="button" class="icon-btn" data-action="live-next" ${idx === L.answers.length - 1 ? 'disabled' : ''} title="Próxima">${icon('caret-right')}</button>`;
+      <button type="button" class="icon-btn" data-action="live-next" ${idx === L.answers.length - 1 ? 'disabled' : ''} title="Next">${icon('caret-right')}</button>`;
   }
 
   function answerHtml() {
@@ -282,10 +282,10 @@
     const running = S.overlayStatus.running;
     const tab = S.ui.liveTab;
     if (tab === 'history') {
-      if (!L.answers.length) return `<div class="empty">${icon('scroll')}<span>As respostas desta sessão ficam listadas aqui.</span></div>`;
+      if (!L.answers.length) return `<div class="empty">${icon('scroll')}<span>This session's answers are listed here.</span></div>`;
       const { idx } = currentAnswer();
       return `<div class="answer-history">${L.answers
-        .map((a, i) => `<button type="button" class="${i === idx ? 'active' : ''}" data-action="live-pick" data-idx="${i}"><span class="row between"><span class="eyebrow">${esc(REASON[a.reason] || a.reason || 'Resposta')}</span><span class="num">${a.ttft ? `${a.ttft} ms` : a.status === 'streaming' ? 'gerando…' : ''}</span></span><span class="truncate" style="font-size:13px">${esc(a.trigger || a.understood || 'Resposta sugerida')}</span></button>`)
+        .map((a, i) => `<button type="button" class="${i === idx ? 'active' : ''}" data-action="live-pick" data-idx="${i}"><span class="row between"><span class="eyebrow">${esc(REASON[a.reason] || a.reason || 'Answer')}</span><span class="num">${a.ttft ? `${a.ttft} ms` : a.status === 'streaming' ? 'generating…' : ''}</span></span><span class="truncate" style="font-size:13px">${esc(a.trigger || a.understood || 'Suggested answer')}</span></button>`)
         .join('')}</div>`;
     }
     if (tab === 'notices') {
@@ -294,23 +294,23 @@
     const cur = currentAnswer();
     if (!cur) {
       if (!running) return idlePanel();
-      return `<div class="empty" style="padding:64px 20px">${icon('sparkle')}<span class="t">${L.transcriptionOnly ? 'Modo só transcrição' : 'Aguardando a próxima pergunta'}</span><span>${L.transcriptionOnly ? 'O copiloto transcreve sem sugerir respostas. Desligue o modo para voltar a receber sugestões.' : 'Quando o entrevistador fizer uma pergunta, a resposta sugerida aparece aqui. Use “Responder agora” para pedir na hora.'}</span>${running && !L.transcriptionOnly ? `<button type="button" class="btn" data-action="live-cmd" data-cmd="answer">${icon('lightning')}Responder agora</button>` : ''}</div>`;
+      return `<div class="empty" style="padding:64px 20px">${icon('sparkle')}<span class="t">${L.transcriptionOnly ? 'Transcription-only mode' : 'Waiting for the next question'}</span><span>${L.transcriptionOnly ? 'The copilot transcribes without suggesting answers. Turn the mode off to get suggestions again.' : 'When the interviewer asks a question, the suggested answer shows up here. Use “Answer now” to ask for one right away.'}</span>${running && !L.transcriptionOnly ? `<button type="button" class="btn" data-action="live-cmd" data-cmd="answer">${icon('lightning')}Answer now</button>` : ''}</div>`;
     }
     const a = cur.a;
     const statusPill =
       a.status === 'streaming'
-        ? '<span class="pill warn"><span class="dot"></span>Gerando</span>'
+        ? '<span class="pill warn"><span class="dot"></span>Generating</span>'
         : a.status === 'completed'
-          ? '<span class="pill ok"><span class="dot"></span>Pronta</span>'
-          : `<span class="pill danger"><span class="dot"></span>${esc(a.status === 'interrupted' ? 'Interrompida' : 'Falhou')}</span>`;
+          ? '<span class="pill ok"><span class="dot"></span>Ready</span>'
+          : `<span class="pill danger"><span class="dot"></span>${esc(a.status === 'interrupted' ? 'Interrupted' : 'Failed')}</span>`;
     return `<div class="stack gap-8">
-        <div class="row"><span class="eyebrow">Pergunta</span><span class="tag">${esc(REASON[a.reason] || a.reason || 'Auto')}</span>${a.image ? `<span class="tag">${icon('camera')} tela</span>` : ''}</div>
+        <div class="row"><span class="eyebrow">Question</span><span class="tag">${esc(REASON[a.reason] || a.reason || 'Auto')}</span>${a.image ? `<span class="tag">${icon('camera')} screen</span>` : ''}</div>
         <span class="answer-q">${esc(a.trigger || a.understood || '—')}</span>
-        ${a.understood && a.understood !== a.trigger ? `<span class="small faint">Entendido como: ${esc(a.understood)}</span>` : ''}
+        ${a.understood && a.understood !== a.trigger ? `<span class="small faint">Understood as: ${esc(a.understood)}</span>` : ''}
       </div>
       <div class="stack" style="gap:12px">
-        <div class="row"><span class="eyebrow">Resposta sugerida</span>${statusPill}</div>
-        <div class="answer-body md ${a.status === 'streaming' ? 'streaming' : ''}">${a.text ? C.md(a.text) : a.status === 'streaming' ? '' : `<span class="faint">${esc(a.error || 'Sem texto.')}</span>`}</div>
+        <div class="row"><span class="eyebrow">Suggested answer</span>${statusPill}</div>
+        <div class="answer-body md ${a.status === 'streaming' ? 'streaming' : ''}">${a.text ? C.md(a.text) : a.status === 'streaming' ? '' : `<span class="faint">${esc(a.error || 'No text.')}</span>`}</div>
       </div>`;
   }
 
@@ -320,29 +320,29 @@
     const ready = C.engineReady();
     const cfg = S.config || {};
     const checks = [
-      ['Transcrição (Deepgram)', ready.stt, 'settings/ai'],
-      ['Modelo de IA', ready.llm, 'settings/ai'],
-      ['Microfone (você)', cfg.mic_enabled !== false, 'settings/audio'],
-      ['Áudio do sistema (entrevistador)', cfg.loopback_enabled !== false, 'settings/audio']
+      ['Transcription (Deepgram)', ready.stt, 'settings/ai'],
+      ['AI model', ready.llm, 'settings/ai'],
+      ['Microphone (you)', cfg.mic_enabled !== false, 'settings/audio'],
+      ['System audio (interviewer)', cfg.loopback_enabled !== false, 'settings/audio']
     ];
     return `<div class="stack gap-24">
-      <div class="stack gap-4"><span class="eyebrow">Pronto para começar</span><span class="answer-q">Abra a chamada e inicie o copiloto.</span><span class="muted" style="font-size:13.5px">O painel flutuante (HUD) aparece sobre a reunião; esta tela espelha a transcrição e as respostas em tempo real.</span></div>
+      <div class="stack gap-4"><span class="eyebrow">Ready to start</span><span class="answer-q">Open the call and start the copilot.</span><span class="muted" style="font-size:13.5px">The floating panel (HUD) appears over the meeting; this screen mirrors the transcript and answers in real time.</span></div>
       ${agents.length
-        ? `<label class="field">Sessão<select class="select" data-change="live-agent">${C.opts(agents.map((x) => [x.id, C.agentTitle(x)]), a ? a.id : '')}</select></label>
-           <div class="row wrap"><button type="button" class="btn primary lg" data-action="start-copilot" data-agent="${esc(a ? a.id : '')}">${icon('play')}Iniciar ao vivo</button><button type="button" class="btn lg" data-action="start-copilot" data-agent="${esc(a ? a.id : '')}" data-demo="1">${icon('robot')}Simular entrevista</button></div>`
-        : `<div class="row"><button type="button" class="btn primary lg" data-action="new-session">${icon('plus')}Criar sessão</button></div>`}
+        ? `<label class="field">Session<select class="select" data-change="live-agent">${C.opts(agents.map((x) => [x.id, C.agentTitle(x)]), a ? a.id : '')}</select></label>
+           <div class="row wrap"><button type="button" class="btn primary lg" data-action="start-copilot" data-agent="${esc(a ? a.id : '')}">${icon('play')}Go live</button><button type="button" class="btn lg" data-action="start-copilot" data-agent="${esc(a ? a.id : '')}" data-demo="1">${icon('robot')}Practice interview</button></div>`
+        : `<div class="row"><button type="button" class="btn primary lg" data-action="new-session">${icon('plus')}Create session</button></div>`}
       <div class="inset" style="gap:0">${checks
-        .map(([label, ok, to]) => `<div class="check-item ${ok ? 'done' : ''}"><span class="mark">${icon('check')}</span><span class="label grow">${esc(label)}</span>${ok ? '<span class="num">ok</span>' : `<a class="small" data-action="go" data-to="${to}">Configurar</a>`}</div>`)
+        .map(([label, ok, to]) => `<div class="check-item ${ok ? 'done' : ''}"><span class="mark">${icon('check')}</span><span class="label grow">${esc(label)}</span>${ok ? '<span class="num">ok</span>' : `<a class="small" data-action="go" data-to="${to}">Set up</a>`}</div>`)
         .join('')}</div>
-      <div class="stack gap-8"><span class="eyebrow">Atalhos no HUD</span><div class="row wrap" style="gap:6px">
-        ${[['Ctrl Alt Enter', 'responder'], ['Ctrl Alt M', 'só transcrição'], ['Ctrl Alt H', 'ocultar'], ['Ctrl Alt Q', 'encerrar']].map(([k, l]) => `<span class="chip"><span class="kbd">${k}</span>${l}</span>`).join('')}
-        <a class="small muted" data-action="go" data-to="settings/shortcuts">Todos os atalhos →</a></div></div>
+      <div class="stack gap-8"><span class="eyebrow">HUD shortcuts</span><div class="row wrap" style="gap:6px">
+        ${[['Ctrl Alt Enter', 'answer'], ['Ctrl Alt M', 'transcription only'], ['Ctrl Alt H', 'hide'], ['Ctrl Alt Q', 'stop']].map(([k, l]) => `<span class="chip"><span class="kbd">${k}</span>${l}</span>`).join('')}
+        <a class="small muted" data-action="go" data-to="settings/shortcuts">All shortcuts →</a></div></div>
     </div>`;
   }
 
   function noticesHtml() {
     const list = S.live.notices.slice(-12).reverse();
-    if (!list.length) return '<span class="small faint">Nenhum aviso do motor.</span>';
+    if (!list.length) return '<span class="small faint">No engine notices.</span>';
     return list
       .map((n) => `<div class="notice-line ${esc(n.level)}">${icon(n.level === 'error' ? 'warning' : n.level === 'warning' ? 'warning' : 'info')}<span>${esc(n.text)}</span></div>`)
       .join('');
@@ -352,13 +352,13 @@
     const cur = currentAnswer();
     const running = S.overlayStatus.running;
     const a = cur && cur.a;
-    return `<span>${a ? `Resposta · ${esc((REASON[a.reason] || a.reason || 'auto').toLowerCase())}` : 'Resposta'}</span><span class="vsep">|</span><span>${a && a.ttft ? `${a.ttft} ms` : '—'}</span>${a && a.model ? `<span class="vsep">|</span><span>${esc(C.modelLabel(a.model))}</span>` : ''}
+    return `<span>${a ? `Answer · ${esc((REASON[a.reason] || a.reason || 'auto').toLowerCase())}` : 'Answer'}</span><span class="vsep">|</span><span>${a && a.ttft ? `${a.ttft} ms` : '—'}</span>${a && a.model ? `<span class="vsep">|</span><span>${esc(C.modelLabel(a.model))}</span>` : ''}
       <div class="actions">
-        <button type="button" class="icon-btn ${a && a.vote > 0 ? 'on' : ''}" data-action="live-rate" data-vote="1" title="Boa resposta" ${!a || !running ? 'disabled' : ''}>${icon('thumbs-up')}</button>
-        <button type="button" class="icon-btn ${a && a.vote < 0 ? 'on' : ''}" data-action="live-rate" data-vote="-1" title="Resposta ruim" ${!a || !running ? 'disabled' : ''}>${icon('thumbs-down')}</button>
-        <button type="button" class="btn sm raised" data-action="live-cmd" data-cmd="recap" ${!running ? 'disabled' : ''} title="Resumo da conversa até agora">${icon('scroll')}Resumo</button>
-        <button type="button" class="btn sm raised" data-action="live-cmd" data-cmd="followup" ${!running ? 'disabled' : ''} title="Sugerir uma pergunta de follow-up">${icon('chat')}Follow-up</button>
-        <button type="button" class="btn sm raised" data-action="live-cmd" data-cmd="answer" ${!running ? 'disabled' : ''} title="Gerar resposta agora (Ctrl+Alt+Enter)">${icon('refresh')}Responder agora</button>
+        <button type="button" class="icon-btn ${a && a.vote > 0 ? 'on' : ''}" data-action="live-rate" data-vote="1" title="Good answer" ${!a || !running ? 'disabled' : ''}>${icon('thumbs-up')}</button>
+        <button type="button" class="icon-btn ${a && a.vote < 0 ? 'on' : ''}" data-action="live-rate" data-vote="-1" title="Bad answer" ${!a || !running ? 'disabled' : ''}>${icon('thumbs-down')}</button>
+        <button type="button" class="btn sm raised" data-action="live-cmd" data-cmd="recap" ${!running ? 'disabled' : ''} title="Recap of the conversation so far">${icon('scroll')}Recap</button>
+        <button type="button" class="btn sm raised" data-action="live-cmd" data-cmd="followup" ${!running ? 'disabled' : ''} title="Suggest a follow-up question">${icon('chat')}Follow-up</button>
+        <button type="button" class="btn sm raised" data-action="live-cmd" data-cmd="answer" ${!running ? 'disabled' : ''} title="Generate an answer now (Ctrl+Alt+Enter)">${icon('refresh')}Answer now</button>
       </div>`;
   }
 
@@ -371,13 +371,13 @@
     const linkOk = (src) => /connected|ok|streaming|live/i.test(L.link[src] || '') || (running && L.levels && L.levels[`${src}_active`]);
     const src = (key, label, ic) => {
       const paused = L.paused[key];
-      return `<button type="button" class="chip btn-chip" data-action="live-pause" data-src="${key}" ${!running ? 'disabled' : ''} title="${paused ? 'Retomar' : 'Pausar'} ${label.toLowerCase()}">
+      return `<button type="button" class="chip btn-chip" data-action="live-pause" data-src="${key}" ${!running ? 'disabled' : ''} title="${paused ? 'Resume' : 'Pause'} ${label.toLowerCase()}">
         <span class="level-bars" id="lvl-${key}">${bars(0)}</span>${icon(paused ? (key === 'voce' ? 'microphone-slash' : 'speaker-slash') : ic)}${label}${paused ? ' · pausado' : running && !linkOk(key) ? ' · conectando' : ''}</button>`;
     };
     const tabs = [
-      ['answer', 'Resposta'],
-      ['history', `Histórico${L.answers.length ? ` ${L.answers.length}` : ''}`],
-      ['notices', 'Avisos']
+      ['answer', 'Answer'],
+      ['history', `History${L.answers.length ? ` ${L.answers.length}` : ''}`],
+      ['notices', 'Notices']
     ];
 
     return `<div class="page wide" style="padding:20px 24px 24px;gap:12px">
@@ -386,34 +386,34 @@
           <div class="live-bar">
             <span class="dot ${running ? 'danger live' : 'off'}"></span>
             <span class="mono" style="font-size:12px" id="liveClock">${since}</span>
-            <span class="small faint truncate">${running ? (S.overlayStatus.mode === 'demo' ? 'Simulação' : 'Ao vivo') : L.ended ? 'Sessão encerrada' : 'Parado'}</span>
+            <span class="small faint truncate">${running ? (S.overlayStatus.mode === 'demo' ? 'Practice' : 'Live') : L.ended ? 'Session ended' : 'Stopped'}</span>
             ${running
-              ? `<button type="button" class="btn sm danger ml-auto" data-action="stop-copilot">${icon('stop')}Encerrar</button>`
-              : `<button type="button" class="btn sm primary ml-auto" data-action="start-copilot" data-agent="${esc(a ? a.id : '')}" ${a ? '' : 'disabled'}>${icon('play')}Iniciar escuta</button>`}
+              ? `<button type="button" class="btn sm danger ml-auto" data-action="stop-copilot">${icon('stop')}Stop</button>`
+              : `<button type="button" class="btn sm primary ml-auto" data-action="start-copilot" data-agent="${esc(a ? a.id : '')}" ${a ? '' : 'disabled'}>${icon('play')}Start listening</button>`}
           </div>
-          <div class="row wrap" style="padding:10px 16px 0;gap:6px">${src('outros', 'Entrevistador', 'speaker')}${src('voce', 'Você', 'microphone')}</div>
-          <div class="row between" style="padding:12px 16px 4px"><span class="eyebrow">Transcrição ao vivo</span><span class="eyebrow">${plural(L.transcript.length, 'fala', 'falas')}</span></div>
+          <div class="row wrap" style="padding:10px 16px 0;gap:6px">${src('outros', 'Interviewer', 'speaker')}${src('voce', 'You', 'microphone')}</div>
+          <div class="row between" style="padding:12px 16px 4px"><span class="eyebrow">Live transcript</span><span class="eyebrow">${plural(L.transcript.length, 'turn', 'turns')}</span></div>
           <div class="live-scroll" id="liveTranscript">${transcriptHtml()}</div>
           <div class="live-ctx">
-            <div class="row between"><span class="eyebrow">Contexto</span>${a ? `<a class="small muted" data-action="go" data-to="session/${esc(a.id)}">Editar</a>` : ''}</div>
+            <div class="row between"><span class="eyebrow">Context</span>${a ? `<a class="small muted" data-action="go" data-to="session/${esc(a.id)}">Edit</a>` : ''}</div>
             ${a
-              ? `<div class="kv" style="font-size:12px;gap:10px"><div><span class="k">Cargo</span><span class="strong truncate" style="font-family:var(--font-sans);font-size:12.5px">${esc(C.agentRole(a) || '—')}</span></div><div><span class="k">Empresa</span><span class="strong truncate" style="font-family:var(--font-sans);font-size:12.5px">${esc(C.agentCompany(a) || '—')}</span></div></div>
-                 <div class="row wrap" style="gap:6px">${docs.length ? docs.slice(0, 6).map((d) => `<span class="chip">${icon(C.docIcon(d))}<span class="truncate">${esc(fixText(d.title || d.name))}</span></span>`).join('') : '<span class="xs faint">Nenhum arquivo: o copiloto responde só com a descrição da vaga.</span>'}${docs.length > 6 ? `<span class="xs faint">+${docs.length - 6}</span>` : ''}</div>`
-              : '<span class="small faint">Nenhuma sessão selecionada.</span>'}
+              ? `<div class="kv" style="font-size:12px;gap:10px"><div><span class="k">Role</span><span class="strong truncate" style="font-family:var(--font-sans);font-size:12.5px">${esc(C.agentRole(a) || '—')}</span></div><div><span class="k">Company</span><span class="strong truncate" style="font-family:var(--font-sans);font-size:12.5px">${esc(C.agentCompany(a) || '—')}</span></div></div>
+                 <div class="row wrap" style="gap:6px">${docs.length ? docs.slice(0, 6).map((d) => `<span class="chip">${icon(C.docIcon(d))}<span class="truncate">${esc(fixText(d.title || d.name))}</span></span>`).join('') : '<span class="xs faint">No files: the copilot answers from the job description only.</span>'}${docs.length > 6 ? `<span class="xs faint">+${docs.length - 6}</span>` : ''}</div>`
+              : '<span class="small faint">No session selected.</span>'}
           </div>
         </div>
 
         <div class="live-col">
           <div class="live-bar">
             <div class="segmented sm">${tabs.map(([id, label]) => `<button type="button" class="${S.ui.liveTab === id ? 'active' : ''}" data-action="live-tab" data-tab="${id}">${esc(label)}</button>`).join('')}</div>
-            <label class="row small muted ml-auto" style="cursor:pointer" title="Ctrl+Alt+M no HUD">${C.sw(`data-change="live-mode" ${running ? '' : 'disabled'}`, L.transcriptionOnly, !running)}Só transcrição</label>
+            <label class="row small muted ml-auto" style="cursor:pointer" title="Ctrl+Alt+M no HUD">${C.sw(`data-change="live-mode" ${running ? '' : 'disabled'}`, L.transcriptionOnly, !running)}Transcription only</label>
             <span class="row" style="gap:2px" id="liveAnswerNav">${answerNavHtml()}</span>
           </div>
           <div class="answer-pane" id="liveAnswer">${answerHtml()}</div>
           ${S.ui.liveTab === 'answer' ? '' : ''}
           <div class="live-foot" id="liveFoot">${footHtml()}</div>
           <div class="chat-row">
-            <input class="input" id="liveChat" placeholder="${running ? 'Pergunte ao copiloto (ex.: como explico esse projeto?)' : 'Inicie o copiloto para conversar'}" ${running ? '' : 'disabled'} data-input="noop"/>
+            <input class="input" id="liveChat" placeholder="${running ? 'Ask the copilot (e.g. how do I explain this project?)' : 'Start the copilot to chat'}" ${running ? '' : 'disabled'} data-input="noop"/>
             <button type="button" class="btn primary" data-action="live-chat" ${running ? '' : 'disabled'}>${icon('send')}Enviar</button>
           </div>
           <div id="liveNotices" hidden></div>
@@ -448,14 +448,14 @@
 
   // ----------------------------------------------------------- actions --
   async function send(command, okMsg) {
-    const res = await C.guard(() => api.overlayCommand(command), 'O copiloto não recebeu o comando.');
-    if (res && res.ok === false) C.toast(res.error || 'Comando recusado.', 'error');
+    const res = await C.guard(() => api.overlayCommand(command), 'The copilot did not receive the command.');
+    if (res && res.ok === false) C.toast(res.error || 'Command refused.', 'error');
     else if (res && okMsg) C.toast(okMsg);
     return res;
   }
 
   C.actions['live-cmd'] = (el) => {
-    const labels = { answer: 'Gerando resposta…', recap: 'Gerando resumo…', followup: 'Gerando follow-up…' };
+    const labels = { answer: 'Generating answer…', recap: 'Generating recap…', followup: 'Generating follow-up…' };
     S.live.cur = -1;
     S.ui.liveTab = 'answer';
     send({ cmd: el.dataset.cmd }, labels[el.dataset.cmd]);
@@ -481,7 +481,7 @@
     if (!cur) return;
     const vote = Number(el.dataset.vote);
     cur.a.vote = vote;
-    send({ cmd: 'rate', id: cur.a.id, vote }, vote > 0 ? 'Marcada como útil.' : 'Obrigado: o copiloto evita respostas assim.');
+    send({ cmd: 'rate', id: cur.a.id, vote }, vote > 0 ? 'Marked as helpful.' : 'Thanks: the copilot avoids answers like this.');
     mark('answer');
   };
 
@@ -514,10 +514,10 @@
 
   C.changes['live-mode'] = async (el) => {
     const want = el.checked;
-    const res = await C.guard(() => api.setMode(want), 'Não foi possível trocar o modo.');
+    const res = await C.guard(() => api.setMode(want), 'Could not change the mode.');
     if (res && res.ok === false) {
       el.checked = !want;
-      C.toast(res.error || 'O copiloto não está rodando.', 'error');
+      C.toast(res.error || 'The copilot is not running.', 'error');
     }
   };
 

@@ -27,6 +27,11 @@ function normalizeBaseUrl(url) {
   return /^https?:\/\/[^\s/]+/i.test(u) ? u : '';
 }
 
+// Hosted billing pages must be https; plain http only for a local server (backend/).
+function billingUrlAllowed(url) {
+  return /^https:\/\//i.test(url) || /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?\//i.test(url);
+}
+
 function effectiveServerUrl(configured) {
   return normalizeBaseUrl(configured) || normalizeBaseUrl(process.env.RTAI_SERVER_URL) || normalizeBaseUrl(BUILTIN_SERVER_URL);
 }
@@ -34,23 +39,23 @@ function effectiveServerUrl(configured) {
 // pt-BR text for the device-flow errors of RFC 8628 §3.5 and HTTP failures.
 function describeError(code, status) {
   switch (code) {
-    case 'access_denied': return 'Acesso negado no navegador.';
-    case 'expired_token': return 'O código expirou. Tente entrar de novo.';
-    case 'invalid_token': return 'Sessão expirada: entre de novo na sua conta.';
-    case 'network': return 'Sem conexão com o servidor RealTimeAI.';
-    case 'no_server': return 'Nenhum servidor configurado.';
-    case 'invalid_credentials': return 'E-mail ou senha incorretos.';
-    case 'email_taken': return 'Já existe uma conta com este e-mail. Entre ou recupere a senha.';
-    case 'weak_password': return 'Senha fraca: use pelo menos 8 caracteres.';
-    case 'invalid_email': return 'E-mail inválido.';
-    case 'email_not_verified': return 'Confirme o seu e-mail pelo link que enviamos e entre de novo.';
-    case 'sso_not_configured': return 'SSO não está configurado para este domínio. Fale com o administrador da sua empresa.';
-    case 'rate_limited': return 'Muitas tentativas. Aguarde um pouco e tente de novo.';
+    case 'access_denied': return 'Access denied in the browser.';
+    case 'expired_token': return 'The code expired. Try signing in again.';
+    case 'invalid_token': return 'Session expired: sign in to your account again.';
+    case 'network': return 'No connection to the RealTimeAI server.';
+    case 'no_server': return 'No server configured.';
+    case 'invalid_credentials': return 'Wrong e-mail or password.';
+    case 'email_taken': return 'An account with this e-mail already exists. Sign in or reset the password.';
+    case 'weak_password': return 'Weak password: use at least 8 characters.';
+    case 'invalid_email': return 'Invalid e-mail.';
+    case 'email_not_verified': return 'Confirm your e-mail with the link we sent, then sign in again.';
+    case 'sso_not_configured': return 'SSO is not set up for this domain. Contact your company administrator.';
+    case 'rate_limited': return 'Too many attempts. Wait a moment and try again.';
     default:
-      if (status === 401) return 'Sessão expirada: entre de novo na sua conta.';
-      if (status === 426) return 'Versão do app muito antiga: atualize.';
-      if (status >= 500) return 'Servidor indisponível no momento.';
-      return 'Não foi possível falar com o servidor.';
+      if (status === 401) return 'Session expired: sign in to your account again.';
+      if (status === 426) return 'App version too old: please update.';
+      if (status >= 500) return 'Server unavailable right now.';
+      return 'Could not reach the server.';
   }
 }
 
@@ -73,11 +78,11 @@ function createCloudAccount(deps) {
   let login = null; // { cancelled: boolean }
   let cache = null; // { at, value }
 
-  async function request(method, path, { body, token } = {}) {
+  async function request(method, path, { body, token, timeoutMs } = {}) {
     const base = effectiveServerUrl(deps.getServerUrl());
     if (!base) return { ok: false, status: 0, error: 'no_server', data: null };
     const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
-    const timer = ctrl ? setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT_MS) : null;
+    const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs || REQUEST_TIMEOUT_MS) : null;
     try {
       const res = await fetchImpl(base + path, {
         method,
@@ -101,6 +106,26 @@ function createCloudAccount(deps) {
     }
   }
 
+  // Authenticated call for the server-side features (research, community
+  // questions, Google Calendar broker). { ok, status, error, data }; a 401
+  // drops the cached account so the app shows the sign-in screen again.
+  async function api(method, path, body, { timeoutMs } = {}) {
+    const token = deps.readToken();
+    if (!token) return { ok: false, status: 401, error: 'invalid_token', data: null };
+    const r = await request(method, path, { body, token, timeoutMs });
+    if (r.status === 401) cache = null;
+    return r;
+  }
+
+  // Where the dashboard's own AI calls go when signed in: the server relay,
+  // authorized with the device token. null without a server or a token.
+  function aiEndpoint() {
+    const base = effectiveServerUrl(deps.getServerUrl());
+    const token = base ? deps.readToken() : '';
+    if (!token) return null;
+    return { url: `${base}/v1/ai/chat/completions`, headers: { Authorization: `Bearer ${token}`, 'X-RTAI-Version': deps.appVersion || '' } };
+  }
+
   function serverInfo() {
     const url = effectiveServerUrl(deps.getServerUrl());
     return { available: Boolean(url), serverUrl: url, builtin: !normalizeBaseUrl(deps.getServerUrl()) && Boolean(url) };
@@ -115,7 +140,7 @@ function createCloudAccount(deps) {
     // Encrypted by the engine (dpapi:...): the dashboard cannot read it back.
     // It is still a valid sign-in; the engine uses it at the next session.
     if (!token) {
-      const value = { ...info, signedIn: true, account: null, detail: 'Conta conectada.' };
+      const value = { ...info, signedIn: true, account: null, detail: 'Signed in.' };
       cache = { at: Date.now(), value };
       return value;
     }
@@ -138,7 +163,7 @@ function createCloudAccount(deps) {
     if (!serverInfo().available) return { ok: false, error: describeError('no_server') };
     const provider = options && ['google', 'sso'].includes(options.provider) ? options.provider : 'google';
     const hint = String((options && options.hint) || '').trim();
-    if (provider === 'sso' && !hint) return { ok: false, error: 'Informe o e-mail corporativo ou o domínio da empresa.' };
+    if (provider === 'sso' && !hint) return { ok: false, error: 'Enter your work e-mail or company domain.' };
     if (login) login.cancelled = true;
     const mine = { cancelled: false };
     login = mine;
@@ -206,7 +231,7 @@ function createCloudAccount(deps) {
   async function loginWithPassword(email, password) {
     if (!serverInfo().available) return { ok: false, error: describeError('no_server') };
     if (!validEmail(email)) return { ok: false, error: describeError('invalid_email') };
-    if (!password) return { ok: false, error: 'Informe a senha.' };
+    if (!password) return { ok: false, error: 'Enter your password.' };
     const r = await request('POST', '/v1/auth/login', {
       body: { email: String(email).trim(), password: String(password), client_id: 'rtai-dashboard' }
     });
@@ -238,7 +263,7 @@ function createCloudAccount(deps) {
       token,
       body: kind === 'portal' ? {} : { plan: 'pro' }
     });
-    if (r.ok && r.data && /^https:\/\//i.test(String(r.data.url || ''))) {
+    if (r.ok && r.data && billingUrlAllowed(String(r.data.url || ''))) {
       deps.openBrowser(r.data.url);
       cache = null; // the plan may change once the user pays
       return { ok: true };
@@ -260,7 +285,7 @@ function createCloudAccount(deps) {
     return { ok: true };
   }
 
-  return { status, startLogin, cancelLogin, loginWithPassword, signup, resetPassword, billing, logout, serverInfo };
+  return { status, startLogin, cancelLogin, loginWithPassword, signup, resetPassword, billing, logout, serverInfo, api, aiEndpoint };
 }
 
 module.exports = { createCloudAccount, effectiveServerUrl, normalizeBaseUrl, describeError, BUILTIN_SERVER_URL };

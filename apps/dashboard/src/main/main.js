@@ -18,6 +18,7 @@ const { createMeetingPopup } = require('./meeting_popup');
 const { createFlagStore } = require('./feature_flags');
 const { createUpdater } = require('./updater');
 const { createCloudAccount, effectiveServerUrl } = require('./cloud_account');
+const localBackend = require('./local_backend');
 const jevEngine = require('./jev_engine');
 const companyLogoService = require('./company_logo_service');
 
@@ -99,15 +100,33 @@ function getAppDataDir() {
 }
 
 // Google Calendar (see google_calendar.js). The OAuth client file is looked up
-// in the app data folder, next to this file and in the project folder.
+// in the app data folder, next to this file and in the project folder; without
+// one, a signed-in app uses the RealTimeAI server's client (it does the token
+// exchanges, so the client secret stays on the server).
 let googleCalendar = null;
+let googleBroker = { client: null, at: 0 };
+async function refreshGoogleBroker(force = false) {
+  if (!isSignedIn()) {
+    googleBroker = { client: null, at: 0 };
+    return null;
+  }
+  if (!force && googleBroker.at && Date.now() - googleBroker.at < 5 * 60 * 1000) return googleBroker.client;
+  const r = await cloudAccount.api('GET', '/v1/integrations/google');
+  if (r.ok && r.data && r.data.client_id) googleBroker = { client: r.data, at: Date.now() };
+  else if (r.status !== 0) googleBroker = { client: null, at: Date.now() }; // keep the last one on network errors
+  return googleBroker.client;
+}
 function getGoogleCalendar() {
   if (!googleCalendar) {
     googleCalendar = createGoogleCalendar({
       dataDir: getAppDataDir(),
       searchDirs: [APP_ROOT, REPO_ROOT],
       safeStorage,
-      openExternal: (url) => shell.openExternal(url)
+      openExternal: (url) => shell.openExternal(url),
+      broker: {
+        client: () => (isSignedIn() ? googleBroker.client : null),
+        token: (params) => cloudAccount.api('POST', '/v1/integrations/google/token', params, { timeoutMs: 15000 })
+      }
     });
   }
   return googleCalendar;
@@ -117,6 +136,7 @@ function getGoogleCalendar() {
 // { ok: false, error, code } (never throws across IPC).
 async function gcalCall(fn) {
   try {
+    await refreshGoogleBroker();
     const result = await fn(getGoogleCalendar());
     return { ok: true, result };
   } catch (e) {
@@ -311,7 +331,7 @@ function cloudBackendActive(cfg) {
   return c.server_mode !== 'proprio' && isSignedIn(c);
 }
 
-const LOGIN_REQUIRED = { ok: false, needsLogin: true, error: 'Entre na sua conta RealTimeAI para usar o copiloto.' };
+const LOGIN_REQUIRED = { ok: false, needsLogin: true, error: 'Sign in to your RealTimeAI account to use the copilot.' };
 
 // Before a live start: signed in, keys present when using own keys, and the
 // plan still has minutes (the engine asks the server again: this is only so
@@ -320,7 +340,7 @@ async function checkCanStartLive() {
   const cfg = readConfigIni();
   if (!isSignedIn(cfg)) return LOGIN_REQUIRED;
   if (!cloudBackendActive(cfg) && !cfg.has_deepgram_key) {
-    return { ok: false, error: 'Modo "Minhas chaves": configure a chave do Deepgram ou volte para os servidores RealTimeAI.' };
+    return { ok: false, error: '"My keys" mode: set the Deepgram key or switch back to the RealTimeAI servers.' };
   }
   const st = await cloudAccount.status(false);
   if (st && st.expired) return LOGIN_REQUIRED;
@@ -634,9 +654,49 @@ function getOpenRouterApiKey() {
   return unprotectSecret(rawKey);
 }
 
+// Where the dashboard's own AI calls go (compaction, JEV, dossier, OCR):
+// the RealTimeAI server when signed in, so no key is needed, or OpenRouter
+// with the user's key in "My keys" mode. null when neither is available.
+const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
+function aiTarget(title = 'RealTimeAI Studio') {
+  const cfg = readConfigIni();
+  const ownKey = getOpenRouterApiKey();
+  const direct = ownKey
+    ? { url: OPENROUTER_CHAT_URL, headers: { Authorization: `Bearer ${ownKey}`, 'HTTP-Referer': 'https://realtimeai.local', 'X-Title': title } }
+    : null;
+  if (cfg.server_mode === 'proprio' && direct) return direct;
+  return (isSignedIn(cfg) && cloudAccount.aiEndpoint()) || direct;
+}
+
+// POST to an aiTarget(); resolves { status, body } ('' body on failure).
+function aiPost(target, payload, timeoutMs) {
+  return new Promise((resolve) => {
+    const lib = target.url.startsWith('http:') ? http : https;
+    const req = lib.request(
+      target.url,
+      {
+        method: 'POST',
+        headers: { ...target.headers, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload, 'utf8') },
+        timeout: timeoutMs
+      },
+      (res) => {
+        const chunks = [];
+        res.on('data', (c) => chunks.push(c));
+        res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString('utf8') }));
+      }
+    );
+    req.on('error', (e) => resolve({ status: 0, body: '', error: e.message }));
+    req.on('timeout', () => {
+      req.destroy();
+      resolve({ status: 0, body: '', error: 'timeout' });
+    });
+    req.end(payload);
+  });
+}
+
 function callOpenRouterSol61(messagesOrSystem, userOrMaxTokens = 1800, maybeMaxTokens = 1800) {
-  const apiKey = getOpenRouterApiKey();
-  if (!apiKey) return Promise.resolve('');
+  const target = aiTarget('RealTimeAI Studio');
+  if (!target) return Promise.resolve('');
 
   let messages;
   let maxTokens = 1800;
@@ -663,42 +723,12 @@ function callOpenRouterSol61(messagesOrSystem, userOrMaxTokens = 1800, maybeMaxT
     }
   });
 
-  return new Promise((resolve) => {
-    const req = https.request(
-      'https://openrouter.ai/api/v1/chat/completions',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(payload, 'utf8'),
-          'HTTP-Referer': 'https://realtimeai.local',
-          'X-Title': 'RealTimeAI Studio'
-        },
-        timeout: 18000
-      },
-      (res) => {
-        const chunks = [];
-        res.on('data', (c) => chunks.push(c));
-        res.on('end', () => {
-          try {
-            const body = Buffer.concat(chunks).toString('utf8');
-            const parsed = JSON.parse(body);
-            const content = parsed?.choices?.[0]?.message?.content || '';
-            resolve(String(content).trim());
-          } catch (_e) {
-            resolve('');
-          }
-        });
-      }
-    );
-    req.on('error', () => resolve(''));
-    req.on('timeout', () => {
-      req.destroy();
-      resolve('');
-    });
-    req.write(payload);
-    req.end();
+  return aiPost(target, payload, 18000).then((r) => {
+    try {
+      return String(JSON.parse(r.body)?.choices?.[0]?.message?.content || '').trim();
+    } catch (_e) {
+      return '';
+    }
   });
 }
 
@@ -1286,8 +1316,8 @@ function jevPairs(events) {
 }
 
 function callOpenRouterJson(messages, maxTokens, timeoutMs) {
-  const apiKey = getOpenRouterApiKey();
-  if (!apiKey) return Promise.resolve({ ok: false, error: 'Configure a chave do OpenRouter para usar a avaliação JEV.' });
+  const target = aiTarget('RealTimeAI JEV');
+  if (!target) return Promise.resolve({ ok: false, error: 'Sign in to your RealTimeAI account (or set the OpenRouter key) to use the JEV evaluation.' });
   const payload = JSON.stringify({
     model: SOL_ANALYSIS_MODEL,
     messages,
@@ -1298,48 +1328,22 @@ function callOpenRouterJson(messages, maxTokens, timeoutMs) {
     // The judge needs no chain of thought; reasoning tokens would eat max_tokens.
     reasoning: { enabled: false }
   });
-  return new Promise((resolve) => {
-    const req = https.request(
-      'https://openrouter.ai/api/v1/chat/completions',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(payload, 'utf8'),
-          'HTTP-Referer': 'https://realtimeai.local',
-          'X-Title': 'RealTimeAI JEV'
-        },
-        timeout: timeoutMs || 60000
-      },
-      (res) => {
-        const chunks = [];
-        res.on('data', (c) => chunks.push(c));
-        res.on('end', () => {
-          try {
-            const parsed = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-            if (parsed.error) return resolve({ ok: false, error: parsed.error.message || 'Erro do provedor.' });
-            const choice = parsed?.choices?.[0] || {};
-            const content = String(choice.message?.content || '');
-            const match = content.match(/\{[\s\S]*\}/);
-            if (!match) {
-              console.warn('[jev] no JSON', choice.finish_reason, content.slice(0, 300));
-              return resolve({ ok: false, error: `Resposta do avaliador sem JSON (${choice.finish_reason || 'vazia'}).` });
-            }
-            resolve({ ok: true, json: JSON.parse(match[0]) });
-          } catch (e) {
-            resolve({ ok: false, error: `Resposta inválida do avaliador: ${e.message}` });
-          }
-        });
+  return aiPost(target, payload, timeoutMs || 60000).then((r) => {
+    if (r.error) return { ok: false, error: r.error === 'timeout' ? 'The evaluator took too long to answer.' : r.error };
+    try {
+      const parsed = JSON.parse(r.body);
+      if (parsed.error) return { ok: false, error: parsed.error.message || 'Provider error.' };
+      const choice = parsed?.choices?.[0] || {};
+      const content = String(choice.message?.content || '');
+      const match = content.match(/\{[\s\S]*\}/);
+      if (!match) {
+        console.warn('[jev] no JSON', choice.finish_reason, content.slice(0, 300));
+        return { ok: false, error: `Evaluator answer without JSON (${choice.finish_reason || 'empty'}).` };
       }
-    );
-    req.on('error', (e) => resolve({ ok: false, error: e.message }));
-    req.on('timeout', () => {
-      req.destroy();
-      resolve({ ok: false, error: 'O avaliador demorou demais para responder.' });
-    });
-    req.write(payload);
-    req.end();
+      return { ok: true, json: JSON.parse(match[0]) };
+    } catch (e) {
+      return { ok: false, error: `Invalid evaluator answer: ${e.message}` };
+    }
   });
 }
 
@@ -1372,11 +1376,11 @@ const JEV_SYSTEM = `Você é o JEV, avaliador de entrevistas. Avalie a RESPOSTA 
 - evidencias: exemplos concretos, números e fatos coerentes com o currículo; penalize fatos inventados.
 - objetividade: vai direto ao ponto, sem rodeios nem repetição.
 A transcrição vem de reconhecimento de voz e pode ter erros de palavra; não penalize isso.
-Responda SOMENTE JSON em português do Brasil.`;
+Responda SOMENTE JSON e escreva todos os textos do JSON em inglês.`;
 
 async function evaluateSessionWithJev({ sessionId, agentId, force }) {
   const { id, events } = readSessionEvents(sessionId);
-  if (!events.length) return { ok: false, error: 'Esta sessão não tem registro de eventos para avaliar.' };
+  if (!events.length) return { ok: false, error: 'This session has no event log to evaluate.' };
   const cachePath = path.join(getAppDataDir(), 'sessions', `${id}.jev.json`);
   if (!force && fs.existsSync(cachePath)) {
     try {
@@ -1386,7 +1390,7 @@ async function evaluateSessionWithJev({ sessionId, agentId, force }) {
   }
   const pairs = jevPairs(events);
   if (!pairs.length) {
-    return { ok: false, error: 'Nenhuma pergunta com resposta falada foi encontrada: o JEV avalia o que você disse no microfone depois de cada pergunta (do entrevistador, do chat ou do banco de perguntas).' };
+    return { ok: false, error: 'No question with a spoken answer was found: JEV evaluates what you said on the microphone after each question (from the interviewer, the chat or the question bank).' };
   }
 
   const agent = agentId ? loadAllAgents().find((a) => a.id === agentId) : null;
@@ -1442,7 +1446,7 @@ async function evaluateSessionWithJev({ sessionId, agentId, force }) {
     }
   }
   items.sort((a, b) => a.index - b.index);
-  if (!items.length) return { ok: false, error: (failed && failed.error) || 'O avaliador não devolveu notas.' };
+  if (!items.length) return { ok: false, error: (failed && failed.error) || 'The evaluator returned no scores.' };
 
   const criteria = {};
   for (const c of JEV_CRITERIA) {
@@ -1454,7 +1458,7 @@ async function evaluateSessionWithJev({ sessionId, agentId, force }) {
 
   const synth = await callOpenRouterJson(
     [
-      { role: 'system', content: 'Você é o JEV e escreve o feedback final para o candidato sobre o desempenho dele na entrevista, com base nas avaliações por pergunta. Fale do candidato (em segunda pessoa), não das notas nem da avaliação. Responda SOMENTE JSON em português do Brasil.' },
+      { role: 'system', content: 'Você é o JEV e escreve o feedback final para o candidato sobre o desempenho dele na entrevista, com base nas avaliações por pergunta. Fale do candidato (em segunda pessoa), não das notas nem da avaliação. Responda SOMENTE JSON e escreva todos os textos do JSON em inglês.' },
       {
         role: 'user',
         content: `Empresa: ${companyName || '(desconhecida)'}. Médias (0-100): ${JSON.stringify(criteria)}.\nAvaliações por pergunta:\n${items
@@ -1506,7 +1510,7 @@ Se a pergunta cita um projeto, empresa ou resposta do candidato mas tem uma vers
 "pergunta": a pergunta clara, completa e genérica, sem nomes do candidato, no idioma original. Responda SOMENTE JSON.`;
 
 async function classifyQuestionsWithJev(questions, { company } = {}) {
-  if (!Array.isArray(questions) || !questions.length || !getOpenRouterApiKey()) return null;
+  if (!Array.isArray(questions) || !questions.length || !aiTarget()) return null;
   const res = await callOpenRouterJson(
     [
       { role: 'system', content: JEV_BANK_SYSTEM },
@@ -1543,10 +1547,30 @@ function sessionQuestionLines(events, { withChat }) {
 
 const bankClassifier = (questions, ctx) => classifyQuestionsWithJev(questions, ctx);
 
+// "Share anonymized questions": after a session, the generalist questions JEV
+// kept go to the RealTimeAI community bank, and the questions other candidates
+// reported for that company come back into the local bank. Never blocks.
+async function shareSessionQuestions(extraction) {
+  try {
+    const cfg = readConfigIni();
+    if (cfg.share_anonymized_questions === false || !isSignedIn(cfg)) return;
+    if (!extraction || !extraction.company || !Array.isArray(extraction.questions) || !extraction.questions.length) return;
+    const questions = extraction.questions.map((q) => ({ text: q.text, category: q.category, subCategory: q.subCategory || '' }));
+    const r = await cloudAccount.api('POST', '/v1/questions', { company: extraction.company, questions });
+    if (!r.ok || !r.data || !Array.isArray(r.data.questions)) return;
+    const merged = jevEngine.mergeCommunityQuestions(getAppDataDir(), extraction.company, r.data.questions);
+    if (merged.added && mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('rtai:question-bank-updated', { ok: true, company: extraction.company, added: merged.added, community: true });
+    }
+  } catch (err) {
+    console.warn('Community questions:', err && err.message ? err.message : err);
+  }
+}
+
 async function rebuildQuestionBankFromSessions() {
   const sessions = loadPastSessions();
   const agents = loadAllAgents();
-  const withChat = Boolean(getOpenRouterApiKey());
+  const withChat = Boolean(aiTarget());
   const entries = [];
   for (const s of sessions) {
     // Only sessions that ran with a goal: the goal names the company.
@@ -1687,6 +1711,7 @@ async function generateSessionDebrief({ sessionId, goalId, agentId, transcript: 
   if (cfg.share_anonymized_questions !== false && transcript) {
     try {
       jevExtraction = await jevEngine.ingestSessionQuestions(getAppDataDir(), transcript, goal.company || '', { classify: bankClassifier });
+      shareSessionQuestions(jevExtraction);
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('rtai:question-bank-updated', jevExtraction);
       }
@@ -1933,7 +1958,7 @@ async function extractDocumentContent(filePath) {
     text = result.text;
     if (pdfText.looksScanned(result)) {
       // No text layer: one OCR call now, so the live interview never waits on it.
-      const ocr = await pdfText.ocrPdfWithOpenRouter(buf, path.basename(filePath), getOpenRouterApiKey(), https);
+      const ocr = await pdfText.ocrPdfWithOpenRouter(buf, path.basename(filePath), aiTarget(), https, undefined, undefined, http);
       if (ocr && ocr.replace(/\s+/g, '').length > text.replace(/\s+/g, '').length) {
         text = pdfText.cleanPdfText(ocr);
       }
@@ -1948,9 +1973,9 @@ async function extractDocumentContent(filePath) {
       content: '',
       error:
         ext === '.pdf'
-          ? (getOpenRouterApiKey()
+          ? (aiTarget()
               ? 'Could not read this PDF, not even with OCR. Use "Paste text".'
-              : 'This PDF looks scanned (no text layer). Set the OpenRouter key to read it with OCR, or use "Paste text".')
+              : 'This PDF looks scanned (no text layer). Sign in (or set the OpenRouter key) to read it with OCR, or use "Paste text".')
           : 'The file has no readable text.'
     };
   }
@@ -2083,7 +2108,7 @@ async function scrapeWebsiteFacts(targetUrl) {
     const lines = [];
     if (title) lines.push(`• Official title (${targetUrl}): ${title}`);
     if (metas.length > 0) lines.push(`• Official description: ${metas.slice(0, 2).join(' | ')}`);
-    if (headings.length > 0) lines.push(`• Principais Destaques do Site: ${[...new Set(headings)].join(' · ')}`);
+    if (headings.length > 0) lines.push(`• Key website highlights: ${[...new Set(headings)].join(' · ')}`);
     if (paragraphs.length > 0) {
       lines.push(`• Content from the site:\n  - ${[...new Set(paragraphs)].slice(0, 6).join('\n  - ')}`);
     }
@@ -2116,7 +2141,18 @@ async function searchDuckDuckGoHtml(query) {
   }
 }
 
-async function runCompanyRecon({ company, role, job_description }) {
+// Company research runs on the RealTimeAI server when signed in (scraping +
+// dossier, no keys on this machine); the local version stays for offline use.
+async function runCompanyRecon(input) {
+  const { company, role, job_description } = input || {};
+  if (String(company || '').trim() && isSignedIn()) {
+    const r = await cloudAccount.api('POST', '/v1/research/company', { company, role, job_description }, { timeoutMs: 45000 });
+    if (r.ok && r.data && r.data.dossier) return r.data.dossier;
+  }
+  return runCompanyReconLocal({ company, role, job_description });
+}
+
+async function runCompanyReconLocal({ company, role, job_description }) {
   const cleanCompany = String(company || '').trim();
   if (!cleanCompany) {
     return 'Enter the company name or URL (e.g. https://tako.ai/pt/ or Nubank) to research its business, culture and fit.';
@@ -2676,7 +2712,7 @@ function launchOverlay({ agent, demo = false, configOverrides = {} }) {
                   // The session log next to the export: its questions are
                   // structured, while the .md also carries the copilot's answers.
                   const { events } = readSessionEvents(path.basename(exportPath));
-                  const fromEvents = events.length ? sessionQuestionLines(events, { withChat: Boolean(getOpenRouterApiKey()) }).join('\n') : '';
+                  const fromEvents = events.length ? sessionQuestionLines(events, { withChat: Boolean(aiTarget()) }).join('\n') : '';
                   const t = events.length ? fromEvents : fs.readFileSync(exportPath, 'utf8');
                   if (t) {
                     const currentGoal = overlayAgentId ? loadAllAgents().find((a) => a.id === overlayAgentId) : null;
@@ -2685,6 +2721,7 @@ function launchOverlay({ agent, demo = false, configOverrides = {} }) {
                       if (mainWindow && !mainWindow.isDestroyed()) {
                         mainWindow.webContents.send('rtai:question-bank-updated', extraction);
                       }
+                      shareSessionQuestions(extraction);
                     }).catch((err) => console.warn('Auto JEV question extraction error:', err));
                   }
                 }
@@ -3258,8 +3295,26 @@ function createWindow() {
   }
 }
 
+// Running from source: use (and start) the local RealTimeAI server in
+// backend/ unless a server is configured. The engine inherits the env var.
+let localBackendChild = null;
+function startLocalBackendForDev() {
+  const configured = readConfigIni().server_url;
+  const devUrl = localBackend.devServerUrl({ packaged: app.isPackaged, repoRoot: REPO_ROOT, configuredUrl: configured });
+  if (devUrl) process.env.RTAI_SERVER_URL = devUrl;
+  const url = effectiveServerUrl(configured);
+  if (app.isPackaged || process.env.RTAI_LOCAL_BACKEND === '0' || !localBackend.isLoopbackUrl(url)) return;
+  localBackend.ensureLocalBackend({ url, repoRoot: REPO_ROOT }).then((r) => {
+    localBackendChild = r.child;
+    if (r.started) console.log(`[backend] local server ${r.ready ? 'ready' : 'starting'} at ${url}`);
+    // The renderer may have asked before the server was up: refresh the account.
+    if (r.ready && mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('rtai:cloud-event', { type: 'server_ready' });
+  }).catch((e) => console.warn('[backend]', e.message));
+}
+
 app.whenReady().then(() => {
   if (!gotSingleInstanceLock) return;
+  startLocalBackendForDev();
   if (session && session.defaultSession) {
     // Only the bundled UI (file://) may use the microphone meter, clipboard and
     // notifications; anything remote that ends up in a window gets nothing.
@@ -3477,7 +3532,10 @@ app.whenReady().then(() => {
   });
 
   // ---- Google Calendar ----------------------------------------------------
-  ipcMain.handle('rtai:gcal-status', async () => getGoogleCalendar().status());
+  ipcMain.handle('rtai:gcal-status', async () => {
+    await refreshGoogleBroker();
+    return getGoogleCalendar().status();
+  });
   ipcMain.handle('rtai:gcal-import-client', async () => {
     const res = await dialog.showOpenDialog(mainWindow, {
       title: 'Google OAuth client file (client_secret_....json)',
@@ -3936,6 +3994,10 @@ app.whenReady().then(() => {
 });
 
 app.on('will-quit', () => {
+  if (localBackendChild) {
+    try { localBackendChild.kill(); } catch (_e) {}
+    localBackendChild = null;
+  }
   if (globalShortcut && typeof globalShortcut.unregisterAll === 'function') {
     try { globalShortcut.unregisterAll(); } catch (_e) {}
   }
@@ -3979,6 +4041,12 @@ if (process.env.RTAI_TEST_EXPORTS === '1') {
     rebuildQuestionBankFromSessions,
     pickDefaultAgentId,
     getMeetingSettings,
-    applyElectronStealthMode
+    applyElectronStealthMode,
+    aiTarget,
+    runCompanyRecon,
+    callOpenRouterJson,
+    shareSessionQuestions,
+    getGoogleCalendar,
+    refreshGoogleBroker
   };
 }

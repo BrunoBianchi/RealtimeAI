@@ -39,7 +39,7 @@ test('Feature: Library (Arquivos) lists every file with its session, type and st
   ];
   const r = loadRenderer({ state: { agents } });
   let html = render(r.Cue, 'files');
-  assert.ok(html.includes('3 arquivos'));
+  assert.ok(html.includes('3 files'));
   assert.ok(tags(html, { 'data-action': 'files-pick' }).length === 1 && html.includes('id="filesDrop"'), 'drop zone / picker');
   assert.deepStrictEqual(tags(html, { 'data-change': 'files-target' }).length, 1, 'choose the session new files go to');
   assert.ok(/data-to="session\/a2"[^>]*>Stone · SRE</.test(html), 'each file links to its session');
@@ -50,13 +50,13 @@ test('Feature: Library (Arquivos) lists every file with its session, type and st
   // Search filters by name, session or type.
   r.S.ui.filesQuery = 'stone';
   html = render(r.Cue, 'files');
-  assert.ok(html.includes('1 arquivo') && html.includes('vaga.txt') && !html.includes('cv.pdf'));
+  assert.ok(html.includes('1 file') && html.includes('vaga.txt') && !html.includes('cv.pdf'));
   r.S.ui.filesQuery = 'zzz';
-  assert.ok(render(r.Cue, 'files').includes('Nenhum arquivo com essa busca.'));
+  assert.ok(render(r.Cue, 'files').includes('No files match this search.'));
 
   // No session yet: the page offers to create one instead of a dead drop zone.
   const none = render(loadRenderer().Cue, 'files');
-  assert.ok(none.includes('Crie uma sessão para anexar arquivos') && tags(none, { 'data-action': 'new-session' }).length === 1);
+  assert.ok(none.includes('Create a session to attach files') && tags(none, { 'data-action': 'new-session' }).length === 1);
 });
 
 test('Feature: playbooks are chosen per session and applied with their settings', async () => {
@@ -76,7 +76,7 @@ test('Feature: playbooks are chosen per session and applied with their settings'
   assert.strictEqual(saved.playbook_name, 'Conciso');
   assert.strictEqual(saved.playbook_answer_length, 'Concise');
   assert.strictEqual(saved.playbook_lead_with_answer, true);
-  assert.ok(r.toasts().some((t) => t.text === 'Playbook "Conciso" aplicado.'));
+  assert.ok(r.toasts().some((t) => t.text === 'Playbook "Conciso" applied.'));
 });
 
 test('Feature: the Ctrl+K palette finds actions, sessions, files and questions', async () => {
@@ -89,7 +89,7 @@ test('Feature: the Ctrl+K palette finds actions, sessions, files and questions',
   r.Cue.openModal('palette');
   const L = r.dialogs[0];
   const list = L.querySelector('#pcList');
-  assert.ok(list.innerHTML.includes('Nova sessão') && list.innerHTML.includes('Ir para'), 'empty query: actions and destinations');
+  assert.ok(list.innerHTML.includes('New session') && list.innerHTML.includes('Go to'), 'empty query: actions and destinations');
   const search = async (q) => {
     L.querySelector('#pcQuery').value = q;
     await L.querySelector('#pcQuery').fire('input');
@@ -99,5 +99,5 @@ test('Feature: the Ctrl+K palette finds actions, sessions, files and questions',
   assert.ok((await search('portfolio')).includes('portfolio.pdf'), 'files');
   assert.ok((await search('kafka')).includes('Como você escala Kafka?'), 'unlocked questions');
   assert.ok(!(await search('segredo')).includes('Segredo'), 'locked questions stay hidden');
-  assert.ok((await search('xyzzy')).includes('Nada encontrado.'));
+  assert.ok((await search('xyzzy')).includes('Nothing found.'));
 });

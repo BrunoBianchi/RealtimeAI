@@ -18,7 +18,7 @@ test('Model Tier Selection: three cards (Rápido, Equilibrado, Ultra), the curre
   assert.deepStrictEqual(cards.map((c) => c['aria-pressed']), ['false', 'true', 'false']);
   for (const name of ['Qwen 3.6 Flash', 'Llama 3.3 70B', 'GPT-OSS 120B']) assert.ok(html.includes(name));
   assert.ok(!/\d+\s*ms\b/.test(html), 'cards must not promise fixed latencies; the HUD shows measured time');
-  assert.ok(html.includes('Atual: Llama 3.3 70B'), 'header names the active model');
+  assert.ok(html.includes('Current: Llama 3.3 70B'), 'header names the active model');
 
   // Both Ultra ids (OpenRouter and Cerebras) light the Ultra card.
   assert.strictEqual(cardsFor('gpt-oss-120b').cards[2]['aria-pressed'], 'true');
@@ -27,7 +27,7 @@ test('Model Tier Selection: three cards (Rápido, Equilibrado, Ultra), the curre
   // A custom model lights no card and stays editable in the free-text field.
   const custom = cardsFor('mistralai/mistral-large');
   assert.ok(custom.cards.every((c) => c['aria-pressed'] === 'false'));
-  assert.ok(custom.html.includes('Personalizado.'));
+  assert.ok(custom.html.includes('Custom.'));
   assert.strictEqual(tags(custom.html, { 'data-key': 'model' })[0].value, 'mistralai/mistral-large');
 });
 

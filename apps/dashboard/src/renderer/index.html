@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR" data-theme="dark">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -9,15 +9,15 @@
   </head>
   <body>
     <div class="app" id="app">
-      <aside class="sidebar" id="sidebar" aria-label="Navegação">
+      <aside class="sidebar" id="sidebar" aria-label="Navigation">
         <div class="brand">
           <div class="brand-mark" data-icon="waveform"></div>
           <span class="brand-name">Cue</span>
-          <span class="pill ok" id="engineStatusPill" title="Status do copiloto"><span class="dot"></span><span id="engineStatusLabel">Pronto</span></span>
+          <span class="pill ok" id="engineStatusPill" title="Copilot status"><span class="dot"></span><span id="engineStatusLabel">Ready</span></span>
         </div>
 
-        <button type="button" class="btn primary lg" id="btnNewSession" data-action="new-session" title="Nova sessão">
-          <span data-icon="plus"></span><span class="new-session-label">Nova sessão</span>
+        <button type="button" class="btn primary lg" id="btnNewSession" data-action="new-session" title="New session">
+          <span data-icon="plus"></span><span class="new-session-label">New session</span>
         </button>
 
         <nav class="nav" id="sideNav"></nav>
@@ -39,20 +39,20 @@
 
       <main class="main">
         <header class="topbar">
-          <div class="crumb"><span class="muted">Cue</span><span class="sep">/</span><span id="crumb">Início</span></div>
-          <button type="button" class="search-trigger" id="searchTrigger" data-action="open-palette" title="Buscar (Ctrl+K)">
+          <div class="crumb"><span class="muted">Cue</span><span class="sep">/</span><span id="crumb">Home</span></div>
+          <button type="button" class="search-trigger" id="searchTrigger" data-action="open-palette" title="Search (Ctrl+K)">
             <span data-icon="magnifying-glass"></span>
-            <span class="truncate">Buscar sessões, arquivos, perguntas…</span>
+            <span class="truncate">Search sessions, files, questions…</span>
             <span class="kbd">Ctrl K</span>
           </button>
           <div class="topbar-actions">
             <button type="button" class="btn raised" id="btnUpdateChip" data-action="go" data-to="settings/updates" hidden></button>
-            <button type="button" class="btn raised" id="btnStealthChip" data-action="toggle-stealth" title="Ocultar o painel de gravações e compartilhamento (Ctrl+Alt+S)"></button>
+            <button type="button" class="btn raised" id="btnStealthChip" data-action="toggle-stealth" title="Hide the panel from recordings and screen sharing (Ctrl+Alt+S)"></button>
             <button type="button" class="btn raised" id="btnGoLive" data-action="go" data-to="live"></button>
             <div class="win-controls">
-              <button type="button" class="win-btn" data-win="minimize" title="Minimizar"><span data-icon="minus"></span></button>
-              <button type="button" class="win-btn" data-win="maximize" title="Maximizar"><span data-icon="square"></span></button>
-              <button type="button" class="win-btn close" data-win="close" title="Fechar"><span data-icon="x"></span></button>
+              <button type="button" class="win-btn" data-win="minimize" title="Minimize"><span data-icon="minus"></span></button>
+              <button type="button" class="win-btn" data-win="maximize" title="Maximize"><span data-icon="square"></span></button>
+              <button type="button" class="win-btn close" data-win="close" title="Close"><span data-icon="x"></span></button>
             </div>
           </div>
         </header>

@@ -8,7 +8,7 @@
   const api = window.rtai;
   const { esc, icon, fixText, pctBar, plural } = C;
 
-  const FORMATS = ['Comportamental', 'Técnica', 'Painel misto', 'Cultura', 'Case', 'Triagem', 'System design', 'Final'];
+  const FORMATS = ['Behavioral', 'Technical', 'Mixed panel', 'Culture', 'Case', 'Screening', 'System design', 'Final'];
   C.FORMATS = FORMATS;
 
   function formatOf(a) {
@@ -41,7 +41,7 @@
   // ================================================================ HOME ==
   function greeting() {
     const h = new Date().getHours();
-    return h < 5 ? 'Boa noite' : h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
+    return h < 5 ? 'Good evening' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
   }
 
   function calCard(a, iv) {
@@ -53,13 +53,13 @@
       <div class="row top" style="gap:14px">
         <div class="date-tile"><span class="d">${C.pad2(iv.at.getDate())}</span><span class="m">${C.MONTHS[iv.at.getMonth()]}</span></div>
         <div class="stack gap-4 grow" style="gap:3px">
-          <span class="small muted truncate">${esc(C.agentCompany(a) || 'Empresa não definida')}</span>
+          <span class="small muted truncate">${esc(C.agentCompany(a) || 'No company set')}</span>
           <span class="truncate" style="font-size:14.5px;font-weight:500;letter-spacing:-.01em;line-height:1.35">${esc(C.agentRole(a) || a.name || 'Entrevista')}</span>
         </div>
         <span class="pill ${soon ? 'ok' : ''}"><span class="dot"></span>${esc(C.relDays(iv.days))}</span>
       </div>
       <div class="cal-meta">
-        <span>${icon('clock')}<span class="mono" style="font-size:11.5px">${iv.hasTime ? esc(iv.time) : 'Sem horário'}</span></span>
+        <span>${icon('clock')}<span class="mono" style="font-size:11.5px">${iv.hasTime ? esc(iv.time) : 'No time set'}</span></span>
         <span>${icon('users')}${esc(formatOf(a))}</span>
         <span>${icon('bell')}${esc(reminder)}</span>
       </div>
@@ -69,8 +69,8 @@
       </div>
       <div class="cal-actions">
         ${today
-          ? `<button type="button" class="btn primary flex1" data-action="start-copilot" data-agent="${esc(a.id)}">${icon('video')}Entrar na sala</button>`
-          : `<button type="button" class="btn flex1" data-action="start-copilot" data-agent="${esc(a.id)}" data-demo="1">${icon('play')}Simular</button>`}
+          ? `<button type="button" class="btn primary flex1" data-action="start-copilot" data-agent="${esc(a.id)}">${icon('video')}Join the room</button>`
+          : `<button type="button" class="btn flex1" data-action="start-copilot" data-agent="${esc(a.id)}" data-demo="1">${icon('play')}Practice</button>`}
         <button type="button" class="btn flex1" data-action="go" data-to="session/${esc(a.id)}">${icon('folder')}Contexto</button>
       </div>
     </div>`;
@@ -93,7 +93,7 @@
 
   function latencyChart(pts) {
     if (pts.length < 2) {
-      return `<div class="chart-box"><div class="empty" style="padding:36px 10px">${icon('chart')}<span>A latência aparece depois de duas sessões com respostas do copiloto.</span></div></div>`;
+      return `<div class="chart-box"><div class="empty" style="padding:36px 10px">${icon('chart')}<span>Latency shows up after two sessions with copilot answers.</span></div></div>`;
     }
     const vals = pts.map((p) => p.v);
     const step = niceStep(Math.max(1, Math.max(...vals) - Math.min(...vals)));
@@ -118,7 +118,7 @@
     return `<div class="chart-box">
       <div class="chart-wrap">
         <div class="chart-y">${ticks.map((t) => `<span>${t}</span>`).join('')}</div>
-        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="Latência do primeiro token por sessão, em milissegundos">
+        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="First-token latency per session, in milliseconds">
           <defs><linearGradient id="latArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".18"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
           ${grid}${avgLine}
           <path d="${area}" fill="url(#latArea)"/>
@@ -127,25 +127,25 @@
         </svg>
       </div>
       <div class="chart-axis" style="padding-left:52px"><span>${esc(C.fmtDateShort(pts[0].d))}</span><span>${esc(C.fmtDateShort(mid.d))}</span><span style="color:var(--text-secondary)">${esc(C.fmtDateShort(pts[pts.length - 1].d))}</span></div>
-      <div class="chart-foot"><span>Média <b>${avg} ms</b></span><span>Melhor <b>${Math.round(best)} ms</b></span><span>Última <b>${Math.round(vals[vals.length - 1])} ms</b></span><span>${plural(pts.length, 'sessão', 'sessões')} · ms</span></div>
+      <div class="chart-foot"><span>Average <b>${avg} ms</b></span><span>Best <b>${Math.round(best)} ms</b></span><span>Last <b>${Math.round(vals[vals.length - 1])} ms</b></span><span>${plural(pts.length, 'session', 'sessions')} · ms</span></div>
     </div>`;
   }
 
   // Behavioral = the "tell me about a time..." questions about you (JEV "pessoal").
   const CAT_LABEL = {
-    Behavioral: 'Pessoal',
-    Technical: 'Técnica',
-    Culture: 'Cultura',
-    'Domain knowledge': 'Domínio',
-    Leadership: 'Liderança',
-    Salary: 'Salário',
-    Opening: 'Abertura',
-    Experience: 'Experiência',
-    General: 'Geral',
+    Behavioral: 'Personal',
+    Technical: 'Technical',
+    Culture: 'Culture',
+    'Domain knowledge': 'Domain',
+    Leadership: 'Leadership',
+    Salary: 'Salary',
+    Opening: 'Opening',
+    Experience: 'Experience',
+    General: 'General',
     'System design': 'System design',
-    Coding: 'Código'
+    Coding: 'Coding'
   };
-  C.catLabel = (c) => CAT_LABEL[c] || fixText(c || 'Outras');
+  C.catLabel = (c) => CAT_LABEL[c] || fixText(c || 'Other');
 
   function categoryBars() {
     const counts = {};
@@ -159,7 +159,7 @@
     }
     const rows = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
     if (!rows.length) {
-      return { total, html: `<div class="empty" style="padding:24px 10px">${icon('question')}<span>As perguntas detectadas nas suas sessões aparecem aqui.</span></div>` };
+      return { total, html: `<div class="empty" style="padding:24px 10px">${icon('question')}<span>Questions detected in your sessions show up here.</span></div>` };
     }
     const max = rows[0][1];
     return {
@@ -191,19 +191,19 @@
       .slice(0, 3);
 
     const setupBanner = !ready.ok
-      ? `<div class="banner warn">${icon('key')}<span class="grow">${!ready.stt ? 'Adicione sua chave de transcrição (Deepgram) para o copiloto ouvir a entrevista.' : 'Adicione uma chave de IA (OpenRouter, Cerebras, OpenAI…) para o copiloto sugerir respostas.'}</span><button type="button" class="btn sm" data-action="go" data-to="settings/ai">Configurar</button></div>`
+      ? `<div class="banner warn">${icon('key')}<span class="grow">${!ready.stt ? 'Add your transcription key (Deepgram) so the copilot can hear the interview.' : 'Add an AI key (OpenRouter, Cerebras, OpenAI…) so the copilot can suggest answers.'}</span><button type="button" class="btn sm" data-action="go" data-to="settings/ai">Set up</button></div>`
       : '';
 
     const liveBanner = running
-      ? `<div class="banner">${icon('broadcast')}<span class="grow">Copiloto ${S.overlayStatus.mode === 'demo' ? 'em simulação' : 'ao vivo'}${C.agentById(S.overlayStatus.agentId) ? ` · ${esc(C.agentTitle(C.agentById(S.overlayStatus.agentId)))}` : ''}</span><button type="button" class="btn sm" data-action="go" data-to="live">Abrir painel ao vivo</button><button type="button" class="btn sm danger" data-action="stop-copilot">${icon('stop')}Encerrar</button></div>`
+      ? `<div class="banner">${icon('broadcast')}<span class="grow">Copilot ${S.overlayStatus.mode === 'demo' ? 'in practice' : 'live'}${C.agentById(S.overlayStatus.agentId) ? ` · ${esc(C.agentTitle(C.agentById(S.overlayStatus.agentId)))}` : ''}</span><button type="button" class="btn sm" data-action="go" data-to="live">Open live panel</button><button type="button" class="btn sm danger" data-action="stop-copilot">${icon('stop')}Stop</button></div>`
       : '';
 
     return `<div class="page">
       ${head(
-        `<div class="title-row"><h1 class="h1">${esc(greeting())}${name ? `, ${esc(name)}` : ''}</h1>${agents.length ? `<span class="pill ok"><span class="dot"></span>${plural(agents.length, 'sessão ativa', 'sessões ativas')}</span>` : ''}</div>`,
-        'Visão geral da sua preparação e do desempenho do copiloto.',
-        `<button type="button" class="status-chip" data-action="go" data-to="settings/ai"><span class="dot ${ready.ok ? '' : 'warn'}"></span>${esc(C.modelLabel(cfg.model))}<span class="vsep">|</span><span class="num">${lat ? `${lat} ms` : 'sem medições'}</span></button>
-         <button type="button" class="status-chip" data-action="go" data-to="settings/privacy">${icon('shield-check')}${cfg.save_sessions === false ? 'Sem gravação' : 'Gravação local'}<span class="vsep">|</span><span class="sub">${stealthOn ? 'Oculto' : 'Visível'} em capturas</span></button>`,
+        `<div class="title-row"><h1 class="h1">${esc(greeting())}${name ? `, ${esc(name)}` : ''}</h1>${agents.length ? `<span class="pill ok"><span class="dot"></span>${plural(agents.length, 'active session', 'active sessions')}</span>` : ''}</div>`,
+        'Overview of your preparation and the copilot performance.',
+        `<button type="button" class="status-chip" data-action="go" data-to="settings/ai"><span class="dot ${ready.ok ? '' : 'warn'}"></span>${esc(C.modelLabel(cfg.model))}<span class="vsep">|</span><span class="num">${lat ? `${lat} ms` : 'no measurements'}</span></button>
+         <button type="button" class="status-chip" data-action="go" data-to="settings/privacy">${icon('shield-check')}${cfg.save_sessions === false ? 'Not recording' : 'Local recording'}<span class="vsep">|</span><span class="sub">${stealthOn ? 'Hidden' : 'Visible'} in captures</span></button>`,
         true
       )}
       ${liveBanner}${setupBanner}
@@ -211,41 +211,41 @@
       <section class="card" style="gap:16px">
         <div class="row top" style="gap:12px">
           <span class="icon-tile">${icon('calendar')}</span>
-          <div class="stack gap-4 grow" style="gap:0"><span class="h2">Próximas entrevistas</span><span class="small faint">${gconn ? `Sincronizado com o Google Calendar${S.gcal.status.email ? ` · ${esc(S.gcal.status.email)}` : ''}` : 'Datas definidas nas suas sessões'}</span></div>
-          <span class="pill lg">${week ? `${week} em 7 dias` : `${up.length} agendada${up.length === 1 ? '' : 's'}`}</span>
-          <button type="button" class="btn primary" data-action="open-scheduler">${icon('plus')}Agendar</button>
+          <div class="stack gap-4 grow" style="gap:0"><span class="h2">Upcoming interviews</span><span class="small faint">${gconn ? `Synced with Google Calendar${S.gcal.status.email ? ` · ${esc(S.gcal.status.email)}` : ''}` : 'Dates set in your sessions'}</span></div>
+          <span class="pill lg">${week ? `${week} in 7 days` : `${up.length} scheduled`}</span>
+          <button type="button" class="btn primary" data-action="open-scheduler">${icon('plus')}Schedule</button>
         </div>
         ${up.length
           ? `<div class="cal-grid">${up.slice(0, 4).map(({ a, iv }) => calCard(a, iv)).join('')}</div>`
-          : `<div class="empty boxed">${icon('calendar')}<span class="t">Nenhuma entrevista agendada</span><span>Defina a data de uma sessão para ver a contagem regressiva e receber lembretes.</span><div class="row"><button type="button" class="btn" data-action="open-scheduler">${icon('calendar')}Agendar entrevista</button><button type="button" class="btn primary" data-action="new-session">${icon('plus')}Nova sessão</button></div></div>`}
-        <div class="reminder-bar"><span class="dot sm"></span><span style="color:var(--text)" class="nowrap">Lembrete inteligente</span><span class="grow">${gconn ? `Google Calendar avisa ${S.gcal.status.reminderMin ?? 60} min antes; notificação do Windows 1 hora antes.` : 'Notificação do Windows 1 hora antes de cada entrevista.'}</span><a class="nowrap" data-action="go" data-to="settings/calendar">Configurar</a></div>
+          : `<div class="empty boxed">${icon('calendar')}<span class="t">No interviews scheduled</span><span>Set a session date to see the countdown and get reminders.</span><div class="row"><button type="button" class="btn" data-action="open-scheduler">${icon('calendar')}Schedule interview</button><button type="button" class="btn primary" data-action="new-session">${icon('plus')}New session</button></div></div>`}
+        <div class="reminder-bar"><span class="dot sm"></span><span style="color:var(--text)" class="nowrap">Smart reminder</span><span class="grow">${gconn ? `Google Calendar reminds you ${S.gcal.status.reminderMin ?? 60} min before; Windows notification 1 hour before.` : 'Windows notification 1 hour before each interview.'}</span><a class="nowrap" data-action="go" data-to="settings/calendar">Set up</a></div>
       </section>
 
       <section class="grid-2">
         <div class="card">
-          <div class="row between"><span class="eyebrow">Modelo ativo</span><span class="pill ${running ? 'danger' : ready.ok ? 'ok' : 'warn'}">${running ? 'Em uso' : ready.ok ? 'Streaming' : 'Sem chave'}</span></div>
+          <div class="row between"><span class="eyebrow">Active model</span><span class="pill ${running ? 'danger' : ready.ok ? 'ok' : 'warn'}">${running ? 'In use' : ready.ok ? 'Streaming' : 'No key'}</span></div>
           <div class="stack gap-4">
             <div class="row between" style="align-items:baseline"><span style="font-size:15px;font-weight:500">${esc(C.modelLabel(cfg.model))}</span><span class="num">${lat ? `~${lat}ms` : '—'}</span></div>
-            <span class="muted" style="font-size:13px">via ${esc(C.providerFor(cfg.model))} · respostas ${cfg.auto_suggest === false ? 'sob demanda' : 'automáticas'} em ${esc(cfg.ai_response_language && cfg.ai_response_language !== 'auto' ? cfg.ai_response_language : 'idioma da conversa')}.</span>
+            <span class="muted" style="font-size:13px">via ${esc(C.providerFor(cfg.model))} · ${cfg.auto_suggest === false ? 'on-demand' : 'automatic'} answers in ${esc(cfg.ai_response_language && cfg.ai_response_language !== 'auto' ? cfg.ai_response_language : 'the conversation language')}.</span>
           </div>
           <div class="toggle-row boxed">
-            <span class="txt"><span class="t">Ocultar da tela</span><span class="s">Painel invisível em gravações e compartilhamento</span></span>
-            ${C.sw('data-change="stealth-switch" aria-label="Ocultar da tela"', stealthOn)}
+            <span class="txt"><span class="t">Hide from screen</span><span class="s">Panel invisible in recordings and screen sharing</span></span>
+            ${C.sw('data-change="stealth-switch" aria-label="Hide from screen"', stealthOn)}
           </div>
-          <a class="small muted" style="margin-top:auto" data-action="go" data-to="settings/ai">Alterar modelo nas configurações →</a>
+          <a class="small muted" style="margin-top:auto" data-action="go" data-to="settings/ai">Change the model in settings →</a>
         </div>
         <div class="card">
-          <div class="row between"><span class="eyebrow">Uso e cota</span><span class="pill">Plano ${esc(u.planLabel)}</span></div>
-          <div class="stack gap-4"><span class="metric">${u.usedMin}<span class="unit"> ${u.limit ? `/ ${u.limit} min` : 'min'}</span></span><span class="muted" style="font-size:13px">Transcritos em ${esc(u.monthLabel)}</span></div>
+          <div class="row between"><span class="eyebrow">Usage and quota</span><span class="pill">${esc(u.planLabel)} plan</span></div>
+          <div class="stack gap-4"><span class="metric">${u.usedMin}<span class="unit"> ${u.limit ? `/ ${u.limit} min` : 'min'}</span></span><span class="muted" style="font-size:13px">Transcribed in ${esc(u.monthLabel)}</span></div>
           ${u.limit ? pctBar(u.pct) : ''}
-          <div class="kv"><div><span class="k">Sessões</span><span class="v">${u.sessions}</span></div><div><span class="k">Perguntas</span><span class="v">${u.questions}</span></div></div>
-          <div class="card-foot"><span>${u.limit ? `Renova em ${esc(u.renewLabel)}` : `Ciclo de ${esc(u.monthLabel)}`}</span><span style="color:var(--text-secondary)">${u.limit ? `${u.left} min restantes` : `${u.answers} respostas`}</span></div>
+          <div class="kv"><div><span class="k">Sessions</span><span class="v">${u.sessions}</span></div><div><span class="k">Questions</span><span class="v">${u.questions}</span></div></div>
+          <div class="card-foot"><span>${u.limit ? `Renews on ${esc(u.renewLabel)}` : `${esc(u.monthLabel)} cycle`}</span><span style="color:var(--text-secondary)">${u.limit ? `${u.left} min left` : `${u.answers} answers`}</span></div>
         </div>
       </section>
 
       <section class="stack gap-16">
         <div class="card tight">
-          <div class="card-head"><div class="stack gap-4" style="gap:0"><span class="t">Sessões em preparação</span><span class="s">Contextos que o copiloto usa ao vivo</span></div><a class="small muted nowrap" data-action="go" data-to="sessions">Ver todas (${agents.length})</a></div>
+          <div class="card-head"><div class="stack gap-4" style="gap:0"><span class="t">Sessions in preparation</span><span class="s">Context the copilot uses live</span></div><a class="small muted nowrap" data-action="go" data-to="sessions">View all (${agents.length})</a></div>
           ${prep.length
             ? prep
                 .map(({ a, r }) => `<button type="button" class="list-row" data-action="go" data-to="session/${esc(a.id)}">
@@ -256,18 +256,18 @@
                   ${icon('caret-right', 'faint')}
                 </button>`)
                 .join('')
-            : `<div class="empty">${icon('stack')}<span class="t">Nenhuma sessão ainda</span><span>Cada sessão reúne a vaga, seus arquivos e as instruções que a IA usa ao vivo.</span><button type="button" class="btn primary" data-action="new-session">${icon('plus')}Criar sessão</button></div>`}
+            : `<div class="empty">${icon('stack')}<span class="t">No sessions yet</span><span>Each session brings together the job, your files and the instructions the AI uses live.</span><button type="button" class="btn primary" data-action="new-session">${icon('plus')}Create session</button></div>`}
         </div>
 
         <div class="card" style="gap:22px">
-          <div class="card-head"><div class="stack gap-4" style="gap:0"><span class="t">Desempenho</span><span class="s">Latência do copiloto e perguntas detectadas</span></div><span class="pill ok"><span class="dot"></span>Dados reais</span></div>
+          <div class="card-head"><div class="stack gap-4" style="gap:0"><span class="t">Performance</span><span class="s">Copilot latency and detected questions</span></div><span class="pill ok"><span class="dot"></span>Real data</span></div>
           <div class="grid-2" style="gap:20px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
             <div class="stack gap-8" style="gap:10px">
-              <div class="row between top"><div class="stack" style="gap:0"><span style="font-size:13px">Primeiro token por sessão</span><span class="xs faint">Média das últimas ${latPts.length || 0} sessões, em ms</span></div><span class="num" style="color:var(--accent);font-size:13px">${lat ? `${lat} ms` : '—'}</span></div>
+              <div class="row between top"><div class="stack" style="gap:0"><span style="font-size:13px">First token per session</span><span class="xs faint">Average of the last ${latPts.length || 0} sessions, in ms</span></div><span class="num" style="color:var(--accent);font-size:13px">${lat ? `${lat} ms` : '—'}</span></div>
               ${latencyChart(latPts)}
             </div>
             <div class="stack gap-8" style="gap:10px">
-              <div class="row between" style="align-items:baseline"><span style="font-size:13px">Perguntas por categoria</span><span class="num">${cats.total} no banco</span></div>
+              <div class="row between" style="align-items:baseline"><span style="font-size:13px">Questions by category</span><span class="num">${cats.total} in the bank</span></div>
               <div class="inset" style="flex:1;justify-content:center;gap:12px">${cats.html}</div>
             </div>
           </div>
@@ -282,10 +282,10 @@
 
   C.changes['stealth-switch'] = async (el) => {
     const want = el.checked;
-    const res = await C.guard(() => api.setStealthMode({ active: want }), 'Não foi possível alterar o modo oculto.');
+    const res = await C.guard(() => api.setStealthMode({ active: want }), 'Could not change hidden mode.');
     if (res && (res.status || res.state)) S.stealthState = res.status || res.state;
     else if (res) S.stealthState = { ...S.stealthState, active: want };
-    C.toast(want ? 'Painel oculto de gravações e compartilhamento.' : 'Painel visível em gravações.');
+    C.toast(want ? 'Panel hidden from recordings and screen sharing.' : 'Panel visible in recordings.');
     C.renderShell();
   };
 
@@ -293,27 +293,27 @@
   function sessionRowsPast() {
     const list = S.sessions;
     if (!list.length) {
-      return `<div class="empty boxed">${icon('history')}<span class="t">Nenhuma sessão gravada</span><span>Quando você encerrar o copiloto, a transcrição e as respostas aparecem aqui.</span><button type="button" class="btn primary" data-action="go" data-to="live">${icon('broadcast')}Ir para Ao vivo</button></div>`;
+      return `<div class="empty boxed">${icon('history')}<span class="t">No recorded sessions</span><span>When you stop the copilot, the transcript and answers show up here.</span><button type="button" class="btn primary" data-action="go" data-to="live">${icon('broadcast')}Go to Live</button></div>`;
     }
     const cols = 'grid-template-columns:minmax(0,1fr) 140px 100px 100px auto';
     return `<div class="card flush">
-      <div class="table-head" style="${cols}"><span>Sessão</span><span>Nota JEV</span><span>Respostas</span><span>Latência</span><span></span></div>
+      <div class="table-head" style="${cols}"><span>Session</span><span>JEV score</span><span>Answers</span><span>Latency</span><span></span></div>
       ${list
         .map((s) => {
           const d = C.sessionDate(s);
           const a = C.agentForSession(s);
           const title = C.sessionTitle(s);
-          const mode = s.mode === 'demo' ? 'Simulação' : s.mode === 'live' ? 'Ao vivo' : 'Sessão';
+          const mode = s.mode === 'demo' ? 'Practice' : s.mode === 'live' ? 'Live' : 'Session';
           const answers = Number(s.suggestions || s.answersCount || 0);
           const lat = C.sessionLatency(s);
           return `<div class="table-row clickable" style="${cols}" data-action="go" data-to="review/${esc(s.id)}">
             <div class="row" style="gap:12px;min-width:0">${monoTile(a ? C.agentCompany(a) : title, a ? companyLogo(C.agentCompany(a)) : '')}<div class="stack" style="gap:0;min-width:0"><span class="truncate strong">${esc(title)}</span><span class="truncate faint" style="font-size:12.5px">${esc(mode)} · <span class="mono" style="font-size:11.5px">${d ? `${esc(C.fmtDateShort(d))} · ${esc(C.fmtTime(d))}` : '—'} · ${esc(C.fmtDuration(s.durationSeconds))}</span></span></div></div>
             ${Number.isFinite(s.jevScore)
               ? `<div class="row"><span class="mono" style="font-size:14px;font-weight:500;width:26px;color:${C.scoreTone(s.jevScore).color}">${s.jevScore}</span>${pctBar(s.jevScore, `grow ${C.scoreTone(s.jevScore).cls === 'ok' ? '' : C.scoreTone(s.jevScore).cls}`)}</div>`
-              : `<span class="small faint">${s.hasEvents ? 'Não avaliada' : '—'}</span>`}
+              : `<span class="small faint">${s.hasEvents ? 'Not evaluated' : '—'}</span>`}
             <span class="mono" style="font-size:13px">${answers}</span>
             <span class="mono" style="font-size:12px;color:var(--text-secondary)">${lat ? `${Math.round(lat)} ms` : '—'}</span>
-            <button type="button" class="btn" data-action="go" data-to="review/${esc(s.id)}" data-stop="1">Ver análise${icon('arrow-right')}</button>
+            <button type="button" class="btn" data-action="go" data-to="review/${esc(s.id)}" data-stop="1">View review${icon('arrow-right')}</button>
           </div>`;
         })
         .join('')}
@@ -323,7 +323,7 @@
   function sessionRowsUpcoming() {
     const list = S.agents.filter((a) => S.ui.showArchived || !a.archived);
     if (!list.length) {
-      return `<div class="empty boxed">${icon('stack')}<span class="t">Crie sua primeira sessão</span><span>Informe o cargo e a empresa; depois anexe currículo e descrição da vaga.</span><button type="button" class="btn primary" data-action="new-session">${icon('plus')}Nova sessão</button></div>`;
+      return `<div class="empty boxed">${icon('stack')}<span class="t">Create your first session</span><span>Enter the role and company, then attach your resume and the job description.</span><button type="button" class="btn primary" data-action="new-session">${icon('plus')}New session</button></div>`;
     }
     const sorted = list
       .map((a) => ({ a, iv: C.agentInterview(a), r: C.readiness(a) }))
@@ -337,13 +337,13 @@
       <div class="table-head" style="${cols}"><span>Vaga</span><span>Formato</span><span>Data</span><span>Preparo</span><span></span></div>
       ${sorted
         .map(({ a, iv, r }) => `<div class="table-row clickable" style="${cols}" data-action="go" data-to="session/${esc(a.id)}">
-          <div class="row" style="gap:12px;min-width:0">${monoTile(C.agentCompany(a) || a.name, companyLogo(C.agentCompany(a)))}<div class="stack" style="gap:1px;min-width:0"><span class="strong truncate">${esc(C.agentRole(a) || a.name)}${a.archived ? ' <span class="tag">Arquivada</span>' : ''}</span><span class="truncate faint" style="font-size:12.5px">${esc(C.agentCompany(a) || '—')} · ${plural((a.documents || []).length, 'arquivo', 'arquivos')}</span></div></div>
+          <div class="row" style="gap:12px;min-width:0">${monoTile(C.agentCompany(a) || a.name, companyLogo(C.agentCompany(a)))}<div class="stack" style="gap:1px;min-width:0"><span class="strong truncate">${esc(C.agentRole(a) || a.name)}${a.archived ? ' <span class="tag">Archived</span>' : ''}</span><span class="truncate faint" style="font-size:12.5px">${esc(C.agentCompany(a) || '—')} · ${plural((a.documents || []).length, 'file', 'files')}</span></div></div>
           <span class="muted" style="font-size:13px">${esc(formatOf(a))}</span>
           <span class="mono" style="font-size:12px;color:var(--text-secondary)">${iv ? `${esc(C.fmtDateShort(iv.at))}${iv.hasTime ? ` · ${esc(iv.time)}` : ''}${iv.days < 0 ? ' <span class="faint">(passou)</span>' : ''}` : '—'}</span>
           <div class="row">${pctBar(r.pct, 'neutral grow')}<span class="num" style="color:var(--text-secondary);width:32px;text-align:right">${r.pct}%</span></div>
           <div class="row" style="justify-content:flex-end">
-            <button type="button" class="btn sm" data-action="start-copilot" data-agent="${esc(a.id)}" data-demo="1" data-stop="1" title="Simular com perguntas de treino">${icon('robot')}Simular</button>
-            <button type="button" class="btn sm" data-action="start-copilot" data-agent="${esc(a.id)}" data-stop="1">${icon('play')}Iniciar</button>
+            <button type="button" class="btn sm" data-action="start-copilot" data-agent="${esc(a.id)}" data-demo="1" data-stop="1" title="Practice with training questions">${icon('robot')}Practice</button>
+            <button type="button" class="btn sm" data-action="start-copilot" data-agent="${esc(a.id)}" data-stop="1">${icon('play')}Start</button>
           </div>
         </div>`)
         .join('')}
@@ -354,14 +354,14 @@
     const past = S.ui.sessTab === 'past';
     const nArchived = S.agents.filter((a) => a.archived).length;
     return `<div class="page tight">
-      ${head(past ? 'Histórico' : 'Sessões', past ? 'Sessões gravadas pelo copiloto, com transcrição, respostas e análise.' : 'Cada sessão reúne a vaga, seus arquivos e as instruções que a IA usa ao vivo.',
-        `${past ? `<button type="button" class="btn" data-action="open-path">${icon('folder')}Abrir pasta</button>` : ''}<button type="button" class="btn primary lg" data-action="new-session">${icon('plus')}Nova sessão</button>`)}
+      ${head(past ? 'History' : 'Sessions', past ? 'Sessions recorded by the copilot, with transcript, answers and review.' : 'Each session brings together the job, your files and the instructions the AI uses live.',
+        `${past ? `<button type="button" class="btn" data-action="open-path">${icon('folder')}Open folder</button>` : ''}<button type="button" class="btn primary lg" data-action="new-session">${icon('plus')}New session</button>`)}
       <div class="row between wrap">
         <div class="segmented">
-          <button type="button" class="${past ? '' : 'active'}" data-action="go" data-to="sessions">Próximas<span class="num">${S.agents.filter((a) => !a.archived).length}</span></button>
-          <button type="button" class="${past ? 'active' : ''}" data-action="go" data-to="sessions/past">Concluídas<span class="num">${S.sessions.length}</span></button>
+          <button type="button" class="${past ? '' : 'active'}" data-action="go" data-to="sessions">Upcoming<span class="num">${S.agents.filter((a) => !a.archived).length}</span></button>
+          <button type="button" class="${past ? 'active' : ''}" data-action="go" data-to="sessions/past">Completed<span class="num">${S.sessions.length}</span></button>
         </div>
-        ${!past && nArchived ? `<label class="row small muted" style="cursor:pointer">${C.sw('data-change="toggle-archived"', S.ui.showArchived)}Mostrar arquivadas (${nArchived})</label>` : ''}
+        ${!past && nArchived ? `<label class="row small muted" style="cursor:pointer">${C.sw('data-change="toggle-archived"', S.ui.showArchived)}Show archived (${nArchived})</label>` : ''}
       </div>
       ${past ? sessionRowsPast() : sessionRowsUpcoming()}
     </div>`;
@@ -376,7 +376,7 @@
   C.views.session = function sessionDetail(parts) {
     const a = C.agentById(parts[0]);
     if (!a) {
-      return `<div class="page"><div class="empty boxed">${icon('stack')}<span class="t">Sessão não encontrada</span><button type="button" class="btn" data-action="go" data-to="sessions">Voltar para Sessões</button></div></div>`;
+      return `<div class="page"><div class="empty boxed">${icon('stack')}<span class="t">Session not found</span><button type="button" class="btn" data-action="go" data-to="sessions">Back to Sessions</button></div></div>`;
     }
     S.activeAgentId = a.id;
     const iv = C.agentInterview(a);
@@ -389,26 +389,26 @@
     const research = fixText(a.company_research || a.company_dossier || '');
 
     return `<div class="page tight">
-      <button type="button" class="link-btn" data-action="go" data-to="sessions">${icon('arrow-left')}Sessões</button>
+      <button type="button" class="link-btn" data-action="go" data-to="sessions">${icon('arrow-left')}Sessions</button>
       <section class="page-head ruled" style="align-items:center">
         <div class="row" style="gap:16px;min-width:0;flex:1">
           ${monoTile(C.agentCompany(a) || a.name, companyLogo(C.agentCompany(a)), 'lg')}
           <div class="stack gap-4" style="min-width:0">
             <h1 class="h1 truncate" style="font-size:22px">${esc(C.agentTitle(a))}</h1>
             <div class="cal-meta" style="font-size:12.5px">
-              <span>${icon('calendar')}<span class="mono" style="font-size:12px">${iv ? `${esc(C.fmtDateShort(iv.at))}${iv.hasTime ? ` · ${esc(iv.time)}` : ''} · ${esc(C.relDays(iv.days).toLowerCase())}` : 'Sem data'}</span></span>
+              <span>${icon('calendar')}<span class="mono" style="font-size:12px">${iv ? `${esc(C.fmtDateShort(iv.at))}${iv.hasTime ? ` · ${esc(iv.time)}` : ''} · ${esc(C.relDays(iv.days).toLowerCase())}` : 'No date'}</span></span>
               <span>${icon('users')}${esc(formatOf(a))}</span>
               <span>${icon('flag')}${esc(fixText(a.stage || 'Active') === 'Active' ? 'Em andamento' : fixText(a.stage))}</span>
             </div>
           </div>
         </div>
         <div class="row wrap">
-          <button type="button" class="btn" data-action="edit-session" data-agent="${esc(a.id)}">${icon('pencil')}Editar</button>
-          <button type="button" class="btn" data-action="open-scheduler" data-agent="${esc(a.id)}">${icon('calendar')}${iv ? 'Reagendar' : 'Agendar'}</button>
-          <button type="button" class="btn" data-action="start-copilot" data-agent="${esc(a.id)}" data-demo="1">${icon('robot')}Simular</button>
+          <button type="button" class="btn" data-action="edit-session" data-agent="${esc(a.id)}">${icon('pencil')}Edit</button>
+          <button type="button" class="btn" data-action="open-scheduler" data-agent="${esc(a.id)}">${icon('calendar')}${iv ? 'Reschedule' : 'Schedule'}</button>
+          <button type="button" class="btn" data-action="start-copilot" data-agent="${esc(a.id)}" data-demo="1">${icon('robot')}Practice</button>
           ${running
-            ? `<button type="button" class="btn live" data-action="go" data-to="live">${icon('broadcast')}Ao vivo agora</button>`
-            : `<button type="button" class="btn primary" data-action="start-copilot" data-agent="${esc(a.id)}">${icon('play')}Iniciar ao vivo</button>`}
+            ? `<button type="button" class="btn live" data-action="go" data-to="live">${icon('broadcast')}Live now</button>`
+            : `<button type="button" class="btn primary" data-action="start-copilot" data-agent="${esc(a.id)}">${icon('play')}Go live</button>`}
         </div>
       </section>
 
@@ -421,63 +421,63 @@
             .join('')}</div>
         </div>
         <div class="card">
-          <div class="row between"><span class="eyebrow">Respostas do copiloto</span>${a.playbook_name ? `<span class="pill">${esc(fixText(a.playbook_name))}</span>` : ''}</div>
-          <label class="field">Playbook (estrutura e tamanho das respostas)
-            <div class="row"><select class="select" data-change="agent-playbook" data-agent="${esc(a.id)}">${C.opts(pbNames.map((n) => [n, fixText(n)]), a.playbook_name || 'Standard STAR')}</select><button type="button" class="btn icon-only" data-action="new-playbook" data-agent="${esc(a.id)}" title="Novo playbook">${icon('plus')}</button></div>
+          <div class="row between"><span class="eyebrow">Copilot answers</span>${a.playbook_name ? `<span class="pill">${esc(fixText(a.playbook_name))}</span>` : ''}</div>
+          <label class="field">Playbook (answer structure and length)
+            <div class="row"><select class="select" data-change="agent-playbook" data-agent="${esc(a.id)}">${C.opts(pbNames.map((n) => [n, fixText(n)]), a.playbook_name || 'Standard STAR')}</select><button type="button" class="btn icon-only" data-action="new-playbook" data-agent="${esc(a.id)}" title="New playbook">${icon('plus')}</button></div>
           </label>
           <div class="form-grid">
-            <label class="field">Idioma das respostas<select class="select" data-change="agent-field" data-field="answer_language" data-agent="${esc(a.id)}">${C.opts([['pt-BR', 'Português (Brasil)'], ['en-US', 'Inglês'], ['es', 'Espanhol']], a.answer_language || 'pt-BR')}</select></label>
-            <label class="field">Linguagem de código<select class="select" data-change="agent-field" data-field="coding_language" data-agent="${esc(a.id)}">${C.opts([['', 'Conforme a vaga'], ['Python', 'Python'], ['JavaScript', 'JavaScript'], ['TypeScript', 'TypeScript'], ['Java', 'Java'], ['Go', 'Go'], ['C++', 'C++'], ['C#', 'C#'], ['Kotlin', 'Kotlin'], ['Rust', 'Rust'], ['SQL', 'SQL']], a.coding_language || '')}</select></label>
+            <label class="field">Answer language<select class="select" data-change="agent-field" data-field="answer_language" data-agent="${esc(a.id)}">${C.opts([['pt-BR', 'Portuguese (Brazil)'], ['en-US', 'English'], ['es', 'Spanish']], a.answer_language || 'pt-BR')}</select></label>
+            <label class="field">Coding language<select class="select" data-change="agent-field" data-field="coding_language" data-agent="${esc(a.id)}">${C.opts([['', 'Per the job'], ['Python', 'Python'], ['JavaScript', 'JavaScript'], ['TypeScript', 'TypeScript'], ['Java', 'Java'], ['Go', 'Go'], ['C++', 'C++'], ['C#', 'C#'], ['Kotlin', 'Kotlin'], ['Rust', 'Rust'], ['SQL', 'SQL']], a.coding_language || '')}</select></label>
           </div>
-          <label class="field">Etapa do processo<select class="select" data-change="agent-field" data-field="stage" data-agent="${esc(a.id)}">${C.opts([['Active', 'Em andamento'], ['Applied', 'Candidatura enviada'], ['Screening', 'Triagem'], ['Technical', 'Técnica'], ['Final', 'Final'], ['Offer', 'Proposta'], ['Closed', 'Encerrado']], a.stage || 'Active')}</select></label>
+          <label class="field">Process stage<select class="select" data-change="agent-field" data-field="stage" data-agent="${esc(a.id)}">${C.opts([['Active', 'In progress'], ['Applied', 'Applied'], ['Screening', 'Screening'], ['Technical', 'Technical'], ['Final', 'Final'], ['Offer', 'Offer'], ['Closed', 'Closed']], a.stage || 'Active')}</select></label>
         </div>
       </section>
 
       <section class="card">
-        <div class="card-head"><div class="stack" style="gap:0"><span class="t">Contexto da vaga</span><span class="s">O copiloto lê isto antes de cada resposta</span></div><button type="button" class="btn sm" data-action="save-context" data-agent="${esc(a.id)}">${icon('check')}Salvar contexto</button></div>
-        <label class="field">Descrição da vaga<textarea class="textarea" id="ctxJob" rows="6" placeholder="Cole aqui a descrição da vaga">${esc(fixText(a.job_description || ''))}</textarea></label>
-        <label class="field"><span class="row between">Pesquisa da empresa<button type="button" class="link-btn" data-action="company-recon" data-agent="${esc(a.id)}">${icon('sparkle')}Pesquisar automaticamente</button></span><textarea class="textarea" id="ctxResearch" rows="6" placeholder="Produto, cultura, notícias recentes, stack…">${esc(research)}</textarea></label>
-        <label class="field">Instruções para o copiloto<textarea class="textarea" id="ctxInstr" rows="3" placeholder="Ex.: responda em primeira pessoa, use exemplos reais do meu currículo">${esc(fixText(a.extra_instructions || a.custom_instructions || ''))}</textarea></label>
+        <div class="card-head"><div class="stack" style="gap:0"><span class="t">Job context</span><span class="s">The copilot reads this before every answer</span></div><button type="button" class="btn sm" data-action="save-context" data-agent="${esc(a.id)}">${icon('check')}Save context</button></div>
+        <label class="field">Job description<textarea class="textarea" id="ctxJob" rows="6" placeholder="Paste the job description here">${esc(fixText(a.job_description || ''))}</textarea></label>
+        <label class="field"><span class="row between">Company research<button type="button" class="link-btn" data-action="company-recon" data-agent="${esc(a.id)}">${icon('sparkle')}Research automatically</button></span><textarea class="textarea" id="ctxResearch" rows="6" placeholder="Product, culture, recent news, stack…">${esc(research)}</textarea></label>
+        <label class="field">Instructions for the copilot<textarea class="textarea" id="ctxInstr" rows="3" placeholder="E.g. answer in the first person, use real examples from my resume">${esc(fixText(a.extra_instructions || a.custom_instructions || ''))}</textarea></label>
       </section>
 
       <section class="grid-2">
         <div class="card tight">
-          <div class="card-head"><div class="stack" style="gap:0"><span class="t">Arquivos vinculados</span><span class="s">${plural(docs.length, 'arquivo', 'arquivos')} no contexto desta sessão</span></div>
-            <div class="row"><button type="button" class="btn sm" data-action="paste-doc" data-agent="${esc(a.id)}">${icon('note')}Colar texto</button><button type="button" class="btn sm" data-action="add-docs" data-agent="${esc(a.id)}" data-tag="material">${icon('upload')}Adicionar</button></div></div>
-          ${!docs.some((d) => C.docTag(d) === 'resume') ? `<button type="button" class="dropzone" data-action="add-docs" data-agent="${esc(a.id)}" data-tag="resume" style="padding:20px">${icon('file-text')}<span style="font-size:13px">Anexe seu currículo</span><span class="num">É a principal fonte das respostas</span></button>` : ''}
+          <div class="card-head"><div class="stack" style="gap:0"><span class="t">Linked files</span><span class="s">${plural(docs.length, 'file', 'files')} in this session context</span></div>
+            <div class="row"><button type="button" class="btn sm" data-action="paste-doc" data-agent="${esc(a.id)}">${icon('note')}Paste text</button><button type="button" class="btn sm" data-action="add-docs" data-agent="${esc(a.id)}" data-tag="material">${icon('upload')}Add</button></div></div>
+          ${!docs.some((d) => C.docTag(d) === 'resume') ? `<button type="button" class="dropzone" data-action="add-docs" data-agent="${esc(a.id)}" data-tag="resume" style="padding:20px">${icon('file-text')}<span style="font-size:13px">Attach your resume</span><span class="num">It is the main source for the answers</span></button>` : ''}
           ${docs.length
             ? docs
                 .map((d, i) => `<div class="list-row" style="cursor:default">${icon(C.docIcon(d), 'faint')}<span class="stack grow" style="gap:0"><span class="truncate" style="font-size:13px">${esc(fixText(d.title || d.name || 'Documento'))}</span><span class="xs faint">${esc(C.TAG_LABEL[C.docTag(d)])} · ${esc(C.fmtKb((d.content || '').length))}</span></span>
-                  <button type="button" class="icon-btn" title="Visualizar" data-action="preview-doc" data-agent="${esc(a.id)}" data-idx="${i}">${icon('eye')}</button>
-                  <button type="button" class="icon-btn danger" title="Remover" data-action="remove-doc" data-agent="${esc(a.id)}" data-idx="${i}">${icon('x')}</button></div>`)
+                  <button type="button" class="icon-btn" title="Preview" data-action="preview-doc" data-agent="${esc(a.id)}" data-idx="${i}">${icon('eye')}</button>
+                  <button type="button" class="icon-btn danger" title="Remove" data-action="remove-doc" data-agent="${esc(a.id)}" data-idx="${i}">${icon('x')}</button></div>`)
                 .join('')
             : ''}
         </div>
         <div class="card tight">
-          <div class="card-head"><div class="stack" style="gap:0"><span class="t">Memória do copiloto</span><span class="s">Aprendizados dos debriefs desta vaga</span></div></div>
-          ${a.next_focus ? `<div class="inset"><span class="eyebrow">Próximo foco</span><span style="font-size:13px">${esc(fixText(a.next_focus).replace(/^Focus on:\s*/i, ''))}</span></div>` : ''}
+          <div class="card-head"><div class="stack" style="gap:0"><span class="t">Copilot memory</span><span class="s">Learnings from the debriefs for this job</span></div></div>
+          ${a.next_focus ? `<div class="inset"><span class="eyebrow">Next focus</span><span style="font-size:13px">${esc(fixText(a.next_focus).replace(/^Focus on:\s*/i, ''))}</span></div>` : ''}
           ${(mem.strengths || []).length || (mem.improve || []).length
             ? `${(mem.strengths || []).slice(0, 3).map((x) => `<div class="bullet">${esc(fixText(x))}</div>`).join('')}${(mem.improve || []).slice(0, 3).map((x) => `<div class="bullet neutral">${esc(fixText(x))}</div>`).join('')}`
-            : `<div class="empty" style="padding:20px">${icon('sparkle')}<span>Gere um debrief depois de uma sessão para o copiloto lembrar pontos fortes e o que melhorar.</span></div>`}
+            : `<div class="empty" style="padding:20px">${icon('sparkle')}<span>Generate a debrief after a session so the copilot remembers strengths and what to improve.</span></div>`}
         </div>
       </section>
 
       <section class="card flush">
-        <div class="row between" style="padding:14px 20px;border-bottom:1px solid var(--border-subtle)"><span class="strong">Sessões gravadas desta vaga</span><span class="num">${recs.length}</span></div>
+        <div class="row between" style="padding:14px 20px;border-bottom:1px solid var(--border-subtle)"><span class="strong">Recorded sessions for this job</span><span class="num">${recs.length}</span></div>
         ${recs.length
           ? recs
               .slice(0, 8)
               .map((s) => {
                 const d = C.sessionDate(s);
-                return `<div class="table-row clickable" style="grid-template-columns:minmax(0,1fr) 120px auto" data-action="go" data-to="review/${esc(s.id)}"><span class="truncate">${s.mode === 'demo' ? 'Simulação' : 'Ao vivo'} · <span class="mono faint" style="font-size:12px">${d ? `${esc(C.fmtDateShort(d))} ${esc(C.fmtTime(d))}` : '—'}</span></span><span class="num">${esc(C.fmtDuration(s.durationSeconds))}</span><span class="row small muted">Ver análise${icon('caret-right')}</span></div>`;
+                return `<div class="table-row clickable" style="grid-template-columns:minmax(0,1fr) 120px auto" data-action="go" data-to="review/${esc(s.id)}"><span class="truncate">${s.mode === 'demo' ? 'Practice' : 'Live'} · <span class="mono faint" style="font-size:12px">${d ? `${esc(C.fmtDateShort(d))} ${esc(C.fmtTime(d))}` : '—'}</span></span><span class="num">${esc(C.fmtDuration(s.durationSeconds))}</span><span class="row small muted">View review${icon('caret-right')}</span></div>`;
               })
               .join('')
-          : `<div class="empty" style="padding:24px">${icon('history')}<span>Nenhuma sessão gravada para esta vaga ainda.</span></div>`}
+          : `<div class="empty" style="padding:24px">${icon('history')}<span>No recorded sessions for this job yet.</span></div>`}
       </section>
 
       <section class="row wrap" style="justify-content:flex-end">
         <button type="button" class="btn" data-action="archive-session" data-agent="${esc(a.id)}">${icon('tray')}${a.archived ? 'Desarquivar' : 'Arquivar'}</button>
-        <button type="button" class="btn danger" data-action="delete-session" data-agent="${esc(a.id)}">${icon('trash')}Excluir sessão</button>
+        <button type="button" class="btn danger" data-action="delete-session" data-agent="${esc(a.id)}">${icon('trash')}Delete session</button>
       </section>
     </div>`;
   };
@@ -486,7 +486,7 @@
     const a = C.agentById(el.dataset.agent);
     if (!a) return;
     const label = el.selectedOptions && el.selectedOptions[0] ? el.selectedOptions[0].textContent : el.value;
-    await C.saveAgent({ ...a, [el.dataset.field]: el.value }, `Atualizado: ${label}.`);
+    await C.saveAgent({ ...a, [el.dataset.field]: el.value }, `Updated: ${label}.`);
     C.refresh();
   };
 
@@ -503,7 +503,7 @@
           playbook_name_tradeoffs: pb.name_tradeoffs
         }
       : { playbook_name: el.value };
-    await C.saveAgent({ ...a, ...patch }, `Playbook "${fixText(el.value)}" aplicado.`);
+    await C.saveAgent({ ...a, ...patch }, `Playbook "${fixText(el.value)}" applied.`);
     C.refresh();
   };
 
@@ -522,7 +522,7 @@
         custom_instructions: instr,
         mini_compact: ''
       },
-      'Contexto salvo.'
+      'Context saved.'
     );
     C.refresh();
   };
@@ -530,7 +530,7 @@
   C.actions['company-recon'] = async (el) => {
     const a = C.agentById(el.dataset.agent);
     if (!a || !C.agentCompany(a)) {
-      C.toast('Defina a empresa da sessão primeiro.', 'error');
+      C.toast('Set the session company first.', 'error');
       return;
     }
     const prev = el.innerHTML;
@@ -542,30 +542,30 @@
     if (res && res.dossier) {
       const box = document.getElementById('ctxResearch');
       if (box) box.value = fixText(res.dossier);
-      C.toast('Pesquisa pronta. Revise e clique em Salvar contexto.');
+      C.toast('Research ready. Review it and click Save context.');
     }
   };
 
   C.actions['add-docs'] = async (el) => {
     const a = C.agentById(el.dataset.agent);
     if (!a) return;
-    const res = await C.guard(() => api.pickFiles(el.dataset.tag || 'material'), 'Não foi possível abrir os arquivos.');
+    const res = await C.guard(() => api.pickFiles(el.dataset.tag || 'material'), 'Could not open the files.');
     await attachDocs(a, res, el.dataset.tag);
   };
 
   async function attachDocs(a, res, forceTag) {
     if (!res) return;
-    if (res.failed && res.failed.length) C.toast(`Sem texto legível: ${res.failed.map((f) => f.title).join(', ')}`, 'error');
+    if (res.failed && res.failed.length) C.toast(`No readable text: ${res.failed.map((f) => f.title).join(', ')}`, 'error');
     if (!Array.isArray(res.documents) || !res.documents.length) return;
     const incoming = res.documents.map((d) => (forceTag === 'resume' ? { ...d, tag: 'resume' } : d));
     let docs = [...(a.documents || [])];
     if (incoming.some((d) => C.docTag(d) === 'resume') && forceTag === 'resume') docs = docs.filter((d) => C.docTag(d) !== 'resume');
     docs.push(...incoming);
-    C.toast(`Lendo ${plural(incoming.length, 'arquivo', 'arquivos')}…`);
-    const deep = await C.guard(() => api.deepReadAgent({ ...a, documents: docs }), 'Não foi possível indexar os arquivos.');
+    C.toast(`Reading ${plural(incoming.length, 'file', 'files')}…`);
+    const deep = await C.guard(() => api.deepReadAgent({ ...a, documents: docs }), 'Could not index the files.');
     if (!deep) return;
     C.applyAgents(deep.agents, (deep.agent && deep.agent.id) || a.id);
-    C.toast(`${plural(incoming.length, 'arquivo adicionado', 'arquivos adicionados')} a ${C.agentTitle(a)}.`);
+    C.toast(`${plural(incoming.length, 'file added', 'files added')} to ${C.agentTitle(a)}.`);
     C.refresh();
   }
   C.attachDocs = attachDocs;
@@ -576,10 +576,10 @@
     const idx = Number(el.dataset.idx);
     const doc = (a.documents || [])[idx];
     if (!doc) return;
-    const ok = await C.confirm(`Remover "${fixText(doc.title || doc.name)}" desta sessão?`, 'O arquivo deixa de ser usado pelo copiloto. O original no seu computador não é alterado.', 'Remover');
+    const ok = await C.confirm(`Remove "${fixText(doc.title || doc.name)}" from this session?`, 'The copilot stops using the file. The original on your computer is not changed.', 'Remove');
     if (!ok) return;
     const docs = (a.documents || []).filter((_, i) => i !== idx);
-    await C.saveAgent({ ...a, documents: docs, mini_compact: '' }, 'Arquivo removido.');
+    await C.saveAgent({ ...a, documents: docs, mini_compact: '' }, 'File removed.');
     C.refresh();
   };
 
@@ -592,19 +592,19 @@
   C.actions['archive-session'] = async (el) => {
     const a = C.agentById(el.dataset.agent);
     if (!a) return;
-    await C.saveAgent({ ...a, archived: !a.archived }, a.archived ? 'Sessão desarquivada.' : 'Sessão arquivada.');
+    await C.saveAgent({ ...a, archived: !a.archived }, a.archived ? 'Session unarchived.' : 'Session archived.');
     C.refresh();
   };
 
   C.actions['delete-session'] = async (el) => {
     const a = C.agentById(el.dataset.agent);
     if (!a) return;
-    const ok = await C.confirm(`Excluir "${C.agentTitle(a)}"?`, 'A vaga, os arquivos vinculados e as instruções são apagados. As gravações no Histórico continuam.', 'Excluir');
+    const ok = await C.confirm(`Delete "${C.agentTitle(a)}"?`, 'The job, linked files and instructions are deleted. Recordings in History are kept.', 'Delete');
     if (!ok) return;
-    const res = await C.guard(() => api.deleteAgent(a.id), 'Não foi possível excluir.');
+    const res = await C.guard(() => api.deleteAgent(a.id), 'Could not delete.');
     if (!res) return;
     C.applyAgents(res.agents, '');
-    C.toast('Sessão excluída.');
+    C.toast('Session deleted.');
     C.navigate('sessions');
   };
 
@@ -612,14 +612,14 @@
   // Speech metrics come from the transcript; answer quality comes from the
   // JEV judge (main process), one fixed rubric for every question.
   const JEV_CRITERIA = [
-    ['adequacao', 'Adequação à pergunta', 'Responde exatamente o que foi perguntado'],
-    ['cultura', 'Cultura da empresa', 'Alinhamento aos valores e à forma de trabalhar'],
-    ['estrutura', 'Estrutura', 'STAR nas comportamentais, raciocínio claro nas técnicas'],
-    ['evidencias', 'Evidências', 'Exemplos concretos e números coerentes com o currículo'],
-    ['objetividade', 'Objetividade', 'Vai direto ao ponto, sem rodeios']
+    ['adequacao', 'Relevance', 'Answers exactly what was asked'],
+    ['cultura', 'Company culture', 'Alignment with the values and way of working'],
+    ['estrutura', 'Structure', 'STAR on behavioral, clear reasoning on technical'],
+    ['evidencias', 'Evidence', 'Concrete examples and numbers consistent with the resume'],
+    ['objetividade', 'Conciseness', 'Gets straight to the point']
   ];
   C.JEV_CRITERIA = JEV_CRITERIA;
-  const TIPO_LABEL = { comportamental: 'Comportamental', tecnica: 'Técnica', cultura: 'Cultura', motivacao: 'Motivação', outra: 'Geral' };
+  const TIPO_LABEL = { comportamental: 'Behavioral', tecnica: 'Technical', cultura: 'Culture', motivacao: 'Motivation', outra: 'General' };
 
   // Real fillers only: "tipo" as a crutch ("tipo assim", "tipo,"), not "tipo de dado".
   const FILLER_RES = [
@@ -713,11 +713,11 @@
   }
 
   function scoreTone(v) {
-    if (v == null) return { color: 'var(--text-tertiary)', cls: '', label: 'Sem nota' };
-    if (v >= 85) return { color: 'var(--accent)', cls: 'ok', label: 'Excelente' };
-    if (v >= 70) return { color: 'var(--accent)', cls: 'ok', label: 'Bom' };
-    if (v >= 50) return { color: 'var(--warning)', cls: 'warn', label: 'Regular' };
-    return { color: 'var(--danger)', cls: 'danger', label: 'Fraco' };
+    if (v == null) return { color: 'var(--text-tertiary)', cls: '', label: 'No score' };
+    if (v >= 85) return { color: 'var(--accent)', cls: 'ok', label: 'Excellent' };
+    if (v >= 70) return { color: 'var(--accent)', cls: 'ok', label: 'Good' };
+    if (v >= 50) return { color: 'var(--warning)', cls: 'warn', label: 'Fair' };
+    return { color: 'var(--danger)', cls: 'danger', label: 'Weak' };
   }
   C.scoreTone = scoreTone;
 
@@ -743,12 +743,12 @@
     cache.jevLoading = true;
     cache.jevError = '';
     if (S.route.view === 'review' && S.route.parts[0] === id) C.refresh();
-    const res = await C.guard(() => api.evaluateSession(id, agent ? agent.id : '', force), 'A avaliação JEV falhou.');
+    const res = await C.guard(() => api.evaluateSession(id, agent ? agent.id : '', force), 'The JEV evaluation failed.');
     cache.jevLoading = false;
     if (res && res.ok) {
       cache.jev = res.evaluation;
       if (s) s.jevScore = res.evaluation.score;
-    } else cache.jevError = (res && res.error) || 'A avaliação JEV falhou.';
+    } else cache.jevError = (res && res.error) || 'The JEV evaluation failed.';
     if (S.route.view === 'review' && S.route.parts[0] === id) C.refresh();
   }
 
@@ -769,32 +769,32 @@
     const J = cache.jev;
     const company = agent ? C.agentCompany(agent) : '';
     if (cache.jevLoading) {
-      return `<div class="card" style="gap:16px"><div class="row between"><span class="eyebrow">Avaliação JEV</span><span class="pill warn"><span class="spinner"></span>Avaliando</span></div>
-        <div class="row" style="gap:20px">${ring(null, 112)}<div class="stack gap-8 grow"><span style="font-size:14px">Avaliando cada pergunta com a mesma rubrica${company ? `, incluindo a cultura da ${esc(company)}` : ''}…</span><span class="num">Leva alguns segundos; o resultado fica salvo com a sessão.</span></div></div></div>`;
+      return `<div class="card" style="gap:16px"><div class="row between"><span class="eyebrow">JEV evaluation</span><span class="pill warn"><span class="spinner"></span>Evaluating</span></div>
+        <div class="row" style="gap:20px">${ring(null, 112)}<div class="stack gap-8 grow"><span style="font-size:14px">Evaluating each question with the same rubric${company ? `, including the culture of ${esc(company)}` : ''}…</span><span class="num">Takes a few seconds; the result is saved with the session.</span></div></div></div>`;
     }
     if (!J) {
-      return `<div class="card" style="gap:14px"><div class="row between"><span class="eyebrow">Avaliação JEV</span><span class="pill"><span class="dot"></span>Pendente</span></div>
-        <div class="row wrap" style="gap:16px"><span class="grow muted" style="font-size:13.5px">${esc(cache.jevError || 'A sessão ainda não foi avaliada.')}</span>
-        ${/OpenRouter/i.test(cache.jevError || '') ? '<button type="button" class="btn" data-action="go" data-to="settings/ai">Configurar chave</button>' : ''}
-        <button type="button" class="btn primary" data-action="jev-run" data-session="${esc(s.id)}">${icon('sparkle')}Avaliar com JEV</button></div></div>`;
+      return `<div class="card" style="gap:14px"><div class="row between"><span class="eyebrow">JEV evaluation</span><span class="pill"><span class="dot"></span>Pending</span></div>
+        <div class="row wrap" style="gap:16px"><span class="grow muted" style="font-size:13.5px">${esc(cache.jevError || 'The session has not been evaluated yet.')}</span>
+        ${/OpenRouter/i.test(cache.jevError || '') ? '<button type="button" class="btn" data-action="go" data-to="settings/ai">Set up key</button>' : ''}
+        <button type="button" class="btn primary" data-action="jev-run" data-session="${esc(s.id)}">${icon('sparkle')}Evaluate with JEV</button></div></div>`;
     }
     const tone = scoreTone(J.score);
     const when = J.evaluatedAt ? new Date(J.evaluatedAt) : null;
     return `<div class="card" style="gap:16px">
-      <div class="row between"><span class="eyebrow">Avaliação JEV</span><span class="pill ${tone.cls}"><span class="dot"></span>${tone.label}</span></div>
+      <div class="row between"><span class="eyebrow">JEV evaluation</span><span class="pill ${tone.cls}"><span class="dot"></span>${tone.label}</span></div>
       <div class="row wrap" style="gap:20px 28px">
         ${ring(J.score, 112)}
         <div class="stack gap-8" style="flex:1 1 280px;max-width:640px">
-          <span style="font-size:14px;line-height:1.6;color:var(--text-body)">${esc(J.resumo || `${plural(J.items.length, 'pergunta avaliada', 'perguntas avaliadas')} com a mesma rubrica.`)}</span>
-          <span class="num">${plural(J.items.length, 'pergunta', 'perguntas')} · cultura de referência: ${esc(fixText(J.company || company || 'não definida'))}${when ? ` · ${esc(C.fmtDateShort(when))} ${esc(C.fmtTime(when))}` : ''}${J.partial ? ' · parcial' : ''}</span>
+          <span style="font-size:14px;line-height:1.6;color:var(--text-body)">${esc(J.resumo || `${plural(J.items.length, 'question evaluated', 'questions evaluated')} with the same rubric.`)}</span>
+          <span class="num">${plural(J.items.length, 'question', 'questions')} · reference culture: ${esc(fixText(J.company || company || 'not set'))}${when ? ` · ${esc(C.fmtDateShort(when))} ${esc(C.fmtTime(when))}` : ''}${J.partial ? ' · partial' : ''}</span>
         </div>
-        <button type="button" class="btn sm ml-auto" data-action="jev-run" data-session="${esc(s.id)}" title="Avaliar de novo">${icon('refresh')}Reavaliar</button>
+        <button type="button" class="btn sm ml-auto" data-action="jev-run" data-session="${esc(s.id)}" title="Evaluate again">${icon('refresh')}Re-evaluate</button>
       </div>
     </div>`;
   }
 
   function criteriaCard(J) {
-    return `<div class="card tight"><span class="eyebrow">Critérios JEV · média das perguntas</span>
+    return `<div class="card tight"><span class="eyebrow">JEV criteria · average across questions</span>
       ${JEV_CRITERIA.map(([k, label, hint]) => {
         const v = J ? J.criteria[k] : null;
         const tone = scoreTone(v);
@@ -803,14 +803,14 @@
   }
 
   function metricsCard(A) {
-    const pace = A.wpm == null ? 'Sem fala suficiente' : A.wpm < 110 ? 'Pausado (ideal 120–160)' : A.wpm <= 160 ? 'Dentro do ideal (120–160)' : 'Acelerado (ideal 120–160)';
+    const pace = A.wpm == null ? 'Not enough speech' : A.wpm < 110 ? 'Slow (ideal 120–160)' : A.wpm <= 160 ? 'Within ideal (120–160)' : 'Fast (ideal 120–160)';
     const metrics = [
-      ['Tempo de fala', A.talkPct != null && A.you.length ? `${A.talkPct}%` : '—', 'Sua parte das palavras · ideal 55–65%'],
+      ['Talk time', A.talkPct != null && A.you.length ? `${A.talkPct}%` : '—', 'Your share of the words · ideal 55–65%'],
       ['Ritmo', A.wpm ? `${A.wpm} ppm` : '—', pace],
-      ['Vícios', A.fillersPerMin != null ? `${A.fillersPerMin}/min` : '—', A.fillerCounts.length ? A.fillerCounts.slice(0, 3).map(([w, n]) => `"${w}" ${n}×`).join(' · ') : 'Nenhum detectado'],
-      ['Respostas', String(A.you.length), A.avgAnswerSec ? `Duração média de ${C.fmtDuration(A.avgAnswerSec)}` : 'Suas falas']
+      ['Filler words', A.fillersPerMin != null ? `${A.fillersPerMin}/min` : '—', A.fillerCounts.length ? A.fillerCounts.slice(0, 3).map(([w, n]) => `"${w}" ${n}×`).join(' · ') : 'None detected'],
+      ['Answers', String(A.you.length), A.avgAnswerSec ? `Average length ${C.fmtDuration(A.avgAnswerSec)}` : 'Your turns']
     ];
-    return `<div class="card"><span class="eyebrow">Métricas de fala</span>
+    return `<div class="card"><span class="eyebrow">Speech metrics</span>
       <div class="kv" style="gap:16px 12px">${metrics.map(([l, v, h]) => `<div style="gap:2px"><span class="k">${esc(l)}</span><span style="font-size:20px;font-weight:600;letter-spacing:-.03em">${esc(v)}</span><span class="xs muted">${esc(h)}</span></div>`).join('')}</div></div>`;
   }
 
@@ -819,20 +819,20 @@
     const pct = A.questions.length ? Math.round((answered / A.questions.length) * 100) : null;
     return `<div class="card"><span class="eyebrow">Copiloto</span>
       <div class="kv" style="gap:16px 12px">
-        <div style="gap:2px"><span class="k">Perguntas atendidas</span><span style="font-size:20px;font-weight:600;letter-spacing:-.03em">${pct == null ? '—' : `${pct}%`}</span><span class="xs muted">${A.questions.length ? `${answered} de ${A.questions.length} perguntas` : 'Nenhuma pergunta detectada'}</span></div>
-        <div style="gap:2px"><span class="k">Primeiro token</span><span style="font-size:20px;font-weight:600;letter-spacing:-.03em">${A.avgTtft ? `${A.avgTtft} ms` : '—'}</span><span class="xs muted">Média de ${plural(A.completed.length, 'resposta', 'respostas')}</span></div>
-        <div style="gap:2px"><span class="k">Falhas</span><span style="font-size:20px;font-weight:600;letter-spacing:-.03em">${A.failed.length}</span><span class="xs muted">${A.failed.length ? 'Interrompidas ou com erro' : 'Nenhuma'}</span></div>
-        <div style="gap:2px"><span class="k">Falas</span><span style="font-size:20px;font-weight:600;letter-spacing:-.03em">${A.others.length} / ${A.you.length}</span><span class="xs muted">Entrevistador / você</span></div>
+        <div style="gap:2px"><span class="k">Questions answered</span><span style="font-size:20px;font-weight:600;letter-spacing:-.03em">${pct == null ? '—' : `${pct}%`}</span><span class="xs muted">${A.questions.length ? `${answered} of ${A.questions.length} questions` : 'No questions detected'}</span></div>
+        <div style="gap:2px"><span class="k">First token</span><span style="font-size:20px;font-weight:600;letter-spacing:-.03em">${A.avgTtft ? `${A.avgTtft} ms` : '—'}</span><span class="xs muted">Average of ${plural(A.completed.length, 'answer', 'answers')}</span></div>
+        <div style="gap:2px"><span class="k">Failures</span><span style="font-size:20px;font-weight:600;letter-spacing:-.03em">${A.failed.length}</span><span class="xs muted">${A.failed.length ? 'Interrupted or failed' : 'None'}</span></div>
+        <div style="gap:2px"><span class="k">Turns</span><span style="font-size:20px;font-weight:600;letter-spacing:-.03em">${A.others.length} / ${A.you.length}</span><span class="xs muted">Interviewer / you</span></div>
       </div></div>`;
   }
 
   function insightLists(A, J) {
     const strengths = J && J.fortes.length ? J.fortes.slice() : [];
     const improve = J && J.melhorar.length ? J.melhorar.slice() : [];
-    if (A.talkPct != null && A.you.length && (A.talkPct < 45 || A.talkPct > 75)) improve.push(A.talkPct > 75 ? `Você falou ${A.talkPct}% das palavras; deixe mais espaço para o entrevistador.` : `Você falou só ${A.talkPct}% das palavras; desenvolva mais as respostas.`);
-    if (A.wpm && A.wpm > 170) improve.push(`Ritmo de ${A.wpm} palavras por minuto: desacelere nas respostas técnicas.`);
-    if (A.fillersPerMin != null && A.fillersPerMin >= 2) improve.push(`${A.fillersPerMin} vícios por minuto (${A.fillerCounts.slice(0, 2).map(([w, n]) => `"${w}" ${n}×`).join(', ')}).`);
-    if (A.wpm && A.wpm >= 120 && A.wpm <= 160) strengths.push(`Ritmo confortável: ${A.wpm} palavras por minuto.`);
+    if (A.talkPct != null && A.you.length && (A.talkPct < 45 || A.talkPct > 75)) improve.push(A.talkPct > 75 ? `You spoke ${A.talkPct}% of the words; leave more room for the interviewer.` : `You spoke only ${A.talkPct}% of the words; develop your answers more.`);
+    if (A.wpm && A.wpm > 170) improve.push(`Pace of ${A.wpm} words per minute: slow down on technical answers.`);
+    if (A.fillersPerMin != null && A.fillersPerMin >= 2) improve.push(`${A.fillersPerMin} filler words per minute (${A.fillerCounts.slice(0, 2).map(([w, n]) => `"${w}" ${n}×`).join(', ')}).`);
+    if (A.wpm && A.wpm >= 120 && A.wpm <= 160) strengths.push(`Comfortable pace: ${A.wpm} words per minute.`);
     return { strengths, improve };
   }
 
@@ -847,7 +847,7 @@
   function questionCards(J) {
     if (!J || !J.items.length) return '';
     return `<section class="stack gap-8">
-      <div class="row between" style="padding:0 2px"><span class="eyebrow">Perguntas avaliadas · mesma rubrica para todas</span><span class="small faint">Notas de 0 a 10 por critério</span></div>
+      <div class="row between" style="padding:0 2px"><span class="eyebrow">Evaluated questions · same rubric for all</span><span class="small faint">Scores from 0 to 10 per criterion</span></div>
       ${J.items
         .map((it, n) => {
           const tone = scoreTone(it.score);
@@ -856,7 +856,7 @@
               <span class="mono faint" style="font-size:11px;width:22px;flex:none">${String(n + 1).padStart(2, '0')}</span>
               <div class="stack grow" style="gap:10px">
                 <span class="q">${esc(fixText(it.pergunta))}</span>
-                <div class="row wrap" style="gap:6px"><span class="tag">${esc(TIPO_LABEL[it.tipo] || 'Geral')}</span>${chips(it.notas)}</div>
+                <div class="row wrap" style="gap:6px"><span class="tag">${esc(TIPO_LABEL[it.tipo] || 'General')}</span>${chips(it.notas)}</div>
                 ${it.veredito ? `<span class="small muted">${esc(fixText(it.veredito))}</span>` : ''}
               </div>
               <span class="pill ${tone.cls} lg" style="flex:none"><span class="mono">${it.score == null ? '—' : it.score}</span></span>
@@ -865,10 +865,10 @@
             <div class="detail">
               ${it.dica ? `<div class="note" style="margin-top:14px">${icon('arrow-up-right')}<span><b style="color:var(--text);font-weight:500">Como melhorar:</b> ${esc(fixText(it.dica))}</span></div>` : ''}
               <div class="grid-2" style="gap:12px">
-                <div class="inset"><span class="eyebrow">Sua resposta${it.answerSeconds ? ` · ${C.fmtDuration(it.answerSeconds)}` : ''}</span><span style="font-size:13px;line-height:1.6;color:var(--text-body)">${esc(fixText(it.answer))}</span></div>
-                <div class="inset"><span class="eyebrow">Sugestão do copiloto${it.ttftMs ? ` · ${it.ttftMs} ms` : ''}</span>${it.copilot ? `<div class="md sm">${C.md(it.copilot)}</div>` : '<span class="small faint">O copiloto não respondeu esta pergunta.</span>'}</div>
+                <div class="inset"><span class="eyebrow">Your answer${it.answerSeconds ? ` · ${C.fmtDuration(it.answerSeconds)}` : ''}</span><span style="font-size:13px;line-height:1.6;color:var(--text-body)">${esc(fixText(it.answer))}</span></div>
+                <div class="inset"><span class="eyebrow">Copilot suggestion${it.ttftMs ? ` · ${it.ttftMs} ms` : ''}</span>${it.copilot ? `<div class="md sm">${C.md(it.copilot)}</div>` : '<span class="small faint">The copilot did not answer this question.</span>'}</div>
               </div>
-              <span class="xs faint">Pergunta transcrita: “${esc(fixText(it.question).slice(-300))}”</span>
+              <span class="xs faint">Transcribed question: “${esc(fixText(it.question).slice(-300))}”</span>
             </div>
           </div>`;
         })
@@ -880,14 +880,14 @@
     const id = parts[0];
     const s = S.sessions.find((x) => x.id === id);
     if (!s) {
-      return `<div class="page"><div class="empty boxed">${icon('history')}<span class="t">Sessão não encontrada</span><button type="button" class="btn" data-action="go" data-to="sessions/past">Voltar ao histórico</button></div></div>`;
+      return `<div class="page"><div class="empty boxed">${icon('history')}<span class="t">Session not found</span><button type="button" class="btn" data-action="go" data-to="sessions/past">Back to history</button></div></div>`;
     }
     const cache = S.ui.reviews[id];
     if (!cache) loadReview(id);
     const d = C.sessionDate(s);
     const agent = C.agentForSession(s);
     const title = C.sessionTitle(s);
-    const headHtml = `<button type="button" class="link-btn" data-action="go" data-to="sessions/past">${icon('arrow-left')}Histórico</button>
+    const headHtml = `<button type="button" class="link-btn" data-action="go" data-to="sessions/past">${icon('arrow-left')}History</button>
       <section class="page-head ruled" style="align-items:center">
         <div class="row" style="gap:16px;min-width:0;flex:1">
           ${monoTile(agent ? C.agentCompany(agent) : title, agent ? companyLogo(C.agentCompany(agent)) : '', 'lg')}
@@ -896,15 +896,15 @@
             <div class="cal-meta" style="font-size:12.5px">
               <span>${icon('calendar')}<span class="mono" style="font-size:12px">${d ? `${esc(C.fmtDateShort(d))} · ${esc(C.fmtTime(d))}` : '—'}</span></span>
               <span>${icon('clock')}<span class="mono" style="font-size:12px">${esc(C.fmtDuration(s.durationSeconds))}</span></span>
-              <span>${icon('broadcast')}${s.mode === 'demo' ? 'Simulação' : 'Ao vivo'}</span>
+              <span>${icon('broadcast')}${s.mode === 'demo' ? 'Practice' : 'Live'}</span>
               ${s.llmModel ? `<span>${icon('cpu')}${esc(C.modelLabel(s.llmModel))}</span>` : ''}
             </div>
           </div>
         </div>
         <div class="row wrap">
-          <button type="button" class="btn" data-action="open-path" data-path="${esc(s.fullPath || '')}">${icon('download')}Abrir arquivo</button>
-          ${agent ? `<button type="button" class="btn" data-action="gen-debrief" data-session="${esc(s.id)}" data-agent="${esc(agent.id)}">${icon('sparkle')}Salvar debrief</button>` : ''}
-          ${agent ? `<button type="button" class="btn primary" data-action="start-copilot" data-agent="${esc(agent.id)}" data-demo="1">${icon('refresh')}Simular de novo</button>` : ''}
+          <button type="button" class="btn" data-action="open-path" data-path="${esc(s.fullPath || '')}">${icon('download')}Open file</button>
+          ${agent ? `<button type="button" class="btn" data-action="gen-debrief" data-session="${esc(s.id)}" data-agent="${esc(agent.id)}">${icon('sparkle')}Save debrief</button>` : ''}
+          ${agent ? `<button type="button" class="btn primary" data-action="start-copilot" data-agent="${esc(agent.id)}" data-demo="1">${icon('refresh')}Practice again</button>` : ''}
         </div>
       </section>`;
 
@@ -914,8 +914,8 @@
     const A = cache.a;
     if (!A) {
       return `<div class="page tight">${headHtml}
-        <div class="banner warn">${icon('info')}<span class="grow">Esta sessão não tem registro de eventos (versão antiga); exibindo o arquivo salvo.</span></div>
-        <section class="card"><div class="md sm">${C.md(cache.md || 'Arquivo vazio.')}</div></section></div>`;
+        <div class="banner warn">${icon('info')}<span class="grow">This session has no event log (older version); showing the saved file.</span></div>
+        <section class="card"><div class="md sm">${C.md(cache.md || 'Empty file.')}</div></section></div>`;
     }
     const J = cache.jev;
     const { strengths, improve } = insightLists(A, J);
@@ -925,7 +925,7 @@
             const ts = C.fmtClock(it.t);
             if (it.kind === 'turn') {
               const you = it.b.src === 'voce';
-              return `<div class="turn ${you ? 'you' : ''}"><span class="ts">${ts}</span><div class="stack" style="gap:6px"><span class="who">${you ? 'Você' : 'Entrevistador'}</span><span class="txt">${esc(it.b.text)}</span></div></div>`;
+              return `<div class="turn ${you ? 'you' : ''}"><span class="ts">${ts}</span><div class="stack" style="gap:6px"><span class="who">${you ? 'You' : 'Interviewer'}</span><span class="txt">${esc(it.b.text)}</span></div></div>`;
             }
             const x = it.x;
             const ok = x.status === 'completed';
@@ -935,7 +935,7 @@
             </div></div>`;
           })
           .join('')
-      : `<div class="empty">${icon('text-align-left')}<span>Sem transcrição registrada.</span></div>`;
+      : `<div class="empty">${icon('text-align-left')}<span>No transcript recorded.</span></div>`;
 
     return `<div class="page tight">${headHtml}
       ${jevSection(s, cache, agent)}
@@ -944,12 +944,12 @@
         <div class="stack gap-16">${metricsCard(A)}${copilotCard(A)}</div>
       </section>
       <section class="grid-2">
-        <div class="card tight"><div class="row">${icon('check-circle')}<span class="strong" style="font-size:14px">Pontos fortes</span></div>${strengths.length ? strengths.map((x) => `<div class="bullet">${esc(fixText(x))}</div>`).join('') : `<span class="small faint">${J ? 'Nada a destacar nesta sessão.' : 'Aparecem após a avaliação JEV.'}</span>`}</div>
-        <div class="card tight"><div class="row">${icon('arrow-up-right')}<span class="strong" style="font-size:14px">Para melhorar</span></div>${improve.length ? improve.map((x) => `<div class="bullet neutral">${esc(fixText(x))}</div>`).join('') : `<span class="small faint">${J ? 'Nenhum ponto de atenção.' : 'Aparecem após a avaliação JEV.'}</span>`}</div>
+        <div class="card tight"><div class="row">${icon('check-circle')}<span class="strong" style="font-size:14px">Strengths</span></div>${strengths.length ? strengths.map((x) => `<div class="bullet">${esc(fixText(x))}</div>`).join('') : `<span class="small faint">${J ? 'Nothing to highlight in this session.' : 'Shown after the JEV evaluation.'}</span>`}</div>
+        <div class="card tight"><div class="row">${icon('arrow-up-right')}<span class="strong" style="font-size:14px">To improve</span></div>${improve.length ? improve.map((x) => `<div class="bullet neutral">${esc(fixText(x))}</div>`).join('') : `<span class="small faint">${J ? 'Nothing to watch out for.' : 'Shown after the JEV evaluation.'}</span>`}</div>
       </section>
       ${questionCards(J)}
       <section class="card flush">
-        <div class="row between" style="padding:14px 20px;border-bottom:1px solid var(--border-subtle)"><div class="row">${icon('text-align-left', 'faint')}<span class="strong" style="font-size:14px">Transcrição completa</span></div><span class="num">${plural(A.blocks.length, 'fala', 'falas')} · ${plural(A.sugg.length, 'resposta do copiloto', 'respostas do copiloto')}</span></div>
+        <div class="row between" style="padding:14px 20px;border-bottom:1px solid var(--border-subtle)"><div class="row">${icon('text-align-left', 'faint')}<span class="strong" style="font-size:14px">Full transcript</span></div><span class="num">${plural(A.blocks.length, 'turn', 'turns')} · ${plural(A.sugg.length, 'copilot answer', 'copilot answers')}</span></div>
         ${transcript}
       </section>
     </div>`;
@@ -960,16 +960,16 @@
     const prev = el.innerHTML;
     el.disabled = true;
     el.innerHTML = '<span class="spinner"></span>Gerando…';
-    const res = await C.guard(() => api.generateDebrief({ agentId: el.dataset.agent, sessionId: s ? s.fileName : el.dataset.session }), 'Não foi possível gerar o debrief.');
+    const res = await C.guard(() => api.generateDebrief({ agentId: el.dataset.agent, sessionId: s ? s.fileName : el.dataset.session }), 'Could not generate the debrief.');
     el.disabled = false;
     el.innerHTML = prev;
     if (!res) return;
     if (res.ok === false) {
-      C.toast(res.error || 'Debrief indisponível.', 'error');
+      C.toast(res.error || 'Debrief unavailable.', 'error');
       return;
     }
     await C.refreshState();
-    C.toast('Debrief salvo na memória da sessão.');
+    C.toast('Debrief saved to the session memory.');
     C.navigate(`session/${el.dataset.agent}`);
   };
 
@@ -993,21 +993,21 @@
     const target = C.agentById(S.ui.filesTarget) || C.activeAgent();
     const cols = 'grid-template-columns:20px minmax(0,1fr) minmax(0,150px) minmax(0,170px) 70px 96px 56px';
     return `<div class="page tight">
-      ${head('Arquivos', 'Currículo, descrição da vaga e portfólio dão contexto às respostas.', `<button type="button" class="btn" data-action="paste-doc" data-agent="${esc(target ? target.id : '')}">${icon('note')}Colar texto</button>`)}
+      ${head('Files', 'Resume, job description and portfolio give the answers context.', `<button type="button" class="btn" data-action="paste-doc" data-agent="${esc(target ? target.id : '')}">${icon('note')}Paste text</button>`)}
       ${agents.length
-        ? `<div class="row wrap"><span class="small muted">Vincular novos arquivos a</span><select class="select sm" style="width:auto;min-width:260px" data-change="files-target">${C.opts(agents.map((a) => [a.id, C.agentTitle(a)]), target ? target.id : '')}</select></div>
+        ? `<div class="row wrap"><span class="small muted">Link new files to</span><select class="select sm" style="width:auto;min-width:260px" data-change="files-target">${C.opts(agents.map((a) => [a.id, C.agentTitle(a)]), target ? target.id : '')}</select></div>
            <button type="button" class="dropzone" id="filesDrop" data-action="files-pick">
              ${icon('upload')}
-             <span style="font-size:14px">Arraste arquivos ou <u>escolha do computador</u></span>
-             <span class="num">PDF · DOCX · TXT · MD · código</span>
+             <span style="font-size:14px">Drag files or <u>choose from your computer</u></span>
+             <span class="num">PDF · DOCX · TXT · MD · code</span>
            </button>`
-        : `<div class="empty boxed">${icon('folder')}<span class="t">Crie uma sessão para anexar arquivos</span><button type="button" class="btn primary" data-action="new-session">${icon('plus')}Nova sessão</button></div>`}
+        : `<div class="empty boxed">${icon('folder')}<span class="t">Create a session to attach files</span><button type="button" class="btn primary" data-action="new-session">${icon('plus')}New session</button></div>`}
       <div class="row between wrap">
-        <div class="search-box">${icon('magnifying-glass')}<input type="text" placeholder="Buscar arquivo ou sessão" value="${esc(S.ui.filesQuery)}" data-input="files-query"/></div>
-        <span class="num">${plural(rows.length, 'arquivo', 'arquivos')}</span>
+        <div class="search-box">${icon('magnifying-glass')}<input type="text" placeholder="Search file or session" value="${esc(S.ui.filesQuery)}" data-input="files-query"/></div>
+        <span class="num">${plural(rows.length, 'file', 'files')}</span>
       </div>
       <div class="card flush" id="filesTable">
-        <div class="table-head" style="${cols}"><span></span><span>Nome</span><span>Tipo</span><span>Sessão</span><span style="text-align:right">Tamanho</span><span>Status</span><span></span></div>
+        <div class="table-head" style="${cols}"><span></span><span>Name</span><span>Type</span><span>Session</span><span style="text-align:right">Size</span><span>Status</span><span></span></div>
         ${rows.length
           ? rows
               .map(({ a, d, idx, name }) => {
@@ -1019,11 +1019,11 @@
                   <a class="truncate small muted" data-action="go" data-to="session/${esc(a.id)}">${esc(C.agentTitle(a))}</a>
                   <span class="num" style="text-align:right">${esc(C.fmtKb((d.content || '').length))}</span>
                   <span class="row small" style="gap:6px;color:${hasText ? 'var(--accent)' : 'var(--warning)'}"><span class="dot sm" style="background:currentColor"></span>${hasText ? 'Indexado' : 'Sem texto'}</span>
-                  <span class="row" style="gap:2px;justify-content:flex-end"><button type="button" class="icon-btn" title="Visualizar" data-action="preview-doc" data-agent="${esc(a.id)}" data-idx="${idx}">${icon('eye')}</button><button type="button" class="icon-btn danger" title="Remover" data-action="remove-doc" data-agent="${esc(a.id)}" data-idx="${idx}">${icon('x')}</button></span>
+                  <span class="row" style="gap:2px;justify-content:flex-end"><button type="button" class="icon-btn" title="Preview" data-action="preview-doc" data-agent="${esc(a.id)}" data-idx="${idx}">${icon('eye')}</button><button type="button" class="icon-btn danger" title="Remove" data-action="remove-doc" data-agent="${esc(a.id)}" data-idx="${idx}">${icon('x')}</button></span>
                 </div>`;
               })
               .join('')
-          : `<div class="empty">${icon('file-text')}<span>${S.ui.filesQuery ? 'Nenhum arquivo com essa busca.' : 'Nenhum arquivo anexado ainda.'}</span></div>`}
+          : `<div class="empty">${icon('file-text')}<span>${S.ui.filesQuery ? 'No files match this search.' : 'No files attached yet.'}</span></div>`}
       </div>
     </div>`;
   };
@@ -1043,10 +1043,10 @@
       if (!target) return;
       const paths = [...(e.dataTransfer.files || [])].map((f) => api.getPathForFile(f)).filter(Boolean);
       if (!paths.length) {
-        C.toast('Não foi possível ler os arquivos soltos.', 'error');
+        C.toast('Could not read the dropped files.', 'error');
         return;
       }
-      const res = await C.guard(() => api.importFiles(paths, 'material'), 'Falha ao importar os arquivos.');
+      const res = await C.guard(() => api.importFiles(paths, 'material'), 'Failed to import the files.');
       await attachDocs(target, res);
     });
   };
@@ -1054,7 +1054,7 @@
   C.actions['files-pick'] = async () => {
     const target = C.agentById(S.ui.filesTarget) || C.activeAgent();
     if (!target) return;
-    const res = await C.guard(() => api.pickFiles('material'), 'Não foi possível abrir os arquivos.');
+    const res = await C.guard(() => api.pickFiles('material'), 'Could not open the files.');
     await attachDocs(target, res);
   };
 
@@ -1078,7 +1078,7 @@
     if (!a) return;
     const idx = Number(el.dataset.idx);
     const docs = (a.documents || []).map((d, i) => (i === idx ? { ...d, tag: el.value, path: el.value } : d));
-    await C.saveAgent({ ...a, documents: docs, mini_compact: '' }, `Tipo alterado para ${C.TAG_LABEL[el.value]}.`);
+    await C.saveAgent({ ...a, documents: docs, mini_compact: '' }, `Type changed to ${C.TAG_LABEL[el.value]}.`);
   };
 
   // ======================================================= QUESTION BANK ==
@@ -1128,28 +1128,28 @@
     const rebuilding = S.ui.qRebuilding;
 
     return `<div class="page tight">
-      ${head('Banco de perguntas', 'Perguntas que entrevistadores fizeram nas suas sessões gravadas, por empresa e tema.',
-        `<span class="status-chip"><span class="mono" style="font-size:12px">${all.length}</span><span class="faint">perguntas</span></span><span class="status-chip"><span class="mono" style="font-size:12px">${companies.length}</span><span class="faint">empresas</span></span><button type="button" class="btn" data-action="q-rebuild" ${rebuilding ? 'disabled' : ''} title="Lê de novo todas as sessões gravadas">${rebuilding ? '<span class="spinner"></span>Reconstruindo…' : `${icon('refresh')}Reconstruir`}</button>`)}
-      <div class="banner ${share ? '' : 'warn'}">${icon('shield-check')}<span class="grow">${share ? 'Ao fim de cada sessão, as perguntas do entrevistador são anonimizadas, validadas e adicionadas aqui. Suas respostas nunca saem do computador.' : 'A coleta de perguntas está desligada: novas sessões não alimentam o banco.'}</span>${C.sw('data-change="share-questions" aria-label="Coletar perguntas"', share)}</div>
+      ${head('Question bank', 'Questions interviewers asked in your recorded sessions, by company and topic.',
+        `<span class="status-chip"><span class="mono" style="font-size:12px">${all.length}</span><span class="faint">questions</span></span><span class="status-chip"><span class="mono" style="font-size:12px">${companies.length}</span><span class="faint">companies</span></span><button type="button" class="btn" data-action="q-rebuild" ${rebuilding ? 'disabled' : ''} title="Reads all recorded sessions again">${rebuilding ? '<span class="spinner"></span>Rebuilding…' : `${icon('refresh')}Rebuild`}</button>`)}
+      <div class="banner ${share ? '' : 'warn'}">${icon('shield-check')}<span class="grow">${share ? 'At the end of each session, the interviewer questions are anonymized, validated and added here. Your answers never leave your computer.' : 'Question collection is off: new sessions do not feed the bank.'}</span>${C.sw('data-change="share-questions" aria-label="Collect questions"', share)}</div>
       ${companies.length
         ? `<nav class="tabs">
-            <button type="button" class="${coFilter === 'all' ? 'active' : ''}" data-action="q-company" data-id="all">Todas<span class="num">${all.length}</span></button>
+            <button type="button" class="${coFilter === 'all' ? 'active' : ''}" data-action="q-company" data-id="all">All<span class="num">${all.length}</span></button>
             ${companies
               .map((c) => `<button type="button" class="${coFilter === c.id ? 'active' : ''}" data-action="q-company" data-id="${esc(c.id)}">${c.logo ? `<span class="mono-tile xs" style="padding:0;width:20px"><img src="${esc(c.logo)}" alt=""/></span>` : `<span class="mono-tile xs">${esc(c.monogram || C.monogram(c.name))}</span>`}${esc(fixText(c.name))}<span class="num">${(c.questions || []).length}</span></button>`)
               .join('')}
           </nav>
           <section class="row wrap" style="gap:12px">
-            <div class="search-box">${icon('magnifying-glass')}<input type="text" placeholder="Buscar pergunta ou tema" value="${esc(S.ui.qQuery)}" data-input="q-query"/></div>
+            <div class="search-box">${icon('magnifying-glass')}<input type="text" placeholder="Search question or topic" value="${esc(S.ui.qQuery)}" data-input="q-query"/></div>
             <div class="row wrap" style="gap:4px">
-              <button type="button" class="filter-chip ${S.ui.qCat === 'all' ? 'active' : ''}" data-action="q-cat" data-cat="all">Todas</button>
+              <button type="button" class="filter-chip ${S.ui.qCat === 'all' ? 'active' : ''}" data-action="q-cat" data-cat="all">All</button>
               ${cats.map((c) => `<button type="button" class="filter-chip ${S.ui.qCat === c ? 'active' : ''}" data-action="q-cat" data-cat="${esc(c)}">${esc(c)}</button>`).join('')}
             </div>
           </section>
           <section class="stack gap-8">
-            <div class="row between" style="padding:0 2px"><span class="eyebrow">${plural(list.length, 'resultado', 'resultados')}${co ? ` · ${esc(fixText(co.name))} · ${plural(Number(co.interviewsReported) || 1, 'entrevista', 'entrevistas')}` : ''}</span><span class="small faint">Mais recorrentes primeiro</span></div>
-            ${list.length ? list.map((x) => qCard(x)).join('') : `<div class="card"><div class="empty">Nenhuma pergunta com esses filtros.</div></div>`}
+            <div class="row between" style="padding:0 2px"><span class="eyebrow">${plural(list.length, 'result', 'results')}${co ? ` · ${esc(fixText(co.name))} · ${plural(Number(co.interviewsReported) || 1, 'interview', 'interviews')}` : ''}</span><span class="small faint">Most frequent first</span></div>
+            ${list.length ? list.map((x) => qCard(x)).join('') : `<div class="card"><div class="empty">No questions match these filters.</div></div>`}
           </section>`
-        : `<div class="empty boxed">${icon('question')}<span class="t">O banco ainda está vazio</span><span>Ele é montado a partir das falas do entrevistador nas suas sessões gravadas.</span>${S.sessions.some((s) => s.hasEvents) ? `<button type="button" class="btn primary" data-action="q-rebuild" ${rebuilding ? 'disabled' : ''}>${icon('refresh')}Montar a partir de ${plural(S.sessions.filter((s) => s.hasEvents).length, 'sessão', 'sessões')}</button>` : ''}</div>`}
+        : `<div class="empty boxed">${icon('question')}<span class="t">The bank is still empty</span><span>It is built from what the interviewer said in your recorded sessions.</span>${S.sessions.some((s) => s.hasEvents) ? `<button type="button" class="btn primary" data-action="q-rebuild" ${rebuilding ? 'disabled' : ''}>${icon('refresh')}Build from ${plural(S.sessions.filter((s) => s.hasEvents).length, 'session', 'sessions')}</button>` : ''}</div>`}
     </div>`;
   };
 
@@ -1168,7 +1168,7 @@
             ${sub && sub !== C.catLabel(x.q.category) ? `<span class="tag">${esc(sub.split(' · ')[0])}</span>` : ''}
           </div>
         </div>
-        <div class="stack" style="align-items:flex-end;gap:6px;flex:none" title="Em ${x.seen} de ${x.total} entrevistas"><span class="mono" style="font-size:12px;color:var(--text-body)">${x.seen}/${x.total}</span>${pctBar(x.freq, 'w56')}</div>
+        <div class="stack" style="align-items:flex-end;gap:6px;flex:none" title="In ${x.seen} of ${x.total} interviews"><span class="mono" style="font-size:12px;color:var(--text-body)">${x.seen}/${x.total}</span>${pctBar(x.freq, 'w56')}</div>
         ${icon(open ? 'caret-up' : 'caret-down', 'faint')}
       </button>
       ${open
@@ -1176,12 +1176,12 @@
             <div class="grid-3" style="padding-top:14px;gap:18px">
               <div class="stack gap-8"><span class="eyebrow">Empresas</span><div class="row wrap" style="gap:6px">${x.companies.map((c) => `<span class="chip"><span class="mono-tile xs" style="height:18px">${esc(c.monogram || C.monogram(c.name))}</span>${esc(fixText(c.name))}</span>`).join('')}</div></div>
               <div class="stack gap-8"><span class="eyebrow">Cargo</span><div class="row wrap" style="gap:6px">${[...new Set(x.companies.map((c) => fixText(c.role || '')).filter(Boolean))].map((r) => `<span class="chip">${esc(r)}</span>`).join('') || '<span class="small faint">—</span>'}</div></div>
-              <div class="stack gap-8"><span class="eyebrow">Recorrência</span><span class="small muted">Apareceu em ${x.seen} de ${plural(x.total, 'entrevista gravada', 'entrevistas gravadas')}${x.q.lastReported && x.q.lastReported !== 'Today' ? ` · última em ${esc(x.q.lastReported)}` : ''}</span></div>
+              <div class="stack gap-8"><span class="eyebrow">Frequency</span><span class="small muted">Appeared in ${x.seen} of ${plural(x.total, 'recorded interview', 'recorded interviews')}${x.q.lastReported && x.q.lastReported !== 'Today' ? ` · last on ${esc(x.q.lastReported)}` : ''}</span></div>
             </div>
             <div class="row wrap">
-              <button type="button" class="btn primary lg" data-action="q-practice" data-key="${esc(x.key)}">${icon('microphone')}Praticar com IA</button>
-              ${agents.length ? `<select class="select sm" style="width:auto;max-width:260px" id="qAddTarget">${C.opts(agents.map((a) => [a.id, C.agentTitle(a)]), (C.activeAgent() || {}).id)}</select><button type="button" class="btn lg" data-action="q-add" data-key="${esc(x.key)}">${icon('bookmark')}Adicionar à sessão</button>` : ''}
-              <button type="button" class="btn lg ghost" data-action="q-copy" data-key="${esc(x.key)}">${icon('copy')}Copiar</button>
+              <button type="button" class="btn primary lg" data-action="q-practice" data-key="${esc(x.key)}">${icon('microphone')}Practice with AI</button>
+              ${agents.length ? `<select class="select sm" style="width:auto;max-width:260px" id="qAddTarget">${C.opts(agents.map((a) => [a.id, C.agentTitle(a)]), (C.activeAgent() || {}).id)}</select><button type="button" class="btn lg" data-action="q-add" data-key="${esc(x.key)}">${icon('bookmark')}Add to session</button>` : ''}
+              <button type="button" class="btn lg ghost" data-action="q-copy" data-key="${esc(x.key)}">${icon('copy')}Copy</button>
             </div>
           </div>`
         : ''}
@@ -1217,20 +1217,20 @@
   };
   C.changes['share-questions'] = async (el) => {
     const on = el.checked;
-    await C.guard(() => api.setQuestionSharing(on), 'Não foi possível alterar a coleta.');
+    await C.guard(() => api.setQuestionSharing(on), 'Could not change collection.');
     S.config.share_anonymized_questions = on;
-    C.toast(on ? 'Coleta de perguntas ligada.' : 'Coleta de perguntas desligada.');
+    C.toast(on ? 'Question collection on.' : 'Question collection off.');
     C.refresh();
   };
   C.actions['q-rebuild'] = async () => {
     S.ui.qRebuilding = true;
     C.refresh();
-    const res = await C.guard(() => api.rebuildQuestionBank(), 'Não foi possível reconstruir o banco.');
+    const res = await C.guard(() => api.rebuildQuestionBank(), 'Could not rebuild the bank.');
     S.ui.qRebuilding = false;
     if (res && res.bank) {
       S.questionBank = res.bank;
       S.ui.qCompany = 'all';
-      C.toast(`Banco reconstruído: ${plural(res.added || 0, 'pergunta', 'perguntas')} das suas sessões.`);
+      C.toast(`Bank rebuilt: ${plural(res.added || 0, 'question', 'questions')} from your sessions.`);
     }
     C.renderShell();
     C.refresh();
@@ -1240,9 +1240,9 @@
     if (!x) return;
     try {
       await navigator.clipboard.writeText(fixText(x.q.text));
-      C.toast('Pergunta copiada.');
+      C.toast('Question copied.');
     } catch (_e) {
-      C.toast('Não foi possível copiar.', 'error');
+      C.toast('Could not copy.', 'error');
     }
   };
   C.actions['q-add'] = async (el) => {
@@ -1250,14 +1250,14 @@
     const sel = document.getElementById('qAddTarget');
     const a = sel && C.agentById(sel.value);
     if (!x || !a) return;
-    const line = `Pergunta provável: ${fixText(x.q.text)}`;
+    const line = `Likely question: ${fixText(x.q.text)}`;
     const cur = fixText(a.extra_instructions || a.custom_instructions || '');
     if (cur.includes(line)) {
-      C.toast('Essa pergunta já está na sessão.');
+      C.toast('This question is already in the session.');
       return;
     }
     const next = cur ? `${cur}\n${line}` : line;
-    await C.saveAgent({ ...a, extra_instructions: next, custom_instructions: next, mini_compact: '' }, `Adicionada às instruções de ${C.agentTitle(a)}.`);
+    await C.saveAgent({ ...a, extra_instructions: next, custom_instructions: next, mini_compact: '' }, `Added to the instructions of ${C.agentTitle(a)}.`);
   };
   C.actions['q-practice'] = async (el) => {
     const x = findQ(el.dataset.key);
@@ -1266,10 +1266,10 @@
     if (S.overlayStatus.running) {
       const res = await C.guard(() => api.overlayCommand({ cmd: 'chat', text: `Como eu responderia: "${text}"` }));
       if (res && res.ok) {
-        C.toast('Pergunta enviada ao copiloto.');
+        C.toast('Question sent to the copilot.');
         C.navigate('live');
       } else {
-        C.toast((res && res.error) || 'O copiloto não recebeu a pergunta.', 'error');
+        C.toast((res && res.error) || 'The copilot did not receive the question.', 'error');
       }
       return;
     }

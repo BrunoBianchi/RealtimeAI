@@ -95,8 +95,8 @@ function monogram(name) {
 }
 Cue.monogram = monogram;
 
-const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-const MONTHS_LONG = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 Cue.MONTHS = MONTHS;
 Cue.MONTHS_LONG = MONTHS_LONG;
 
@@ -118,7 +118,7 @@ Cue.dayDiff = dayDiff;
 
 function fmtDateShort(d) {
   if (!d || Number.isNaN(d.getTime())) return '—';
-  return `${pad2(d.getDate())} ${MONTHS[d.getMonth()]}`;
+  return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
 }
 Cue.fmtDateShort = fmtDateShort;
 
@@ -159,11 +159,11 @@ function fmtKb(chars) {
 Cue.fmtKb = fmtKb;
 
 function relDays(n) {
-  if (n === 0) return 'Hoje';
-  if (n === 1) return 'Amanhã';
-  if (n === -1) return 'Ontem';
-  if (n > 1) return `Em ${n} dias`;
-  return `Há ${-n} dias`;
+  if (n === 0) return 'Today';
+  if (n === 1) return 'Tomorrow';
+  if (n === -1) return 'Yesterday';
+  if (n > 1) return `In ${n} days`;
+  return `${-n} days ago`;
 }
 Cue.relDays = relDays;
 
@@ -261,7 +261,7 @@ function agentTitle(a) {
   const c = agentCompany(a);
   const r = agentRole(a);
   if (c && r) return `${c} · ${r}`;
-  return c || r || fixText((a && a.name) || 'Sessão sem nome');
+  return c || r || fixText((a && a.name) || 'Untitled session');
 }
 Cue.agentCompany = agentCompany;
 Cue.agentRole = agentRole;
@@ -300,12 +300,12 @@ function docTag(doc) {
 Cue.docTag = docTag;
 
 const TAG_LABEL = {
-  resume: 'Currículo',
-  job: 'Descrição da vaga',
-  project: 'Projeto',
-  portfolio: 'Portfólio',
+  resume: 'Resume',
+  job: 'Job description',
+  project: 'Project',
+  portfolio: 'Portfolio',
   material: 'Material',
-  doc: 'Documento'
+  doc: 'Document'
 };
 Cue.TAG_LABEL = TAG_LABEL;
 
@@ -327,12 +327,12 @@ function readiness(a) {
   const docs = Array.isArray(a.documents) ? a.documents : [];
   const cs = a.checklist_state || {};
   const items = [
-    { key: 'resume', label: 'Currículo anexado', done: docs.some((d) => docTag(d) === 'resume'), w: 30 },
-    { key: 'job', label: 'Descrição da vaga', done: Boolean((a.job_description || '').trim()) || docs.some((d) => docTag(d) === 'job'), w: 20 },
-    { key: 'research', label: 'Pesquisa da empresa', done: Boolean((a.company_research || a.company_dossier || '').trim()), w: 15 },
-    { key: 'extra', label: 'Material extra (projetos, portfólio)', done: docs.filter((d) => docTag(d) !== 'resume').length > 0, w: 10 },
-    { key: 'practice', label: 'Simulação feita', done: Boolean(cs.practice_run), w: 15 },
-    { key: 'debrief', label: 'Debrief gerado', done: Boolean(cs.debrief_read) || (a.goal_memory_strengths || []).length > 0, w: 10 }
+    { key: 'resume', label: 'Resume attached', done: docs.some((d) => docTag(d) === 'resume'), w: 30 },
+    { key: 'job', label: 'Job description', done: Boolean((a.job_description || '').trim()) || docs.some((d) => docTag(d) === 'job'), w: 20 },
+    { key: 'research', label: 'Company research', done: Boolean((a.company_research || a.company_dossier || '').trim()), w: 15 },
+    { key: 'extra', label: 'Extra material (projects, portfolio)', done: docs.filter((d) => docTag(d) !== 'resume').length > 0, w: 10 },
+    { key: 'practice', label: 'Practice run done', done: Boolean(cs.practice_run), w: 15 },
+    { key: 'debrief', label: 'Debrief generated', done: Boolean(cs.debrief_read) || (a.goal_memory_strengths || []).length > 0, w: 10 }
   ];
   const pct = items.reduce((acc, i) => acc + (i.done ? i.w : 0), 0);
   return { pct: clamp(pct, 0, 100), items };
@@ -353,7 +353,7 @@ function sessionTitle(s) {
   const label = fixText((s && s.goalLabel) || '');
   if (label) return label;
   const d = sessionDate(s);
-  return d ? `Sessão de ${fmtDateShort(d)}` : fixText((s && s.id) || 'Sessão');
+  return d ? `Session of ${fmtDateShort(d)}` : fixText((s && s.id) || 'Session');
 }
 Cue.sessionTitle = sessionTitle;
 
@@ -419,8 +419,8 @@ function usage() {
       answers: list.reduce((acc, s) => acc + (Number(s.suggestions) || Number(s.answersCount) || 0), 0),
       pct: limit ? clamp(Math.round((ent.usedMinutes / limit) * 100), 0, 100) : null,
       left: limit ? Math.max(0, Math.round(ent.leftMinutes)) : null,
-      renewLabel: ent.monthly ? fmtDateShort(renew) : 'não renova',
-      monthLabel: ent.monthly ? MONTHS_LONG[now.getMonth()] : 'sessão gratuita'
+      renewLabel: ent.monthly ? fmtDateShort(renew) : 'does not renew',
+      monthLabel: ent.monthly ? MONTHS_LONG[now.getMonth()] : 'free session'
     };
   }
   const sec = list.reduce((acc, s) => acc + (Number(s.durationSeconds) || 0), 0);
@@ -517,7 +517,7 @@ async function guard(fn, failMessage) {
     return await fn();
   } catch (err) {
     console.error(err);
-    toast(failMessage || 'Algo deu errado.', 'error');
+    toast(failMessage || 'Something went wrong.', 'error');
     return null;
   }
 }
@@ -545,20 +545,20 @@ async function refreshState() {
 Cue.refreshState = refreshState;
 
 async function saveAgent(agent, message) {
-  const res = await guard(() => api.saveAgent(agent), 'Não foi possível salvar a sessão.');
+  const res = await guard(() => api.saveAgent(agent), 'Could not save the session.');
   if (!res) return null;
   applyAgents(res.agents, res.saved && res.saved.id);
-  if (message) toast(res.overlayRestarted ? `${message} O copiloto foi reiniciado para aplicar.` : message);
+  if (message) toast(res.overlayRestarted ? `${message} The copilot restarted to apply it.` : message);
   renderShell();
   return res.saved || res.agent || null;
 }
 Cue.saveAgent = saveAgent;
 
 async function saveConfig(patch, message) {
-  const res = await guard(() => api.saveConfig(patch), 'Não foi possível salvar a configuração.');
+  const res = await guard(() => api.saveConfig(patch), 'Could not save the settings.');
   if (!res) return null;
   if (res.config) S.config = res.config;
-  if (message) toast(res.overlayRestarted ? `${message} O copiloto foi reiniciado.` : message);
+  if (message) toast(res.overlayRestarted ? `${message} The copilot restarted.` : message);
   renderShell();
   return res;
 }
@@ -568,7 +568,7 @@ Cue.saveConfig = saveConfig;
 async function startCopilot(agent, demo) {
   const target = agent || activeAgent();
   if (!target) {
-    toast('Crie uma sessão antes de iniciar o copiloto.');
+    toast('Create a session before starting the copilot.');
     Cue.openModal('new-session');
     return null;
   }
@@ -584,19 +584,19 @@ async function startCopilot(agent, demo) {
   }
   const ready = engineReady();
   if (!demo && !ready.ok) {
-    toast(!ready.stt ? 'Configure a chave de transcrição (Deepgram) primeiro.' : 'Configure uma chave de IA primeiro.', 'error');
+    toast(!ready.stt ? 'Set up the transcription key (Deepgram) first.' : 'Set up an AI key first.', 'error');
     navigate('settings/ai');
     return null;
   }
   S.activeAgentId = target.id;
-  toast(demo ? `Iniciando simulação: ${agentTitle(target)}` : `Iniciando copiloto: ${agentTitle(target)}`);
+  toast(demo ? `Starting practice: ${agentTitle(target)}` : `Starting copilot: ${agentTitle(target)}`);
   const res = await guard(
     () => api.startOverlay({ agent: target, demo: Boolean(demo), configOverrides: {} }),
-    'Não foi possível iniciar o copiloto.'
+    'Could not start the copilot.'
   );
   if (!res) return null;
   if (res.ok === false) {
-    toast(res.error || 'O copiloto não iniciou.', 'error');
+    toast(res.error || 'The copilot did not start.', 'error');
     if (res.needsLogin && Cue.authRefresh) await Cue.authRefresh(true);
     else if (res.needsUpgrade) navigate('settings/plan');
     return null;
@@ -610,22 +610,22 @@ async function startCopilot(agent, demo) {
 Cue.startCopilot = startCopilot;
 
 async function stopCopilot() {
-  await guard(() => api.stopOverlay(), 'Não foi possível parar o copiloto.');
-  toast('Copiloto encerrado. A sessão foi salva.');
+  await guard(() => api.stopOverlay(), 'Could not stop the copilot.');
+  toast('Copilot stopped. The session was saved.');
 }
 Cue.stopCopilot = stopCopilot;
 
 // ----------------------------------------------------------------- router --
 const CRUMBS = {
-  home: 'Início',
-  sessions: 'Sessões',
-  history: 'Histórico',
-  session: 'Sessão',
-  review: 'Análise',
-  files: 'Arquivos',
-  questions: 'Banco de perguntas',
-  live: 'Ao vivo',
-  settings: 'Configurações'
+  home: 'Home',
+  sessions: 'Sessions',
+  history: 'History',
+  session: 'Session',
+  review: 'Review',
+  files: 'Files',
+  questions: 'Question bank',
+  live: 'Live',
+  settings: 'Settings'
 };
 
 function parseHash() {
@@ -671,6 +671,8 @@ Cue.isLocked = isLocked;
 
 function applyLock() {
   const locked = isLocked();
+  const app = document.getElementById('app');
+  if (app) app.classList.toggle('locked', locked);
   for (const id of ['sidebar', 'searchTrigger', 'btnUpdateChip', 'btnStealthChip', 'btnGoLive']) {
     const el = document.getElementById(id);
     if (el && (id !== 'btnUpdateChip' || locked)) el.hidden = locked;
@@ -687,7 +689,7 @@ function renderView(resetScroll) {
     html = view(S.route.parts);
   } catch (err) {
     console.error(err);
-    html = `<div class="page"><div class="empty boxed">${icon('warning')}<span class="t">Esta tela falhou ao carregar</span><span>${esc(err.message)}</span></div></div>`;
+    html = `<div class="page"><div class="empty boxed">${icon('warning')}<span class="t">This screen failed to load</span><span>${esc(err.message)}</span></div></div>`;
   }
   host.innerHTML = html;
   hydrateIcons(host);
@@ -708,13 +710,13 @@ function refresh() {
 Cue.refresh = refresh;
 
 const NAV = [
-  ['home', 'Início', 'house'],
-  ['sessions', 'Sessões', 'stack'],
-  ['history', 'Histórico', 'history'],
-  ['files', 'Arquivos', 'folder'],
-  ['questions', 'Banco de perguntas', 'question'],
-  ['live', 'Ao vivo', 'broadcast'],
-  ['settings', 'Configurações', 'gear']
+  ['home', 'Home', 'house'],
+  ['sessions', 'Sessions', 'stack'],
+  ['history', 'History', 'history'],
+  ['files', 'Files', 'folder'],
+  ['questions', 'Question bank', 'question'],
+  ['live', 'Live', 'broadcast'],
+  ['settings', 'Settings', 'gear']
 ];
 
 function navActive(id) {
@@ -739,7 +741,7 @@ Cue.allDocs = allDocs;
 function renderShell() {
   if (applyLock()) {
     const crumbEl = document.getElementById('crumb');
-    if (crumbEl) crumbEl.textContent = 'Entrar';
+    if (crumbEl) crumbEl.textContent = 'Sign in';
     return;
   }
   const running = Boolean(S.overlayStatus && S.overlayStatus.running);
@@ -758,7 +760,7 @@ function renderShell() {
     setHtml(nav, NAV.map(([id, label, ic]) => {
       const right =
         id === 'live' && running
-          ? '<span class="nav-live-dot" title="Copiloto ativo"></span>'
+          ? '<span class="nav-live-dot" title="Copilot running"></span>'
           : `<span class="nav-count">${counts[id] === undefined || counts[id] === '' ? '' : counts[id]}</span>`;
       return `<button type="button" class="nav-item ${navActive(id) ? 'active' : ''}" data-action="go" data-to="${id}" title="${esc(label)}">${icon(ic)}<span class="nav-label">${esc(label)}</span>${right}</button>`;
     }).join(''));
@@ -766,11 +768,11 @@ function renderShell() {
 
   const crumb = document.getElementById('crumb');
   if (crumb) {
-    let label = CRUMBS[S.route.view] || 'Início';
-    if (S.route.view === 'sessions' && S.ui.sessTab === 'past') label = 'Histórico';
+    let label = CRUMBS[S.route.view] || 'Home';
+    if (S.route.view === 'sessions' && S.ui.sessTab === 'past') label = 'History';
     if (S.route.view === 'session') {
       const a = agentById(S.route.parts[0]);
-      if (a) label = `Sessões / ${agentTitle(a)}`;
+      if (a) label = `Sessions / ${agentTitle(a)}`;
     }
     crumb.textContent = label;
   }
@@ -782,16 +784,16 @@ function renderShell() {
   if (pill && pillLabel) {
     if (running) {
       pill.className = 'pill danger';
-      pillLabel.textContent = S.overlayStatus.mode === 'demo' ? 'Simulando' : 'Ao vivo';
-      pill.title = 'O copiloto está rodando';
+      pillLabel.textContent = S.overlayStatus.mode === 'demo' ? 'Practice' : 'Live';
+      pill.title = 'The copilot is running';
     } else if (ready.ok) {
       pill.className = 'pill ok';
-      pillLabel.textContent = 'Pronto';
-      pill.title = 'Chaves de transcrição e IA configuradas';
+      pillLabel.textContent = 'Ready';
+      pill.title = 'Transcription and AI keys set up';
     } else {
       pill.className = 'pill warn';
-      pillLabel.textContent = 'Configurar';
-      pill.title = !ready.stt ? 'Falta a chave de transcrição (Deepgram)' : 'Falta uma chave de IA';
+      pillLabel.textContent = 'Set up';
+      pill.title = !ready.stt ? 'Missing the transcription key (Deepgram)' : 'Missing an AI key';
     }
   }
 
@@ -800,7 +802,7 @@ function renderShell() {
   if (next) {
     const upcoming = upcomingAgents().slice(0, 2);
     setHtml(next, upcoming.length
-      ? `<span class="eyebrow" style="padding:0 10px">A seguir</span>${upcoming
+      ? `<span class="eyebrow" style="padding:0 10px">Up next</span>${upcoming
           .map(({ a, iv }) => `<button type="button" class="next-item" data-action="go" data-to="session/${esc(a.id)}"><span class="t">${esc(agentTitle(a))}</span><span class="s">${esc(fmtDateShort(iv.at))}${iv.hasTime ? ` · ${esc(iv.time)}` : ''} · ${esc(relDays(iv.days).toLowerCase())}</span></button>`)
           .join('')}`
       : '');
@@ -816,10 +818,10 @@ function renderShell() {
       return `<span class="${i < Math.floor(filled) ? 'on' : i < filled ? 'half' : ''}"></span>`;
     }).join('');
     setHtml(card, `
-      <div class="row between"><span class="eyebrow">Uso do mês</span><span class="pill">${esc(u.planLabel)}</span></div>
-      <div class="row" style="align-items:baseline;gap:6px"><span style="font-size:22px;font-weight:600;letter-spacing:-.03em;line-height:1">${u.usedMin}</span><span class="num">${u.limit ? `/ ${u.limit} min` : 'min transcritos'}</span></div>
+      <div class="row between"><span class="eyebrow">Usage this month</span><span class="pill">${esc(u.planLabel)}</span></div>
+      <div class="row" style="align-items:baseline;gap:6px"><span style="font-size:22px;font-weight:600;letter-spacing:-.03em;line-height:1">${u.usedMin}</span><span class="num">${u.limit ? `/ ${u.limit} min` : 'min transcribed'}</span></div>
       ${u.limit ? `<div class="usage-ticks">${ticks}</div>` : ''}
-      <div class="row between faint" style="font-size:11.5px"><span>${u.limit ? `${u.left} min restantes` : plural(u.sessions, 'sessão', 'sessões')}</span><span class="nowrap">${u.limit ? `Renova ${esc(u.renewLabel)}` : esc(u.monthLabel)}</span></div>`);
+      <div class="row between faint" style="font-size:11.5px"><span>${u.limit ? `${u.left} min left` : plural(u.sessions, 'session', 'sessions')}</span><span class="nowrap">${u.limit ? `Renews ${esc(u.renewLabel)}` : esc(u.monthLabel)}</span></div>`);
   }
 
   // Profile
@@ -828,9 +830,9 @@ function renderShell() {
     const el = document.getElementById(id);
     if (el) el.textContent = t;
   };
-  setText('profileInitials', monogram(name || 'Você'));
-  setText('profileName', name || 'Configurar perfil');
-  setText('profilePlan', `Plano ${u.planLabel}`);
+  setText('profileInitials', monogram(name || 'You'));
+  setText('profileName', name || 'Set up profile');
+  setText('profilePlan', `${u.planLabel} plan`);
 
   // Top bar: live button, stealth, update chip
   const live = document.getElementById('btnGoLive');
@@ -839,17 +841,17 @@ function renderShell() {
       live.className = 'btn live';
       // The clock span is ticked in place (tickLiveClock) so the pulse
       // animation is not restarted every second.
-      setHtml(live, `<span class="dot" style="background:#fff;animation:pulse 1.4s infinite"></span>${S.overlayStatus.mode === 'demo' ? 'Simulando' : 'Ao vivo'} <span class="mono" id="btnGoLiveClock" style="font-size:11px;opacity:.85"></span>`);
+      setHtml(live, `<span class="dot" style="background:#fff;animation:pulse 1.4s infinite"></span>${S.overlayStatus.mode === 'demo' ? 'Practice' : 'Live'} <span class="mono" id="btnGoLiveClock" style="font-size:11px;opacity:.85"></span>`);
       tickLiveClock();
     } else {
       live.className = 'btn raised';
-      setHtml(live, '<span class="dot"></span>Entrar ao vivo');
+      setHtml(live, '<span class="dot"></span>Go live');
     }
   }
   const stealth = document.getElementById('btnStealthChip');
   if (stealth) {
     const on = Boolean(S.stealthState && S.stealthState.active);
-    setHtml(stealth, `${icon(on ? 'eye-slash' : 'eye')}${on ? 'Oculto' : 'Visível'}`);
+    setHtml(stealth, `${icon(on ? 'eye-slash' : 'eye')}${on ? 'Hidden' : 'Visible'}`);
     stealth.style.color = on ? 'var(--accent)' : '';
   }
   const upd = document.getElementById('btnUpdateChip');
@@ -859,7 +861,7 @@ function renderShell() {
     upd.hidden = !show;
     if (show) {
       const v = S.update.latestVersion || '';
-      setHtml(upd, `${icon('download')}${st === 'downloaded' ? 'Reiniciar para atualizar' : st === 'downloading' ? `Baixando ${S.update.progress ? Math.round(S.update.progress.percent || 0) + '%' : ''}` : `Atualização ${esc(v)}`}`);
+      setHtml(upd, `${icon('download')}${st === 'downloaded' ? 'Restart to update' : st === 'downloading' ? `Downloading ${S.update.progress ? Math.round(S.update.progress.percent || 0) + '%' : ''}` : `Update ${esc(v)}`}`);
     }
   }
 }
@@ -895,10 +897,10 @@ Cue.actions.go = (el) => navigate(el.dataset.to);
 Cue.actions.back = () => history.back();
 
 Cue.actions['toggle-stealth'] = async () => {
-  const res = await guard(() => api.toggleStealthMode(), 'Não foi possível alternar o modo oculto.');
+  const res = await guard(() => api.toggleStealthMode(), 'Could not toggle hidden mode.');
   if (res && res.status) {
     S.stealthState = res.status;
-    toast(res.status.active ? 'Painel oculto de gravações e compartilhamento de tela.' : 'Painel visível em gravações.');
+    toast(res.status.active ? 'Panel hidden from recordings and screen sharing.' : 'Panel visible in recordings.');
     renderShell();
     if (['home', 'settings'].includes(S.route.view)) refresh();
   }
@@ -909,7 +911,7 @@ Cue.actions['stop-copilot'] = () => stopCopilot();
 Cue.actions['open-path'] = (el) => api.openExternalPath(el.dataset.path || undefined);
 Cue.actions['open-url'] = async (el) => {
   const res = await api.openUrl(el.dataset.url);
-  if (!res || !res.ok) toast('Não foi possível abrir o link.', 'error');
+  if (!res || !res.ok) toast('Could not open the link.', 'error');
 };
 
 // The only actions that work before signing in (sign-in screen + window).
@@ -973,7 +975,7 @@ Cue.applyTheme = applyTheme;
 // ------------------------------------------------------------- live data --
 async function loadQuestionBank(force) {
   if (S.questionBank && !force) return S.questionBank;
-  const bank = await guard(() => api.getQuestionBank(), 'Não foi possível carregar o banco de perguntas.');
+  const bank = await guard(() => api.getQuestionBank(), 'Could not load the question bank.');
   S.questionBank = bank || { companies: [] };
   return S.questionBank;
 }
@@ -1011,7 +1013,7 @@ function subscribe() {
   api.onSessionSummary((summary) => {
     if (!summary) return;
     if (!summary.ok) {
-      toast('O resumo não pôde ser gerado; a transcrição foi salva.', 'error');
+      toast('The summary could not be generated; the transcript was saved.', 'error');
       return;
     }
     Cue.openModal('summary', summary);
@@ -1055,7 +1057,7 @@ function subscribe() {
       return;
     }
     if (payload && payload.questionsExtracted > 0) {
-      toast(`${plural(payload.questionsExtracted, 'pergunta nova', 'perguntas novas')} no banco${payload.company ? ` (${fixText(payload.company)})` : ''}.`);
+      toast(`${plural(payload.questionsExtracted, 'new question', 'new questions')} added to the bank${payload.company ? ` (${fixText(payload.company)})` : ''}.`);
       await loadQuestionBank(true);
       renderShell();
       if (S.route.view === 'questions' || S.route.view === 'home') refresh();
@@ -1076,7 +1078,7 @@ async function boot() {
     await refreshState();
   } catch (err) {
     console.error(err);
-    toast('Não foi possível ler os dados locais.', 'error');
+    toast('Could not read the local data.', 'error');
   }
   applyTheme();
   S.activeAgentId = (S.overlayStatus && S.overlayStatus.agentId) || S.config.last_agent || '';

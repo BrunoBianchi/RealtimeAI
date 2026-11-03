@@ -14,8 +14,11 @@
   // Screen state. The password lives only here, only until it is sent.
   const A = { mode: 'signin', email: '', name: '', password: '', ssoHint: '', busy: '', error: '', info: '', pending: null };
 
+  // Google "G" mark (brand colours, as Google's sign-in guidelines ask).
+  const GOOGLE_G = `<svg class="g-logo" viewBox="0 0 48 48" aria-hidden="true"><path class="g-y" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.6-.4-3.5z"/><path class="g-r" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path class="g-g" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path class="g-b" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.5z"/></svg>`;
+
   function field(name, label, type, value, placeholder, autocomplete) {
-    return `<label class="stack" style="gap:6px"><span class="small muted">${esc(label)}</span>
+    return `<label class="auth-field"><span>${esc(label)}</span>
       <input class="input" type="${type}" value="${esc(value)}" placeholder="${esc(placeholder || '')}" autocomplete="${autocomplete || 'off'}" spellcheck="false" data-input="auth-field" data-field="${name}"/></label>`;
   }
 
@@ -23,73 +26,88 @@
     return A.busy === kind ? '<span class="spinner"></span>' : '';
   }
 
+  const dis = () => (A.busy ? 'disabled' : '');
+
   function serverBlock() {
     const cfg = S.config || {};
     const st = S.auth || {};
     if (st.available || cfg.server_url_effective) return '';
-    return `<div class="inset stack" style="gap:8px"><span class="small">Nenhum servidor RealTimeAI configurado nesta versão.</span>
-      <input class="input sm" type="text" value="${esc(cfg.server_url || '')}" placeholder="https://servidor.exemplo.com" data-change="auth-server" aria-label="Endereço do servidor"/></div>`;
+    return `<div class="auth-server"><span>This build has no RealTimeAI server configured. Enter its address to sign in.</span>
+      <input class="input sm" type="text" value="${esc(cfg.server_url || '')}" placeholder="https://server.example.com" data-change="auth-server" aria-label="Server address"/></div>`;
   }
 
   function pendingBlock() {
     const p = A.pending;
-    return `<div class="stack" style="gap:12px;align-items:center;text-align:center">
-      <span class="muted">${p.provider === 'sso' ? 'Conclua o login da sua empresa no navegador.' : 'Conclua o login com o Google no navegador.'} Confirme este código se for pedido:</span>
-      <span class="metric mono" style="letter-spacing:.12em">${esc(p.userCode || '—')}</span>
-      <span class="row" style="gap:8px"><span class="spinner"></span><span class="small faint">Aguardando a confirmação…</span></span>
-      <div class="row" style="gap:8px"><button type="button" class="btn sm" data-action="auth-reopen">${icon('external')}Abrir o navegador de novo</button>
-      <button type="button" class="btn sm ghost" data-action="auth-cancel">Cancelar</button></div></div>`;
+    return `<div class="auth-step">
+      <p class="auth-sub" style="text-align:center;margin:0 auto">${p.provider === 'sso' ? 'Finish signing in with your company in the browser.' : 'Finish signing in with Google in the browser.'} If asked, confirm this code:</p>
+      <div class="auth-code">${esc(p.userCode || '—')}</div>
+      <div class="auth-wait"><span class="spinner"></span>Waiting for confirmation…</div>
+      <button type="button" class="auth-btn" data-action="auth-reopen">${icon('external')}Open the browser again</button>
+      <div class="auth-links center"><button type="button" class="auth-link" data-action="auth-cancel">Cancel</button></div></div>`;
   }
 
   function formBlock() {
     if (A.mode === 'sso') {
-      return `<div class="stack" style="gap:12px">
-        ${field('ssoHint', 'E-mail corporativo ou domínio da empresa', 'text', A.ssoHint, 'voce@empresa.com', 'email')}
-        <button type="button" class="btn primary lg" data-action="auth-sso" ${A.busy ? 'disabled' : ''}>${spinner('sso')}Continuar com SSO</button>
-        <button type="button" class="btn ghost sm" data-action="auth-mode" data-mode="signin">Voltar</button></div>`;
+      return `<div class="auth-step">
+        ${field('ssoHint', 'Work e-mail or company domain', 'text', A.ssoHint, 'you@company.com', 'email')}
+        <button type="button" class="auth-btn primary" id="authSubmit" data-action="auth-sso" ${dis()}>${spinner('sso')}Continue with SSO</button>
+        <div class="auth-links center"><button type="button" class="auth-link" data-action="auth-mode" data-mode="signin">Back</button></div></div>`;
     }
     if (A.mode === 'reset') {
-      return `<div class="stack" style="gap:12px">
-        ${field('email', 'E-mail da conta', 'email', A.email, 'voce@email.com', 'email')}
-        <button type="button" class="btn primary lg" data-action="auth-reset" ${A.busy ? 'disabled' : ''}>${spinner('reset')}Enviar link de recuperação</button>
-        <button type="button" class="btn ghost sm" data-action="auth-mode" data-mode="signin">Voltar para entrar</button></div>`;
+      return `<div class="auth-step">
+        ${field('email', 'Account e-mail', 'email', A.email, 'you@email.com', 'email')}
+        <button type="button" class="auth-btn primary" id="authSubmit" data-action="auth-reset" ${dis()}>${spinner('reset')}Send reset link</button>
+        <div class="auth-links center"><button type="button" class="auth-link" data-action="auth-mode" data-mode="signin">Back to sign in</button></div></div>`;
     }
     const signup = A.mode === 'signup';
-    return `<div class="stack" style="gap:12px">
-      <button type="button" class="btn lg" data-action="auth-google" ${A.busy ? 'disabled' : ''}>${spinner('google') || icon('globe')}Continuar com Google</button>
-      <button type="button" class="btn lg" data-action="auth-mode" data-mode="sso" ${A.busy ? 'disabled' : ''}>${icon('key')}Entrar com SSO da empresa</button>
-      <div class="row" style="gap:10px;align-items:center"><span class="grow" style="height:1px;background:var(--border-subtle)"></span><span class="xs faint">ou com e-mail</span><span class="grow" style="height:1px;background:var(--border-subtle)"></span></div>
-      ${signup ? field('name', 'Nome', 'text', A.name, 'Seu nome', 'name') : ''}
-      ${field('email', 'E-mail', 'email', A.email, 'voce@email.com', 'email')}
-      ${field('password', signup ? 'Senha (mínimo 8 caracteres)' : 'Senha', 'password', '', '', signup ? 'new-password' : 'current-password')}
-      <button type="button" class="btn primary lg" id="authSubmit" data-action="auth-password" ${A.busy ? 'disabled' : ''}>${spinner('password')}${signup ? 'Criar conta' : 'Entrar'}</button>
-      <div class="row between small">
+    return `<div class="auth-step">
+      <button type="button" class="auth-btn" data-action="auth-google" ${dis()}>${spinner('google') || GOOGLE_G}Continue with Google</button>
+      <button type="button" class="auth-btn" data-action="auth-mode" data-mode="sso" ${dis()}>${icon('key')}Continue with SSO</button>
+      <div class="auth-divider">or</div>
+      ${signup ? field('name', 'Name', 'text', A.name, 'Your name', 'name') : ''}
+      ${field('email', 'E-mail', 'email', A.email, 'you@email.com', 'email')}
+      ${field('password', 'Password', 'password', '', signup ? 'At least 8 characters' : '', signup ? 'new-password' : 'current-password')}
+      <button type="button" class="auth-btn primary" id="authSubmit" data-action="auth-password" ${dis()}>${spinner('password')}${signup ? 'Create account' : 'Sign in'}</button>
+      <div class="auth-links ${signup ? 'center' : ''}">
         ${signup
-          ? '<a data-action="auth-mode" data-mode="signin">Já tenho conta</a><span></span>'
-          : '<a data-action="auth-mode" data-mode="signup">Criar conta</a><a data-action="auth-mode" data-mode="reset">Esqueci a senha</a>'}
+          ? '<button type="button" class="auth-link" data-action="auth-mode" data-mode="signin">Already have an account? <span class="auth-link strong">Sign in</span></button>'
+          : '<button type="button" class="auth-link" data-action="auth-mode" data-mode="signup">No account? <span class="auth-link strong">Sign up</span></button><button type="button" class="auth-link" data-action="auth-mode" data-mode="reset">Forgot password?</button>'}
       </div></div>`;
   }
 
+  const TITLES = { signin: 'Welcome to Cue', signup: 'Create your account', reset: 'Reset your password', sso: 'Single sign-on' };
+  const SUBS = {
+    signin: 'Your real-time interview copilot. Sign in to continue.',
+    signup: 'Start on the Free plan: one session of up to 15 minutes.',
+    reset: 'We will e-mail you a link to choose a new password.',
+    sso: 'Use the identity provider of your company.'
+  };
+
   C.views.login = function login() {
     const expired = S.auth && S.auth.expired;
-    const title = A.mode === 'signup' ? 'Crie sua conta' : A.mode === 'reset' ? 'Recuperar senha' : 'Entre no Cue';
-    return `<div class="page" style="display:flex;justify-content:center;padding-top:56px">
-      <section class="card" style="width:100%;max-width:420px">
-        <div class="stack" style="gap:6px;margin-bottom:18px">
-          <span class="row" style="gap:10px"><span class="brand-mark" style="width:28px;height:28px">${icon('waveform')}</span><span class="strong" style="font-size:18px">${esc(title)}</span></span>
-          <span class="small faint">${expired ? 'Sua sessão expirou. Entre de novo para continuar.' : 'É preciso entrar para usar o copiloto. Novas contas começam no plano Free: uma sessão de até 15 minutos.'}</span>
+    const title = A.pending ? 'Check your browser' : TITLES[A.mode] || TITLES.signin;
+    const sub = expired ? 'Your session expired. Sign in again to continue.' : SUBS[A.mode] || SUBS.signin;
+    return `<div class="auth">
+      <section class="auth-panel" aria-labelledby="authTitle">
+        <header class="auth-head">
+          <div class="auth-logo" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+          <div class="stack" style="gap:6px;align-items:center"><h1 class="auth-title" id="authTitle">${esc(title)}</h1><p class="auth-sub">${esc(sub)}</p></div>
+        </header>
+        <div class="auth-body">
+          ${serverBlock()}
+          ${A.pending ? pendingBlock() : formBlock()}
+          ${A.error ? `<div class="auth-msg error" role="alert">${esc(A.error)}</div>` : ''}
+          ${A.info ? `<div class="auth-msg info" role="status">${esc(A.info)}</div>` : ''}
         </div>
-        ${serverBlock()}
-        ${A.pending ? pendingBlock() : formBlock()}
-        ${A.error ? `<div class="small" role="alert" style="color:var(--danger);margin-top:12px">${esc(A.error)}</div>` : ''}
-        ${A.info ? `<div class="small" style="color:var(--accent);margin-top:12px">${esc(A.info)}</div>` : ''}
+        <p class="auth-foot">By continuing you agree to the RealTimeAI Terms and Privacy Policy.</p>
       </section></div>`;
   };
 
   C.afterRender.login = () => {
-    // Enter submits the e-mail form.
+    // Enter submits the visible form; the first empty field gets focus.
     const submit = document.getElementById('authSubmit');
-    document.querySelectorAll('[data-field]').forEach((input) => {
+    const inputs = [...document.querySelectorAll('[data-field]')];
+    inputs.forEach((input) => {
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && submit && !submit.disabled) {
           e.preventDefault();
@@ -97,6 +115,8 @@
         }
       });
     });
+    const first = inputs.find((i) => !i.value);
+    if (first && !A.busy) first.focus();
   };
 
   // ------------------------------------------------------------ state --
@@ -127,7 +147,7 @@
     A.password = '';
     if (config) S.config = config;
     await authRefresh(true);
-    C.toast('Conta conectada.');
+    C.toast('Signed in.');
   }
 
   C.authInit = async () => {
@@ -140,10 +160,14 @@
         } else if (e.type === 'signed_in') {
           await signedIn(e.config);
           return;
+        } else if (e.type === 'server_ready') {
+          // The local server came up after the first status check.
+          await authRefresh(true);
+          return;
         } else if (e.type === 'error') {
           A.pending = null;
           A.busy = '';
-          A.error = e.error || 'Não foi possível entrar.';
+          A.error = e.error || 'Could not sign in.';
         }
         if (C.isLocked()) C.refresh();
       });
@@ -176,10 +200,10 @@
     A.busy = provider;
     A.error = '';
     C.refresh();
-    const res = await C.guard(() => api.cloudLogin({ provider, hint: provider === 'sso' ? A.ssoHint : '' }), 'Não foi possível iniciar o login.');
+    const res = await C.guard(() => api.cloudLogin({ provider, hint: provider === 'sso' ? A.ssoHint : '' }), 'Could not start signing in.');
     A.busy = '';
     if (res && res.ok) A.pending = { provider, userCode: res.userCode, verificationUri: res.verificationUri };
-    else A.error = (res && res.error) || 'Não foi possível iniciar o login.';
+    else A.error = (res && res.error) || 'Could not start signing in.';
     C.refresh();
   }
 
@@ -206,7 +230,7 @@
     C.refresh();
     const res = await C.guard(
       () => (signup ? api.cloudSignup({ name: A.name, email: A.email, password }) : api.cloudPasswordLogin({ email: A.email, password })),
-      'Não foi possível entrar.'
+      'Could not sign in.'
     );
     A.busy = '';
     if (res && res.ok) {
@@ -217,7 +241,7 @@
       A.mode = 'signin';
       A.info = res.error;
     } else {
-      A.error = (res && res.error) || 'Não foi possível entrar.';
+      A.error = (res && res.error) || 'Could not sign in.';
     }
     C.refresh();
   };
@@ -226,13 +250,13 @@
     A.busy = 'reset';
     A.error = '';
     C.refresh();
-    const res = await C.guard(() => api.cloudResetPassword(A.email), 'Não foi possível enviar o link.');
+    const res = await C.guard(() => api.cloudResetPassword(A.email), 'Could not send the link.');
     A.busy = '';
     if (res && res.ok) {
       A.mode = 'signin';
-      A.info = 'Se houver uma conta com este e-mail, enviamos um link para criar uma nova senha.';
+      A.info = 'If an account exists for this e-mail, we sent a link to choose a new password.';
     } else {
-      A.error = (res && res.error) || 'Não foi possível enviar o link.';
+      A.error = (res && res.error) || 'Could not send the link.';
     }
     C.refresh();
   };

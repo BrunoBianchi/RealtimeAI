@@ -31,11 +31,11 @@ function entitlement(account) {
   let reason = '';
   if (rules.id === 'free' && sessionsUsed >= rules.maxSessions) {
     canStart = false;
-    reason = 'Você já usou a sessão gratuita de 15 minutos. Assine o PRO para continuar.';
+    reason = 'You already used the free 15-minute session. Upgrade to PRO to continue.';
   } else if (!canStart) {
     reason = rules.monthly
-      ? `Os ${limit} minutos do PRO deste mês acabaram. Renovam ${p.period_end ? `em ${p.period_end}` : 'no próximo mês'}.`
-      : 'Você já usou os minutos gratuitos. Assine o PRO para continuar.';
+      ? `This month's ${limit} PRO minutes are used up. They renew ${p.period_end ? `on ${p.period_end}` : 'next month'}.`
+      : 'You already used the free minutes. Upgrade to PRO to continue.';
   }
   return {
     planId: rules.id,

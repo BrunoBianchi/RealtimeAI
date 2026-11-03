@@ -70,7 +70,7 @@ test('device sign-in: a denial ends the flow with a pt-BR message', async () => 
   const { acc, events, store } = account(server);
   await acc.startLogin();
   await waitFor(() => events.some((e) => e.type === 'error'));
-  assert.match(events.find((e) => e.type === 'error').error, /negado/);
+  assert.match(events.find((e) => e.type === 'error').error, /denied/);
   assert.strictEqual(store.token, '');
 });
 
@@ -211,16 +211,16 @@ test('e-mail + password: sign in, wrong password, sign-up and verification', asy
   });
   const { acc, events, store } = account(server);
 
-  assert.match((await acc.loginWithPassword('não-é-email', 'x')).error, /E-mail inválido/);
-  assert.match((await acc.loginWithPassword('ana@x.com', 'errada')).error, /incorretos/);
+  assert.match((await acc.loginWithPassword('não-é-email', 'x')).error, /Invalid e-mail/);
+  assert.match((await acc.loginWithPassword('ana@x.com', 'errada')).error, /Wrong e-mail or password/);
   assert.strictEqual(store.token, '');
   const ok = await acc.loginWithPassword('ana@x.com', 'certa123');
   assert.strictEqual(ok.ok, true);
   assert.strictEqual(store.token, 'pw-token');
   assert.ok(events.some((e) => e.type === 'signed_in'));
 
-  assert.match((await acc.signup('Ana', 'ana@x.com', '123')).error, /8 caracteres/);
-  assert.match((await acc.signup('Ana', 'ana@x.com', 'segura123')).error, /Já existe uma conta/);
+  assert.match((await acc.signup('Ana', 'ana@x.com', '123')).error, /8 characters/);
+  assert.match((await acc.signup('Ana', 'ana@x.com', 'segura123')).error, /already exists/);
   const pending = await acc.signup('Nova', 'nova@x.com', 'segura123');
   assert.strictEqual(pending.pendingVerification, true);
 
@@ -238,20 +238,28 @@ test('billing opens the hosted checkout or portal (https only)', async () => {
   assert.strictEqual((await acc.billing('portal')).ok, false, 'never opens a non-https url');
 });
 
+test('billing accepts plain http only from a local server', async () => {
+  for (const [url, ok] of [['http://localhost:8787/billing/checkout?s=1', true], ['http://127.0.0.1:8787/b', true], ['http://pay.test/c', false], ['http://localhost.evil.com/x', false]]) {
+    const server = fakeServer(() => ({ status: 200, body: { url } }));
+    const { acc } = account(server, { token: 'tok' });
+    assert.strictEqual((await acc.billing('checkout')).ok, ok, url);
+  }
+});
+
 test('plans: Free is one session of up to 15 minutes, once; PRO is 200 minutes a month', () => {
   const { entitlement } = require('../src/main/plans');
   const fresh = entitlement({ plan: { id: 'free' } });
   assert.deepStrictEqual([fresh.canStart, fresh.limitMinutes, fresh.maxSessionMinutes, fresh.maxSessions], [true, 15, 15, 1]);
   const used = entitlement({ plan: { id: 'free', minutes_used: 3, sessions_used: 1 } });
   assert.strictEqual(used.canStart, false, 'the free session is single, even if it was short');
-  assert.match(used.reason, /Assine o PRO/);
+  assert.match(used.reason, /Upgrade to PRO/);
   assert.strictEqual(entitlement(null).planId, 'free', 'unknown plan is Free');
 
   const pro = entitlement({ plan: { id: 'pro', minutes_used: 150, sessions_used: 40 } });
   assert.deepStrictEqual([pro.canStart, pro.limitMinutes, pro.leftMinutes, pro.maxSessionMinutes], [true, 200, 50, 50]);
   const out = entitlement({ plan: { id: 'pro', minutes_used: 200, period_end: '2026-12-01' } });
   assert.strictEqual(out.canStart, false);
-  assert.match(out.reason, /200 minutos do PRO/);
+  assert.match(out.reason, /200 PRO minutes/);
 });
 
 test('main process: nothing starts the copilot while signed out (demo included)', async () => {

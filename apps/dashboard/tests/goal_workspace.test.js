@@ -32,20 +32,20 @@ test('Task 5.1 / Property 1: header of a session (back, title, date, edit, sched
   const { html } = workspace();
   assert.ok(/data-action="go" data-to="sessions"/.test(html), 'back to Sessões');
   assert.ok(html.includes('Nubank · Backend Engineer'));
-  assert.ok(html.includes('10 jan · 10:00'), 'interview date and time');
+  assert.ok(html.includes('Jan 10 · 10:00'), 'interview date and time');
   for (const a of ['edit-session', 'open-scheduler', 'start-copilot']) assert.ok(actions(html).includes(a), a);
   const starts = tags(html, { 'data-action': 'start-copilot' });
   assert.deepStrictEqual(starts.map((s) => s['data-demo'] || ''), ['1', ''], 'Simular (demo) and Iniciar ao vivo');
-  assert.ok(html.includes('Reagendar'), 'scheduled: Reagendar');
+  assert.ok(html.includes('Reschedule'), 'scheduled: Reschedule');
 
   // While this session is live the button jumps to the live view instead.
   const live = workspace(AGENT, { overlayStatus: { running: true, agentId: 'a1', mode: 'live' } });
-  assert.ok(live.html.includes('Ao vivo agora') && /data-action="go" data-to="live"/.test(live.html));
+  assert.ok(live.html.includes('Live now') && /data-action="go" data-to="live"/.test(live.html));
 
   // Unknown id: a way back, not a crash.
   const r = loadRenderer();
   const missing = render(r.Cue, 'session/nope');
-  assert.ok(missing.includes('Sessão não encontrada') && missing.includes('data-to="sessions"'));
+  assert.ok(missing.includes('Session not found') && missing.includes('data-to="sessions"'));
 });
 
 test('Task 5.1 / Property 2: playbook and scheduler dialogs', async () => {
@@ -95,9 +95,9 @@ test('Task 5.1 / Property 3: readiness, context and memory sections', () => {
   assert.ok(actions(html).includes('save-context') && actions(html).includes('company-recon'));
 
   // Copilot memory: empty state, then what the debriefs learned.
-  assert.ok(html.includes('Gere um debrief depois de uma sessão'));
+  assert.ok(html.includes('Generate a debrief after a session'));
   const filled = workspace({ ...AGENT, next_focus: 'Focus on: métricas', goal_memory: { strengths: ['Clareza'], improve: ['Ser mais breve'] } }).html;
-  assert.ok(filled.includes('Próximo foco') && filled.includes('>métricas<'), 'next focus without the prefix');
+  assert.ok(filled.includes('Next focus') && filled.includes('>métricas<'), 'next focus without the prefix');
   assert.ok(filled.includes('<div class="bullet">Clareza</div>') && filled.includes('<div class="bullet neutral">Ser mais breve</div>'));
 });
 
@@ -112,19 +112,19 @@ test('Task 5.1 / Property 4: answer defaults (playbook, language, code, stage) a
   // Files: the résumé is listed; without one the drop zone asks for it.
   assert.ok(html.includes('cv.pdf') && html.includes('2.0 KB'));
   assert.ok(actions(html).includes('preview-doc') && actions(html).includes('remove-doc'));
-  assert.ok(!html.includes('Anexe seu currículo'));
+  assert.ok(!html.includes('Attach your resume'));
   const noCv = workspace({ ...AGENT, documents: [] }).html;
-  assert.ok(noCv.includes('Anexe seu currículo') && /data-action="add-docs"[^>]*data-tag="resume"/.test(noCv));
+  assert.ok(noCv.includes('Attach your resume') && /data-action="add-docs"[^>]*data-tag="resume"/.test(noCv));
 });
 
 test('Task 5.1 / Property 5: recorded sessions of this goal', () => {
   const empty = workspace().html;
-  assert.ok(empty.includes('Nenhuma sessão gravada para esta vaga ainda.'));
+  assert.ok(empty.includes('No recorded sessions for this job yet.'));
   const withRecs = workspace(AGENT, {
     sessions: [{ id: '2026-10-01_10-00-00_ab12', goalLabel: 'Nubank · Backend Engineer', startedAt: '2026-10-01T13:00:00Z', durationSeconds: 1800, mode: 'demo' }]
   }).html;
   assert.ok(/data-action="go" data-to="review\/2026-10-01_10-00-00_ab12"/.test(withRecs), 'a recorded session opens its review');
-  assert.ok(withRecs.includes('Simulação') && withRecs.includes('30 min'));
+  assert.ok(withRecs.includes('Practice') && withRecs.includes('30 min'));
   assert.ok(actions(withRecs).includes('archive-session') && actions(withRecs).includes('delete-session'));
 });
 
