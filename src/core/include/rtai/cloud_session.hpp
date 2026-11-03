@@ -179,14 +179,14 @@ inline std::optional<Session> parse_session(std::string_view body, std::string& 
                                             bool require_credentials = true) {
     auto root = json::Parser::parse(body);
     if (!root || !root->is_object()) {
-        error = "resposta do servidor inválida";
+        error = "invalid server response";
         return std::nullopt;
     }
     const json::Value& r = *root;
     if (r.has("error")) {
         const auto& e = r["error"];
         error = e.is_string() ? e.as_string() : e["message"].as_string();
-        if (error.empty()) error = "o servidor recusou a sessão";
+        if (error.empty()) error = "the server refused the session";
         return std::nullopt;
     }
     Session s;
@@ -207,7 +207,7 @@ inline std::optional<Session> parse_session(std::string_view body, std::string& 
     s.notice = r["notice"].as_string();
 
     if (s.minutes_left == 0) {
-        error = "seu plano não tem minutos disponíveis";
+        error = "your plan has no minutes left";
         return std::nullopt;
     }
     if (!require_credentials && s.stt.url.empty()) {
@@ -217,13 +217,13 @@ inline std::optional<Session> parse_session(std::string_view body, std::string& 
         return s;
     }
     if (!s.stt.valid() || !detail::scheme_is(s.stt.url, "wss://", "ws://") || !parse_url(s.stt.url).ok) {
-        error = "o servidor não enviou um endpoint de transcrição válido";
+        error = "the server did not send a valid transcription endpoint";
         return std::nullopt;
     }
     // LLM is optional (transcription-only plans); when present it must be usable.
     if (!s.llm.url.empty() &&
         (!s.llm.valid() || !detail::scheme_is(s.llm.url, "https://", "http://") || !parse_url(s.llm.url).ok)) {
-        error = "o servidor enviou um endpoint de IA inválido";
+        error = "the server sent an invalid AI endpoint";
         return std::nullopt;
     }
     // The fallback slot of the LLM client is HTTPS-only.

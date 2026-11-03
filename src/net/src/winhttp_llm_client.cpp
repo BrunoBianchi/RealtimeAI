@@ -540,7 +540,7 @@ void WinHttpLlmClient::warm_up(std::function<void(bool, std::string)> on_result)
                     ok = false;
                     msg = openrouter::parse_error_body(static_cast<int>(status), body);
                 } else if (status == 200) {
-                    msg = "OpenRouter conectado";
+                    msg = "OpenRouter connected";
                 } else {
                     msg = "OpenRouter answered HTTP " + std::to_string(status) + " when validating the key";
                 }

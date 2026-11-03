@@ -812,8 +812,8 @@ int run_app(AppConfig cfg) {
 
     if (!cfg.demo && !cloud::signed_in(cfg.st)) {
         const char* why = cloud::server_known(cfg.st)
-                              ? "Entre na sua conta RealTimeAI pelo dashboard para usar o copiloto."
-                              : "Nenhum servidor RealTimeAI configurado: informe [servidor] url e entre pelo dashboard.";
+                              ? "Sign in to your RealTimeAI account in the dashboard to use the copilot."
+                              : "No RealTimeAI server configured: set [servidor] url and sign in from the dashboard.";
         log.line(std::string("Cloud: ") + why);
         if (out) {
             cfg.notes.push_back(why);
@@ -1404,13 +1404,13 @@ int run_app(AppConfig cfg) {
             if (warn_s < budget_s && wait_until(warn_s)) {
                 const std::int64_t left = budget_s - warn_s;
                 engine->notify(NoticeLevel::Warning,
-                               "Plano " + label + ": a sessão termina em " +
+                               label + " plan: the session ends in " +
                                    (left >= 60 ? std::to_string(left / 60) + " min." : std::to_string(left) + " s."));
             }
             if (wait_until(budget_s)) {
                 engine->notify(NoticeLevel::Warning,
-                               "Limite do plano " + label + " atingido: a sessão foi encerrada e salva." +
-                                   (label == "PRO" ? "" : " Assine o PRO para continuar."));
+                               label + " plan limit reached: the session was stopped and saved." +
+                                   (label == "PRO" ? "" : " Upgrade to PRO to continue."));
                 log.line("Plan limit reached: ending the session");
                 SetEvent(g_stop_event);
                 if (auto* o = g_overlay.load()) o->request_close();

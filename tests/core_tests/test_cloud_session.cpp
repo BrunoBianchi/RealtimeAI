@@ -99,7 +99,7 @@ TEST(CloudPlan, SessionBudgetUsesServerValuesCappedByMinutesLeft) {
 TEST(CloudPlan, NoMinutesLeftRefusesTheSessionAndOwnKeysNeedNoCredentials) {
     std::string err;
     EXPECT_FALSE(cloud::parse_session(R"({"session_id":"s","account":{"plan":"free","minutes_left":0}})", err, false));
-    EXPECT_NE(err.find("minutos"), std::string::npos);
+    EXPECT_NE(err.find("minutes"), std::string::npos);
     auto s = cloud::parse_session(R"({"session_id":"s","account":{"plan":"pro","minutes_left":120,"max_session_s":7200}})",
                                   err, /*require_credentials=*/false);
     ASSERT_TRUE(s) << err;

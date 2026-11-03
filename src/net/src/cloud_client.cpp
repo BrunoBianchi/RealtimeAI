@@ -27,12 +27,12 @@ std::int64_t unix_now_s() { return static_cast<std::int64_t>(std::time(nullptr))
 // pt-BR reason for the UI; the server's own message wins when it sent one.
 std::string status_text(DWORD status) {
     switch (status) {
-        case 401: return "sessão expirada: entre de novo na sua conta";
-        case 402: return "limite do plano atingido: assine o PRO para continuar";
-        case 403: return "conta sem acesso a este recurso";
-        case 426: return "versão do app muito antiga: atualize";
-        case 429: return "muitas requisições: tente de novo em instantes";
-        default:  return status >= 500 ? "servidor indisponível no momento" : "o servidor recusou a sessão";
+        case 401: return "session expired: sign in to your account again";
+        case 402: return "plan limit reached: upgrade to PRO to continue";
+        case 403: return "this account has no access to this feature";
+        case 426: return "app version too old: please update";
+        case 429: return "too many requests: try again in a moment";
+        default:  return status >= 500 ? "server unavailable right now" : "the server refused the session";
     }
 }
 
@@ -91,7 +91,7 @@ std::optional<cloud::Session> CloudClient::fetch(std::string& error, int* http_s
 std::optional<cloud::Session> CloudClient::fetch_locked_out(std::string& error, int* http_status) {
     if (http_status) *http_status = 0;
     if (!http_->ok) {
-        error = "endereço do servidor inválido: " + opts_.base_url;
+        error = "invalid server address: " + opts_.base_url;
         return std::nullopt;
     }
     DWORD status = 0;
@@ -99,7 +99,7 @@ std::optional<cloud::Session> CloudClient::fetch_locked_out(std::string& error, 
     const std::wstring path = win::widen(http_->prefix + "/v1/session");
     if (!post_json(http_->connection.get(), http_->secure, path, opts_.token,
                    cloud::build_session_request(opts_.request), status, body, error)) {
-        error = "sem conexão com o servidor (" + error + ")";
+        error = "no connection to the server (" + error + ")";
         return std::nullopt;
     }
     if (http_status) *http_status = static_cast<int>(status);
@@ -107,7 +107,7 @@ std::optional<cloud::Session> CloudClient::fetch_locked_out(std::string& error, 
     auto s = cloud::parse_session(body, parse_error, opts_.request.credentials);
     if (status != 200) {
         // Prefer the server's own explanation ({"error": "..."}) when present.
-        error = !parse_error.empty() && parse_error != "resposta do servidor inválida" ? parse_error
+        error = !parse_error.empty() && parse_error != "invalid server response" ? parse_error
                                                                                       : status_text(status);
         return std::nullopt;
     }

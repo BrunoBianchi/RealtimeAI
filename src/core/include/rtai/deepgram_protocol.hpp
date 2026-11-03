@@ -234,7 +234,7 @@ inline TranscriptResult parse_transcript(std::string_view json_text) {
 // Close-frame interpretation for logs/UI. Deepgram closes with 1011 on
 // timeouts (NET-0000/NET-0001) and 1008 on undecodable audio (DATA-0000).
 inline std::string describe_close(std::uint16_t code, std::string_view reason) {
-    std::string d = "fechado pelo servidor (" + std::to_string(code);
+    std::string d = "closed by the server (" + std::to_string(code);
     if (!reason.empty()) {
         d += " ";
         d += reason;

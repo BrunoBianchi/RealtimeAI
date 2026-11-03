@@ -333,7 +333,7 @@ void DeepgramStream::writer_loop() {
             }
             if (!fresh) {
                 connect_failures_.fetch_add(1);
-                const std::string why = res.error.empty() ? "falha ao conectar" : res.error;
+                const std::string why = res.error.empty() ? "connection failed" : res.error;
                 // HTTP 400 = a query parameter was rejected. Retry once with only
                 // the essential parameters before giving up for good.
                 if (!res.retryable && res.http_status == 400 && !minimal_params_) {
@@ -387,8 +387,8 @@ void DeepgramStream::writer_loop() {
             IWebSocket* raw = ws.get();
             reader_ = std::thread([this, raw] { reader_main(raw); });
             publish(LinkState::Connected,
-                    res.request_id.empty() ? std::string("conectado")
-                                           : "conectado (request " + res.request_id + ")",
+                    res.request_id.empty() ? std::string("connected")
+                                           : "connected (request " + res.request_id + ")",
                     res.http_status);
         }
 
@@ -491,7 +491,7 @@ void DeepgramStream::writer_loop() {
         dropped_samples_.fetch_add(queue_.audio_samples());
         queue_.clear();
     }
-    publish(LinkState::Closed, "encerrado");
+    publish(LinkState::Closed, "closed");
 }
 
 } // namespace rtai

@@ -1693,7 +1693,7 @@ inline LRESULT CALLBACK studio_wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM l
             if (id == kStSaveAgentBtn) {
                 sync_agent_from_ui(s);
                 if (s->current_agent.name.empty()) {
-                    s->current_agent.name = "Goal Personalizado";
+                    s->current_agent.name = "Custom goal";
                     s->current_agent.id = MiniAgentProfile::slugify(s->current_agent.name);
                 }
                 std::error_code ec;
