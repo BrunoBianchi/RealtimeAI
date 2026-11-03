@@ -12,7 +12,8 @@ Root (`package.json`):
 |---|---|
 | `npm run setup` | install root + dashboard deps |
 | `npm run dev` | run the dashboard from source (`apps/dashboard`, `npm start`) |
-| `npm run backend` | local RealTimeAI server (`backend/`, see its README). `npm run dev` starts it by itself when no server is configured (`local_backend.js`; `RTAI_LOCAL_BACKEND=0` turns it off) |
+| `npm run backend` | local RealTimeAI server (`backend/`, Go, run with Docker; see its README). `backend:docker` / `backend:docker:down` run it detached. `npm run dev` starts the container by itself when no server is configured (`local_backend.js`; `RTAI_LOCAL_BACKEND=0` turns it off) |
+| `npm run test:backend` / `lint:backend` | `go test` / `go vet` for `backend/` (`scripts/backend-go.mjs`: local Go, else the `golang` Docker image) |
 | `npm run build:native` | `cmake --preset windows-release` + build |
 | `npm run test:native` | `ctest --preset windows-release` |
 | `npm test` | script tests (`scripts/tests/*.test.mjs`) + backend tests + dashboard tests |
@@ -62,7 +63,7 @@ Both sides are defined in `src/core/include/rtai/server_protocol.hpp`; `apps/das
 - Plans (`plans.js` ↔ `cloud::PlanRules`): Free = one session of up to 15 min, once; PRO = 200 min/month. The server is authoritative (`402` → `needs = "upgrade"`); the engine's plan guard ends the session at the budget.
 - `[servidor]` (`modo` auto/nuvem/proprio, `url`, `regiao`, `token`): the engine makes one `POST /v1/session` at start (overlapped with set-up) and gets short-lived STT/LLM credentials; audio still goes straight to Deepgram. `modo = proprio` uses own keys but still needs the session grant (quota).
 - Engine: `cloud_session.hpp` (core, tested) + `CloudClient` (`src/net`); dashboard: `cloud_account.js` (sign-in, billing), `plans.js`, `renderer/auth.js`, and the `account`/`plan` settings tabs. Default server URL: CMake `RTAI_SERVER_URL` + `BUILTIN_SERVER_URL` (keep both in sync).
-- `backend/` — local implementation of this API (Node, no dependencies, `npm run backend`): accounts, device sign-in pages, plans, test billing, Deepgram grants, SSE LLM relay (mock without a key), dashboard AI relay, company research, Google Calendar token broker, community question bank. Keep it in step with `docs/server-api.md`.
+- `backend/` — git-ignored, kept only on the developer's machine (tests skip without it) — local implementation of this API (Go, stdlib `net/http` + `golang.org/x/crypto`/`x/text`, `cmd/server` + `internal/*`, distroless Docker image): accounts, device sign-in pages, plans, test billing, Deepgram grants, SSE LLM relay (mock without a key), dashboard AI relay, company research, Google Calendar token broker, community question bank. Keep it in step with `docs/server-api.md`. Security rules there: tokens and one-time links are stored as SHA-256 hashes, passwords as argon2id, browser forms go through `http.CrossOriginProtection`, pages use `html/template` with a nonce CSP, and research fetches go through `research.SafeGet` (public addresses only, checked at dial time).
 - Signed in, the dashboard's own AI calls go through `aiTarget()` in `main.js` (server relay; OpenRouter direct only in "My keys" mode with a key); research, Google token exchanges and question sharing use `cloudAccount.api()`. Don't add direct provider calls that need the user's keys.
 
 ### Dashboard (`apps/dashboard/`)

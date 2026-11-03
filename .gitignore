@@ -14,6 +14,9 @@ client_secret*.json
 *.p12
 *.key
 
+# ---- Local test server: kept on this machine, never pushed ----------------
+/backend/
+
 # ---- Native build (CMake) ---------------------------------------------------
 /build/
 /out/
