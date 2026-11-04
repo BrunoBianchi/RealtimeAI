@@ -45,7 +45,7 @@ test('Client-side Router: hash routes map to views', async () => {
   r.Cue.navigate('history');
   assert.strictEqual(r.S.ui.sessTab, 'past');
   assert.ok(/class="nav-item active"[^>]*data-to="history"/.test(r.page('sideNav').innerHTML));
-  assert.strictEqual(r.page('crumb').textContent, 'Histórico');
+  assert.strictEqual(r.page('crumb').textContent, 'History');
 });
 
 test('Prep Session & Goal Workspace Navigation: links go where they say', async () => {
@@ -54,7 +54,7 @@ test('Prep Session & Goal Workspace Navigation: links go where they say', async 
   const html = r.page('view').innerHTML;
   assert.ok(tags(html, { 'data-action': 'go', 'data-to': 'sessions' }).length >= 1, 'back to Sessões');
   assert.ok(tags(html, { 'data-action': 'go', 'data-to': `review/${SESSION_ID}` }).length === 1, 'recorded session opens its review');
-  assert.strictEqual(r.page('crumb').textContent, 'Sessões / Nubank · Backend');
+  assert.strictEqual(r.page('crumb').textContent, 'Sessions / Nubank · Backend');
 
   // Every internal link on every screen points at a route the router knows.
   const known = new Set(['home', 'sessions', 'history', 'session', 'review', 'files', 'questions', 'live', 'settings']);

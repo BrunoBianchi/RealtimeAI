@@ -1,5 +1,5 @@
-// Pure core: ILlmClient fake that streams a scripted answer token by token.
-// Used by the --demo mode (no network) and by the copilot engine tests.
+// Pure core — ILlmClient fake that streams a scripted answer token by token.
+// Test-only (tests/support): used by the copilot engine tests.
 #pragma once
 
 #include <atomic>

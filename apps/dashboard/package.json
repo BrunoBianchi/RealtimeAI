@@ -2,7 +2,7 @@
   "name": "realtimeai-dashboard",
   "version": "2.0.0",
   "private": true,
-  "description": "RealTimeAI: interview copilot dashboard, session manager and overlay control",
+  "description": "Cue: interview copilot dashboard, session manager and overlay control",
   "author": {
     "name": "Bruno Raiado Bianchi"
   },
@@ -16,6 +16,7 @@
     "dist:dir": "npm run build:css && electron-builder --win dir --x64 --publish never"
   },
   "dependencies": {
+    "driver.js": "1.10.2",
     "electron-updater": "^6.6.2",
     "pdf-parse": "^1.1.1"
   },

@@ -31,10 +31,10 @@ test('Clean Sidebar: brand, new session, navigation, next interviews, usage and 
   assert.ok(nav.includes('<span class="nav-count">2</span>'), 'active (non-archived) sessions are counted');
 
   const next = r.page('sidebarNext').innerHTML;
-  assert.ok(next.includes('A seguir') && next.includes('Nubank · Backend') && next.includes('15:00') && next.includes('em 2 dias'));
+  assert.ok(next.includes('Up next') && next.includes('Nubank · Backend') && next.includes('15:00') && next.includes('in 2 days'));
   assert.ok(!next.includes('Itaú'), 'archived sessions are not "up next"');
 
-  assert.strictEqual(r.page('engineStatusLabel').textContent, 'Pronto', 'both keys configured');
+  assert.strictEqual(r.page('engineStatusLabel').textContent, 'Ready', 'both keys configured');
 });
 
 test('Easy Goal Creation: the new-session wizard asks the essentials and creates the session', async () => {
@@ -51,7 +51,7 @@ test('Easy Goal Creation: the new-session wizard asks the essentials and creates
   });
   r.Cue.openModal('new-session');
   const step1 = r.modals.last;
-  assert.ok(step1.includes('Nova sessão') && step1.includes('Passo 1 / 2'));
+  assert.ok(step1.includes('New session') && step1.includes('Step 1 / 2'));
   for (const id of ['nsRole', 'nsCompany', 'nsDate', 'nsTime', 'nsJob']) assert.ok(step1.includes(`id="${id}"`), id);
   assert.ok(/id="nsRole"[^>]*autofocus/.test(step1), 'role field is focused first');
   assert.ok(tags(step1).filter((t) => t['data-ns-format']).length >= 4, 'interview formats');
@@ -62,8 +62,8 @@ test('Easy Goal Creation: the new-session wizard asks the essentials and creates
 
   // Nothing typed: the wizard refuses to continue.
   await clickOn('data-ns-next');
-  assert.ok(r.toasts().some((t) => t.error && t.text === 'Informe pelo menos o cargo ou a empresa.'));
-  assert.ok(box.innerHTML.includes('Passo 1 / 2'));
+  assert.ok(r.toasts().some((t) => t.error && t.text === 'Enter at least the role or the company.'));
+  assert.ok(box.innerHTML.includes('Step 1 / 2'));
 
   field('nsRole', 'Backend Engineer');
   field('nsCompany', 'nubank.com.br');
@@ -71,7 +71,7 @@ test('Easy Goal Creation: the new-session wizard asks the essentials and creates
   field('nsTime', '11:00');
   field('nsJob', 'Go e Kafka');
   await clickOn('data-ns-next');
-  assert.ok(box.innerHTML.includes('Passo 2 / 2') && box.innerHTML.includes('id="nsResearch"'));
+  assert.ok(box.innerHTML.includes('Step 2 / 2') && box.innerHTML.includes('id="nsResearch"'));
   box.querySelector('#nsResearch').checked = false;
   await clickOn('data-ns-next');
   await settle();

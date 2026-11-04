@@ -1,4 +1,4 @@
-// Pure core — IAudioCaptureSource backed by a WAV file, streamed at real-time
+// Test-only (tests/support) — IAudioCaptureSource backed by a WAV file, streamed at real-time
 // pace. Lets the whole pipeline run with no hardware. Supports PCM16 and
 // IEEE-float WAV; emits interleaved float to match the capture contract.
 #pragma once

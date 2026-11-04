@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <vector>
+
+#include "rtai/energy_vad.hpp"
 #include "rtai/vad_state_machine.hpp"
 
 using namespace rtai;
@@ -78,4 +82,14 @@ TEST(VadStateMachine, ScriptedSilenceSpeechSilence) {
     EXPECT_TRUE(ever_active);
     EXPECT_TRUE(closed);
     EXPECT_FALSE(sm.speech_active());
+}
+
+TEST(EnergyVadGate, LoudWindowIsSpeechQuietIsNot) {
+    EnergyVadGate gate{512, 0.05f};
+    std::vector<std::int16_t> quiet(512, 100);    // ~0.003 RMS
+    std::vector<std::int16_t> loud(512, 8000);    // ~0.24 RMS
+    EXPECT_EQ(gate.window_samples(), 512u);
+    EXPECT_LT(gate.process_window(quiet), 0.5f);
+    EXPECT_GT(gate.process_window(loud), 0.5f);
+    EXPECT_LT(gate.process_window({}), 0.5f);
 }

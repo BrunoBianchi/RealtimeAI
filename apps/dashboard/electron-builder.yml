@@ -3,7 +3,7 @@
 # locally: scripts/windows/package.bat). Updates come from this repository's
 # GitHub releases; CI points publish at vars.RELEASES_REPO when it is set.
 appId: com.raiado.realtimeai
-productName: RealTimeAI
+productName: Cue
 copyright: Copyright © 2026 Bruno Raiado Bianchi
 
 directories:
@@ -35,7 +35,7 @@ win:
     - target: nsis
       arch: [x64]
   icon: assets/icon.png
-  artifactName: RealTimeAI-Setup-${version}.${ext}
+  artifactName: Cue-Setup-${version}.${ext}
 
 nsis:
   oneClick: true

@@ -751,7 +751,7 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
         auto messages = build_action_messages(cfg.prompt, history, ai, thread);
         std::string question;
         if (in.reason == TriggerReason::Chat) question = ai.text;
-        else if (in.reason == TriggerReason::Screenshot) question = "[captura de tela] " + ai.text;
+        else if (in.reason == TriggerReason::Screenshot) question = "[screenshot] " + ai.text;
         start_request(std::move(shown), AudioSource::Microphone, in.reason, {}, std::move(messages),
                       !ai.image_url.empty(), std::move(question));
     }

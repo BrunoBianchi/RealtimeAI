@@ -37,6 +37,8 @@
     'check-circle': '<circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-5"/>',
     check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
     'text-align-left': '<path d="M4 6h16M4 10h10M4 14h16M4 18h10"/>',
+    cloud: '<path d="M7 18.5h10.5a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.6 9.1 4.75 4.75 0 0 0 7 18.5z"/>',
+    'arrows-clockwise': '<path d="M20 8a8 8 0 0 0-14.3-2.5L4 7.5"/><path d="M4 3.5v4h4"/><path d="M4 16a8 8 0 0 0 14.3 2.5l1.7-2"/><path d="M20 20.5v-4h-4"/>',
     sparkle: '<path d="M12 3.5 13.8 10l6.2 2-6.2 2L12 20.5 10.2 14 4 12l6.2-2z"/>',
     'file-text': '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
     file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',

@@ -51,7 +51,7 @@ const KNOWN_COMPANIES = [
  */
 function detectCompanyFromTranscript(transcriptText, fallbackName = '') {
   if (!transcriptText || typeof transcriptText !== 'string') {
-    const cleanFallback = (fallbackName || 'Empresa não identificada').trim();
+    const cleanFallback = (fallbackName || 'Unknown company').trim();
     return {
       name: cleanFallback,
       id: cleanFallback.toLowerCase().replace(/[^a-z0-9]/g, '') || 'company',
@@ -313,13 +313,13 @@ function categorizeQuestionWithJev(questionText) {
   // Opening, culture/motivation and past-experience questions come first:
   // they are the most common and were all falling into "Technical".
   if (/(fale (um pouco )?sobre (você|voce|sua trajetória)|sua trajetória|se apresent|tell me about yourself|walk me through your (background|resume))/iu.test(lower)) {
-    return { category: 'Opening', subCategory: 'Apresentação' };
+    return { category: 'Opening', subCategory: 'Introduction' };
   }
   if (/(cultura|valores|por que (você|voce) quer|por que (a|o) |o que (você|voce) (mais )?(quer|busca|espera)|motiva|se identifica|why (do you want|this company|us)|culture|values)/iu.test(lower)) {
-    return { category: 'Culture', subCategory: 'Cultura e motivação' };
+    return { category: 'Culture', subCategory: 'Culture and motivation' };
   }
   if (/(conte(-me)? (um pouco )?sobre (o |a |seu |sua )?(projeto|experiência|trabalho)|seu projeto|sua experiência|tell me about (your|the) (project|experience))/iu.test(lower)) {
-    return { category: 'Experience', subCategory: 'Projetos e experiência' };
+    return { category: 'Experience', subCategory: 'Projects and experience' };
   }
 
   // Behavioral (STAR) - check early so questions about conflicts/situations with architecture/code get prioritized
@@ -348,7 +348,7 @@ function categorizeQuestionWithJev(questionText) {
   }
 
   // Default fallback
-  return { category: 'General', subCategory: 'Geral' };
+  return { category: 'General', subCategory: 'General' };
 }
 
 /**
@@ -588,13 +588,13 @@ const QUESTION_BANK_VERSION = 3;
 // What JEV calls each kind of question -> the bank's category. "especifica"
 // (only makes sense for one candidate) and "nao_pergunta" are left out.
 const JEV_QUESTION_TYPES = {
-  pessoal: ['Behavioral', 'Pessoal e comportamental'],
-  cultura: ['Culture', 'Cultura e valores'],
-  motivacao: ['Culture', 'Motivação'],
-  abertura: ['Opening', 'Apresentação'],
-  tecnica: ['Technical', 'Técnica'],
-  dominio: ['Domain knowledge', 'Negócio e produto'],
-  salario: ['Salary', 'Salário e condições']
+  pessoal: ['Behavioral', 'Personal and behavioral'],
+  cultura: ['Culture', 'Culture and values'],
+  motivacao: ['Culture', 'Motivation'],
+  abertura: ['Opening', 'Introduction'],
+  tecnica: ['Technical', 'Technical'],
+  dominio: ['Domain knowledge', 'Business and product'],
+  salario: ['Salary', 'Salary and conditions']
 };
 
 // Applies JEV's verdicts ({ i, tipo, pergunta }) to the extracted questions.
@@ -875,6 +875,50 @@ async function ingestSessionQuestions(appDataDir, transcriptText, companyName = 
 }
 
 /**
+ * Adds questions other candidates reported for the same company (from the
+ * Cue server's community bank) to a company already in the local bank.
+ * questions: [{ text, category, subCategory, reports }]. Returns { added }.
+ */
+function mergeCommunityQuestions(appDataDir, companyName, questions) {
+  const name = String(companyName || '').trim().toLowerCase();
+  if (!name || !Array.isArray(questions) || !questions.length) return { added: 0 };
+  const bank = loadQuestionBank(appDataDir);
+  const company = bank.companies.find((c) => c.name.toLowerCase() === name || c.id === name);
+  if (!company) return { added: 0 };
+  const norm = (t) => String(t || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const ctx = { ...buildCandidateTerms(appDataDir), company: company.name };
+  let added = 0;
+  for (const q of questions) {
+    const text = String((q && q.text) || '').trim();
+    if (!text || MARKUP_RE.test(text) || !isGeneralistQuestion(text, ctx)) continue;
+    const reports = Math.max(1, Number(q.reports) || 1);
+    const existing = (company.questions || []).find((eq) => norm(eq.text) === norm(text));
+    if (existing) {
+      existing.interviewsCount = Math.max(existing.interviewsCount || 1, reports);
+      continue;
+    }
+    company.questions = company.questions || [];
+    company.questions.push({
+      id: `${company.id}-c-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      text,
+      category: q.category || 'Behavioral',
+      subCategory: q.subCategory || '',
+      classifiedBy: 'community',
+      interviewsCount: reports,
+      lastReported: q.last || 'Recently',
+      locked: false
+    });
+    company.questionsReported = company.questions.length;
+    added += 1;
+  }
+  if (added) {
+    bank.totalQuestions = bank.companies.reduce((sum, c) => sum + (c.questions ? c.questions.length : 0), 0);
+    saveQuestionBank(appDataDir, bank);
+  }
+  return { added };
+}
+
+/**
  * Rebuilds the bank from scratch out of real session transcripts.
  * entries: [{ text, company }] (text in any format extractQuestionsFromTranscript reads).
  */
@@ -918,6 +962,7 @@ function unlockCompany(appDataDir, companyId, previewOnly = true) {
 }
 
 module.exports = {
+  mergeCommunityQuestions,
   QUESTION_BANK_VERSION,
   JEV_QUESTION_TYPES,
   applyJevClassification,

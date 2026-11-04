@@ -55,7 +55,7 @@ test('Integrations & Options: meeting detection and Google Calendar have their o
   });
   const general = render(Cue, 'settings/general');
   assert.deepStrictEqual(tags(general, { 'data-change': 'meeting' }).map((t) => t['data-field']), ['enabled', 'keepInTray']);
-  assert.ok(general.includes('Observando Meet, Teams, Zoom, Discord, Slack e outros.'));
+  assert.ok(general.includes('Watching Meet, Teams, Zoom, Discord, Slack and others.'));
   const calendar = render(Cue, 'settings/calendar');
   assert.ok(tags(calendar, { 'data-action': 'gcal-connect' }).length === 1, 'configured client: Conectar');
 });
@@ -102,12 +102,17 @@ test('Integrations & Options: every setting the dashboard writes reads back the 
   const { main, restore } = loadMain();
   try {
     for (const key of keys) {
+      if (key === 'hotkeys') continue; // a map, checked below
       const canonical = ALIASES[key] || key;
       const before = main.readConfigIni()[canonical];
       const value = typeof before === 'boolean' ? !before : typeof before === 'number' ? before + 1 : `x-${key}`;
       main.writeConfigIni({ [key]: value });
       assert.strictEqual(String(main.readConfigIni()[canonical]), String(value), `${key} does not survive config.ini`);
     }
+    main.writeConfigIni({ hotkeys: { responder: 'F9', chat: 'nenhum', 'bad key': 'F1', resumo: 'Ctrl+K\nx=1' } });
+    assert.deepStrictEqual(main.readConfigIni().hotkeys, { responder: 'F9', chat: 'nenhum' });
+    main.writeConfigIni({ model: 'x-other' });
+    assert.deepStrictEqual(main.readConfigIni().hotkeys, { responder: 'F9', chat: 'nenhum' }, 'other saves keep the shortcuts');
   } finally {
     restore();
   }

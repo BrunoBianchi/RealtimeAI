@@ -23,9 +23,9 @@ test('General Settings: one auto-saving field per provider key, no save button',
   }
   // A saved key shows only its mask and can be removed; a missing one asks to paste.
   assert.strictEqual(fields[0].placeholder, '••••••••a1b2');
-  assert.strictEqual(fields[1].placeholder, 'Cole a chave');
+  assert.strictEqual(fields[1].placeholder, 'Paste the key');
   assert.deepStrictEqual(tags(html, { 'data-action': 'clear-key' }).map((b) => b['data-key']), ['deepgram_key']);
-  assert.ok(html.includes('● conectada') && html.includes('○ não definida'));
+  assert.ok(html.includes('● connected') && html.includes('○ not set'));
   assert.ok(!/>\s*Salvar\s*</.test(html), 'no save button: keys save on Enter or blur');
 });
 

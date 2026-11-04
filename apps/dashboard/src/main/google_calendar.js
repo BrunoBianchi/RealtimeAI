@@ -1,5 +1,5 @@
 'use strict';
-// Google Calendar for the RealTimeAI dashboard.
+// Google Calendar for the Cue dashboard.
 //
 // * OAuth 2.0 authorization code flow with PKCE and a loopback redirect: the
 //   system browser shows Google's consent page and a one-shot HTTP server on
@@ -180,9 +180,9 @@ function interviewEventBody(goal, settings, timeZone) {
   const who = [goal.role, goal.company].map((s) => String(s || '').trim()).filter(Boolean).join(' @ ');
   const lines = [];
   if (goal.name) lines.push(`Goal: ${goal.name}`);
-  lines.push('Prep and live copilot in RealTimeAI.');
+  lines.push('Prep and live copilot in Cue.');
   return eventBody({
-    summary: `Interview: ${who || goal.name || 'RealTimeAI'}`,
+    summary: `Interview: ${who || goal.name || 'Cue'}`,
     description: lines.join('\n'),
     date,
     time,
@@ -309,7 +309,7 @@ function startCallbackServer(redirect, expectedState) {
       else result = { code };
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(result.code
-        ? callbackPage(true, 'You can close this tab and go back to RealTimeAI.')
+        ? callbackPage(true, 'You can close this tab and go back to Cue.')
         : callbackPage(false, `${denialText(result.error)} You can close this tab.`));
       if (!outcome) {
         outcome = result;
@@ -318,7 +318,7 @@ function startCallbackServer(redirect, expectedState) {
     });
     server.on('error', (e) => {
       if (e && e.code === 'EADDRINUSE') {
-        reject(new GcalError('port', `Port ${redirect.port} is in use by another program, so Google cannot return to RealTimeAI. Close it and try again.`));
+        reject(new GcalError('port', `Port ${redirect.port} is in use by another program, so Google cannot return to Cue. Close it and try again.`));
       } else {
         reject(e);
       }
@@ -362,7 +362,7 @@ function apiErrorMessage(r, client) {
     return `Google Calendar API is not enabled for this Google Cloud project. Enable it at https://console.cloud.google.com/apis/library/calendar-json.googleapis.com${project} and try again.`;
   }
   if (r.status === 403 && reasons.includes('insufficientPermissions')) {
-    return 'RealTimeAI does not have calendar access. Disconnect, connect again and allow the calendar permissions.';
+    return 'Cue does not have calendar access. Disconnect, connect again and allow the calendar permissions.';
   }
   if (r.status === 404) return 'Calendar or event not found.';
   if (r.status === 429 || reasons.includes('rateLimitExceeded')) return 'Google Calendar is busy right now. Try again in a minute.';
@@ -379,6 +379,10 @@ function createGoogleCalendar(opts = {}) {
   const timeZone = opts.timeZone || defaultTimeZone();
   const connectTimeoutMs = opts.connectTimeoutMs || CONNECT_TIMEOUT_MS;
   const store = tokenStore(dataDir, opts.safeStorage || null);
+  // opts.broker: the Cue server holds the OAuth client. client() gives
+  // its public client id (or null); token(params) does the code/refresh
+  // exchange there, so no client secret is needed on this machine.
+  const broker = opts.broker || null;
   let lastError = '';
   let connecting = null;
 
@@ -398,6 +402,10 @@ function createGoogleCalendar(opts = {}) {
         const c = parseClientJson(fs.readFileSync(file, 'utf8'));
         if (c) return { ...c, source: file };
       } catch (_e) {}
+    }
+    const b = broker && broker.client();
+    if (b && b.client_id) {
+      return { type: 'installed', clientId: String(b.client_id), clientSecret: '', redirectUris: [], projectId: '', source: 'Cue server', brokered: true };
     }
     return null;
   }
@@ -434,6 +442,7 @@ function createGoogleCalendar(opts = {}) {
       configured: Boolean(client),
       clientType: client ? client.type : '',
       clientSource: client ? client.source : '',
+      brokered: Boolean(client && client.brokered),
       projectId: client ? client.projectId : '',
       redirectUri: client && client.type === 'web' ? redirect.uri : '',
       connected: Boolean(tok && tok.refresh_token),
@@ -480,7 +489,12 @@ function createGoogleCalendar(opts = {}) {
     }
   }
 
-  function tokenRequest(client, params) {
+  async function tokenRequest(client, params) {
+    if (client.brokered) {
+      const r = await broker.token(params);
+      if (r.status === 0) throw new GcalError('network', 'Could not reach the Cue server.');
+      return { status: r.status, ok: r.ok, body: r.data };
+    }
     const form = new URLSearchParams({ client_id: client.clientId, ...params });
     if (client.clientSecret) form.set('client_secret', client.clientSecret);
     return httpJson(TOKEN_ENDPOINT, {
@@ -571,7 +585,7 @@ function createGoogleCalendar(opts = {}) {
         }
         const refresh = r.body.refresh_token || (old && old.refresh_token) || '';
         if (!refresh) {
-          throw new GcalError('token', 'Google did not return offline access. Remove RealTimeAI at https://myaccount.google.com/permissions and connect again.');
+          throw new GcalError('token', 'Google did not return offline access. Remove Cue at https://myaccount.google.com/permissions and connect again.');
         }
         const tok = {
           refresh_token: refresh,

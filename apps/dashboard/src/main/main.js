@@ -17,6 +17,19 @@ const { MeetingDetector, APP_NAMES } = require('./meeting_detector');
 const { createMeetingPopup } = require('./meeting_popup');
 const { createFlagStore } = require('./feature_flags');
 const { createUpdater } = require('./updater');
+const { createCloudSync } = require('./cloud_sync');
+const { createCloudAccount, effectiveServerUrl } = require('./cloud_account');
+const { normalizeUiLanguage, resolveUiLocale, systemLanguages, SUPPORTED: UI_LOCALES } = require('./ui_locale');
+const I18n = require('../renderer/i18n.js');
+require('../renderer/locales/pt-BR.js');
+
+// Interface text shown by the main process itself; same catalogs as the renderer.
+function tm(text, vars) {
+  I18n.locale = resolveUiLocale(readConfigIni().ui_language, systemLanguages(app));
+  return I18n.t(text, vars);
+}
+const localBackend = require('./local_backend');
+const { settingsSectionFromArgv } = require('./launch_args');
 const jevEngine = require('./jev_engine');
 const companyLogoService = require('./company_logo_service');
 
@@ -38,12 +51,23 @@ let updater = null;
 
 // One dashboard at a time: it lives in the tray and watches for meetings, so a
 // second launch just brings the first one forward.
-const gotSingleInstanceLock = process.argv.includes('--capture-screenshots') ||
+// Windows shows this ID as the name on notifications, so it is the app's name.
+// The packaged app also keeps the profile it had before its rename, so sign-ins
+// and preferences survive.
+if (typeof app.setAppUserModelId === 'function') app.setAppUserModelId('Cue');
+if (app.isPackaged) app.setPath('userData', path.join(app.getPath('appData'), 'RealTimeAI'));
+
+const gotSingleInstanceLock =
   typeof app.requestSingleInstanceLock !== 'function' || app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
   app.quit();
 } else {
-  app.on('second-instance', () => {
+  app.on('second-instance', (_event, argv) => {
+    const section = settingsSectionFromArgv(argv);
+    if (section) {
+      showSettingsWindow(section);
+      return;
+    }
     if (!app.isPackaged && mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.reloadIgnoringCache();
     }
@@ -98,15 +122,33 @@ function getAppDataDir() {
 }
 
 // Google Calendar (see google_calendar.js). The OAuth client file is looked up
-// in the app data folder, next to this file and in the project folder.
+// in the app data folder, next to this file and in the project folder; without
+// one, a signed-in app uses the Cue server's client (it does the token
+// exchanges, so the client secret stays on the server).
 let googleCalendar = null;
+let googleBroker = { client: null, at: 0 };
+async function refreshGoogleBroker(force = false) {
+  if (!isSignedIn()) {
+    googleBroker = { client: null, at: 0 };
+    return null;
+  }
+  if (!force && googleBroker.at && Date.now() - googleBroker.at < 5 * 60 * 1000) return googleBroker.client;
+  const r = await cloudAccount.api('GET', '/v1/integrations/google');
+  if (r.ok && r.data && r.data.client_id) googleBroker = { client: r.data, at: Date.now() };
+  else if (r.status !== 0) googleBroker = { client: null, at: Date.now() }; // keep the last one on network errors
+  return googleBroker.client;
+}
 function getGoogleCalendar() {
   if (!googleCalendar) {
     googleCalendar = createGoogleCalendar({
       dataDir: getAppDataDir(),
       searchDirs: [APP_ROOT, REPO_ROOT],
       safeStorage,
-      openExternal: (url) => shell.openExternal(url)
+      openExternal: (url) => shell.openExternal(url),
+      broker: {
+        client: () => (isSignedIn() ? googleBroker.client : null),
+        token: (params) => cloudAccount.api('POST', '/v1/integrations/google/token', params, { timeoutMs: 15000 })
+      }
     });
   }
   return googleCalendar;
@@ -116,6 +158,7 @@ function getGoogleCalendar() {
 // { ok: false, error, code } (never throws across IPC).
 async function gcalCall(fn) {
   try {
+    await refreshGoogleBroker();
     const result = await fn(getGoogleCalendar());
     return { ok: true, result };
   } catch (e) {
@@ -192,6 +235,7 @@ function readConfigIni() {
   const agenda = ini.agenda || {};
   const stealth = ini.stealth || {};
   const sistema = ini.sistema || ini.updates || {};
+  const servidor = ini.servidor || {};
 
   // A key is never sent to the renderer in full: a plaintext one (an env var,
   // or one the engine has not encrypted yet) would show up as the field's
@@ -255,6 +299,7 @@ function readConfigIni() {
     energy_threshold: parseFloat(audio.limiar_energia || '0.015'),
     save_sessions: (sessao.salvar ?? 'sim') !== 'nao' && (sessao.salvar ?? 'sim') !== 'false',
     last_agent: sessao.ultimo_agente || '',
+    hotkeys: { ...(ini.atalhos || {}) },
     overlay_width: parseInt(overlay.largura || '620', 10),
     overlay_max_height_pct: parseInt(overlay.altura_max_pct || '92', 10),
     stealth_dock: (stealth.invisivel_barra_tarefas ?? stealth.dock ?? stealth.taskbar ?? 'sim') !== 'nao' &&
@@ -277,13 +322,80 @@ function readConfigIni() {
     auto_update: (sistema.auto_update ?? sistema.atualizacao_automatica ?? 'sim') !== 'nao' &&
                  (sistema.auto_update ?? sistema.atualizacao_automatica ?? 'sim') !== 'false',
     update_channel: (sistema.update_channel || sistema.canal || 'stable') === 'beta' ? 'beta' : 'stable',
+    // Interface language: auto = follow Windows (see ui_locale.js), or a locale.
+    ui_language: normalizeUiLanguage(sistema.idioma_interface || sistema.ui_language || 'auto'),
     process_disguise: stealth.process_disguise || (stealth.electron_disguise === 'sim' ? 'settings' : 'none'),
     interface_opacity: parseFloat(stealth.interface_opacity || stealth.electron_opacity || '1.0'),
     share_anonymized_questions: (stealth.share_anonymized_questions ?? stealth.contribuir_perguntas ?? 'sim') !== 'nao' &&
                                 (stealth.share_anonymized_questions ?? stealth.contribuir_perguntas ?? 'sim') !== 'false',
     calendar_ics_url: agenda.google_ics_url || '',
-    calendar_oauth_token: agenda.google_oauth_token || ''
+    calendar_oauth_token: agenda.google_oauth_token || '',
+    // Cue cloud ([servidor]): auto = our servers when signed in,
+    // nuvem = always, proprio = only the user's own keys (open-source mode).
+    // Stored as written; the engine validates it (unknown values act as auto).
+    server_mode: servidor.modo || 'auto',
+    server_url: servidor.url || '',
+    server_region: servidor.regiao || 'auto',
+    server_url_effective: effectiveServerUrl(servidor.url || ''),
+    has_server_token: Boolean(servidor.token || process.env.RTAI_SERVER_TOKEN),
+    server_token_display: maskKey(servidor.token || '')
   };
+}
+
+// Signed in to a Cue account (mirrors cloud::signed_in). The whole app
+// is gated on it: the renderer shows only the sign-in screen and nothing
+// starts the copilot without it.
+function isSignedIn(cfg) {
+  const c = cfg || readConfigIni();
+  return Boolean(c.has_server_token) && Boolean(c.server_url_effective);
+}
+
+// Local mode ([servidor] modo = local, mirrors cloud::local_mode): no
+// account and no server, only the user's own keys. The app is usable, with
+// the PRO features (cloud backup, sync, Google Calendar) shown as ads.
+function isLocalMode(cfg) {
+  const c = cfg || readConfigIni();
+  return ['local', 'offline'].includes(String(c.server_mode || '').trim().toLowerCase());
+}
+
+// The app is unlocked when signed in or in local mode.
+function canUseApp(cfg) {
+  const c = cfg || readConfigIni();
+  return isSignedIn(c) || isLocalMode(c);
+}
+
+// Signed in and using the server credentials (mirrors cloud::choose_backend).
+function cloudBackendActive(cfg) {
+  const c = cfg || readConfigIni();
+  return c.server_mode !== 'proprio' && !isLocalMode(c) && isSignedIn(c);
+}
+
+const LOGIN_REQUIRED = { ok: false, needsLogin: true, error: 'Sign in to your Cue account, or continue locally with your own API keys.' };
+
+function hasOwnAiKey(c) {
+  return Boolean(c.has_llm_key || c.has_cerebras_key || c.has_groq_key || c.has_openai_key || c.has_anthropic_key || c.has_gemini_key);
+}
+
+// Before a live start: signed in, keys present when using own keys, and the
+// plan still has minutes (the engine asks the server again: this is only so
+// the user gets the reason right away instead of a failed start).
+async function checkCanStartLive() {
+  const cfg = readConfigIni();
+  if (isLocalMode(cfg)) {
+    if (!cfg.has_deepgram_key) return { ok: false, needsKeys: true, error: 'Local mode: add your Deepgram key in AI and models.' };
+    if (!hasOwnAiKey(cfg)) return { ok: false, needsKeys: true, error: 'Local mode: add an AI key (OpenRouter, Cerebras…) in AI and models.' };
+    return { ok: true };
+  }
+  if (!isSignedIn(cfg)) return LOGIN_REQUIRED;
+  if (!cloudBackendActive(cfg) && !cfg.has_deepgram_key) {
+    return { ok: false, error: '"My keys" mode: set the Deepgram key or switch back to the Cue servers.' };
+  }
+  const st = await cloudAccount.status(false);
+  if (st && st.expired) return LOGIN_REQUIRED;
+  if (st && st.entitlement && !st.entitlement.canStart) {
+    return { ok: false, needsUpgrade: true, error: st.entitlement.reason };
+  }
+  return { ok: true };
 }
 
 function writeConfigIni(updates) {
@@ -346,14 +458,19 @@ function writeConfigIni(updates) {
   const electronOpacity = String(updates.electron_opacity ?? current.electron_opacity ?? '1.0');
   const autoUpdate = (updates.auto_update ?? current.auto_update) ? 'sim' : 'nao';
   const updateChannel = (updates.update_channel ?? current.update_channel) === 'beta' ? 'beta' : 'stable';
+  const uiLanguage = normalizeUiLanguage(updates.ui_language ?? current.ui_language ?? 'auto');
   const processDisguise = updates.process_disguise ?? current.process_disguise ?? 'none';
   const interfaceOpacity = String(updates.interface_opacity ?? current.interface_opacity ?? '1.0');
   const shareAnonymizedQuestions = (updates.share_anonymized_questions ?? current.share_anonymized_questions) ? 'sim' : 'nao';
   const calendarIcsUrl = updates.calendar_ics_url ?? current.calendar_ics_url;
   const calendarOauth = updates.calendar_oauth_token ?? current.calendar_oauth_token;
+  const serverMode = String(updates.server_mode ?? current.server_mode ?? 'auto').trim() || 'auto';
+  const serverUrl = String(updates.server_url ?? current.server_url ?? '').trim();
+  const serverRegion = String(updates.server_region ?? current.server_region ?? 'auto').trim() || 'auto';
+  const serverToken = updates.server_token !== undefined ? pickKey(updates.server_token, raw.servidor?.token) : (raw.servidor?.token || '');
 
   const managedLines = [
-    '# RealTimeAI settings (shared by the dashboard and the overlay HUD)',
+    '# Cue settings (shared by the dashboard and the overlay HUD)',
     '# Plain-text keys are encrypted automatically with Windows DPAPI by the overlay.',
     '',
     '[deepgram]',
@@ -416,6 +533,11 @@ function writeConfigIni(updates) {
     `largura = ${overlayWidth}`,
     `altura_max_pct = ${overlayMaxHeightPct}`,
     '',
+    '[atalhos]',
+    ...Object.entries(updates.hotkeys && typeof updates.hotkeys === 'object' ? updates.hotkeys : current.hotkeys || {})
+      .filter(([k, v]) => /^[a-z0-9_]+$/.test(k) && /^[\w+]+$/.test(String(v)))
+      .map(([k, v]) => `${k} = ${v}`),
+    '',
     '[stealth]',
     `invisivel_barra_tarefas = ${stealthDock}`,
     `dock = ${stealthDock}`,
@@ -438,10 +560,17 @@ function writeConfigIni(updates) {
     '[sistema]',
     `auto_update = ${autoUpdate}`,
     `update_channel = ${updateChannel}`,
+    `idioma_interface = ${uiLanguage}`,
     '',
     '[agenda]',
     `google_ics_url = ${calendarIcsUrl}`,
     `google_oauth_token = ${calendarOauth}`,
+    '',
+    '[servidor]',
+    `modo = ${serverMode}`,
+    `url = ${serverUrl}`,
+    `regiao = ${serverRegion}`,
+    `token = ${serverToken}`,
     ''
   ];
   // Keep everything the dashboard does not manage (set by the overlay's own
@@ -486,6 +615,88 @@ function writeConfigIni(updates) {
   return readConfigIni();
 }
 
+// The engine encrypts plaintext secrets in config.ini with DPAPI; run it
+// right after a sign-in so the device token is never left readable on disk.
+function protectConfigSecrets() {
+  const exe = getOverlayExecutablePath();
+  if (!exe || !fs.existsSync(exe)) return; // the next overlay start does it
+  try {
+    execFile(exe, ['--protect-keys'], { windowsHide: true, timeout: 15000 }, () => {});
+  } catch (_e) { /* best effort */ }
+}
+
+// The dashboard keeps its own copy of the device token (Electron safeStorage)
+// for account calls (/v1/me, logout): once the engine seals config.ini with
+// DPAPI, Node can no longer read it back from there.
+function cloudTokenPath() {
+  return path.join(getAppDataDir(), 'cloud_token.bin');
+}
+
+function readCloudToken() {
+  try {
+    const p = cloudTokenPath();
+    if (fs.existsSync(p) && safeStorage && safeStorage.isEncryptionAvailable()) {
+      return safeStorage.decryptString(fs.readFileSync(p));
+    }
+  } catch (_e) { /* fall through */ }
+  const t = (readConfigIni().rawIni.servidor || {}).token || process.env.RTAI_SERVER_TOKEN || '';
+  return t.startsWith('dpapi:') ? '' : t;
+}
+
+function saveCloudToken(token) {
+  // Signing in leaves local mode: the account's plan takes over.
+  const leaveLocal = token && isLocalMode() ? { server_mode: 'auto' } : {};
+  writeConfigIni({ server_token: token || '__CLEAR__', ...leaveLocal });
+  try {
+    if (!token) fs.rmSync(cloudTokenPath(), { force: true });
+    else if (safeStorage && safeStorage.isEncryptionAvailable()) fs.writeFileSync(cloudTokenPath(), safeStorage.encryptString(token));
+  } catch (_e) { /* the engine copy is the one that matters */ }
+  if (token) protectConfigSecrets();
+}
+
+const cloudAccount = createCloudAccount({
+  getServerUrl: () => readConfigIni().server_url,
+  hasToken: () => readConfigIni().has_server_token,
+  readToken: readCloudToken,
+  saveToken: saveCloudToken,
+  openBrowser: (url) => {
+    if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+  },
+  emit: (e) => {
+    // A sign-in rewrote config.ini: hand the renderer the fresh config.
+    const payload = e.type === 'signed_in' ? { ...e, config: readConfigIni() } : e;
+    if (e.type === 'signed_in') scheduleCloudSync();
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('rtai:cloud-event', payload);
+  },
+  appVersion: typeof app.getVersion === 'function' ? app.getVersion() : ''
+});
+
+// Sessions, history and the question bank follow the account (cloud_sync.js).
+const cloudSync = createCloudSync({
+  dataDir: () => getAppDataDir(),
+  client: () => cloudAccount.syncClient,
+  owner: async () => {
+    if (!isSignedIn()) return '';
+    const r = await cloudAccount.api('GET', '/v1/me');
+    return r.ok && r.data ? String(r.data.email || '') : '';
+  },
+  busy: () => isOverlayRunning() // a live session is still writing its files
+});
+async function runCloudSync() {
+  const res = await cloudSync.syncNow();
+  if (res && (res.downloaded || res.removed) && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('rtai:cloud-synced', res);
+  }
+  return res;
+}
+let cloudSyncTimer = null;
+function scheduleCloudSync() {
+  clearTimeout(cloudSyncTimer);
+  cloudSyncTimer = setTimeout(() => {
+    if (isSignedIn()) runCloudSync().catch((err) => console.warn('[cloud-sync]', err));
+  }, 3000);
+}
+
 // ---------------------------------------------------------------------------
 // DPAPI Key Unprotector & Lightweight OpenRouter Qwen 3.6 Flash Client
 // ---------------------------------------------------------------------------
@@ -527,9 +738,50 @@ function getOpenRouterApiKey() {
   return unprotectSecret(rawKey);
 }
 
+// Where the dashboard's own AI calls go (compaction, JEV, dossier, OCR):
+// the Cue server when signed in, so no key is needed, or OpenRouter
+// with the user's key in "My keys" mode. null when neither is available.
+const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
+function aiTarget(title = 'Cue Studio') {
+  const cfg = readConfigIni();
+  const ownKey = getOpenRouterApiKey();
+  const direct = ownKey
+    ? { url: OPENROUTER_CHAT_URL, headers: { Authorization: `Bearer ${ownKey}`, 'HTTP-Referer': 'https://realtimeai.local', 'X-Title': title } }
+    : null;
+  if (isLocalMode(cfg)) return direct; // never the server in local mode
+  if (cfg.server_mode === 'proprio' && direct) return direct;
+  return (isSignedIn(cfg) && cloudAccount.aiEndpoint()) || direct;
+}
+
+// POST to an aiTarget(); resolves { status, body } ('' body on failure).
+function aiPost(target, payload, timeoutMs) {
+  return new Promise((resolve) => {
+    const lib = target.url.startsWith('http:') ? http : https;
+    const req = lib.request(
+      target.url,
+      {
+        method: 'POST',
+        headers: { ...target.headers, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload, 'utf8') },
+        timeout: timeoutMs
+      },
+      (res) => {
+        const chunks = [];
+        res.on('data', (c) => chunks.push(c));
+        res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString('utf8') }));
+      }
+    );
+    req.on('error', (e) => resolve({ status: 0, body: '', error: e.message }));
+    req.on('timeout', () => {
+      req.destroy();
+      resolve({ status: 0, body: '', error: 'timeout' });
+    });
+    req.end(payload);
+  });
+}
+
 function callOpenRouterSol61(messagesOrSystem, userOrMaxTokens = 1800, maybeMaxTokens = 1800) {
-  const apiKey = getOpenRouterApiKey();
-  if (!apiKey) return Promise.resolve('');
+  const target = aiTarget('Cue Studio');
+  if (!target) return Promise.resolve('');
 
   let messages;
   let maxTokens = 1800;
@@ -556,42 +808,12 @@ function callOpenRouterSol61(messagesOrSystem, userOrMaxTokens = 1800, maybeMaxT
     }
   });
 
-  return new Promise((resolve) => {
-    const req = https.request(
-      'https://openrouter.ai/api/v1/chat/completions',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(payload, 'utf8'),
-          'HTTP-Referer': 'https://realtimeai.local',
-          'X-Title': 'RealTimeAI Studio'
-        },
-        timeout: 18000
-      },
-      (res) => {
-        const chunks = [];
-        res.on('data', (c) => chunks.push(c));
-        res.on('end', () => {
-          try {
-            const body = Buffer.concat(chunks).toString('utf8');
-            const parsed = JSON.parse(body);
-            const content = parsed?.choices?.[0]?.message?.content || '';
-            resolve(String(content).trim());
-          } catch (_e) {
-            resolve('');
-          }
-        });
-      }
-    );
-    req.on('error', () => resolve(''));
-    req.on('timeout', () => {
-      req.destroy();
-      resolve('');
-    });
-    req.write(payload);
-    req.end();
+  return aiPost(target, payload, 18000).then((r) => {
+    try {
+      return String(JSON.parse(r.body)?.choices?.[0]?.message?.content || '').trim();
+    } catch (_e) {
+      return '';
+    }
   });
 }
 
@@ -833,6 +1055,34 @@ function healAgentStrings(ag) {
   }
   return changed;
 }
+// Older versions created an empty "My first goal" on first launch. Removed
+// unless the user filled it in or recorded a session with it.
+const STARTER_GOAL_ID = 'my-first-goal';
+function removeUntouchedStarterGoal() {
+  const filePath = path.join(getAppDataDir(), 'agents', `${STARTER_GOAL_ID}.json`);
+  if (!fs.existsSync(filePath)) return false;
+  let g;
+  try {
+    g = JSON.parse(fs.readFileSync(filePath, 'utf8').replace(/^﻿/, ''));
+  } catch (_e) {
+    return false;
+  }
+  const filled = ['company', 'role', 'job_description', 'company_research', 'interview_date', 'mini_compact']
+    .some((k) => String(g[k] || '').trim()) || (g.documents || []).length > 0;
+  if (filled) return false;
+  const sessionsDir = path.join(getAppDataDir(), 'sessions');
+  const used = fs.existsSync(sessionsDir) && fs.readdirSync(sessionsDir).some((f) => {
+    try {
+      return /.(jsonl|md)$/.test(f) && fs.readFileSync(path.join(sessionsDir, f), 'utf8').includes(STARTER_GOAL_ID);
+    } catch (_e) {
+      return false;
+    }
+  });
+  if (used) return false;
+  fs.unlinkSync(filePath);
+  return true;
+}
+
 function loadAllAgents() {
   const agentsDir = path.join(getAppDataDir(), 'agents');
   const files = fs.readdirSync(agentsDir).filter((f) => f.endsWith('.json'));
@@ -1046,8 +1296,8 @@ function scheduleInterviewNotification(goal) {
         const { Notification } = require('electron');
         if (Notification.isSupported()) {
           new Notification({
-            title: `Interview in 1 hour: ${goal.name}`,
-            body: `Your interview with ${goal.company || goal.name} starts at ${ni.time}. Open RealTimeAI to review the Prep tab.`
+            title: tm('Interview in 1 hour: {name}', { name: goal.name }),
+            body: `Your interview with ${goal.company || goal.name} starts at ${ni.time}. Open Cue to review the Prep tab.`
           }).show();
         }
       }, delayMs);
@@ -1179,8 +1429,8 @@ function jevPairs(events) {
 }
 
 function callOpenRouterJson(messages, maxTokens, timeoutMs) {
-  const apiKey = getOpenRouterApiKey();
-  if (!apiKey) return Promise.resolve({ ok: false, error: 'Configure a chave do OpenRouter para usar a avaliação JEV.' });
+  const target = aiTarget('Cue JEV');
+  if (!target) return Promise.resolve({ ok: false, error: 'Sign in to your Cue account (or set the OpenRouter key) to use the JEV evaluation.' });
   const payload = JSON.stringify({
     model: SOL_ANALYSIS_MODEL,
     messages,
@@ -1191,48 +1441,22 @@ function callOpenRouterJson(messages, maxTokens, timeoutMs) {
     // The judge needs no chain of thought; reasoning tokens would eat max_tokens.
     reasoning: { enabled: false }
   });
-  return new Promise((resolve) => {
-    const req = https.request(
-      'https://openrouter.ai/api/v1/chat/completions',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(payload, 'utf8'),
-          'HTTP-Referer': 'https://realtimeai.local',
-          'X-Title': 'RealTimeAI JEV'
-        },
-        timeout: timeoutMs || 60000
-      },
-      (res) => {
-        const chunks = [];
-        res.on('data', (c) => chunks.push(c));
-        res.on('end', () => {
-          try {
-            const parsed = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-            if (parsed.error) return resolve({ ok: false, error: parsed.error.message || 'Erro do provedor.' });
-            const choice = parsed?.choices?.[0] || {};
-            const content = String(choice.message?.content || '');
-            const match = content.match(/\{[\s\S]*\}/);
-            if (!match) {
-              console.warn('[jev] no JSON', choice.finish_reason, content.slice(0, 300));
-              return resolve({ ok: false, error: `Resposta do avaliador sem JSON (${choice.finish_reason || 'vazia'}).` });
-            }
-            resolve({ ok: true, json: JSON.parse(match[0]) });
-          } catch (e) {
-            resolve({ ok: false, error: `Resposta inválida do avaliador: ${e.message}` });
-          }
-        });
+  return aiPost(target, payload, timeoutMs || 60000).then((r) => {
+    if (r.error) return { ok: false, error: r.error === 'timeout' ? 'The evaluator took too long to answer.' : r.error };
+    try {
+      const parsed = JSON.parse(r.body);
+      if (parsed.error) return { ok: false, error: parsed.error.message || 'Provider error.' };
+      const choice = parsed?.choices?.[0] || {};
+      const content = String(choice.message?.content || '');
+      const match = content.match(/\{[\s\S]*\}/);
+      if (!match) {
+        console.warn('[jev] no JSON', choice.finish_reason, content.slice(0, 300));
+        return { ok: false, error: `Evaluator answer without JSON (${choice.finish_reason || 'empty'}).` };
       }
-    );
-    req.on('error', (e) => resolve({ ok: false, error: e.message }));
-    req.on('timeout', () => {
-      req.destroy();
-      resolve({ ok: false, error: 'O avaliador demorou demais para responder.' });
-    });
-    req.write(payload);
-    req.end();
+      return { ok: true, json: JSON.parse(match[0]) };
+    } catch (e) {
+      return { ok: false, error: `Invalid evaluator answer: ${e.message}` };
+    }
   });
 }
 
@@ -1265,11 +1489,11 @@ const JEV_SYSTEM = `Você é o JEV, avaliador de entrevistas. Avalie a RESPOSTA 
 - evidencias: exemplos concretos, números e fatos coerentes com o currículo; penalize fatos inventados.
 - objetividade: vai direto ao ponto, sem rodeios nem repetição.
 A transcrição vem de reconhecimento de voz e pode ter erros de palavra; não penalize isso.
-Responda SOMENTE JSON em português do Brasil.`;
+Responda SOMENTE JSON e escreva todos os textos do JSON em inglês.`;
 
 async function evaluateSessionWithJev({ sessionId, agentId, force }) {
   const { id, events } = readSessionEvents(sessionId);
-  if (!events.length) return { ok: false, error: 'Esta sessão não tem registro de eventos para avaliar.' };
+  if (!events.length) return { ok: false, error: 'This session has no event log to evaluate.' };
   const cachePath = path.join(getAppDataDir(), 'sessions', `${id}.jev.json`);
   if (!force && fs.existsSync(cachePath)) {
     try {
@@ -1279,7 +1503,7 @@ async function evaluateSessionWithJev({ sessionId, agentId, force }) {
   }
   const pairs = jevPairs(events);
   if (!pairs.length) {
-    return { ok: false, error: 'Nenhuma pergunta com resposta falada foi encontrada: o JEV avalia o que você disse no microfone depois de cada pergunta (do entrevistador, do chat ou do banco de perguntas).' };
+    return { ok: false, error: 'No question with a spoken answer was found: JEV evaluates what you said on the microphone after each question (from the interviewer, the chat or the question bank).' };
   }
 
   const agent = agentId ? loadAllAgents().find((a) => a.id === agentId) : null;
@@ -1335,7 +1559,7 @@ async function evaluateSessionWithJev({ sessionId, agentId, force }) {
     }
   }
   items.sort((a, b) => a.index - b.index);
-  if (!items.length) return { ok: false, error: (failed && failed.error) || 'O avaliador não devolveu notas.' };
+  if (!items.length) return { ok: false, error: (failed && failed.error) || 'The evaluator returned no scores.' };
 
   const criteria = {};
   for (const c of JEV_CRITERIA) {
@@ -1347,7 +1571,7 @@ async function evaluateSessionWithJev({ sessionId, agentId, force }) {
 
   const synth = await callOpenRouterJson(
     [
-      { role: 'system', content: 'Você é o JEV e escreve o feedback final para o candidato sobre o desempenho dele na entrevista, com base nas avaliações por pergunta. Fale do candidato (em segunda pessoa), não das notas nem da avaliação. Responda SOMENTE JSON em português do Brasil.' },
+      { role: 'system', content: 'Você é o JEV e escreve o feedback final para o candidato sobre o desempenho dele na entrevista, com base nas avaliações por pergunta. Fale do candidato (em segunda pessoa), não das notas nem da avaliação. Responda SOMENTE JSON e escreva todos os textos do JSON em inglês.' },
       {
         role: 'user',
         content: `Empresa: ${companyName || '(desconhecida)'}. Médias (0-100): ${JSON.stringify(criteria)}.\nAvaliações por pergunta:\n${items
@@ -1399,7 +1623,7 @@ Se a pergunta cita um projeto, empresa ou resposta do candidato mas tem uma vers
 "pergunta": a pergunta clara, completa e genérica, sem nomes do candidato, no idioma original. Responda SOMENTE JSON.`;
 
 async function classifyQuestionsWithJev(questions, { company } = {}) {
-  if (!Array.isArray(questions) || !questions.length || !getOpenRouterApiKey()) return null;
+  if (!Array.isArray(questions) || !questions.length || !aiTarget()) return null;
   const res = await callOpenRouterJson(
     [
       { role: 'system', content: JEV_BANK_SYSTEM },
@@ -1436,10 +1660,30 @@ function sessionQuestionLines(events, { withChat }) {
 
 const bankClassifier = (questions, ctx) => classifyQuestionsWithJev(questions, ctx);
 
+// "Share anonymized questions": after a session, the generalist questions JEV
+// kept go to the Cue community bank, and the questions other candidates
+// reported for that company come back into the local bank. Never blocks.
+async function shareSessionQuestions(extraction) {
+  try {
+    const cfg = readConfigIni();
+    if (cfg.share_anonymized_questions === false || !isSignedIn(cfg)) return;
+    if (!extraction || !extraction.company || !Array.isArray(extraction.questions) || !extraction.questions.length) return;
+    const questions = extraction.questions.map((q) => ({ text: q.text, category: q.category, subCategory: q.subCategory || '' }));
+    const r = await cloudAccount.api('POST', '/v1/questions', { company: extraction.company, questions });
+    if (!r.ok || !r.data || !Array.isArray(r.data.questions)) return;
+    const merged = jevEngine.mergeCommunityQuestions(getAppDataDir(), extraction.company, r.data.questions);
+    if (merged.added && mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('rtai:question-bank-updated', { ok: true, company: extraction.company, added: merged.added, community: true });
+    }
+  } catch (err) {
+    console.warn('Community questions:', err && err.message ? err.message : err);
+  }
+}
+
 async function rebuildQuestionBankFromSessions() {
   const sessions = loadPastSessions();
   const agents = loadAllAgents();
-  const withChat = Boolean(getOpenRouterApiKey());
+  const withChat = Boolean(aiTarget());
   const entries = [];
   for (const s of sessions) {
     // Only sessions that ran with a goal: the goal names the company.
@@ -1500,7 +1744,9 @@ async function generateSessionDebrief({ sessionId, goalId, agentId, transcript: 
     }
   }
 
-  const company = goal.company || 'the company';
+  // Nothing recorded, nothing to judge: no generic praise or advice.
+  if (!transcript) return { ok: false, error: 'This session has no transcript to analyze.' };
+
   const role = goal.role || 'the role';
 
   // Extract substantive questions asked in this session via JEV
@@ -1541,11 +1787,8 @@ async function generateSessionDebrief({ sessionId, goalId, agentId, transcript: 
   if (extractedQuestions.length > 0) {
     const categories = [...new Set(extractedQuestions.map((q) => q.subCategory || q.category))].join(', ');
     dynamicStrengths.push(`Addressed ${extractedQuestions.length} substantive ${extractedQuestions.length === 1 ? 'question' : 'questions'} across ${categories} for ${role}.`);
-  } else {
-    dynamicStrengths.push(`Maintained structured technical fundamentals and precise communication for ${role} at ${company}.`);
   }
 
-  const newStrength = dynamicStrengths[0] || `Clear technical stance for ${role} at ${company}.`;
   const newImprove = dynamicImprovements[0] || `Bring up metrics and trade-offs on your own to strengthen the answer.`;
 
   if (!goal.goal_memory) goal.goal_memory = { strengths: [], improve: [] };
@@ -1580,6 +1823,7 @@ async function generateSessionDebrief({ sessionId, goalId, agentId, transcript: 
   if (cfg.share_anonymized_questions !== false && transcript) {
     try {
       jevExtraction = await jevEngine.ingestSessionQuestions(getAppDataDir(), transcript, goal.company || '', { classify: bankClassifier });
+      shareSessionQuestions(jevExtraction);
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('rtai:question-bank-updated', jevExtraction);
       }
@@ -1826,7 +2070,7 @@ async function extractDocumentContent(filePath) {
     text = result.text;
     if (pdfText.looksScanned(result)) {
       // No text layer: one OCR call now, so the live interview never waits on it.
-      const ocr = await pdfText.ocrPdfWithOpenRouter(buf, path.basename(filePath), getOpenRouterApiKey(), https);
+      const ocr = await pdfText.ocrPdfWithOpenRouter(buf, path.basename(filePath), aiTarget(), https, undefined, undefined, http);
       if (ocr && ocr.replace(/\s+/g, '').length > text.replace(/\s+/g, '').length) {
         text = pdfText.cleanPdfText(ocr);
       }
@@ -1841,9 +2085,9 @@ async function extractDocumentContent(filePath) {
       content: '',
       error:
         ext === '.pdf'
-          ? (getOpenRouterApiKey()
+          ? (aiTarget()
               ? 'Could not read this PDF, not even with OCR. Use "Paste text".'
-              : 'This PDF looks scanned (no text layer). Set the OpenRouter key to read it with OCR, or use "Paste text".')
+              : 'This PDF looks scanned (no text layer). Sign in (or set the OpenRouter key) to read it with OCR, or use "Paste text".')
           : 'The file has no readable text.'
     };
   }
@@ -1976,7 +2220,7 @@ async function scrapeWebsiteFacts(targetUrl) {
     const lines = [];
     if (title) lines.push(`• Official title (${targetUrl}): ${title}`);
     if (metas.length > 0) lines.push(`• Official description: ${metas.slice(0, 2).join(' | ')}`);
-    if (headings.length > 0) lines.push(`• Principais Destaques do Site: ${[...new Set(headings)].join(' · ')}`);
+    if (headings.length > 0) lines.push(`• Key website highlights: ${[...new Set(headings)].join(' · ')}`);
     if (paragraphs.length > 0) {
       lines.push(`• Content from the site:\n  - ${[...new Set(paragraphs)].slice(0, 6).join('\n  - ')}`);
     }
@@ -2009,7 +2253,18 @@ async function searchDuckDuckGoHtml(query) {
   }
 }
 
-async function runCompanyRecon({ company, role, job_description }) {
+// Company research runs on the Cue server when signed in (scraping +
+// dossier, no keys on this machine); the local version stays for offline use.
+async function runCompanyRecon(input) {
+  const { company, role, job_description } = input || {};
+  if (String(company || '').trim() && isSignedIn()) {
+    const r = await cloudAccount.api('POST', '/v1/research/company', { company, role, job_description }, { timeoutMs: 45000 });
+    if (r.ok && r.data && r.data.dossier) return r.data.dossier;
+  }
+  return runCompanyReconLocal({ company, role, job_description });
+}
+
+async function runCompanyReconLocal({ company, role, job_description }) {
   const cleanCompany = String(company || '').trim();
   if (!cleanCompany) {
     return 'Enter the company name or URL (e.g. https://tako.ai/pt/ or Nubank) to research its business, culture and fit.';
@@ -2462,7 +2717,8 @@ function sendOverlayCommand(command) {
   }
 }
 
-function launchOverlay({ agent, demo = false, configOverrides = {} }) {
+function launchOverlay({ agent, configOverrides = {} }) {
+  if (!canUseApp()) return LOGIN_REQUIRED; // also covers relaunches
   // 1. Save the active Mini-Agent (with its RAG documents, instructions, and mini_compact)
   let savedAgent = null;
   if (agent) {
@@ -2486,11 +2742,7 @@ function launchOverlay({ agent, demo = false, configOverrides = {} }) {
   if (savedAgent && savedAgent.id) {
     args.push('--agent', savedAgent.id);
   }
-  if (demo) {
-    args.push('--demo');
-  }
-
-  overlayMode = demo ? 'demo' : 'live';
+  overlayMode = 'live';
   overlayAgentId = savedAgent ? savedAgent.id : '';
 
   overlayStartedAt = Date.now();
@@ -2568,7 +2820,7 @@ function launchOverlay({ agent, demo = false, configOverrides = {} }) {
                   // The session log next to the export: its questions are
                   // structured, while the .md also carries the copilot's answers.
                   const { events } = readSessionEvents(path.basename(exportPath));
-                  const fromEvents = events.length ? sessionQuestionLines(events, { withChat: Boolean(getOpenRouterApiKey()) }).join('\n') : '';
+                  const fromEvents = events.length ? sessionQuestionLines(events, { withChat: Boolean(aiTarget()) }).join('\n') : '';
                   const t = events.length ? fromEvents : fs.readFileSync(exportPath, 'utf8');
                   if (t) {
                     const currentGoal = overlayAgentId ? loadAllAgents().find((a) => a.id === overlayAgentId) : null;
@@ -2577,6 +2829,7 @@ function launchOverlay({ agent, demo = false, configOverrides = {} }) {
                       if (mainWindow && !mainWindow.isDestroyed()) {
                         mainWindow.webContents.send('rtai:question-bank-updated', extraction);
                       }
+                      shareSessionQuestions(extraction);
                     }).catch((err) => console.warn('Auto JEV question extraction error:', err));
                   }
                 }
@@ -2594,6 +2847,7 @@ function launchOverlay({ agent, demo = false, configOverrides = {} }) {
 
   overlayProcess.on('exit', () => {
     overlayProcess = null;
+    scheduleCloudSync();
     overlayMode = null;
     broadcastOverlayStatus();
   });
@@ -2716,7 +2970,9 @@ function popupPayload(kind, meeting) {
 
 function notify(title, body) {
   try {
-    if (Notification && Notification.isSupported()) new Notification({ title, body }).show();
+    if (Notification && Notification.isSupported()) {
+      new Notification({ title, body, icon: path.join(APP_ROOT, 'assets', 'icon.png') }).show();
+    }
   } catch (_e) {}
 }
 
@@ -2803,7 +3059,7 @@ function applyElectronStealthMode(overrides = {}) {
 
     try {
       if (typeof mainWindow.setTitle === 'function') {
-        let title = 'RealTimeAI — Copilot Studio';
+        let title = 'Cue — Interview Copilot';
         if (activeDisguise === 'settings') title = 'Settings';
         else if (activeDisguise === 'cmd') title = 'Command Prompt';
         else if (activeDisguise === 'taskmgr') title = 'Task Manager';
@@ -2866,12 +3122,13 @@ async function startCopilotForMeeting(agentId) {
   if (!exePath || !fs.existsSync(exePath)) {
     return { ok: false, error: 'Overlay not found. Build it first: npm run build:native (scripts\\windows\\build.bat).' };
   }
-  if (!readConfigIni().has_deepgram_key) {
-    showSettingsWindow('general');
-    return { ok: false, error: 'Add your Deepgram key first. Settings is open in the dashboard.' };
+  const allowed = await checkCanStartLive();
+  if (!allowed.ok) {
+    showSettingsWindow(allowed.needsLogin ? 'account' : allowed.needsKeys ? 'ai' : 'plan');
+    return allowed;
   }
   const agent = loadAllAgents().find((a) => a.id === agentId) || null;
-  const res = launchOverlay({ agent, demo: false });
+  const res = launchOverlay({ agent });
   return { ok: Boolean(res && res.ok), error: res && res.error };
 }
 
@@ -2919,7 +3176,7 @@ function getMeetingPopup() {
       const m = payload && payload.meeting;
       if (reason === 'mute' && m && m.id && m.via !== 'test') {
         saveMeetingSettings({ mutedApps: [...getMeetingSettings().mutedApps, m.id] });
-        notify(`RealTimeAI won't ask for ${m.name} again`, 'Turn it back on in Settings > General > Meeting detection.');
+        notify(`Cue won't ask for ${m.name} again`, 'Turn it back on in Settings > General > Meeting detection.');
       }
     },
     onOpenDashboard: () => showMainWindow()
@@ -2940,6 +3197,7 @@ function onMeetingStarted(meeting) {
   const s = getMeetingSettings();
   if (!s.enabled || s.mutedApps.includes(meeting.id)) return;
   if (isOverlayRunning()) return; // the copilot is already on
+  if (!canUseApp()) return; // the app does nothing until the user signs in (or goes local)
   getMeetingPopup().show(popupPayload('started', meeting));
 }
 
@@ -2970,7 +3228,7 @@ function refreshTrayMenu() {
   const stealthActive = Boolean(cfg.electron_stealth);
 
   const items = [
-    { label: 'Open RealTimeAI', click: () => showMainWindow() },
+    { label: tm('Open Cue'), click: () => showMainWindow() },
     {
       label: stealthActive ? '🛡️ Stealth Mode (Active)' : '🛡️ Stealth Mode (Off)',
       type: 'checkbox',
@@ -2987,11 +3245,11 @@ function refreshTrayMenu() {
     },
     { type: 'separator' }
   ];
-  if (active.length) items.push({ label: `In a call: ${active.map((m) => m.name).join(', ')}`, enabled: false });
+  if (active.length) items.push({ label: tm('In a call: {names}', { names: active.map((m) => m.name).join(', ') }), enabled: false });
   items.push(running
     ? { label: 'Stop copilot', click: () => stopOverlayGracefully() }
     : {
-        label: 'Start copilot',
+        label: tm('Start copilot'),
         click: async () => {
           const r = await startCopilotForMeeting(pickDefaultAgentId(loadAllAgents()));
           if (!r.ok) notify('Could not start the copilot', r.error || '');
@@ -2999,16 +3257,16 @@ function refreshTrayMenu() {
       });
   items.push(
     { type: 'separator' },
-    { label: 'Detect meetings', type: 'checkbox', checked: s.enabled, click: (item) => saveMeetingSettings({ enabled: item.checked }) },
-    { label: 'Show a test popup', click: () => showTestMeetingPopup() },
+    { label: tm('Detect meetings'), type: 'checkbox', checked: s.enabled, click: (item) => saveMeetingSettings({ enabled: item.checked }) },
+    { label: tm('Show a test popup'), click: () => showTestMeetingPopup() },
     { type: 'separator' },
-    { label: 'Quit RealTimeAI', click: () => { isQuitting = true; app.quit(); } }
+    { label: tm('Quit Cue'), click: () => { isQuitting = true; app.quit(); } }
   );
   try {
     tray.setContextMenu(Menu.buildFromTemplate(items));
     const stealthPrefix = stealthActive ? '🛡️ [Stealth] ' : '';
-    tray.setToolTip(running ? `${stealthPrefix}RealTimeAI · copilot on`
-      : active.length ? `${stealthPrefix}RealTimeAI · ${active[0].name} detected` : `${stealthPrefix}RealTimeAI`);
+    tray.setToolTip(running ? `${stealthPrefix}Cue · copilot on`
+      : active.length ? `${stealthPrefix}Cue · ${active[0].name} detected` : `${stealthPrefix}Cue`);
   } catch (_e) {}
 }
 
@@ -3043,6 +3301,10 @@ function showSettingsWindow(section) {
   else send();
 }
 
+// The whole dashboard (text, spacing, icons, tour popovers) is drawn 10%
+// larger than its CSS pixels.
+const UI_ZOOM = 1.1;
+
 function createWindow() {
   const initialTheme = getThemeState();
   if (initialTheme && initialTheme.preference) {
@@ -3051,19 +3313,28 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 920,
-    minWidth: 1024,
-    minHeight: 680,
+    // At UI_ZOOM these leave about the same CSS space as 1024x680 did at 100%.
+    minWidth: 1100,
+    minHeight: 720,
     frame: false,
     backgroundColor: initialTheme.resolved === 'dark' ? '#0D0D10' : '#FFFFFF',
-    title: 'RealTimeAI — Copilot Studio',
+    title: 'Cue — Interview Copilot',
     icon: path.join(APP_ROOT, 'assets', 'icon.png'),
     webPreferences: {
       preload: path.join(PRELOAD_DIR, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      zoomFactor: UI_ZOOM
     }
   });
 
+  // Electron resets the zoom of file:// pages on loads and on some hash
+  // (router) navigations, so put it back after each of them.
+  const keepZoom = () => {
+    const wc = mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents : null;
+    if (wc && wc.getZoomFactor() !== UI_ZOOM) wc.setZoomFactor(UI_ZOOM);
+  };
+  for (const ev of ['did-finish-load', 'did-navigate', 'did-navigate-in-page']) mainWindow.webContents.on(ev, keepZoom);
   const loadPromise = mainWindow.loadFile(path.join(RENDERER_DIR, 'index.html'));
   applyElectronStealthMode();
 
@@ -3075,7 +3346,11 @@ function createWindow() {
     mainWindow.hide();
     if (!trayHintShown) {
       trayHintShown = true;
-      notify('RealTimeAI is still running', 'It waits in the tray and pops up when a meeting starts. Right-click the tray icon to quit.');
+      const pt = resolveUiLocale(readConfigIni().ui_language, systemLanguages(app)).startsWith('pt');
+      notify(
+        pt ? 'O Cue continua ativo' : 'Cue is still running',
+        pt ? 'Ele fica na bandeja e avisa quando uma reunião começar.' : 'It stays in the tray and lets you know when a meeting starts.'
+      );
     }
   });
 
@@ -3086,70 +3361,32 @@ function createWindow() {
     mainWindow.maximize();
   }
 
-  const capIdx = process.argv.indexOf('--capture-screenshots');
-  if (capIdx >= 0 && process.argv[capIdx + 1]) {
-    const outDir = process.argv[capIdx + 1];
-    loadPromise.then(async () => {
-      try {
-        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-        await wait(2400);
+  const settingsSection = settingsSectionFromArgv(process.argv);
+  if (settingsSection) showSettingsWindow(settingsSection);
+}
 
-        await mainWindow.webContents.executeJavaScript(`applyTheme('dark', 'dark'); switchView('goals'); window.scrollTo(0, 0);`);
-        await wait(700);
-        const imgGoals = await mainWindow.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, '01_goals.png'), imgGoals.toPNG());
-
-        await mainWindow.webContents.executeJavaScript(`document.querySelector('main')?.scrollTo(0, 600);`);
-        await wait(500);
-        const imgGoalsBottom = await mainWindow.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, '02_goals_bottom.png'), imgGoalsBottom.toPNG());
-
-        await mainWindow.webContents.executeJavaScript(`document.querySelector('[data-fq-index="0"]')?.click();`);
-        await wait(500);
-        const imgModalQ = await mainWindow.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, '03_modal_question_practice.png'), imgModalQ.toPNG());
-        await mainWindow.webContents.executeJavaScript(`document.getElementById('modalQuestionPractice')?.classList.remove('open');`);
-        await wait(200);
-
-        await mainWindow.webContents.executeJavaScript(`document.querySelector('[data-sim-idx="0"]')?.click();`);
-        await wait(500);
-        const imgModalRep = await mainWindow.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, '04_modal_session_report.png'), imgModalRep.toPNG());
-        await mainWindow.webContents.executeJavaScript(`document.getElementById('modalSessionReport')?.classList.remove('open');`);
-        await wait(200);
-
-        await mainWindow.webContents.executeJavaScript(`switchView('library'); switchLibraryTab('resumes'); document.querySelector('main')?.scrollTo(0, 0);`);
-        await wait(600);
-        const imgLibResumes = await mainWindow.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, '05_library_resumes.png'), imgLibResumes.toPNG());
-
-        await mainWindow.webContents.executeJavaScript(`switchView('library'); switchLibraryTab('playbooks');`);
-        await wait(600);
-        const imgLibPlaybooks = await mainWindow.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, '06_library_playbooks.png'), imgLibPlaybooks.toPNG());
-
-        await mainWindow.webContents.executeJavaScript(`switchView('settings'); document.querySelector('main')?.scrollTo(0, 0);`);
-        await wait(600);
-        const imgSettings = await mainWindow.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, '07_settings.png'), imgSettings.toPNG());
-
-        await mainWindow.webContents.executeJavaScript(`switchView('history'); document.querySelector('main')?.scrollTo(0, 0);`);
-        await wait(600);
-        const imgHistory = await mainWindow.webContents.capturePage();
-        fs.writeFileSync(path.join(outDir, '08_history.png'), imgHistory.toPNG());
-      } catch (err) {
-        console.error('Capture error:', err);
-      } finally {
-        if (process.argv.includes('--exit-after-capture')) {
-          app.quit();
-        }
-      }
-    });
-  }
+// Running from source: use (and start, with Docker) the local Cue
+// server in ../backend/ unless a server is configured. The engine inherits the env var.
+let localBackendHandle = null;
+function startLocalBackendForDev() {
+  const configured = readConfigIni().server_url;
+  const devUrl = localBackend.devServerUrl({ packaged: app.isPackaged, repoRoot: REPO_ROOT, configuredUrl: configured });
+  if (devUrl) process.env.RTAI_SERVER_URL = devUrl;
+  const url = effectiveServerUrl(configured);
+  if (app.isPackaged || process.env.RTAI_LOCAL_BACKEND === '0' || !localBackend.isLoopbackUrl(url)) return;
+  localBackend.ensureLocalBackend({ url, repoRoot: REPO_ROOT }).then((r) => {
+    localBackendHandle = r;
+    if (r.started) console.log(`[backend] local server ${r.ready ? 'ready' : 'starting'} at ${url}`);
+    // The renderer may have asked before the server was up: refresh the account.
+    if (r.ready && mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('rtai:cloud-event', { type: 'server_ready' });
+  }).catch((e) => console.warn('[backend]', e.message));
 }
 
 app.whenReady().then(() => {
   if (!gotSingleInstanceLock) return;
+  startLocalBackendForDev();
+  scheduleCloudSync();
+  setInterval(scheduleCloudSync, 5 * 60 * 1000).unref(); // also picks up what other devices sent
   if (session && session.defaultSession) {
     // Only the bundled UI (file://) may use the microphone meter, clipboard and
     // notifications; anything remote that ends up in a window gets nothing.
@@ -3160,23 +3397,9 @@ app.whenReady().then(() => {
       callback(isBundledUi((details && details.requestingUrl) || (webContents && webContents.getURL())));
     });
   }
-  // Ensure at least one rich starter Mini-Agent exists if agents folder is empty
-  const existingAgents = loadAllAgents();
-  if (existingAgents.length === 0) {
-    saveAgentToDisk({
-      id: 'my-first-goal',
-      name: 'My first goal',
-      session_type: 'interview',
-      company: '',
-      role: '',
-      job_description: '',
-      extra_instructions: 'Answer in the first person, using STAR for behavioral questions.',
-      company_research: '',
-      // No sample resume: an invented one would be inherited by new goals
-      // and told by the copilot as the candidate's real experience.
-      documents: []
-    });
-  }
+  // A fresh install starts empty: no starter goal. Older versions created an
+  // empty "My first goal"; it goes away while still untouched.
+  removeUntouchedStarterGoal();
 
   ipcMain.handle('rtai:get-state', async () => {
     const config = readConfigIni();
@@ -3187,6 +3410,8 @@ app.whenReady().then(() => {
     return {
       appDataDir: getAppDataDir(),
       overlayExePath: getOverlayExecutablePath(),
+      // Interface language: the setting resolved against the Windows languages.
+      ui: { locale: resolveUiLocale(config.ui_language, systemLanguages(app)), systemLanguages: systemLanguages(app), supported: UI_LOCALES },
       config,
       stealthState: {
         active: Boolean(config.electron_stealth),
@@ -3237,6 +3462,7 @@ app.whenReady().then(() => {
   ipcMain.handle('rtai:save-agent', async (_ev, agent) => {
     const before = loadAllAgents().find((a) => a.id === sanitizeId(agent && agent.id));
     const saved = saveAgentToDisk(agent);
+    scheduleCloudSync();
     // The overlay reads the goal at launch: when the running one uses this goal
     // and its answer settings changed, relaunch it so the change takes effect.
     let overlayRestarted = false;
@@ -3244,7 +3470,7 @@ app.whenReady().then(() => {
       'playbook_lead_with_answer', 'playbook_name_tradeoffs', 'answer_language', 'coding_language'];
     const changed = before && answerKeys.some((k) => String(before[k] ?? '') !== String(saved[k] ?? ''));
     if (changed && isOverlayRunning() && overlayAgentId === saved.id) {
-      launchOverlay({ agent: saved, demo: overlayMode === 'demo' });
+      launchOverlay({ agent: saved });
       overlayRestarted = true;
     }
     return {
@@ -3258,6 +3484,7 @@ app.whenReady().then(() => {
   ipcMain.handle('rtai:delete-agent', async (_ev, agentId) => {
     const filePath = path.join(getAppDataDir(), 'agents', `${sanitizeId(agentId)}.json`);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    scheduleCloudSync();
     const agents = loadAllAgents();
     if (agents.length > 0) {
       writeConfigIni({ last_agent: agents[0].id });
@@ -3267,7 +3494,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle('rtai:pick-files', async (_ev, defaultTag = 'resume') => {
     const res = await dialog.showOpenDialog(mainWindow, {
-      title: 'Select files for the goal RAG (resume, job description, projects)',
+      title: tm('Select files for the goal RAG (resume, job description, projects)'),
       properties: ['openFile', 'multiSelections'],
       filters: [
         {
@@ -3327,50 +3554,18 @@ app.whenReady().then(() => {
         }
       } catch (_e) {}
     }
-    // Provide realistic upcoming interview events if no external .ics feed returned VEVENTs
-    return {
-      ok: true,
-      source: 'template',
-      events: [
-        {
-          id: 'entrevista-system-design',
-          summary: 'Technical & System Design Interview — Senior Software Engineer',
-          company: 'Nubank',
-          role: 'Senior Software Engineer',
-          date: 'Today · 15:00 - 16:00',
-          location: 'Google Meet',
-          description:
-            'Technical chat about distributed architecture, low latency, microservice resilience and culture fit (STAR).'
-        },
-        {
-          id: 'entrevista-hiring-manager',
-          summary: 'Hiring Manager & Culture Fit — Staff AI Engineer',
-          company: 'Mercado Livre',
-          role: 'Staff AI & Backend Engineer',
-          date: 'Tomorrow · 10:30 - 11:30',
-          location: 'Zoom',
-          description:
-            'Technical leadership, real-time AI projects, RAG, decisions under pressure and alignment with the company principles.'
-        },
-        {
-          id: 'call-arquitetura-cliente',
-          summary: 'Architecture & Technical Scope Presentation',
-          company: 'Enterprise Client',
-          role: 'Tech Lead / Solutions Architect',
-          date: 'Friday · 14:00 - 14:45',
-          location: 'Microsoft Teams',
-          description:
-            'Non-functional requirements, SLA, DPAPI security, rollout roadmap and ROI.'
-        }
-      ]
-    };
+    // Only real events: an empty or unreachable feed shows nothing.
+    return { ok: true, source: 'none', events: [] };
   });
 
   // ---- Google Calendar ----------------------------------------------------
-  ipcMain.handle('rtai:gcal-status', async () => getGoogleCalendar().status());
+  ipcMain.handle('rtai:gcal-status', async () => {
+    await refreshGoogleBroker();
+    return getGoogleCalendar().status();
+  });
   ipcMain.handle('rtai:gcal-import-client', async () => {
     const res = await dialog.showOpenDialog(mainWindow, {
-      title: 'Google OAuth client file (client_secret_....json)',
+      title: tm('Google OAuth client file (client_secret_....json)'),
       properties: ['openFile'],
       filters: [{ name: 'Google OAuth client', extensions: ['json'] }]
     });
@@ -3403,6 +3598,41 @@ app.whenReady().then(() => {
     gcalCall((g) => g.updateEvent(p && p.calendarId, p && p.eventId, (p && p.event) || {})));
   ipcMain.handle('rtai:gcal-delete-event', async (_ev, p) => gcalCall((g) => g.deleteEvent(p && p.calendarId, p && p.eventId)));
   // Provider consoles linked from Settings > Account (fixed allowlist).
+  // ---- Cue cloud account (device sign-in; docs/server-api.md) ----
+  ipcMain.handle('rtai:cloud-status', async (_ev, force) => cloudAccount.status(Boolean(force)));
+  ipcMain.handle('rtai:cloud-password-login', async (_ev, p) => cloudAccount.loginWithPassword(p && p.email, p && p.password));
+  ipcMain.handle('rtai:cloud-signup', async (_ev, p) => cloudAccount.signup(p && p.name, p && p.email, p && p.password));
+  ipcMain.handle('rtai:cloud-reset-password', async (_ev, email) => cloudAccount.resetPassword(email));
+  ipcMain.handle('rtai:cloud-sync', async () => (isSignedIn() ? runCloudSync() : { ok: false, error: 'not_signed_in' }));
+  ipcMain.handle('rtai:cloud-files', async () => cloudAccount.listFiles());
+  ipcMain.handle('rtai:cloud-file-delete', async (_ev, id) => cloudAccount.deleteFile(id));
+  // Sends the documents of every session as the text the app extracted from
+  // them (the originals' paths are not kept); the server skips what it has.
+  ipcMain.handle('rtai:cloud-files-backup', async () => {
+    let sent = 0;
+    const failed = [];
+    const seen = new Set();
+    for (const agent of loadAllAgents()) {
+      for (const doc of agent.documents || []) {
+        if (!doc.content) continue;
+        const name = /\.(txt|md)$/i.test(doc.title) ? doc.title : `${doc.title}.txt`;
+        const key = `${name}\n${doc.content}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const r = await cloudAccount.uploadFile(Buffer.from(doc.content, 'utf8'), { name, tag: doc.tag, agentId: agent.id });
+        if (r.ok) sent += 1;
+        else failed.push({ title: doc.title, error: r.error });
+      }
+    }
+    return { ok: true, sent, failed };
+  });
+  ipcMain.handle('rtai:cloud-billing', async (_ev, kind, pack) => cloudAccount.billing(kind === 'portal' ? 'portal' : 'checkout', pack));
+  ipcMain.handle('rtai:cloud-logout', async () => {
+    if (isOverlayRunning()) stopRunningOverlay();
+    const res = await cloudAccount.logout();
+    return { ...res, config: readConfigIni() };
+  });
+
   ipcMain.handle('rtai:open-url', async (_ev, url) => {
     try {
       const u = new URL(String(url || ''));
@@ -3448,8 +3678,10 @@ app.whenReady().then(() => {
     }
     // The overlay reads config.ini only at start: any real change while it
     // runs (keys, language, models, audio, stealth...) restarts it.
+    // The interface language is dashboard-only: it never restarts the copilot.
+    const dashboardOnly = configUpdates && Object.keys(configUpdates).every((k) => k === 'ui_language');
     const changed = before !== JSON.stringify(updated.rawIni);
-    const shouldRelaunch = configUpdates && (
+    const shouldRelaunch = configUpdates && !dashboardOnly && (
       (changed && isOverlayRunning()) ||
       (configUpdates.model && isOverlayRunning()) ||
       (isOverlayRunning() && (
@@ -3466,7 +3698,6 @@ app.whenReady().then(() => {
       const currentAgent = agents.find((a) => a.id === (overlayAgentId || updated.last_agent)) || agents[0] || null;
       launchOverlay({
         agent: currentAgent,
-        demo: overlayMode === 'demo',
         configOverrides: { ...configUpdates }
       });
       overlayRestarted = true;
@@ -3478,8 +3709,12 @@ app.whenReady().then(() => {
     return { profile: saveUserProfile(profile || {}) };
   });
 
+  // Always a real session: there is no scripted demo.
   ipcMain.handle('rtai:start-overlay', async (_ev, options) => {
-    return launchOverlay(options || {});
+    const { agent, configOverrides } = options || {};
+    const allowed = await checkCanStartLive();
+    if (!allowed.ok) return allowed;
+    return launchOverlay({ agent, configOverrides });
   });
 
   ipcMain.handle('rtai:stop-overlay', async () => {
@@ -3775,7 +4010,7 @@ app.whenReady().then(() => {
   ipcMain.handle('rtai:set-process-disguise', async (_ev, disguise) => {
     const valid = ['none', 'settings', 'cmd', 'taskmgr'].includes(disguise) ? disguise : 'none';
     writeConfigIni({ process_disguise: valid });
-    let title = 'RealTimeAI — Copilot Studio';
+    let title = 'Cue — Interview Copilot';
     if (valid === 'settings') title = 'Settings';
     else if (valid === 'cmd') title = 'Command Prompt';
     else if (valid === 'taskmgr') title = 'Task Manager';
@@ -3807,6 +4042,10 @@ app.whenReady().then(() => {
 });
 
 app.on('will-quit', () => {
+  if (localBackendHandle) {
+    localBackendHandle.stop(); // stops the container only if this app started it
+    localBackendHandle = null;
+  }
   if (globalShortcut && typeof globalShortcut.unregisterAll === 'function') {
     try { globalShortcut.unregisterAll(); } catch (_e) {}
   }
@@ -3832,6 +4071,7 @@ if (process.env.RTAI_TEST_EXPORTS === '1') {
   module.exports = {
     saveAgentToDisk,
     loadAllAgents,
+    removeUntouchedStarterGoal,
     generateSessionDebrief,
     loadPastSessions,
     extractDocumentContent,
@@ -3840,12 +4080,24 @@ if (process.env.RTAI_TEST_EXPORTS === '1') {
     inheritableDocuments,
     readConfigIni,
     writeConfigIni,
+    cloudBackendActive,
+    isLocalMode,
+    canUseApp,
+    isSignedIn,
+    checkCanStartLive,
+    launchOverlay,
     jevPairs,
     sessionQuestionAnchors,
     sessionQuestionLines,
     rebuildQuestionBankFromSessions,
     pickDefaultAgentId,
     getMeetingSettings,
-    applyElectronStealthMode
+    applyElectronStealthMode,
+    aiTarget,
+    runCompanyRecon,
+    callOpenRouterJson,
+    shareSessionQuestions,
+    getGoogleCalendar,
+    refreshGoogleBroker
   };
 }

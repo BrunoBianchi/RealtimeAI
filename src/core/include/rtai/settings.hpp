@@ -8,10 +8,12 @@
 
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <optional>
 #include <string>
 #include <vector>
 
+#include "rtai/hotkeys.hpp"
 #include "rtai/ini.hpp"
 #include "rtai/text_util.hpp"
 
@@ -67,9 +69,16 @@ struct Settings {
     bool stealth_activity_monitor{true};
     bool stealth_click_through{false};
     bool stealth_screen_capture{true};
+    // [atalhos]: only the valid values; an action not listed uses its default.
+    std::map<std::string, std::string> hotkeys;
     // [calendario]
     std::string calendar_ics_url;
     std::string calendar_token;
+    // [servidor] Cue cloud (see cloud_session.hpp / docs/server-api.md).
+    std::string server_mode{"auto"}; // auto | nuvem | proprio
+    std::string server_url;          // empty = compiled default (RTAI_SERVER_URL)
+    std::string server_token;        // device token from the dashboard sign-in
+    std::string server_region;       // empty/auto = server decides
 
     // Problems found while loading (shown in the overlay/console).
     std::vector<std::string> warnings;
@@ -298,10 +307,36 @@ inline Settings load_settings(const ini::File& f, const EnvLookup& env, const Se
     boolean("stealth", "invisivel_gravacao", "RTAI_STEALTH_SCREEN_CAPTURE", s.stealth_screen_capture);
     boolean("stealth", "screen_capture", "RTAI_STEALTH_SCREEN_CAPTURE", s.stealth_screen_capture);
 
+    for (const auto& action : hotkeys::kActions) {
+        std::string raw;
+        if (!str("atalhos", action.key, nullptr, raw)) continue;
+        if (hotkeys::is_disabled(raw) || hotkeys::parse(raw)) s.hotkeys[action.key] = raw;
+        else s.warnings.push_back(std::string("[atalhos] ") + action.key + ": invalid shortcut (\"" + raw + "\")");
+    }
+
     str("calendario", "url_ics", "RTAI_CALENDAR_ICS", s.calendar_ics_url);
     {
         std::string source;
         secret_named("calendario", "token", "RTAI_CALENDAR_TOKEN", s.calendar_token, source);
+    }
+
+    {
+        std::string mode;
+        if (str("servidor", "modo", "RTAI_SERVER_MODE", mode)) {
+            const std::string m = text::fold(text::trim(mode));
+            if (m == "auto" || m == "nuvem" || m == "cloud" || m == "proprio" || m == "own" || m == "local" ||
+                m == "offline") {
+                s.server_mode = m;
+            } else {
+                s.warnings.push_back("[servidor] modo: use auto, nuvem, proprio or local");
+            }
+        }
+    }
+    str("servidor", "url", "RTAI_SERVER_URL", s.server_url);
+    str("servidor", "regiao", "RTAI_SERVER_REGION", s.server_region);
+    {
+        std::string source;
+        secret_named("servidor", "token", "RTAI_SERVER_TOKEN", s.server_token, source);
     }
 
     if (!s.mic_enabled && !s.loopback_enabled) {
@@ -331,8 +366,10 @@ inline bool is_known_setting(std::string_view section, std::string_view key) {
         {"stealth", "clique_atravessa"}, {"stealth", "click_through"},
         {"stealth", "invisivel_gravacao"}, {"stealth", "screen_capture"},
         {"calendario", "url_ics"}, {"calendario", "token"},
+        {"servidor", "modo"}, {"servidor", "url"}, {"servidor", "token"}, {"servidor", "regiao"},
     };
     const std::string s = ini::lower(section), k = ini::lower(key);
+    if (s == "atalhos") return hotkeys::find_action(k) != nullptr;
     for (const auto& e : known) {
         if (s == e.s && k == e.k) return true;
     }
@@ -342,14 +379,14 @@ inline bool is_known_setting(std::string_view section, std::string_view key) {
 inline bool is_secret_setting(std::string_view section, std::string_view key) {
     const std::string s = ini::lower(section);
     const std::string k = ini::lower(key);
-    if (s == "calendario" && k == "token") return true;
+    if ((s == "calendario" || s == "servidor") && k == "token") return true;
     return (s == "deepgram" || s == "llm") &&
            (k == "api_key" || k == "cerebras_api_key" || k == "groq_api_key");
 }
 
 inline std::string default_config_text() {
     return R"(; ============================================================================
-; RealTimeAI settings
+; Cue settings
 ; ============================================================================
 ; Edit and save; changes apply the next time the app opens
 ; (Ctrl+Alt+Q closes it, then open it again). Ctrl+Alt+O opens this file.
@@ -430,6 +467,19 @@ altura_max_pct = 60
 salvar = sim
 ; Empty = %LOCALAPPDATA%\RealTimeAI\sessions
 pasta =
+
+[servidor]
+; Cue servers (no API keys needed once signed in from the dashboard).
+; auto = servers when signed in, otherwise your keys above
+; nuvem = always the servers; proprio = your keys, signed in (plan minutes count)
+; local = your keys, no account and no server (open-source mode, answers ~0.5 s slower)
+modo = auto
+; Empty = the official build's default server
+url =
+; auto (closest, lowest latency), sa-east-1, us-east-1, eu-west-1
+regiao = auto
+; Written by the dashboard sign-in; encrypted (dpapi:...) on the next run
+token =
 )";
 }
 

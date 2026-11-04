@@ -16,12 +16,12 @@ BEGIN
         BLOCK "040904B0"
         BEGIN
             VALUE "CompanyName",      "Bruno Raiado Bianchi"
-            VALUE "FileDescription",  "RealTimeAI overlay"
+            VALUE "FileDescription",  "Cue overlay"
             VALUE "FileVersion",      "@RTAI_VERSION_FULL@"
             VALUE "InternalName",     "rtai_app"
             VALUE "LegalCopyright",   "Copyright (C) 2026 Bruno Raiado Bianchi"
             VALUE "OriginalFilename", "rtai_app.exe"
-            VALUE "ProductName",      "RealTimeAI"
+            VALUE "ProductName",      "Cue"
             VALUE "ProductVersion",   "@RTAI_VERSION_FULL@"
         END
     END

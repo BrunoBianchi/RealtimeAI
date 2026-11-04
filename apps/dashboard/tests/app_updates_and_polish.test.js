@@ -25,7 +25,7 @@ test('App Updates & Polish: Settings > Updates shows the version and the right a
   assert.deepStrictEqual(tags(html, { 'data-action': 'update-channel' }).map((t) => t['data-channel']), ['stable', 'beta']);
 
   html = at({ status: 'available', latestVersion: '2.5.0', releaseNotes: '**Mais rápido**' });
-  assert.ok(html.includes('A versão 2.5.0 está disponível.'));
+  assert.ok(html.includes('Version 2.5.0 is available.'));
   assert.ok(actions(html).includes('update-download') && !actions(html).includes('update-check'));
   assert.ok(html.includes('<strong>Mais rápido</strong>'), 'release notes rendered as Markdown');
 
@@ -52,10 +52,10 @@ test('App Updates & Polish: top bar hosts search, update chip, stealth chip and 
   S.update = { status: 'available', latestVersion: '2.5.0' };
   Cue.renderShell();
   assert.strictEqual(page('btnUpdateChip').hidden, false);
-  assert.ok(page('btnUpdateChip').innerHTML.includes('Atualização 2.5.0'));
+  assert.ok(page('btnUpdateChip').innerHTML.includes('Update 2.5.0'));
   S.update = { status: 'downloaded', latestVersion: '2.5.0' };
   Cue.renderShell();
-  assert.ok(page('btnUpdateChip').innerHTML.includes('Reiniciar para atualizar'));
+  assert.ok(page('btnUpdateChip').innerHTML.includes('Restart to update'));
 });
 
 test('App Updates & Polish: Privacy offers window opacity and the four process names', async () => {
@@ -71,7 +71,7 @@ test('App Updates & Polish: Privacy offers window opacity and the four process n
   assert.deepStrictEqual(cards.map((c) => c['data-mode']), ['none', 'settings', 'cmd', 'taskmgr']);
   assert.deepStrictEqual(cards.filter((c) => c['aria-pressed'] === 'true').map((c) => c['data-mode']), ['cmd'], 'current name is the pressed card');
 
-  await Cue.actions['set-disguise'](el({ mode: 'taskmgr', label: 'Gerenciador de Tarefas' }));
+  await Cue.actions['set-disguise'](el({ mode: 'taskmgr', label: 'Task Manager' }));
   assert.deepStrictEqual(called('setProcessDisguise'), [['taskmgr']]);
   assert.deepStrictEqual(called('saveConfig'), [[{ process_disguise: 'taskmgr' }]]);
 });

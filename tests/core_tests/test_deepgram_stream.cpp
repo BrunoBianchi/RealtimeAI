@@ -73,6 +73,34 @@ TEST(DeepgramStream, BuildsAuthorizedRequest) {
     EXPECT_EQ(factory->last_request.headers[0].second, "Token test-key");
 }
 
+TEST(DeepgramStream, CloudTokenIsReadPerConnectAndRenewedOnceAfter401) {
+    // Cloud backend: short-lived bearer token from the session broker. An
+    // expired token (401) gets one forced refresh, then the stream connects.
+    auto srv = std::make_shared<FakeServer>();
+    WsConnectResult expired;
+    expired.http_status = 401;
+    expired.retryable = false;
+    expired.error = "token expirado";
+    srv->connect_failures.push_back(expired);
+    auto factory = std::make_shared<FakeWsFactory>(srv);
+    auto cfg = fast_config();
+    std::atomic<int> calls{0}, forced{0};
+    cfg.authorization = [&](bool force) {
+        ++calls;
+        if (force) ++forced;
+        return std::string(forced > 0 ? "Bearer fresh" : "Bearer stale");
+    };
+    DeepgramStream s{cfg, factory};
+    s.open([](const TranscriptEvent&) {});
+    ASSERT_TRUE(eventually([&] { return s.connected(); }));
+    s.close();
+    EXPECT_EQ(forced.load(), 1);
+    EXPECT_GE(calls.load(), 3); // first connect, forced refresh, retry
+    std::lock_guard<std::mutex> lk(srv->mu);
+    EXPECT_EQ(srv->connects, 2);
+    EXPECT_EQ(factory->last_request.headers[0].second, "Bearer fresh");
+}
+
 TEST(DeepgramStream, KeepAliveFiresDuringSilenceWithoutAnyAudioOrServerTraffic) {
     // Reproduces the original bug: nothing is sent and the server never
     // answers (idle loopback). KeepAlive must still go out on its own timer.

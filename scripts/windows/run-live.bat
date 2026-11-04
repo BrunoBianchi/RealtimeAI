@@ -2,8 +2,8 @@
 rem ---------------------------------------------------------------------------
 rem RealTimeAI LIVE: microphone (You) + system audio (Others) -> Deepgram ->
 rem LLM suggestions on the HUD. Sessions go to %LOCALAPPDATA%\RealTimeAI\sessions.
-rem Keys and options: %LOCALAPPDATA%\RealTimeAI\config.ini (rtai_app.exe --config
-rem or Ctrl+Alt+O). Without the Deepgram key the app opens the config and exits.
+rem Keys and options: dashboard Settings (rtai_app.exe --config or Ctrl+Alt+O).
+rem Without the Deepgram key the app opens the dashboard Settings and exits.
 rem Use headphones so the microphone does not pick up the other side.
 rem ---------------------------------------------------------------------------
 setlocal

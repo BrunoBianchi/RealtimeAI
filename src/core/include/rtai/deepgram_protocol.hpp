@@ -28,6 +28,10 @@ namespace rtai::dg {
 // questions) and 300 ms endpointing.
 struct StreamParams {
     std::string host{"api.deepgram.com"};
+    // Listen path; the cloud backend may hand out another one (same protocol).
+    std::string path{"/v1/listen"};
+    // Raw "k=v&k2=v2" appended as-is (cloud: usage tag for metering).
+    std::string extra_query;
     std::string model{"nova-3"};
     std::string encoding{"linear16"};
     std::uint32_t sample_rate{16000};
@@ -72,7 +76,7 @@ inline std::string url_encode(std::string_view s) {
 //   /v1/listen?model=nova-3&encoding=linear16&sample_rate=16000&channels=1&interim_results=true...
 // The scheme is wss; host comes from params.host.
 inline std::string build_listen_path(const StreamParams& p) {
-    std::string q = "/v1/listen";
+    std::string q = p.path.empty() ? std::string("/v1/listen") : p.path;
     q += "?model=" + url_encode(p.model);
     q += "&encoding=" + url_encode(p.encoding);
     q += "&sample_rate=" + std::to_string(p.sample_rate);
@@ -102,6 +106,10 @@ inline std::string build_listen_path(const StreamParams& p) {
     if (p.vad_events) q += "&vad_events=true";
     for (const auto& k : p.keyterms) {
         if (!k.empty()) q += "&keyterm=" + url_encode(k);
+    }
+    if (!p.extra_query.empty()) {
+        if (p.extra_query.front() != '&') q += '&';
+        q += p.extra_query;
     }
     return q;
 }
@@ -226,7 +234,7 @@ inline TranscriptResult parse_transcript(std::string_view json_text) {
 // Close-frame interpretation for logs/UI. Deepgram closes with 1011 on
 // timeouts (NET-0000/NET-0001) and 1008 on undecodable audio (DATA-0000).
 inline std::string describe_close(std::uint16_t code, std::string_view reason) {
-    std::string d = "fechado pelo servidor (" + std::to_string(code);
+    std::string d = "closed by the server (" + std::to_string(code);
     if (!reason.empty()) {
         d += " ";
         d += reason;

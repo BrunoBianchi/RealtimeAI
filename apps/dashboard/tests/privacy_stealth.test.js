@@ -22,14 +22,14 @@ test('Privacy & Stealth: the HUD card has the 4 functional toggles', () => {
 
   // Brand integrity: no third-party names anywhere in the page.
   for (const src of [indexHtml, ...Object.values(sources)]) assert.ok(!src.includes('InterviewCoder'));
-  assert.ok(html.includes('RealTimeAI'), 'the process-name option shows the real app name');
+  assert.ok(html.includes('Cue'), 'the process-name option shows the real app name');
 });
 
 test('Privacy & Stealth: a toggle saves its key as a boolean and says so', async () => {
   const r = loadRenderer({ api: { saveConfig: async (patch) => ({ ok: true, config: patch }) } });
   await r.Cue.changes.cfg(el({ key: 'stealth_click_through', type: 'bool', label: 'Cliques atravessam' }, { checked: true }));
   assert.deepStrictEqual(r.called('saveConfig'), [[{ stealth_click_through: true }]]);
-  assert.deepStrictEqual(r.toasts(), [{ text: 'Cliques atravessam: ligado.', error: false }]);
+  assert.deepStrictEqual(r.toasts(), [{ text: 'Cliques atravessam: on.', error: false }]);
 });
 
 test('Privacy & Stealth: main.js reads, writes, and syncs stealth settings', () => {

@@ -83,7 +83,7 @@ function createUpdater(opts) {
       status: 'available',
       hasUpdate: true,
       latestVersion: info.version,
-      releaseName: info.releaseName || `RealTimeAI ${info.version}`,
+      releaseName: info.releaseName || `Cue ${info.version}`,
       releaseNotes: notesToText(info.releaseNotes),
       releaseDate: info.releaseDate || '',
       prerelease: /-/.test(info.version)

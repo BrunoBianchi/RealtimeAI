@@ -64,6 +64,7 @@ function stubElement() {
     blur() {},
     scrollIntoView() {},
     setAttribute() {},
+    removeAttribute() {},
     getAttribute: () => null,
     closest: () => null
   };
@@ -97,9 +98,13 @@ function makeApi(overrides, calls) {
   });
 }
 
+const SIGNED_IN = { signedIn: true, available: true };
+
 // Loads a fresh renderer.
 //   api          overrides for window.rtai methods
-//   state        merged into Cue.state after the scripts load
+//   state        merged into Cue.state after the scripts load. The user is
+//                signed in unless the test says otherwise (state.auth and
+//                api.cloudStatus), since signed out only the login screen exists
 //   prefersLight answer of matchMedia('(prefers-color-scheme: light)')
 // Returns:
 //   Cue, S       window.Cue and Cue.state
@@ -111,6 +116,7 @@ function makeApi(overrides, calls) {
 //   page(id)     the element with that id in index.html (null if none)
 //   boot()       runs the DOMContentLoaded handlers (subscriptions, routing)
 //   dispatch()   sends a document event to the delegated listeners
+//   window       the page's global (to install fakes such as window.driver)
 function loadRenderer({ api = {}, state = {}, prefersLight = false } = {}) {
   const calls = [];
   const layers = [];
@@ -177,13 +183,13 @@ function loadRenderer({ api = {}, state = {}, prefersLight = false } = {}) {
     cancelAnimationFrame() {},
     // getState defaults to the state the test set up, as if the main process
     // held the same data, so a refreshState() keeps it.
-    rtai: makeApi({ getState: async () => ({ ...ctx.Cue.state }), ...api }, calls)
+    rtai: makeApi({ getState: async () => ({ ...ctx.Cue.state }), cloudStatus: async () => ({ ...SIGNED_IN, ...(state.auth || {}) }), ...api }, calls)
   };
   ctx.window = ctx;
   vm.createContext(ctx);
   for (const f of SCRIPTS) vm.runInContext(sources[f], ctx, { filename: f });
   const Cue = ctx.Cue;
-  deepMerge(Cue.state, state);
+  deepMerge(Cue.state, { auth: { ...SIGNED_IN }, ...state });
   return {
     Cue,
     S: Cue.state,
@@ -197,6 +203,7 @@ function loadRenderer({ api = {}, state = {}, prefersLight = false } = {}) {
     page,
     document,
     location,
+    window: ctx,
     boot: () => Promise.all((winListeners.DOMContentLoaded || []).map((fn) => fn())),
     dispatch: (type, event) => (docListeners[type] || []).forEach((fn) => fn(event))
   };

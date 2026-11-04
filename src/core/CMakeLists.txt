@@ -5,7 +5,6 @@ find_package(Threads REQUIRED)
 
 add_library(rtai_core STATIC
     src/resampler.cpp
-    src/wav_file_source.cpp
     src/deepgram_stream.cpp
     src/copilot_engine.cpp
     src/session_store.cpp
@@ -17,5 +16,11 @@ target_compile_features(rtai_core PUBLIC cxx_std_20)
 target_link_libraries(rtai_core
     PUBLIC Threads::Threads
     PRIVATE rtai::options)
+
+# Default cloud API (cloud_session.hpp): a header-only constant, so the
+# definition is PUBLIC and reaches every consumer of the header.
+if (RTAI_SERVER_URL)
+    target_compile_definitions(rtai_core PUBLIC "RTAI_SERVER_URL=\"${RTAI_SERVER_URL}\"")
+endif()
 
 set_target_properties(rtai_core PROPERTIES FOLDER "core")

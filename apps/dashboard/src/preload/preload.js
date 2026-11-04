@@ -28,6 +28,27 @@ contextBridge.exposeInMainWorld('rtai', {
   companyRecon: (payload) => ipcRenderer.invoke('rtai:company-recon', payload),
   syncCalendar: (icsUrl) => ipcRenderer.invoke('rtai:calendar-sync', icsUrl),
   saveConfig: (config) => ipcRenderer.invoke('rtai:save-config', config),
+  // RealTimeAI cloud account: device sign-in, status, sign-out.
+  cloudStatus: (force) => ipcRenderer.invoke('rtai:cloud-status', Boolean(force)),
+  cloudPasswordLogin: (creds) => ipcRenderer.invoke('rtai:cloud-password-login', creds),
+  cloudSignup: (data) => ipcRenderer.invoke('rtai:cloud-signup', data),
+  cloudResetPassword: (email) => ipcRenderer.invoke('rtai:cloud-reset-password', email),
+  cloudSync: () => ipcRenderer.invoke('rtai:cloud-sync'),
+  onCloudSynced: (cb) => {
+    const handler = (_ev, payload) => cb(payload);
+    ipcRenderer.on('rtai:cloud-synced', handler);
+    return () => ipcRenderer.removeListener('rtai:cloud-synced', handler);
+  },
+  cloudFiles: () => ipcRenderer.invoke('rtai:cloud-files'),
+  cloudFileDelete: (id) => ipcRenderer.invoke('rtai:cloud-file-delete', id),
+  cloudFilesBackup: () => ipcRenderer.invoke('rtai:cloud-files-backup'),
+  cloudBilling: (kind, pack) => ipcRenderer.invoke('rtai:cloud-billing', kind, pack),
+  cloudLogout: () => ipcRenderer.invoke('rtai:cloud-logout'),
+  onCloudEvent: (cb) => {
+    const handler = (_event, msg) => cb(msg);
+    ipcRenderer.on('rtai:cloud-event', handler);
+    return () => ipcRenderer.removeListener('rtai:cloud-event', handler);
+  },
   saveProfile: (profile) => ipcRenderer.invoke('rtai:save-profile', profile),
   startOverlay: (options) => ipcRenderer.invoke('rtai:start-overlay', options),
   stopOverlay: () => ipcRenderer.invoke('rtai:stop-overlay'),

@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "rtai/fake_transport.hpp"
-#include "rtai/fake_vad.hpp"
+#include "rtai/energy_vad.hpp"
 #include "rtai/latency.hpp"
 #include "rtai/source_pipeline.hpp"
 #include "rtai/transcript_aggregator.hpp"
@@ -70,8 +70,7 @@ TEST(PipelineE2E, WavThroughResamplerVadFakeTransport) {
         [&clock] { return clock.ticks(); }, clock.ticks_per_second(),
         /*realtime_pace=*/false};
 
-    FakeVadGate vad{512};
-    vad.set_energy_mode(0.05f); // tone is loud -> speech
+    EnergyVadGate vad{512, 0.05f}; // tone is loud -> speech
 
     FakeTransport transport{AudioSource::Microphone};
 
@@ -126,8 +125,7 @@ TEST(PipelineE2E, SilenceIsGatedOut) {
         wav, AudioSource::Loopback,
         [&clock] { return clock.ticks(); }, clock.ticks_per_second(), false};
 
-    FakeVadGate vad{512};
-    vad.set_energy_mode(0.05f);
+    EnergyVadGate vad{512, 0.05f};
 
     FakeTransport transport{AudioSource::Loopback};
 

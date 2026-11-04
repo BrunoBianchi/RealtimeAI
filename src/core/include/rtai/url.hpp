@@ -28,6 +28,14 @@ inline ParsedUrl parse_url(std::string_view url) {
         u.secure = false;
         u.port = 80;
         rest = url.substr(7);
+    } else if (url.substr(0, 6) == "wss://") { // WebSocket endpoints (cloud STT)
+        u.secure = true;
+        u.port = 443;
+        rest = url.substr(6);
+    } else if (url.substr(0, 5) == "ws://") {
+        u.secure = false;
+        u.port = 80;
+        rest = url.substr(5);
     } else {
         return u;
     }

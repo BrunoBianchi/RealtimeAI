@@ -42,6 +42,7 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <memory>
 #include <string>
 
@@ -69,6 +70,8 @@ struct OverlayOptions {
     bool stealth_activity_monitor{true};
     bool stealth_click_through{false};
     bool stealth_screen_capture{true};
+    // [atalhos] of config.ini; an action not listed uses its default.
+    std::map<std::string, std::string> hotkeys;
 };
 
 // Audio meters polled by the overlay (~20 Hz while visible).

@@ -1,4 +1,4 @@
-// Pure core — ITranscriptionTransport fake for tests/demo. Instead of talking
+// Test-only (tests/support) — ITranscriptionTransport fake. Instead of talking
 // to Deepgram, it echoes scripted transcript events and counts audio bytes and
 // KeepAlive/silence marks so tests can assert pipeline behaviour.
 #pragma once

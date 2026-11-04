@@ -1,10 +1,11 @@
 # WinHTTP adapters: WebSocket (Deepgram), streaming HTTPS (LLM providers),
-# analytics and web search.
+# analytics, web search and the RealTimeAI cloud session broker.
 add_library(rtai_net STATIC
     src/winhttp_websocket.cpp
     src/winhttp_llm_client.cpp
     src/jev_analytics_client.cpp
     src/web_search.cpp
+    src/cloud_client.cpp
 )
 add_library(rtai::net ALIAS rtai_net)
 

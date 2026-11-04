@@ -46,7 +46,7 @@
   };
 
   function headHtml(title, sub) {
-    return `<div class="modal-head"><div class="stack grow" style="gap:2px"><span class="t">${esc(title)}</span>${sub ? `<span class="s">${sub}</span>` : ''}</div><button type="button" class="icon-btn" data-action="modal-close" title="Fechar">${icon('x')}</button></div>`;
+    return `<div class="modal-head"><div class="stack grow" style="gap:2px"><span class="t">${esc(title)}</span>${sub ? `<span class="s">${sub}</span>` : ''}</div><button type="button" class="icon-btn" data-action="modal-close" title="Close">${icon('x')}</button></div>`;
   }
 
   C.actions['modal-close'] = () => close();
@@ -59,7 +59,7 @@
         `<div class="modal" role="alertdialog">
           ${headHtml(title)}
           <div class="modal-body"><span class="muted" style="font-size:13px">${esc(body || '')}</span></div>
-          <div class="modal-foot"><button type="button" class="btn lg" data-cf="0">Cancelar</button><button type="button" class="btn lg ${/excluir|remover/i.test(okLabel || '') ? 'danger' : 'primary'}" data-cf="1" autofocus>${esc(okLabel || 'Confirmar')}</button></div>
+          <div class="modal-foot"><button type="button" class="btn lg" data-cf="0">Cancel</button><button type="button" class="btn lg ${/delete|remove|sign out/i.test(okLabel || '') ? 'danger' : 'primary'}" data-cf="1" autofocus>${esc(okLabel || 'Confirm')}</button></div>
         </div>`,
         {
           onClose: () => {
@@ -107,35 +107,35 @@
     function paint() {
       const step1 = `
         <div class="modal-body">
-          <label class="field">Cargo<input class="input" id="nsRole" value="${esc(st.role)}" placeholder="Ex.: Senior Product Designer" autofocus/></label>
+          <label class="field">Role<input class="input" id="nsRole" value="${esc(st.role)}" placeholder="E.g. Senior Product Designer" autofocus/></label>
           <div class="form-grid">
-            <label class="field">Empresa<input class="input" id="nsCompany" value="${esc(st.company)}" placeholder="Ex.: Nubank ou nubank.com.br"/></label>
-            <div class="form-grid" style="gap:8px"><label class="field">Data<input class="input" type="date" id="nsDate" value="${esc(st.date)}"/></label><label class="field">Hora<input class="input" type="time" id="nsTime" value="${esc(st.time)}"/></label></div>
+            <label class="field">Company<input class="input" id="nsCompany" value="${esc(st.company)}" placeholder="E.g. Nubank or nubank.com.br"/></label>
+            <div class="form-grid" style="gap:8px"><label class="field">Date<input class="input" type="date" id="nsDate" value="${esc(st.date)}"/></label><label class="field">Time<input class="input" type="time" id="nsTime" value="${esc(st.time)}"/></label></div>
           </div>
-          <div class="field">Formato
+          <div class="field">Format
             <div class="row wrap" style="gap:4px">${C.FORMATS.map((f) => `<button type="button" class="filter-chip ${st.format === f ? 'active' : ''}" data-ns-format="${esc(f)}">${esc(f)}</button>`).join('')}</div>
           </div>
-          <label class="field">Descrição da vaga <span class="hint">opcional, ajuda muito o copiloto</span><textarea class="textarea" id="nsJob" rows="3" placeholder="Cole a descrição da vaga">${esc(st.job)}</textarea></label>
+          <label class="field">Job description <span class="hint">optional, helps the copilot a lot</span><textarea class="textarea" id="nsJob" rows="3" placeholder="Paste the job description">${esc(st.job)}</textarea></label>
         </div>`;
       const all = [...existing, ...st.uploads];
       const step2 = `
         <div class="modal-body" style="gap:6px">
-          <span class="small muted" style="padding-bottom:4px">Contexto que a IA deve usar</span>
+          <span class="small muted" style="padding-bottom:4px">Context the AI should use</span>
           ${all.length
             ? all
                 .map((d, i) => {
                   const on = st.picked.has(i);
-                  return `<button type="button" class="check-row ${on ? 'on' : ''}" data-ns-pick="${i}"><span class="box">${icon('check')}</span><span class="grow truncate">${esc(fixText(d.title || d.name || 'Documento'))}</span><span class="xs faint">${esc(C.TAG_LABEL[C.docTag(d)])}</span></button>`;
+                  return `<button type="button" class="check-row ${on ? 'on' : ''}" data-ns-pick="${i}"><span class="box">${icon('check')}</span><span class="grow truncate">${esc(fixText(d.title || d.name || 'Document'))}</span><span class="xs faint">${esc(C.TAG_LABEL[C.docTag(d)])}</span></button>`;
                 })
                 .join('')
-            : '<div class="empty" style="padding:20px">Nenhum arquivo ainda. Envie seu currículo para respostas baseadas na sua experiência.</div>'}
-          <button type="button" class="btn" style="margin-top:6px;align-self:flex-start" data-ns-upload="1">${icon('upload')}Enviar arquivos</button>
-          <label class="toggle-row" style="margin-top:8px;cursor:pointer"><span class="txt"><span class="t">Pesquisar a empresa automaticamente</span><span class="s">Gera um dossiê (produto, cultura, notícias) para o copiloto.</span></span>${C.sw('id="nsResearch"', st.research)}</label>
+            : '<div class="empty" style="padding:20px">No files yet. Upload your resume for answers based on your experience.</div>'}
+          <button type="button" class="btn" style="margin-top:6px;align-self:flex-start" data-ns-upload="1">${icon('upload')}Upload files</button>
+          <label class="toggle-row" style="margin-top:8px;cursor:pointer"><span class="txt"><span class="t">Research the company automatically</span><span class="s">Builds a brief (product, culture, news) for the copilot.</span></span>${C.sw('id="nsResearch"', st.research)}</label>
         </div>`;
       box.innerHTML = `
-        ${headHtml('Nova sessão', `Passo ${st.step} / 2`)}
+        ${headHtml('New session', `Step ${st.step} / 2`)}
         ${st.step === 1 ? step1 : step2}
-        <div class="modal-foot"><button type="button" class="btn lg" data-ns-back="1">${st.step === 1 ? 'Cancelar' : 'Voltar'}</button><button type="button" class="btn primary lg" data-ns-next="1">${st.step === 1 ? 'Continuar' : 'Criar sessão'}</button></div>`;
+        <div class="modal-foot"><button type="button" class="btn lg" data-ns-back="1">${st.step === 1 ? 'Cancel' : 'Back'}</button><button type="button" class="btn primary lg" data-ns-next="1">${st.step === 1 ? 'Continue' : 'Create session'}</button></div>`;
       window.CueIcons.hydrateIcons(box);
       const role = box.querySelector('#nsRole');
       if (role) setTimeout(() => role.focus(), 30);
@@ -166,7 +166,7 @@
       capture();
       if (st.step === 1) {
         if (!st.role && !st.company) {
-          C.toast('Informe pelo menos o cargo ou a empresa.', 'error');
+          C.toast('Enter at least the role or the company.', 'error');
           return;
         }
         st.step = 2;
@@ -192,7 +192,7 @@
         role: st.role,
         job_description: st.job,
         interview_format: st.format,
-        extra_instructions: 'Responda em primeira pessoa, com exemplos reais do meu currículo (método STAR), sem inventar fatos.',
+        extra_instructions: 'Answer in the first person, with real examples from my resume (STAR method), without making up facts.',
         company_research: '',
         documents: docs,
         next_interview_date: st.date,
@@ -209,7 +209,7 @@
       let saved = null;
       if (docs.length) {
         btn.innerHTML = '<span class="spinner"></span>Lendo os arquivos…';
-        const deep = await C.guard(() => api.deepReadAgent(agent), 'Não foi possível indexar os arquivos.');
+        const deep = await C.guard(() => api.deepReadAgent(agent), 'Could not index the files.');
         if (deep) {
           C.applyAgents(deep.agents, deep.agent && deep.agent.id);
           saved = deep.agent;
@@ -218,17 +218,17 @@
       if (!saved) saved = await C.saveAgent(agent);
       if (!saved) {
         btn.disabled = false;
-        btn.textContent = 'Criar sessão';
+        btn.textContent = 'Create session';
         return;
       }
       if (st.date) {
         const res = await C.guard(() => api.scheduleInterview({ goalId: saved.id, date: st.date, time: st.time }));
         if (res && res.agents) C.applyAgents(res.agents, saved.id);
         const cal = res && res.calendar;
-        if (cal && cal.ok && !cal.skipped) C.toast('Entrevista adicionada ao Google Calendar.');
+        if (cal && cal.ok && !cal.skipped) C.toast('Interview added to Google Calendar.');
       }
       close(entry);
-      C.toast(`Sessão "${C.agentTitle(saved)}" criada.`);
+      C.toast(`Session "${C.agentTitle(saved)}" created.`);
       C.navigate(`session/${saved.id}`);
     }
 
@@ -251,8 +251,8 @@
       }
       if (e.target.closest('[data-ns-upload]')) {
         capture();
-        const res = await C.guard(() => api.pickFiles('resume'), 'Não foi possível abrir os arquivos.');
-        if (res && res.failed && res.failed.length) C.toast(`Sem texto legível: ${res.failed.map((f) => f.title).join(', ')}`, 'error');
+        const res = await C.guard(() => api.pickFiles('resume'), 'Could not open the files.');
+        if (res && res.failed && res.failed.length) C.toast(`No readable text: ${res.failed.map((f) => f.title).join(', ')}`, 'error');
         if (res && res.documents && res.documents.length) {
           const base = existing.length + st.uploads.length;
           st.uploads.push(...res.documents);
@@ -281,18 +281,18 @@
   MODALS['edit-session'] = (a) => {
     if (!a) return;
     const entry = mount(`<div class="modal wide">
-      ${headHtml('Editar sessão', esc(C.agentTitle(a)))}
+      ${headHtml('Edit session', esc(C.agentTitle(a)))}
       <div class="modal-body">
         <div class="form-grid">
-          <label class="field">Cargo<input class="input" id="esRole" value="${esc(fixText(a.role || ''))}"/></label>
-          <label class="field">Empresa<input class="input" id="esCompany" value="${esc(fixText(a.company || ''))}"/></label>
+          <label class="field">Role<input class="input" id="esRole" value="${esc(fixText(a.role || ''))}"/></label>
+          <label class="field">Company<input class="input" id="esCompany" value="${esc(fixText(a.company || ''))}"/></label>
         </div>
-        <div class="field">Formato<div class="row wrap" style="gap:4px" id="esFormats">${C.FORMATS.map((f) => `<button type="button" class="filter-chip ${a.interview_format === f ? 'active' : ''}" data-f="${esc(f)}">${esc(f)}</button>`).join('')}</div></div>
-        <label class="field">Descrição da vaga<textarea class="textarea" id="esJob" rows="5">${esc(fixText(a.job_description || ''))}</textarea></label>
-        <label class="field">Instruções para o copiloto<textarea class="textarea" id="esInstr" rows="3">${esc(fixText(a.extra_instructions || a.custom_instructions || ''))}</textarea></label>
-        <label class="field">Resumo compacto (mini-compact) <span class="hint">gerado a partir dos arquivos; edite só se precisar</span><textarea class="textarea mono" id="esCompact" rows="5">${esc(fixText(a.mini_compact || ''))}</textarea></label>
+        <div class="field">Format<div class="row wrap" style="gap:4px" id="esFormats">${C.FORMATS.map((f) => `<button type="button" class="filter-chip ${a.interview_format === f ? 'active' : ''}" data-f="${esc(f)}">${esc(f)}</button>`).join('')}</div></div>
+        <label class="field">Job description<textarea class="textarea" id="esJob" rows="5">${esc(fixText(a.job_description || ''))}</textarea></label>
+        <label class="field">Instructions for the copilot<textarea class="textarea" id="esInstr" rows="3">${esc(fixText(a.extra_instructions || a.custom_instructions || ''))}</textarea></label>
+        <label class="field">Compact summary (mini-compact) <span class="hint">generated from the files; edit only if needed</span><textarea class="textarea mono" id="esCompact" rows="5">${esc(fixText(a.mini_compact || ''))}</textarea></label>
       </div>
-      <div class="modal-foot"><button type="button" class="btn lg" data-action="modal-close">Cancelar</button><button type="button" class="btn primary lg" id="esSave">Salvar</button></div>
+      <div class="modal-foot"><button type="button" class="btn lg" data-action="modal-close">Cancel</button><button type="button" class="btn primary lg" id="esSave">Save</button></div>
     </div>`);
     const L = entry.layer;
     let format = a.interview_format || '';
@@ -320,7 +320,7 @@
           custom_instructions: instr,
           mini_compact: changedSources && compact === (a.mini_compact || '') ? '' : compact
         },
-        'Sessão atualizada.'
+        'Session updated.'
       );
       if (saved) {
         close(entry);
@@ -334,7 +334,7 @@
   MODALS.scheduler = (agentId) => {
     const agents = S.agents.filter((a) => !a.archived);
     if (!agents.length) {
-      C.toast('Crie uma sessão para agendar a entrevista.');
+      C.toast('Create a session to schedule the interview.');
       newSession();
       return;
     }
@@ -342,13 +342,13 @@
     const iv = C.agentInterview(a);
     const gconn = S.gcal.status && S.gcal.status.connected;
     const entry = mount(`<div class="modal">
-      ${headHtml('Agendar entrevista', 'Lembrete do Windows 1 hora antes')}
+      ${headHtml('Schedule interview', 'Windows reminder 1 hour before')}
       <div class="modal-body">
-        <label class="field">Sessão<select class="select" id="scAgent">${C.opts(agents.map((x) => [x.id, C.agentTitle(x)]), a.id)}</select></label>
-        <div class="form-grid"><label class="field">Data<input class="input" type="date" id="scDate" value="${esc(iv ? iv.date : '')}"/></label><label class="field">Hora<input class="input" type="time" id="scTime" value="${esc(iv ? iv.time : '')}"/></label></div>
-        ${gconn ? `<label class="toggle-row" style="cursor:pointer"><span class="txt"><span class="t">Adicionar ao Google Calendar</span><span class="s">${esc(S.gcal.status.email || 'Conta conectada')}</span></span>${C.sw('id="scGcal"', S.gcal.status.autoSync !== false)}</label>` : ''}
+        <label class="field">Session<select class="select" id="scAgent">${C.opts(agents.map((x) => [x.id, C.agentTitle(x)]), a.id)}</select></label>
+        <div class="form-grid"><label class="field">Date<input class="input" type="date" id="scDate" value="${esc(iv ? iv.date : '')}"/></label><label class="field">Time<input class="input" type="time" id="scTime" value="${esc(iv ? iv.time : '')}"/></label></div>
+        ${gconn ? `<label class="toggle-row" style="cursor:pointer"><span class="txt"><span class="t">Add to Google Calendar</span><span class="s">${esc(S.gcal.status.email || 'Account connected')}</span></span>${C.sw('id="scGcal"', S.gcal.status.autoSync !== false)}</label>` : ''}
       </div>
-      <div class="modal-foot">${iv ? '<button type="button" class="btn lg danger left" id="scClear">Remover data</button>' : ''}<button type="button" class="btn lg" data-action="modal-close">Cancelar</button><button type="button" class="btn primary lg" id="scSave">Agendar</button></div>
+      <div class="modal-foot">${iv ? '<button type="button" class="btn lg danger left" id="scClear">Remove date</button>' : ''}<button type="button" class="btn lg" data-action="modal-close">Cancel</button><button type="button" class="btn primary lg" id="scSave">Schedule</button></div>
     </div>`);
     const L = entry.layer;
     L.querySelector('#scAgent').addEventListener('change', (e) => {
@@ -358,28 +358,28 @@
     });
     const outcome = (cal) => {
       if (!cal || cal.skipped) return '';
-      if (cal.ok) return cal.removed ? ' Removida do Google Calendar.' : cal.removed === false ? '' : ' Adicionada ao Google Calendar.';
-      return ` Google Calendar: ${cal.error || 'não atualizado.'}`;
+      if (cal.ok) return cal.removed ? ' Removed from Google Calendar.' : cal.removed === false ? '' : ' Added to Google Calendar.';
+      return ` Google Calendar: ${cal.error || 'not updated.'}`;
     };
     L.querySelector('#scSave').addEventListener('click', async () => {
       const id = L.querySelector('#scAgent').value;
       const date = L.querySelector('#scDate').value;
       const time = L.querySelector('#scTime').value;
       if (!date) {
-        C.toast('Escolha a data da entrevista.', 'error');
+        C.toast('Pick the interview date.', 'error');
         return;
       }
       const g = L.querySelector('#scGcal');
-      const res = await C.guard(() => api.scheduleInterview({ goalId: id, date, time, calendar: g ? g.checked : undefined }), 'Não foi possível agendar.');
+      const res = await C.guard(() => api.scheduleInterview({ goalId: id, date, time, calendar: g ? g.checked : undefined }), 'Could not schedule.');
       if (!res) return;
       if (res.ok === false) {
-        C.toast(res.error || 'Não foi possível agendar.', 'error');
+        C.toast(res.error || 'Could not schedule.', 'error');
         return;
       }
       C.applyAgents(res.agents, id);
       close(entry);
       const d = new Date(`${date}T${time || '00:00'}`);
-      C.toast(`Entrevista em ${C.fmtDateShort(d)}${time ? ` às ${time}` : ''}.${outcome(res.calendar)}`);
+      C.toast(`Interview on ${C.fmtDateShort(d)}${time ? ` at ${time}` : ''}.${outcome(res.calendar)}`);
       C.renderShell();
       C.refresh();
     });
@@ -387,11 +387,11 @@
     if (clr)
       clr.addEventListener('click', async () => {
         const id = L.querySelector('#scAgent').value;
-        const res = await C.guard(() => api.clearInterview(id), 'Não foi possível remover a data.');
+        const res = await C.guard(() => api.clearInterview(id), 'Could not remove the date.');
         if (!res) return;
         await C.refreshState();
         close(entry);
-        C.toast(`Data removida.${outcome(res.calendar)}`);
+        C.toast(`Date removed.${outcome(res.calendar)}`);
         C.renderShell();
         C.refresh();
       });
@@ -402,14 +402,14 @@
   MODALS.profile = () => {
     const p = S.profile || {};
     const entry = mount(`<div class="modal">
-      ${headHtml('Perfil', 'Salvo só neste computador')}
+      ${headHtml('Profile', 'Saved only on this computer')}
       <div class="modal-body">
-        <label class="field">Nome<input class="input" id="pfName" value="${esc(fixText(p.name || ''))}" autofocus/></label>
+        <label class="field">Name<input class="input" id="pfName" value="${esc(fixText(p.name || ''))}" autofocus/></label>
         <label class="field">E-mail<input class="input" id="pfEmail" type="email" value="${esc(p.email || '')}"/></label>
-        <div class="form-grid"><label class="field">Cargo atual<input class="input" id="pfHeadline" value="${esc(fixText(p.headline || ''))}"/></label><label class="field">Senioridade<input class="input" id="pfSeniority" value="${esc(fixText(p.seniority || ''))}"/></label></div>
+        <div class="form-grid"><label class="field">Current role<input class="input" id="pfHeadline" value="${esc(fixText(p.headline || ''))}"/></label><label class="field">Seniority<input class="input" id="pfSeniority" value="${esc(fixText(p.seniority || ''))}"/></label></div>
         <label class="field">LinkedIn<input class="input" id="pfLinkedin" value="${esc(p.linkedin || '')}" placeholder="linkedin.com/in/…"/></label>
       </div>
-      <div class="modal-foot"><button type="button" class="btn lg" data-action="modal-close">Cancelar</button><button type="button" class="btn primary lg" id="pfSave">Salvar</button></div>
+      <div class="modal-foot"><button type="button" class="btn lg" data-action="modal-close">Cancel</button><button type="button" class="btn primary lg" id="pfSave">Save</button></div>
     </div>`);
     const L = entry.layer;
     L.querySelector('#pfSave').addEventListener('click', async () => {
@@ -422,12 +422,12 @@
             seniority: L.querySelector('#pfSeniority').value.trim(),
             linkedin: L.querySelector('#pfLinkedin').value.trim()
           }),
-        'Não foi possível salvar o perfil.'
+        'Could not save the profile.'
       );
       if (!res) return;
       S.profile = res.profile || S.profile;
       close(entry);
-      C.toast('Perfil atualizado.');
+      C.toast('Profile updated.');
       C.renderShell();
       C.refresh();
     });
@@ -438,12 +438,12 @@
   MODALS.summary = (summary) => {
     const agent = C.agentById(S.overlayStatus.agentId || S.live.agentId) || C.activeAgent();
     const entry = mount(`<div class="modal wide">
-      ${headHtml('Resumo da sessão', summary.export_path ? esc(summary.export_path) : 'Gerado ao encerrar o copiloto')}
-      <div class="modal-body"><div class="doc-preview md sm" style="max-height:52vh">${C.md(summary.text || 'Sem resumo.')}</div></div>
+      ${headHtml('Session summary', summary.export_path ? esc(summary.export_path) : 'Generated when the copilot stops')}
+      <div class="modal-body"><div class="doc-preview md sm" style="max-height:52vh">${C.md(summary.text || 'No summary.')}</div></div>
       <div class="modal-foot">
-        ${summary.export_path ? `<button type="button" class="btn lg left" data-action="open-path" data-path="${esc(summary.export_path)}">${icon('external')}Abrir arquivo</button>` : '<button type="button" class="btn lg left" data-action="open-path">Abrir pasta</button>'}
-        ${agent ? `<button type="button" class="btn lg" id="smDebrief">${icon('sparkle')}Salvar debrief na sessão</button>` : ''}
-        <button type="button" class="btn primary lg" data-action="go" data-to="sessions/past" id="smHistory">Ver no histórico</button>
+        ${summary.export_path ? `<button type="button" class="btn lg left" data-action="open-path" data-path="${esc(summary.export_path)}">${icon('external')}Open file</button>` : '<button type="button" class="btn lg left" data-action="open-path">Open folder</button>'}
+        ${agent ? `<button type="button" class="btn lg" id="smDebrief">${icon('sparkle')}Save debrief to the session</button>` : ''}
+        <button type="button" class="btn primary lg" data-action="go" data-to="sessions/past" id="smHistory">View in history</button>
       </div>
     </div>`);
     const L = entry.layer;
@@ -453,15 +453,15 @@
       dbf.addEventListener('click', async () => {
         dbf.disabled = true;
         dbf.innerHTML = '<span class="spinner"></span>Gerando…';
-        const res = await C.guard(() => api.generateDebrief({ agentId: agent.id, sessionId: summary.export_path || '', transcript: summary.text || '' }), 'Não foi possível gerar o debrief.');
+        const res = await C.guard(() => api.generateDebrief({ agentId: agent.id, sessionId: summary.export_path || '', transcript: summary.text || '' }), 'Could not generate the debrief.');
         if (res && res.ok !== false) {
           await C.refreshState();
-          C.toast('Debrief salvo na memória da sessão.');
+          C.toast('Debrief saved to the session memory.');
           close(entry);
           C.navigate(`session/${agent.id}`);
         } else {
           dbf.disabled = false;
-          dbf.textContent = 'Tentar de novo';
+          dbf.textContent = 'Try again';
         }
       });
   };
@@ -469,9 +469,9 @@
   // ------------------------------------------------------- doc preview --
   MODALS['doc-preview'] = (doc) => {
     mount(`<div class="modal xwide">
-      ${headHtml(fixText(doc.title || doc.name || 'Documento'), `${esc(C.TAG_LABEL[C.docTag(doc)])} · ${esc(C.fmtKb((doc.content || '').length))}`)}
-      <div class="modal-body"><div class="doc-preview"><pre class="pre-text">${esc(fixText(doc.content || 'Sem texto extraído deste arquivo.'))}</pre></div></div>
-      <div class="modal-foot"><button type="button" class="btn primary lg" data-action="modal-close">Fechar</button></div>
+      ${headHtml(fixText(doc.title || doc.name || 'Document'), `${esc(C.TAG_LABEL[C.docTag(doc)])} · ${esc(C.fmtKb((doc.content || '').length))}`)}
+      <div class="modal-body"><div class="doc-preview"><pre class="pre-text">${esc(fixText(doc.content || 'No text extracted from this file.'))}</pre></div></div>
+      <div class="modal-foot"><button type="button" class="btn primary lg" data-action="modal-close">Close</button></div>
     </div>`);
   };
 
@@ -484,19 +484,19 @@
     }
     const a = C.agentById(agentId) || C.activeAgent() || agents[0];
     const entry = mount(`<div class="modal wide">
-      ${headHtml('Colar texto', 'Vira um documento no contexto da sessão')}
+      ${headHtml('Paste text', 'Becomes a document in the session context')}
       <div class="modal-body">
-        <div class="form-grid"><label class="field">Título<input class="input" id="pdTitle" placeholder="Ex.: Descrição da vaga" autofocus/></label><label class="field">Tipo<select class="select" id="pdTag">${C.opts(Object.entries(C.TAG_LABEL), 'job')}</select></label></div>
-        <label class="field">Sessão<select class="select" id="pdAgent">${C.opts(agents.map((x) => [x.id, C.agentTitle(x)]), a.id)}</select></label>
-        <label class="field">Conteúdo<textarea class="textarea" id="pdContent" rows="10" placeholder="Cole aqui o texto"></textarea></label>
+        <div class="form-grid"><label class="field">Title<input class="input" id="pdTitle" placeholder="E.g. Job description" autofocus/></label><label class="field">Type<select class="select" id="pdTag">${C.opts(Object.entries(C.TAG_LABEL), 'job')}</select></label></div>
+        <label class="field">Session<select class="select" id="pdAgent">${C.opts(agents.map((x) => [x.id, C.agentTitle(x)]), a.id)}</select></label>
+        <label class="field">Content<textarea class="textarea" id="pdContent" rows="10" placeholder="Paste the text here"></textarea></label>
       </div>
-      <div class="modal-foot"><button type="button" class="btn lg" data-action="modal-close">Cancelar</button><button type="button" class="btn primary lg" id="pdSave">Adicionar</button></div>
+      <div class="modal-foot"><button type="button" class="btn lg" data-action="modal-close">Cancel</button><button type="button" class="btn primary lg" id="pdSave">Add</button></div>
     </div>`);
     const L = entry.layer;
     L.querySelector('#pdSave').addEventListener('click', async () => {
       const content = L.querySelector('#pdContent').value.trim();
       if (!content) {
-        C.toast('Cole o conteúdo antes de salvar.', 'error');
+        C.toast('Paste the content before saving.', 'error');
         return;
       }
       const target = C.agentById(L.querySelector('#pdAgent').value);
@@ -512,15 +512,15 @@
   MODALS.playbook = (agentId) => {
     let length = 'Balanced';
     const entry = mount(`<div class="modal">
-      ${headHtml('Novo playbook', 'Como o copiloto estrutura as respostas')}
+      ${headHtml('New playbook', 'How the copilot structures answers')}
       <div class="modal-body">
-        <label class="field">Nome<input class="input" id="pbName" placeholder="Ex.: STAR executivo" autofocus/></label>
-        <div class="field">Tamanho<div class="segmented" id="pbLen">${[['Concise', 'Conciso'], ['Balanced', 'Equilibrado'], ['Thorough', 'Detalhado']].map(([v, l]) => `<button type="button" class="${v === length ? 'active' : ''}" data-v="${v}">${l}</button>`).join('')}</div></div>
-        <label class="field">Estrutura comportamental<select class="select" id="pbStruct">${C.opts([['Auto', 'Automática'], ['STAR (Situation, Task, Action, Result)', 'STAR (Situação, Tarefa, Ação, Resultado)'], ['CAR (Context, Action, Result)', 'CAR (Contexto, Ação, Resultado)'], ['PAR (Problem, Action, Result)', 'PAR (Problema, Ação, Resultado)']], 'STAR (Situation, Task, Action, Result)')}</select></label>
-        <label class="toggle-row" style="cursor:pointer"><span class="txt"><span class="t">Começar pela resposta</span><span class="s">O veredito vem antes do contexto.</span></span>${C.sw('id="pbLead"', true)}</label>
-        <label class="toggle-row" style="cursor:pointer"><span class="txt"><span class="t">Explicitar trade-offs</span><span class="s">Nomeia alternativas e por que foram descartadas.</span></span>${C.sw('id="pbTrade"', false)}</label>
+        <label class="field">Name<input class="input" id="pbName" placeholder="E.g. Executive STAR" autofocus/></label>
+        <div class="field">Length<div class="segmented" id="pbLen">${[['Concise', 'Concise'], ['Balanced', 'Balanced'], ['Thorough', 'Thorough']].map(([v, l]) => `<button type="button" class="${v === length ? 'active' : ''}" data-v="${v}">${l}</button>`).join('')}</div></div>
+        <label class="field">Behavioral structure<select class="select" id="pbStruct">${C.opts([['Auto', 'Automatic'], ['STAR (Situation, Task, Action, Result)', 'STAR (Situation, Task, Action, Result)'], ['CAR (Context, Action, Result)', 'CAR (Context, Action, Result)'], ['PAR (Problem, Action, Result)', 'PAR (Problem, Action, Result)']], 'STAR (Situation, Task, Action, Result)')}</select></label>
+        <label class="toggle-row" style="cursor:pointer"><span class="txt"><span class="t">Lead with the answer</span><span class="s">The verdict comes before the context.</span></span>${C.sw('id="pbLead"', true)}</label>
+        <label class="toggle-row" style="cursor:pointer"><span class="txt"><span class="t">Make trade-offs explicit</span><span class="s">Names alternatives and why they were ruled out.</span></span>${C.sw('id="pbTrade"', false)}</label>
       </div>
-      <div class="modal-foot"><button type="button" class="btn lg" data-action="modal-close">Cancelar</button><button type="button" class="btn primary lg" id="pbSave">Salvar e aplicar</button></div>
+      <div class="modal-foot"><button type="button" class="btn lg" data-action="modal-close">Cancel</button><button type="button" class="btn primary lg" id="pbSave">Save and apply</button></div>
     </div>`);
     const L = entry.layer;
     L.querySelector('#pbLen').addEventListener('click', (e) => {
@@ -532,7 +532,7 @@
     L.querySelector('#pbSave').addEventListener('click', async () => {
       const name = L.querySelector('#pbName').value.trim();
       if (!name) {
-        C.toast('Dê um nome ao playbook.', 'error');
+        C.toast('Give the playbook a name.', 'error');
         return;
       }
       const pb = {
@@ -542,7 +542,7 @@
         lead_with_answer: L.querySelector('#pbLead').checked,
         name_tradeoffs: L.querySelector('#pbTrade').checked
       };
-      const res = await C.guard(() => api.savePlaybook(pb), 'Não foi possível salvar o playbook.');
+      const res = await C.guard(() => api.savePlaybook(pb), 'Could not save the playbook.');
       if (!res) return;
       if (res.playbooks) S.playbooks = res.playbooks;
       const a = C.agentById(agentId);
@@ -556,7 +556,7 @@
             playbook_lead_with_answer: pb.lead_with_answer,
             playbook_name_tradeoffs: pb.name_tradeoffs
           },
-          `Playbook "${name}" salvo e aplicado.`
+          `Playbook "${name}" saved and applied.`
         );
       } else C.toast(`Playbook "${name}" salvo.`);
       close(entry);
@@ -569,7 +569,7 @@
   MODALS.palette = () => {
     if (stack.some((e) => e.palette)) return;
     const entry = mount(`<div class="modal palette">
-      <div class="palette-input">${icon('magnifying-glass')}<input id="pcQuery" placeholder="Buscar sessões, arquivos, perguntas ou ações…" autofocus/><span class="kbd">Esc</span></div>
+      <div class="palette-input">${icon('magnifying-glass')}<input id="pcQuery" placeholder="Search sessions, files, questions or actions…" autofocus/><span class="kbd">Esc</span></div>
       <div class="palette-list" id="pcList"></div>
     </div>`);
     entry.palette = true;
@@ -582,23 +582,23 @@
     const base = () => {
       const out = [];
       const running = S.overlayStatus.running;
-      out.push({ g: 'Ações', ic: 'plus', t: 'Nova sessão', run: () => newSession() });
-      out.push(running ? { g: 'Ações', ic: 'stop', t: 'Encerrar copiloto', run: () => C.stopCopilot() } : { g: 'Ações', ic: 'play', t: 'Iniciar copiloto ao vivo', sub: C.activeAgent() ? C.agentTitle(C.activeAgent()) : '', run: () => C.startCopilot(C.activeAgent(), false) });
-      out.push({ g: 'Ações', ic: 'calendar', t: 'Agendar entrevista', run: () => MODALS.scheduler() });
-      out.push({ g: 'Ações', ic: 'eye-slash', t: S.stealthState.active ? 'Mostrar painel em capturas' : 'Ocultar painel de capturas', run: () => C.actions['toggle-stealth']() });
-      [['home', 'Início', 'house'], ['sessions', 'Sessões', 'stack'], ['sessions/past', 'Histórico', 'history'], ['files', 'Arquivos', 'folder'], ['questions', 'Banco de perguntas', 'question'], ['live', 'Ao vivo', 'broadcast'], ['settings/ai', 'Configurações · IA e modelos', 'cpu'], ['settings/audio', 'Configurações · Áudio', 'microphone'], ['settings/privacy', 'Configurações · Privacidade', 'shield-check'], ['settings/calendar', 'Configurações · Calendário', 'calendar'], ['settings/shortcuts', 'Atalhos', 'keyboard'], ['settings/updates', 'Atualizações', 'download']].forEach(([to, t, ic]) =>
-        out.push({ g: 'Ir para', ic, t, run: () => C.navigate(to) })
+      out.push({ g: 'Actions', ic: 'plus', t: 'New session', run: () => newSession() });
+      out.push(running ? { g: 'Actions', ic: 'stop', t: 'Stop copilot', run: () => C.stopCopilot() } : { g: 'Actions', ic: 'play', t: 'Start the live copilot', sub: C.activeAgent() ? C.agentTitle(C.activeAgent()) : '', run: () => C.startCopilot(C.activeAgent(), false) });
+      out.push({ g: 'Actions', ic: 'calendar', t: 'Schedule interview', run: () => MODALS.scheduler() });
+      out.push({ g: 'Actions', ic: 'eye-slash', t: S.stealthState.active ? 'Show the panel in captures' : 'Hide the panel from captures', run: () => C.actions['toggle-stealth']() });
+      [['home', 'Home', 'house'], ['sessions', 'Sessions', 'stack'], ['sessions/past', 'History', 'history'], ['files', 'Files', 'folder'], ['questions', 'Question bank', 'question'], ['live', 'Live', 'broadcast'], ['settings/ai', 'Settings · AI and models', 'cpu'], ['settings/audio', 'Settings · Audio', 'microphone'], ['settings/privacy', 'Settings · Privacy', 'shield-check'], ['settings/calendar', 'Settings · Calendar', 'calendar'], ['settings/shortcuts', 'Shortcuts', 'keyboard'], ['settings/updates', 'Updates', 'download']].forEach(([to, t, ic]) =>
+        out.push({ g: 'Go to', ic, t, run: () => C.navigate(to) })
       );
-      S.agents.forEach((a) => out.push({ g: 'Sessões', ic: 'stack', t: C.agentTitle(a), sub: a.archived ? 'arquivada' : `${C.readiness(a).pct}% preparado`, run: () => C.navigate(`session/${a.id}`) }));
+      S.agents.forEach((a) => out.push({ g: 'Sessions', ic: 'stack', t: C.agentTitle(a), sub: a.archived ? 'archived' : `${C.readiness(a).pct}% ready`, run: () => C.navigate(`session/${a.id}`) }));
       S.sessions.slice(0, 60).forEach((s) => {
         const d = C.sessionDate(s);
-        out.push({ g: 'Histórico', ic: 'history', t: C.sessionTitle(s), sub: d ? `${C.fmtDateShort(d)} ${C.fmtTime(d)}` : '', run: () => C.navigate(`review/${s.id}`) });
+        out.push({ g: 'History', ic: 'history', t: C.sessionTitle(s), sub: d ? `${C.fmtDateShort(d)} ${C.fmtTime(d)}` : '', run: () => C.navigate(`review/${s.id}`) });
       });
-      S.agents.forEach((a) => (a.documents || []).forEach((d, i) => out.push({ g: 'Arquivos', ic: C.docIcon(d), t: fixText(d.title || d.name || 'Documento'), sub: C.agentTitle(a), run: () => MODALS['doc-preview'](a.documents[i]) })));
+      S.agents.forEach((a) => (a.documents || []).forEach((d, i) => out.push({ g: 'Files', ic: C.docIcon(d), t: fixText(d.title || d.name || 'Document'), sub: C.agentTitle(a), run: () => MODALS['doc-preview'](a.documents[i]) })));
       for (const co of (S.questionBank && S.questionBank.companies) || []) {
         for (const q of co.questions || []) {
           if (q.locked) continue;
-          out.push({ g: 'Perguntas', ic: 'question', t: fixText(q.text), sub: fixText(co.name), run: () => {
+          out.push({ g: 'Questions', ic: 'question', t: fixText(q.text), sub: fixText(co.name), run: () => {
             S.ui.qCompany = co.id;
             S.ui.qOpen = C.norm(q.text);
             C.navigate('questions');
@@ -611,7 +611,7 @@
 
     function paint() {
       const q = C.norm(input.value);
-      items = q ? everything.filter((x) => C.norm(`${x.t} ${x.sub || ''} ${x.g}`).includes(q)).slice(0, 40) : everything.filter((x) => x.g === 'Ações' || x.g === 'Ir para');
+      items = q ? everything.filter((x) => C.norm(`${x.t} ${x.sub || ''} ${x.g}`).includes(q)).slice(0, 40) : everything.filter((x) => x.g === 'Actions' || x.g === 'Go to');
       active = C.clamp(active, 0, Math.max(0, items.length - 1));
       let lastG = '';
       list.innerHTML = items.length
@@ -622,7 +622,7 @@
               return `${g}<button type="button" class="palette-item ${i === active ? 'active' : ''}" data-i="${i}">${icon(x.ic)}<span class="truncate">${esc(x.t)}</span>${x.sub ? `<span class="sub truncate" style="max-width:40%">${esc(x.sub)}</span>` : ''}</button>`;
             })
             .join('')
-        : '<div class="empty" style="padding:28px">Nada encontrado.</div>';
+        : '<div class="empty" style="padding:28px">Nothing found.</div>';
       const el = list.querySelector('.palette-item.active');
       if (el) el.scrollIntoView({ block: 'nearest' });
     }

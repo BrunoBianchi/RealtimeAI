@@ -8,6 +8,7 @@ add_executable(deepgram_tests
 target_link_libraries(deepgram_tests PRIVATE
     rtai::options
     rtai::core
+    rtai::test_support
     rtai::deepgram
     GTest::gtest
     GTest::gtest_main

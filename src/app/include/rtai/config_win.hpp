@@ -121,7 +121,8 @@ inline int protect_plaintext_keys(const fs::path& path) {
     int count = 0;
     for (const auto& setting : {std::pair{"deepgram", "api_key"},
                                 std::pair{"llm", "api_key"},
-                                std::pair{"llm", "cerebras_api_key"}}) {
+                                std::pair{"llm", "cerebras_api_key"},
+                                std::pair{"servidor", "token"}}) {
         auto t = ini::rewrite_value(text, setting.first, setting.second,
                                     [&](const std::string& old) -> std::optional<std::string> {
                                         const std::string v = text::trim(old);

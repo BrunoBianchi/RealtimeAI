@@ -2,15 +2,12 @@
 
 ## Linha de comando
 
-- `scripts\windows\run-demo.bat`: sem microfone, sem rede e sem chaves. Abre o HUD com uma conversa de
-  vendas roteirizada dos dois lados (objeção de preço, pergunta de prazo), sugestões em
-  streaming, e as ações de chat/tela/resumo respondidas por um LLM local de demonstração.
-- `scripts\windows\run-live.bat`: captura real. Sem a chave do Deepgram o app abre o `config.ini` no
-  Bloco de Notas e encerra; com a chave do OpenRouter as sugestões ficam ativas.
-- `rtai_app.exe --config`: abre (e cria, se não existir) o `config.ini` e sai.
+- `scripts\windows\run-live.bat`: captura real. Sem a chave do Deepgram o app abre as Configurações do dashboard
+  e encerra; com a chave do OpenRouter as sugestões ficam ativas.
+- `rtai_app.exe --config`: abre as Configurações do dashboard e sai (sem dashboard instalado, abre o `config.ini` no Bloco de Notas).
 - `rtai_app.exe --config-file C:\caminho\outro.ini`: usa outro arquivo de configuração
   (também via variável `RTAI_CONFIG`).
-- `rtai_app.exe --console`: sem overlay, tudo impresso no console (vale para `--demo`).
+- `rtai_app.exe --console`: sem overlay, tudo impresso no console.
 - `rtai_app.exe --no-save`: não grava a sessão.
 - `rtai_app.exe --server`: motor sem HUD, para clientes externos (outra UI, automação,
   testes): eventos em JSON por linha no stdout e comandos no stdin
@@ -18,14 +15,14 @@
   principal.
 
 Aberto direto (duplo clique ou `start`), o app esconde a própria janela de console; o log
-vai para `%LOCALAPPDATA%\RealTimeAI\logs\rtai.log`.
+vai para `%LOCALAPPDATA%\Cue\logs\rtai.log`.
 
 Use fone de ouvido: sem ele, o microfone também capta a voz dos outros saindo do alto-falante.
 
 ## config.ini
 
-Tudo fica em `%LOCALAPPDATA%\RealTimeAI\config.ini`, criado na primeira execução com todas
-as opções comentadas. Abra com `rtai_app.exe --config` ou Ctrl+Alt+O com o app rodando
+Tudo fica em `%LOCALAPPDATA%\Cue\config.ini`, criado na primeira execução com todas
+as opções comentadas. As Configurações do dashboard (`rtai_app.exe --config` ou Ctrl+Alt+O com o app rodando) editam esse arquivo
 (mudanças valem ao reabrir o app).
 
 Chaves de API: cole em texto puro em `[deepgram] api_key` e `[llm] api_key`. Na próxima
@@ -59,9 +56,19 @@ variável/padrão.
 | `[audio] silero_modelo` | `silero_vad.onnx` ao lado do exe | `RTAI_SILERO_MODEL` | Modelo Silero (build com ONNX) |
 | `[audio] limiar_energia` | `0.01` | | Sensibilidade do VAD por energia |
 | `[overlay] largura` / `altura_max_pct` | `560` / `60` | | Tamanho do overlay |
-| `[sessao] salvar` / `pasta` | `sim` / `%LOCALAPPDATA%\RealTimeAI\sessions` | `RTAI_SESSION_DIR` | Gravação das sessões |
+| `[sessao] salvar` / `pasta` | `sim` / `%LOCALAPPDATA%\Cue\sessions` | `RTAI_SESSION_DIR` | Gravação das sessões |
+| `[servidor] modo` | `auto` | `RTAI_SERVER_MODE` | `auto`/`nuvem` (transcrição e IA pelos servidores Cue) ou `proprio` (suas chaves; login e cota continuam valendo) |
+| `[servidor] url` | padrão do build | `RTAI_SERVER_URL` | Endereço da API (veja `docs/server-api.md`) |
+| `[servidor] regiao` | `auto` | `RTAI_SERVER_REGION` | Região preferida; `auto` = a mais próxima |
+| `[servidor] token` | (login do dashboard) | `RTAI_SERVER_TOKEN` | Token do dispositivo, criptografado com DPAPI |
 
-Só por variável: `RTAI_DEMO_WAV` (WAV para o modo demo) e `RTAI_CONFIG` (caminho do config).
+É preciso entrar numa conta Cue para usar o app (Google, SSO ou e-mail + senha;
+plano Free: uma sessão de até 15 minutos, uma vez; PRO: 200 minutos por mês). Com a conta, as chaves do
+Deepgram e do LLM deixam de ser obrigatórias: o app pede credenciais temporárias ao servidor
+no início de cada sessão e fala direto com os provedores. Detalhes e contrato da API em
+[`server-api.md`](server-api.md); plano de migração em [`cloud-migration.md`](cloud-migration.md).
+
+Só por variável: `RTAI_CONFIG` (caminho do config).
 
 ## Atalhos globais
 
@@ -80,5 +87,7 @@ Só por variável: `RTAI_DEMO_WAV` (WAV para o modo demo) e `RTAI_CONFIG` (camin
 | Ctrl+Alt+O | Abrir o `config.ini` |
 | Ctrl+Alt+Q | Encerrar salvando a sessão |
 
-Os atalhos usam Ctrl+Alt para não colidir com Ctrl+Enter de apps de chat. Se algum já
+Dá para trocar os atalhos do HUD em **Configurações > Atalhos** (mapa pronto ou tecla por tecla) ou na seção `[atalhos]` do `config.ini` (ex.: `responder = Ctrl+Shift+Enter`, `chat = nenhum` para desligar; lista em `src/core/include/rtai/hotkeys.hpp`).
+
+Por padrão, os atalhos usam Ctrl+Alt para não colidir com Ctrl+Enter de apps de chat. Se algum já
 estiver ocupado por outro app, o HUD avisa qual.

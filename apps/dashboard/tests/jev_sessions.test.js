@@ -134,7 +134,7 @@ test('JEV classification decides the kind, rewrites generically and drops what d
   const qs = bank.companies[0].questions;
   const by = (t) => qs.find((q) => q.text.startsWith(t));
   assert.strictEqual(by('Me conte uma vez').category, 'Behavioral');
-  assert.strictEqual(by('Me conte uma vez').subCategory, 'Pessoal e comportamental');
+  assert.strictEqual(by('Me conte uma vez').subCategory, 'Personal and behavioral');
   assert.strictEqual(by('Como os valores').category, 'Culture');
   assert.strictEqual(by('Como você aprende uma tecnologia').category, 'Technical', 'specific follow-up rewritten generically');
   assert.ok(!qs.some((q) => /Tech Lab|conta na tela/.test(q.text)), 'specific wording and non-questions are left out');
@@ -188,5 +188,5 @@ test('the dashboard reloads the rebuilt bank quietly', async () => {
   await onUpdate({ rebuilt: true, added: 1 });
   assert.strictEqual(r.S.questionBank.companies[0].name, 'Ifood');
   assert.deepStrictEqual(r.toasts(), [], 'no "new questions" toast for a rebuild');
-  assert.strictEqual(r.Cue.catLabel('Behavioral'), 'Pessoal');
+  assert.strictEqual(r.Cue.catLabel('Behavioral'), 'Personal');
 });

@@ -181,15 +181,15 @@ test('wiring: IPC, preload bridges, settings controls and popup actions', () => 
   };
   const on = settings({ supported: true, enabled: true, keepInTray: true, active: [{ name: 'Zoom' }], mutedApps: ['teams'], appNames: { teams: 'Microsoft Teams' } });
   assert.deepStrictEqual(tags(on, { 'data-change': 'meeting' }).map((t) => t['data-field']), ['enabled', 'keepInTray']);
-  assert.ok(on.includes('Em chamada agora: Zoom.'), 'status names the live call');
+  assert.ok(on.includes('In a call now: Zoom.'), 'status names the live call');
   assert.ok(on.includes('Microsoft Teams') && tags(on, { 'data-action': 'meeting-unmute' }).length === 1, 'muted apps can be unmuted');
   assert.ok(tags(on, { 'data-action': 'meeting-test' }).length === 1);
   const off = settings({ supported: true, enabled: false, keepInTray: false, active: [], mutedApps: [] });
-  assert.ok(off.includes('Desligada: nenhum aviso quando uma reunião começa.'));
+  assert.ok(off.includes('Off: no alert when a meeting starts.'));
   assert.ok(/data-field="keepInTray"[^>]*disabled/.test(off), 'tray option needs detection on');
   assert.ok(!off.includes('meeting-unmute'));
   const unsupported = settings({ supported: false, enabled: false, active: [], mutedApps: [] });
-  assert.ok(unsupported.includes('Disponível só no Windows.') && /data-field="enabled"[^>]*disabled/.test(unsupported));
+  assert.ok(unsupported.includes('Available on Windows only.') && /data-field="enabled"[^>]*disabled/.test(unsupported));
   const popup = read('src/renderer/meeting_popup.html');
   for (const id of ['btnStart', 'btnLater', 'btnMute', 'selGoal', 'btnStop', 'btnKeep']) {
     assert.ok(popup.includes(`id="${id}"`), `popup has #${id}`);

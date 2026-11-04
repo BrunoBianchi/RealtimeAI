@@ -265,8 +265,13 @@ function looksScanned(result) {
 // OCR / reading through OpenRouter's file-parser (mistral-ocr): used only for
 // PDFs without a text layer. One call at upload time, never during the live
 // interview. Resolves to '' on any failure.
-function ocrPdfWithOpenRouter(buffer, filename, apiKey, httpsModule, model = 'qwen/qwen3.6-flash', timeoutMs = 90000) {
-  if (!apiKey || !buffer || !buffer.length) return Promise.resolve('');
+// `target`: an OpenRouter key, or { url, headers } (the Cue server relay).
+function ocrPdfWithOpenRouter(buffer, filename, target, httpsModule, model = 'qwen/qwen3.6-flash', timeoutMs = 90000, httpModule = null) {
+  if (!target || !buffer || !buffer.length) return Promise.resolve('');
+  const endpoint = typeof target === 'string'
+    ? { url: 'https://openrouter.ai/api/v1/chat/completions', headers: { Authorization: `Bearer ${target}`, 'HTTP-Referer': 'https://realtimeai.local', 'X-Title': 'RealTimeAI Studio' } }
+    : target;
+  const lib = endpoint.url.startsWith('http:') && httpModule ? httpModule : httpsModule;
   const payload = JSON.stringify({
     model,
     temperature: 0,
@@ -298,16 +303,14 @@ function ocrPdfWithOpenRouter(buffer, filename, apiKey, httpsModule, model = 'qw
       }
     };
     try {
-      const req = httpsModule.request(
-        'https://openrouter.ai/api/v1/chat/completions',
+      const req = lib.request(
+        endpoint.url,
         {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${apiKey}`,
+            ...endpoint.headers,
             'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(payload, 'utf8'),
-            'HTTP-Referer': 'https://realtimeai.local',
-            'X-Title': 'RealTimeAI Studio'
+            'Content-Length': Buffer.byteLength(payload, 'utf8')
           },
           timeout: timeoutMs
         },

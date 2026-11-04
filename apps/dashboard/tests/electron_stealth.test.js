@@ -58,12 +58,12 @@ test('Electron Stealth Mode: chip, switches and the global shortcut stay in sync
     }
   });
   await r.boot();
-  assert.ok(r.page('btnStealthChip').innerHTML.includes('Visível'));
+  assert.ok(r.page('btnStealthChip').innerHTML.includes('Visible'));
 
   // Clicking the chip.
   await r.Cue.actions['toggle-stealth']();
   assert.strictEqual(r.called('toggleStealthMode').length, 1);
-  assert.ok(r.page('btnStealthChip').innerHTML.includes('Oculto'));
+  assert.ok(r.page('btnStealthChip').innerHTML.includes('Hidden'));
 
   // A settings switch sends only its own field.
   await r.Cue.changes.stealth(el({ field: 'skipTaskbar' }, { checked: true }));
@@ -72,7 +72,7 @@ test('Electron Stealth Mode: chip, switches and the global shortcut stay in sync
   // Ctrl+Alt+S in the main process republishes the state; the chip follows it.
   const [listener] = r.calls.find(([n]) => n === 'onStealthModeUpdated')[1];
   listener({ active: true });
-  assert.ok(r.page('btnStealthChip').innerHTML.includes('Oculto'));
+  assert.ok(r.page('btnStealthChip').innerHTML.includes('Hidden'));
   listener({ active: false });
-  assert.ok(r.page('btnStealthChip').innerHTML.includes('Visível'));
+  assert.ok(r.page('btnStealthChip').innerHTML.includes('Visible'));
 });

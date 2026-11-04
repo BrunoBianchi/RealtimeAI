@@ -19,6 +19,8 @@ add_executable(core_tests
     test_session_store.cpp
     test_text_and_ui_core.cpp
     test_settings.cpp
+    test_cloud_session.cpp
+    test_delayed_llm.cpp
     test_ui_actions.cpp
     test_server_protocol.cpp
     test_ui_models.cpp
@@ -49,6 +51,7 @@ target_include_directories(core_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(core_tests PRIVATE
     rtai::options
     rtai::core
+    rtai::test_support
     GTest::gtest
     GTest::gtest_main
 )

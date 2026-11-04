@@ -14,7 +14,8 @@ const definedIds = new Set([...markup.matchAll(/\bid=["']([A-Za-z][\w-]*)["']/g)
 test('Feature: dashboard-ui-redesign, Property 6: Preservação dos ganchos de script', () => {
   // Elements looked up by id exist in index.html or in a template the renderer writes.
   let lookups = 0;
-  for (const [file, src] of Object.entries(sources)) {
+  // Third-party code under vendor/ manages its own elements.
+  for (const [file, src] of Object.entries(sources).filter(([f]) => !f.startsWith('vendor/'))) {
     for (const m of src.matchAll(/(?:getElementById\(\s*|querySelector(?:All)?\(\s*['"`]#)['"`]?([A-Za-z][\w-]*)['"`]/g)) {
       lookups += 1;
       assert.ok(definedIds.has(m[1]), `${file} looks up #${m[1]}, which no markup defines`);
@@ -51,11 +52,11 @@ test('Feature: dashboard-ui-redesign, Property 5: Preservação da estrutura de 
   // Scripts load core first, then the views that register on window.Cue.
   assert.deepStrictEqual(
     [...indexHtml.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]),
-    ['icons.js', 'app.js', 'views.js', 'live.js', 'settings.js', 'modals.js']
+    ['i18n.js', 'locales/pt-BR.js', 'icons.js', 'app.js', 'views.js', 'live.js', 'settings.js', 'modals.js', 'auth.js', 'vendor/driver/driver.iife.js', 'tour.js']
   );
   // Every view the sidebar links to is registered.
   const { Cue } = loadRenderer();
-  for (const view of ['home', 'sessions', 'session', 'review', 'files', 'questions', 'live', 'settings']) {
+  for (const view of ['home', 'sessions', 'session', 'review', 'files', 'questions', 'live', 'settings', 'login']) {
     assert.strictEqual(typeof Cue.views[view], 'function', `view ${view}`);
   }
 });
