@@ -91,7 +91,7 @@ const SAMPLE = {
 // Values that come from the sample data, not from the interface.
 const SAMPLE_VALUES = new Set(['Tell me about a project you led.', 'Acme', 'Globex', 'Backend Engineer', 'Data Analyst', 'Acme mock', 'Globex screening', 'Sample User', 'cv.pdf', 'e4a1••••', 'sk-o••••', 'S', 'SU']);
 
-const ROUTES = ['home', 'sessions', 'sessions/past', 'session/a1', 'session/a2', 'review/s1', 'files', 'questions', 'live'];
+const ROUTES = ['home', 'sessions', 'sessions/past', 'session/a1', 'session/a2', 'review/s1', 'files', 'questions', 'mock', 'live'];
 
 function settingsTabs() {
   const m = /const TABS = \[([\s\S]*?)\];/.exec(sources['settings.js']);

@@ -603,12 +603,12 @@
   // Account plan from the server (S.auth.entitlement): Free = one session of up
   // to 15 min, once; PRO = 200 min per month.
   // Prices in US dollars; main/plans.js and the server hold the same catalog.
-  const PRO_PRICE = 15;
+  const PRO_PRICE = 19;
   const PRO_MINUTES = 200;
   const TOKEN_PACKS = [
-    { id: 'tokens_60', minutes: 60, price: 6 },
-    { id: 'tokens_150', minutes: 150, price: 13 },
-    { id: 'tokens_400', minutes: 400, price: 32 }
+    { id: 'tokens_60', minutes: 60, price: 7 },
+    { id: 'tokens_150', minutes: 150, price: 16 },
+    { id: 'tokens_400', minutes: 400, price: 40 }
   ];
   const perMinute = (price, minutes) => `$${(price / minutes).toFixed(3).replace(/0$/, '')}`;
 
@@ -649,8 +649,9 @@
       ['API keys', 'Your own', 'Not needed', 'Not needed'],
       ['Price', 'Free', 'Free', `$${PRO_PRICE} / month`],
       ['Live minutes', 'Pay your providers', '15 min, once', '200 min / month'],
-      ['Extra tokens', '—', 'From $0.08 per minute', 'From $0.08 per minute'],
+      ['Extra tokens', '—', 'From $0.10 per minute', 'From $0.10 per minute'],
       ['Answer speed', `+${d} ms per answer`, 'Instant', 'Instant'],
+      ['AI mock interviews', '—', 'From $4.99 each', '1 per month'],
       ['Cloud backup of files', '—', '25 MB', '500 MB'],
       ['Sessions saved in the cloud', '—', '3', 'Unlimited'],
       ['History saved in the cloud', '—', '5', 'Unlimited'],

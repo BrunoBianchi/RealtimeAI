@@ -26,7 +26,7 @@ test('Clean Sidebar: brand, new session, navigation, next interviews, usage and 
   r.Cue.renderShell();
 
   const nav = r.page('sideNav').innerHTML;
-  assert.deepStrictEqual(tags(nav, { 'data-action': 'go' }).map((t) => t['data-to']), ['home', 'sessions', 'history', 'files', 'questions', 'live', 'settings']);
+  assert.deepStrictEqual(tags(nav, { 'data-action': 'go' }).map((t) => t['data-to']), ['home', 'sessions', 'history', 'files', 'questions', 'mock', 'live', 'settings']);
   assert.ok(/class="nav-item active"[^>]*data-to="sessions"/.test(nav), 'current route is highlighted');
   assert.ok(nav.includes('<span class="nav-count">2</span>'), 'active (non-archived) sessions are counted');
 

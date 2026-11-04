@@ -177,10 +177,10 @@ Arquivo de outra conta responde `404`.
 | Plano | Limite | Sessões | Renova |
 |---|---|---|---|
 | `free` | 15 min | **uma única**, de até 15 min | nunca (é um teste) |
-| `pro` | US$ 15/mês, 200 min (tokens) por mês | quantas quiser | todo mês (`period_end`) |
+| `pro` | US$ 19/mês, 200 min (tokens) e 1 entrevista simulada por mês | quantas quiser | todo mês (`period_end`) |
 
 Tokens avulsos: 1 token = 1 minuto, nunca expiram e são gastos depois dos minutos do plano.
-Pacotes: `tokens_60` (US$ 6), `tokens_150` (US$ 13), `tokens_400` (US$ 32). O saldo vem em
+Pacotes: `tokens_60` (US$ 7), `tokens_150` (US$ 16), `tokens_400` (US$ 40). O saldo vem em
 `plan.credit_minutes` de `GET /v1/me`, e `minutes_left`/`max_session_s` da sessão já o incluem.
 
 - O servidor é a autoridade: recusa `POST /v1/session` com `402` quando o plano não tem
@@ -199,6 +199,17 @@ Bearer. `checkout` recebe `{"plan": "pro"}` ou `{"pack": "tokens_60"}` (pacote i
 `{"url": "https://..."}` com a página hospedada (ex.: Stripe Checkout / Customer Portal),
 que o app abre no navegador. Só `https://` é aceito. Depois do pagamento, `GET /v1/me`
 passa a mostrar `pro`.
+
+### Entrevista simulada (`/v1/mock`)
+
+Até 30 min. PRO tem 1 por mês (`plan.mocks_limit`, `plan.mocks_used`); qualquer conta usa créditos comprados (`plan.mock_credits`, pacotes `mock_1` US$ 4,99 e `mock_3` US$ 11,99, nunca expiram), gastos depois da entrevista do plano.
+
+- `POST /v1/mock/start` `{agent_id}` → `{id, source, max_s, stt}`. Gasta uma entrevista; uma em andamento é retomada sem nova cobrança. `402 mock_not_included` sem direito; `503` sem chaves, sem gastar nada.
+- `POST /v1/mock/{id}/chat`: corpo chat/completions; o servidor impõe modelo e `max_tokens`. Aceito até 3 min depois do limite (feedback final).
+- `POST /v1/mock/{id}/tts` `{text}` (até 500 caracteres; 15 mil por entrevista) → áudio mp3 (`TTS_MODEL`, padrão `elevenlabs/eleven-turbo-v2.5`; `TTS_VOICE`, padrão `sarah`; o modelo detecta o idioma do texto).
+- `POST /v1/mock/{id}/stt` → nova credencial de transcrição.
+- `POST /v1/mock/{id}/end` → `{refunded}`: devolve a entrevista encerrada em menos de 1 min.
+- Depois do limite: `410 mock_over`.
 
 ### `POST /v1/session` — credenciais da sessão (engine)
 

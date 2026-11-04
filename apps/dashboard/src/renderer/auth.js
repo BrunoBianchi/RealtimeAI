@@ -114,6 +114,7 @@
     const wasLocked = C.isLocked();
     const st = api.cloudStatus ? await C.guard(() => api.cloudStatus(Boolean(force))) : null;
     S.auth = st || { signedIn: false };
+    if (S.auth.account) S.profile = { ...S.profile, name: S.auth.account.name || '', email: S.auth.account.email || '' };
     lastStatusAt = Date.now();
     if (wasLocked !== C.isLocked()) {
       if (!C.isLocked()) C.navigate('home', true);

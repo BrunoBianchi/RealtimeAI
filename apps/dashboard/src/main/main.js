@@ -31,6 +31,7 @@ function tm(text, vars) {
 const localBackend = require('./local_backend');
 const { settingsSectionFromArgv } = require('./launch_args');
 const jevEngine = require('./jev_engine');
+const { createMockInterviews, languageName } = require('./mock_interview');
 const companyLogoService = require('./company_logo_service');
 
 // apps/dashboard (or the app.asar root once packaged) and the repository root.
@@ -390,7 +391,8 @@ async function checkCanStartLive() {
   if (!cloudBackendActive(cfg) && !cfg.has_deepgram_key) {
     return { ok: false, error: '"My keys" mode: set the Deepgram key or switch back to the Cue servers.' };
   }
-  const st = await cloudAccount.status(false);
+  // Fresh: the session that just ended may have used the last minutes.
+  const st = await cloudAccount.status(true);
   if (st && st.expired) return LOGIN_REQUIRED;
   if (st && st.entitlement && !st.entitlement.canStart) {
     return { ok: false, needsUpgrade: true, error: st.entitlement.reason };
@@ -1525,7 +1527,16 @@ async function evaluateSessionWithJev({ sessionId, agentId, force }) {
   const start = events.find((e) => e.type === 'notice' && /^Active goal:/i.test(e.text || ''));
   const goalLabel = start ? String(start.text).replace(/^Active goal:\s*/i, '').split(' · ')[0] : '';
   const companyName = agent ? agent.company : companyFromGoalLabel(goalLabel);
-  const context = jevContext(agent, goalLabel);
+  const result = await jevEvaluatePairs(pairs, { context: jevContext(agent, goalLabel), companyName });
+  if (!result.ok) return result;
+  const evaluation = { version: JEV_VERSION, sessionId: id, agentId: agent ? agent.id : '', ...result.evaluation };
+  fs.writeFileSync(cachePath, JSON.stringify(evaluation, null, 2), 'utf8');
+  return { ok: true, cached: false, evaluation };
+}
+
+// The rubric over question/answer pairs: saved sessions and mock interviews.
+async function jevEvaluatePairs(pairs, { context, companyName, lang }) {
+  const language = (text) => (lang ? text.split('em inglês').join(`em ${languageName(lang)}`) : text);
   const items = [];
   const BATCH = 5;
   const batches = [];
@@ -1534,7 +1545,7 @@ async function evaluateSessionWithJev({ sessionId, agentId, force }) {
     batches.map((batch, bi) =>
       callOpenRouterJson(
         [
-          { role: 'system', content: JEV_SYSTEM },
+          { role: 'system', content: language(JEV_SYSTEM) },
           {
             role: 'user',
             content: `${context}\n\nAvalie os pares abaixo e devolva {"items":[{"i":<índice>,"pergunta":"<pergunta reescrita em uma frase clara>","tipo":"comportamental|tecnica|cultura|motivacao|outra","notas":{"adequacao":0,"cultura":0,"estrutura":0,"evidencias":0,"objetividade":0},"veredito":"<uma frase>","dica":"<uma ação concreta para melhorar>"}]}\n\n${batch
@@ -1586,7 +1597,7 @@ async function evaluateSessionWithJev({ sessionId, agentId, force }) {
 
   const synth = await callOpenRouterJson(
     [
-      { role: 'system', content: 'Você é o JEV e escreve o feedback final para o candidato sobre o desempenho dele na entrevista, com base nas avaliações por pergunta. Fale do candidato (em segunda pessoa), não das notas nem da avaliação. Responda SOMENTE JSON e escreva todos os textos do JSON em inglês.' },
+      { role: 'system', content: language('Você é o JEV e escreve o feedback final para o candidato sobre o desempenho dele na entrevista, com base nas avaliações por pergunta. Fale do candidato (em segunda pessoa), não das notas nem da avaliação. Responda SOMENTE JSON e escreva todos os textos do JSON em inglês.') },
       {
         role: 'user',
         content: `Empresa: ${companyName || '(desconhecida)'}. Médias (0-100): ${JSON.stringify(criteria)}.\nAvaliações por pergunta:\n${items
@@ -1599,11 +1610,8 @@ async function evaluateSessionWithJev({ sessionId, agentId, force }) {
   );
 
   const evaluation = {
-    version: JEV_VERSION,
-    sessionId: id,
     evaluatedAt: new Date().toISOString(),
     model: SOL_ANALYSIS_MODEL,
-    agentId: agent ? agent.id : '',
     company: companyName || '',
     score,
     criteria,
@@ -1613,8 +1621,7 @@ async function evaluateSessionWithJev({ sessionId, agentId, force }) {
     fortes: synth.ok && Array.isArray(synth.json.fortes) ? synth.json.fortes.map(String).slice(0, 3) : [],
     melhorar: synth.ok && Array.isArray(synth.json.melhorar) ? synth.json.melhorar.map(String).slice(0, 3) : []
   };
-  fs.writeFileSync(cachePath, JSON.stringify(evaluation, null, 2), 'utf8');
-  return { ok: true, cached: false, evaluation };
+  return { ok: true, evaluation };
 }
 
 // Interviewer text of every saved session, as the question extractor reads it.
@@ -3621,7 +3628,15 @@ app.whenReady().then(() => {
   ipcMain.handle('rtai:gcal-delete-event', async (_ev, p) => gcalCall((g) => g.deleteEvent(p && p.calendarId, p && p.eventId)));
   // Provider consoles linked from Settings > Account (fixed allowlist).
   // ---- Cue cloud account (device sign-in; docs/server-api.md) ----
-  ipcMain.handle('rtai:cloud-status', async (_ev, force) => cloudAccount.status(Boolean(force)));
+  ipcMain.handle('rtai:cloud-status', async (_ev, force) => {
+    const st = await cloudAccount.status(Boolean(force));
+    const account = st && st.account;
+    if (account) {
+      const p = loadUserProfile();
+      if (p.name !== account.name || p.email !== account.email) saveUserProfile({ name: account.name || '', email: account.email || '' });
+    }
+    return st;
+  });
   ipcMain.handle('rtai:cloud-password-login', async (_ev, p) => cloudAccount.loginWithPassword(p && p.email, p && p.password));
   ipcMain.handle('rtai:cloud-signup', async (_ev, p) => cloudAccount.signup(p && p.name, p && p.email, p && p.password));
   ipcMain.handle('rtai:cloud-reset-password', async (_ev, email) => cloudAccount.resetPassword(email));
@@ -3657,6 +3672,36 @@ app.whenReady().then(() => {
     }
     return { ok: true, sent, failed };
   });
+  const mockInterviews = createMockInterviews({
+    dataDir: () => getAppDataDir(),
+    agents: () => loadAllAgents(),
+    now: () => Date.now(),
+    fetch: (...args) => fetch(...args),
+    evaluate: async (pairs, agent, lang) => {
+      const r = await jevEvaluatePairs(pairs, { context: jevContext(agent, ''), companyName: agent.company || '', lang });
+      return r.ok ? r.evaluation : null;
+    },
+    complete: (messages, maxTokens) => callOpenRouterSol61(messages, maxTokens),
+    bank: () => jevEngine.loadQuestionBank(getAppDataDir()),
+    api: (method, route, body) => cloudAccount.api(method, route, body, { timeoutMs: 15000 }),
+    url: (route) => cloudAccount.aiEndpoint().url.replace('/v1/ai/chat/completions', route),
+    headers: () => cloudAccount.aiEndpoint().headers,
+    emit: (event) => {
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('rtai:mock-event', event);
+    }
+  });
+  ipcMain.handle('rtai:mock-start', async (_ev, agentId, lang) => {
+    if (isLocalMode(readConfigIni())) return { ok: false, error: 'Mock interviews need a Cue account.' };
+    return mockInterviews.start({ agentId, lang });
+  });
+  ipcMain.handle('rtai:mock-turn', async (_ev, text) => mockInterviews.turn(text));
+  ipcMain.handle('rtai:mock-cancel-turn', async () => mockInterviews.cancelTurn());
+  ipcMain.handle('rtai:mock-speak', async (_ev, text) => mockInterviews.speak(text));
+  ipcMain.handle('rtai:mock-end', async () => mockInterviews.end());
+  ipcMain.handle('rtai:mock-prep', async (_ev, agentId) => mockInterviews.prep(agentId));
+  ipcMain.handle('rtai:mock-coach', async (_ev, id, question) => mockInterviews.coach(id, question));
+  ipcMain.handle('rtai:mock-list', async () => mockInterviews.list());
+  ipcMain.handle('rtai:mock-stt-token', async () => mockInterviews.sttToken());
   ipcMain.handle('rtai:cloud-billing', async (_ev, kind, pack) => cloudAccount.billing(kind === 'portal' ? 'portal' : 'checkout', pack));
   ipcMain.handle('rtai:cloud-logout', async () => {
     if (isOverlayRunning()) stopRunningOverlay();
@@ -3737,7 +3782,13 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('rtai:save-profile', async (_ev, profile) => {
-    return { profile: saveUserProfile(profile || {}) };
+    const next = { ...(profile || {}) };
+    // Name and e-mail belong to the account while signed in.
+    if (isSignedIn()) {
+      delete next.name;
+      delete next.email;
+    }
+    return { profile: saveUserProfile(next) };
   });
 
   // Always a real session: there is no scripted demo.

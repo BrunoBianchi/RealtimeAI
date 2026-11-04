@@ -107,6 +107,8 @@
         if (msg.mode !== undefined) L.transcriptionOnly = Boolean(msg.mode);
         // The server refused the session: expired sign-in (locks the app
         // again), plan without minutes, or server down.
+        // Nothing is running then: stop the engine so no session timer counts.
+        if (msg.ready === false && ['login', 'upgrade', 'server'].includes(msg.needs)) api.stopOverlay();
         if (msg.ready === false && msg.needs === 'login') {
           C.toast('Your session expired. Sign in to your account again.', 'error');
           if (C.authRefresh) C.authRefresh(true);

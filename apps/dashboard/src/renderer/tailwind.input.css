@@ -3503,3 +3503,36 @@ table.compare td.strong {
 .driver-popover.cue-tour .driver-popover-arrow-side-right.driver-popover-arrow { border-right-color: var(--surface-overlay); }
 .driver-popover.cue-tour .driver-popover-arrow-side-top.driver-popover-arrow { border-top-color: var(--surface-overlay); }
 .driver-popover.cue-tour .driver-popover-arrow-side-bottom.driver-popover-arrow { border-bottom-color: var(--surface-overlay); }
+
+/* Mock interview */
+.mock-hero { display: flex; align-items: center; gap: 24px; padding: 24px 28px; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: radial-gradient(circle at 12% 50%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 42%), var(--surface-card); }
+.mock-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.mock-step { display: flex; gap: 12px; padding: 12px 14px; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--surface-raised); }
+.mock-step .n { flex: none; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; font-size: 12px; color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.mock-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 16px; align-items: start; }
+.mock-langs { display: flex; flex-wrap: wrap; gap: 6px; }
+.mock-lang { padding: 6px 12px; border: 1px solid var(--border-subtle); border-radius: 999px; background: transparent; color: var(--text-secondary); font: inherit; font-size: 13px; cursor: pointer; transition: border-color .15s, color .15s, background .15s; }
+.mock-lang:hover { color: var(--text-strong); border-color: var(--text-tertiary); }
+.mock-lang.active { color: var(--text-strong); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.mock-meter { height: 6px; border-radius: 999px; background: var(--surface-sunken); overflow: hidden; }
+.mock-meter span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .08s linear; }
+.mock-start { width: 100%; justify-content: center; }
+.mock-ring { --p: 0; flex: none; width: 52px; height: 52px; display: grid; place-items: center; border-radius: 50%; font-size: 12px; background: radial-gradient(closest-side, var(--surface-card) 76%, transparent 78%), conic-gradient(var(--accent) calc(var(--p) * 1%), var(--surface-sunken) 0); }
+.mock-check { display: flex; gap: 10px; align-items: flex-start; color: var(--text-tertiary); }
+.mock-check.ok { color: var(--accent); }
+.mock-check > .stack > span:first-child { color: var(--text-body); }
+.mock-q { display: flex; gap: 8px; justify-content: space-between; align-items: flex-start; padding: 8px 10px; border-radius: var(--radius); background: var(--surface-raised); font-size: 13px; color: var(--text-body); }
+.mock-q .tag { flex: none; }
+.mock-stage { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 28px; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 55%), var(--surface-card); }
+.mock-orb { position: relative; flex: none; width: 56px; height: 56px; display: flex; align-items: center; justify-content: center; gap: 3px; }
+.mock-orb.lg { width: 92px; height: 92px; }
+.mock-orb .core { position: absolute; inset: 0; border-radius: 50%; background: color-mix(in srgb, var(--accent) 20%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); }
+.mock-orb i { position: relative; width: 4px; height: 14%; border-radius: 4px; background: var(--accent); }
+.mock-orb.idle i { animation: mock-wave 2.8s ease-in-out infinite; animation-delay: calc(var(--n) * .16s); }
+.mock-orb.speaking i { animation: mock-wave .8s ease-in-out infinite; animation-delay: calc(var(--n) * .09s); }
+.mock-orb.listening .core { animation: mock-pulse 1.8s ease-out infinite; }
+.mock-orb.thinking .core, .mock-orb.connecting .core { border-style: dashed; animation: mock-spin 3s linear infinite; }
+@keyframes mock-wave { 0%, 100% { height: 14%; } 50% { height: 52%; } }
+@keyframes mock-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); } 100% { box-shadow: 0 0 0 20px transparent; } }
+@keyframes mock-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .mock-orb i, .mock-orb .core { animation: none !important; } .mock-orb i { height: 34%; } }

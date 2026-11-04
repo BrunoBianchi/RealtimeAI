@@ -212,6 +212,7 @@
       : '';
 
     return `<div class="page">
+      ${C.mockAd ? C.mockAd() : ''}
       ${head(
         `<div class="title-row"><h1 class="h1">${esc(greeting())}${name ? `, ${esc(name)}` : ''}</h1>${agents.length ? `<span class="pill ok"><span class="dot"></span>${plural(agents.length, 'active session', 'active sessions')}</span>` : ''}</div>`,
         'Overview of your preparation and the copilot performance.',

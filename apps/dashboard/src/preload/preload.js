@@ -43,6 +43,20 @@ contextBridge.exposeInMainWorld('rtai', {
   cloudFiles: () => ipcRenderer.invoke('rtai:cloud-files'),
   cloudFileDelete: (id) => ipcRenderer.invoke('rtai:cloud-file-delete', id),
   cloudFilesBackup: () => ipcRenderer.invoke('rtai:cloud-files-backup'),
+  mockStart: (agentId, lang) => ipcRenderer.invoke('rtai:mock-start', agentId, lang),
+  mockTurn: (text) => ipcRenderer.invoke('rtai:mock-turn', text),
+  mockCancelTurn: () => ipcRenderer.invoke('rtai:mock-cancel-turn'),
+  mockSpeak: (text) => ipcRenderer.invoke('rtai:mock-speak', text),
+  mockEnd: () => ipcRenderer.invoke('rtai:mock-end'),
+  mockPrep: (agentId) => ipcRenderer.invoke('rtai:mock-prep', agentId),
+  mockCoach: (id, question) => ipcRenderer.invoke('rtai:mock-coach', id, question),
+  mockList: () => ipcRenderer.invoke('rtai:mock-list'),
+  mockSttToken: () => ipcRenderer.invoke('rtai:mock-stt-token'),
+  onMockEvent: (cb) => {
+    const handler = (_event, msg) => cb(msg);
+    ipcRenderer.on('rtai:mock-event', handler);
+    return () => ipcRenderer.removeListener('rtai:mock-event', handler);
+  },
   cloudBilling: (kind, pack) => ipcRenderer.invoke('rtai:cloud-billing', kind, pack),
   cloudLogout: () => ipcRenderer.invoke('rtai:cloud-logout'),
   onCloudEvent: (cb) => {

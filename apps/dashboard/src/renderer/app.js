@@ -703,6 +703,7 @@ Cue.stopCopilot = stopCopilot;
 // ----------------------------------------------------------------- router --
 const CRUMBS = {
   home: 'Home',
+  mock: 'Mock interview',
   sessions: 'Sessions',
   history: 'History',
   session: 'Session',
@@ -802,6 +803,7 @@ const NAV = [
   ['history', 'History', 'history'],
   ['files', 'Files', 'folder'],
   ['questions', 'Question bank', 'question'],
+  ['mock', 'Mock interview', 'microphone'],
   ['live', 'Live', 'broadcast'],
   ['settings', 'Settings', 'gear']
 ];

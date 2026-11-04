@@ -401,12 +401,13 @@
   // ----------------------------------------------------------- profile --
   MODALS.profile = () => {
     const p = S.profile || {};
-    const acct = (S.auth && S.auth.signedIn && S.auth.account) || null;
+    const signedIn = Boolean(S.auth && S.auth.signedIn);
+    const acct = (signedIn && S.auth.account) || null;
     const entry = mount(`<div class="modal">
-      ${headHtml('Profile', 'Saved only on this computer')}
+      ${headHtml('Profile', signedIn ? 'Name and e-mail come from your Cue account' : 'Saved only on this computer')}
       <div class="modal-body">
-        <label class="field">Name<input class="input" id="pfName" value="${esc(fixText(p.name || (acct && acct.name) || ''))}" autofocus/></label>
-        <label class="field">E-mail<input class="input" id="pfEmail" type="email" value="${esc((acct && acct.email) || p.email || '')}" ${acct ? 'disabled title="The e-mail of your Cue account"' : ''}/></label>
+        <label class="field">Name<input class="input" id="pfName" value="${esc(fixText((acct && acct.name) || p.name || ''))}" ${signedIn ? 'disabled' : 'autofocus'}/></label>
+        <label class="field">E-mail<input class="input" id="pfEmail" type="email" value="${esc((acct && acct.email) || p.email || '')}" ${signedIn ? 'disabled title="The e-mail of your Cue account"' : ''}/></label>
         <div class="form-grid"><label class="field">Current role<input class="input" id="pfHeadline" value="${esc(fixText(p.headline || ''))}"/></label><label class="field">Seniority<input class="input" id="pfSeniority" value="${esc(fixText(p.seniority || ''))}"/></label></div>
         <label class="field">LinkedIn<input class="input" id="pfLinkedin" value="${esc(p.linkedin || '')}" placeholder="linkedin.com/in/…"/></label>
       </div>

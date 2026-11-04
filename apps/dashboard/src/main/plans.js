@@ -3,7 +3,7 @@
 // engine (src/core/include/rtai/cloud_session.hpp) and fill in what the
 // server did not send, so the dashboard can explain the limit before a start.
 //   Free: one single session of up to 15 minutes, once (a trial).
-//   PRO:  up to 200 minutes per calendar month.
+//   PRO:  up to 200 minutes and 1 mock interview per calendar month.
 'use strict';
 
 const PLANS = {
@@ -13,11 +13,16 @@ const PLANS = {
 
 // Prices in US dollars; the server's plans.go holds the same catalog.
 const PRICING = {
-  proMonthly: 15,
+  proMonthly: 19,
   packs: [
-    { id: 'tokens_60', minutes: 60, price: 6 },
-    { id: 'tokens_150', minutes: 150, price: 13 },
-    { id: 'tokens_400', minutes: 400, price: 32 }
+    { id: 'tokens_60', minutes: 60, price: 7 },
+    { id: 'tokens_150', minutes: 150, price: 16 },
+    { id: 'tokens_400', minutes: 400, price: 40 }
+  ],
+  // AI mock interviews: one a month on PRO, or bought by any account.
+  mockPacks: [
+    { id: 'mock_1', interviews: 1, price: 4.99 },
+    { id: 'mock_3', interviews: 3, price: 11.99 }
   ]
 };
 
@@ -36,6 +41,10 @@ function entitlement(account) {
   const used = Math.max(0, num(p.minutes_used) ?? 0);
   const sessionsUsed = Math.max(0, num(p.sessions_used) ?? 0);
   const credit = Math.max(0, num(p.credit_minutes) ?? 0);
+  const mocksLimit = Math.max(0, num(p.mocks_limit) ?? (rules.id === 'pro' ? 1 : 0));
+  const mocksUsed = Math.max(0, num(p.mocks_used) ?? 0);
+  const mockCredits = Math.max(0, num(p.mock_credits) ?? 0);
+  const mocksLeft = Math.max(0, mocksLimit - mocksUsed);
   const trialUsed = rules.id === 'free' && sessionsUsed >= rules.maxSessions;
   const left = trialUsed && credit > 0 ? 0 : Math.max(0, limit - used);
   const maxSession = Math.min(num(p.max_session_minutes) ?? rules.maxSessionMinutes, left + credit);
@@ -63,6 +72,10 @@ function entitlement(account) {
     maxSessionMinutes: Math.max(0, maxSession),
     periodEnd: p.period_end || '',
     canStart,
+    mocksLimit,
+    mocksLeft,
+    mockCredits,
+    canMock: mocksLeft + mockCredits > 0,
     reason
   };
 }

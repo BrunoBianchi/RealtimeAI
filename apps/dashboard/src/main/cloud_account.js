@@ -131,10 +131,11 @@ function createCloudAccount(deps) {
     if (!deps.hasToken()) return { ...info, signedIn: false };
     if (!force && cache && Date.now() - cache.at < STATUS_TTL_MS) return cache.value;
     const token = deps.readToken();
-    // Encrypted by the engine (dpapi:...): the dashboard cannot read it back.
-    // It is still a valid sign-in; the engine uses it at the next session.
+    // Sealed where this app cannot read it (dpapi:..., or a copy written by
+    // another install): without it there is no account, plan or quota check, so
+    // the user signs in again and the dashboard gets a copy it can read.
     if (!token) {
-      const value = { ...info, signedIn: true, account: null, detail: 'Signed in.' };
+      const value = { ...info, signedIn: false, expired: true, detail: describeError('invalid_token', 401) };
       cache = { at: Date.now(), value };
       return value;
     }
