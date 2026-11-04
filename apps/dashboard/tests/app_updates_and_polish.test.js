@@ -122,3 +122,12 @@ test('App Updates & Polish: update actions call the updater and reflect its answ
   await Cue.actions['update-install']();
   assert.strictEqual(called('installUpdate').length, 1);
 });
+
+test('update check: a release still being published is not an error, and no raw stack reaches the screen', () => {
+  const { describeUpdateError } = require('../src/main/updater');
+  const missing = describeUpdateError(new Error('Cannot find latest.yml in the latest release artifacts: HttpError: 404 Headers: {}'));
+  assert.strictEqual(missing.status, 'publishing');
+  const other = describeUpdateError(new Error('net::ERR_INTERNET_DISCONNECTED at createHttpError (C:\\x.js:1:1)'));
+  assert.strictEqual(other.status, 'error');
+  assert.ok(!other.error.includes('createHttpError'));
+});

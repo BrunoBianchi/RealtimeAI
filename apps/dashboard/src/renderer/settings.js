@@ -707,7 +707,8 @@
       available: `Version ${latest} is available.`,
       downloading: `Downloading ${latest}…`,
       downloaded: `Version ${latest} is ready. Restart to finish.`,
-      error: `Could not check: ${st.error || 'unknown error'}`,
+      publishing: 'A new version is being published. Try again in a few minutes.',
+      error: `Could not check for updates. ${st.error || ''}`,
       disabled: st.error || 'Updates only work in the installed app.'
     };
     const status = st.status || 'idle';

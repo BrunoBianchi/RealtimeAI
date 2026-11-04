@@ -24,6 +24,9 @@
     ],
 
     strings: {
+      'A new version is being published. Try again in a few minutes.': 'Uma nova versão está sendo publicada. Tente de novo em alguns minutos.',
+      'Could not check for updates. Check your connection and try again.': 'Não foi possível verificar atualizações. Confira sua conexão e tente de novo.',
+      'Could not check for updates. ': 'Não foi possível verificar atualizações.',
       'Wrong password.': 'Senha incorreta.',
       'Wrong e-mail or password.': 'E-mail ou senha incorretos.',
       'Delete account': 'Excluir conta',

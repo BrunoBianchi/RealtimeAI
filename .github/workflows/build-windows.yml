@@ -154,6 +154,14 @@ jobs:
           gh release upload "v$version" @assets --repo "${{ github.repository }}" --clobber
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+          # semantic-release leaves a draft: it goes public only now, with every
+          # file in place, because installed apps look for latest.yml in the
+          # latest public release.
+          $publish = @("v$version", "--repo", "${{ github.repository }}", "--draft=false")
+          if ($beta) { $publish += "--prerelease" } else { $publish += "--latest" }
+          gh release edit @publish
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
           # 2. If a dedicated public RELEASES_REPO is configured with a token, mirror the release and update metadata there too
           if ($env:RELEASES_REPO -and $env:RELEASES_TOKEN -and ($env:RELEASES_REPO -ne "${{ github.repository }}")) {
             $env:GH_TOKEN = $env:RELEASES_TOKEN

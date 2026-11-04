@@ -11,6 +11,16 @@
 
 'use strict';
 
+// What the screen shows for a failed check. The updater's own message is a
+// stack trace with HTTP headers: that goes to the log only.
+function describeUpdateError(err) {
+  const raw = err ? err.message || String(err) : 'unknown error';
+  console.warn('[updater]', raw);
+  // The latest release has no update metadata yet: it is still being published.
+  if (/latest\.yml|beta\.yml|\b404\b/i.test(raw)) return { status: 'publishing', hasUpdate: false, error: '' };
+  return { status: 'error', hasUpdate: false, error: 'Check your connection and try again.' };
+}
+
 function stripHtml(html) {
   return String(html || '')
     .replace(/<\s*br\s*\/?>/gi, '\n')
@@ -102,7 +112,7 @@ function createUpdater(opts) {
       publish({ status: 'downloaded', latestVersion: info.version });
       send('rtai:update-downloaded', { version: info.version, releaseName: info.releaseName || '' });
     });
-    updater.on('error', (err) => publish({ status: 'error', error: err ? err.message || String(err) : 'unknown error' }));
+    updater.on('error', (err) => publish(describeUpdateError(err)));
     return updater;
   }
 
@@ -121,7 +131,7 @@ function createUpdater(opts) {
     try {
       await u.checkForUpdates();
     } catch (e) {
-      publish({ status: 'error', error: e.message || String(e) });
+      publish(describeUpdateError(e));
     }
     return state;
   }
@@ -175,4 +185,4 @@ function createUpdater(opts) {
   };
 }
 
-module.exports = { createUpdater, stripHtml, notesToText, formatBytes };
+module.exports = { describeUpdateError, createUpdater, stripHtml, notesToText, formatBytes };
