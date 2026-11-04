@@ -17,6 +17,7 @@ const { MeetingDetector, APP_NAMES } = require('./meeting_detector');
 const { createMeetingPopup } = require('./meeting_popup');
 const { createFlagStore } = require('./feature_flags');
 const { createUpdater } = require('./updater');
+const { createCloudSync } = require('./cloud_sync');
 const { createCloudAccount, effectiveServerUrl } = require('./cloud_account');
 const { normalizeUiLanguage, resolveUiLocale, systemLanguages, SUPPORTED: UI_LOCALES } = require('./ui_locale');
 const I18n = require('../renderer/i18n.js');
@@ -664,10 +665,37 @@ const cloudAccount = createCloudAccount({
   emit: (e) => {
     // A sign-in rewrote config.ini: hand the renderer the fresh config.
     const payload = e.type === 'signed_in' ? { ...e, config: readConfigIni() } : e;
+    if (e.type === 'signed_in') scheduleCloudSync();
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('rtai:cloud-event', payload);
   },
   appVersion: typeof app.getVersion === 'function' ? app.getVersion() : ''
 });
+
+// Sessions, history and the question bank follow the account (cloud_sync.js).
+const cloudSync = createCloudSync({
+  dataDir: () => getAppDataDir(),
+  client: () => cloudAccount.syncClient,
+  owner: async () => {
+    if (!isSignedIn()) return '';
+    const r = await cloudAccount.api('GET', '/v1/me');
+    return r.ok && r.data ? String(r.data.email || '') : '';
+  },
+  busy: () => isOverlayRunning() // a live session is still writing its files
+});
+async function runCloudSync() {
+  const res = await cloudSync.syncNow();
+  if (res && (res.downloaded || res.removed) && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('rtai:cloud-synced', res);
+  }
+  return res;
+}
+let cloudSyncTimer = null;
+function scheduleCloudSync() {
+  clearTimeout(cloudSyncTimer);
+  cloudSyncTimer = setTimeout(() => {
+    if (isSignedIn()) runCloudSync().catch((err) => console.warn('[cloud-sync]', err));
+  }, 3000);
+}
 
 // ---------------------------------------------------------------------------
 // DPAPI Key Unprotector & Lightweight OpenRouter Qwen 3.6 Flash Client
@@ -2819,6 +2847,7 @@ function launchOverlay({ agent, configOverrides = {} }) {
 
   overlayProcess.on('exit', () => {
     overlayProcess = null;
+    scheduleCloudSync();
     overlayMode = null;
     broadcastOverlayStatus();
   });
@@ -3356,6 +3385,8 @@ function startLocalBackendForDev() {
 app.whenReady().then(() => {
   if (!gotSingleInstanceLock) return;
   startLocalBackendForDev();
+  scheduleCloudSync();
+  setInterval(scheduleCloudSync, 5 * 60 * 1000).unref(); // also picks up what other devices sent
   if (session && session.defaultSession) {
     // Only the bundled UI (file://) may use the microphone meter, clipboard and
     // notifications; anything remote that ends up in a window gets nothing.
@@ -3431,6 +3462,7 @@ app.whenReady().then(() => {
   ipcMain.handle('rtai:save-agent', async (_ev, agent) => {
     const before = loadAllAgents().find((a) => a.id === sanitizeId(agent && agent.id));
     const saved = saveAgentToDisk(agent);
+    scheduleCloudSync();
     // The overlay reads the goal at launch: when the running one uses this goal
     // and its answer settings changed, relaunch it so the change takes effect.
     let overlayRestarted = false;
@@ -3452,6 +3484,7 @@ app.whenReady().then(() => {
   ipcMain.handle('rtai:delete-agent', async (_ev, agentId) => {
     const filePath = path.join(getAppDataDir(), 'agents', `${sanitizeId(agentId)}.json`);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    scheduleCloudSync();
     const agents = loadAllAgents();
     if (agents.length > 0) {
       writeConfigIni({ last_agent: agents[0].id });
@@ -3567,10 +3600,10 @@ app.whenReady().then(() => {
   // Provider consoles linked from Settings > Account (fixed allowlist).
   // ---- Cue cloud account (device sign-in; docs/server-api.md) ----
   ipcMain.handle('rtai:cloud-status', async (_ev, force) => cloudAccount.status(Boolean(force)));
-  ipcMain.handle('rtai:cloud-login', async (_ev, options) => cloudAccount.startLogin(options || {}));
   ipcMain.handle('rtai:cloud-password-login', async (_ev, p) => cloudAccount.loginWithPassword(p && p.email, p && p.password));
   ipcMain.handle('rtai:cloud-signup', async (_ev, p) => cloudAccount.signup(p && p.name, p && p.email, p && p.password));
   ipcMain.handle('rtai:cloud-reset-password', async (_ev, email) => cloudAccount.resetPassword(email));
+  ipcMain.handle('rtai:cloud-sync', async () => (isSignedIn() ? runCloudSync() : { ok: false, error: 'not_signed_in' }));
   ipcMain.handle('rtai:cloud-files', async () => cloudAccount.listFiles());
   ipcMain.handle('rtai:cloud-file-delete', async (_ev, id) => cloudAccount.deleteFile(id));
   // Sends the documents of every session as the text the app extracted from
@@ -3594,7 +3627,6 @@ app.whenReady().then(() => {
     return { ok: true, sent, failed };
   });
   ipcMain.handle('rtai:cloud-billing', async (_ev, kind, pack) => cloudAccount.billing(kind === 'portal' ? 'portal' : 'checkout', pack));
-  ipcMain.handle('rtai:cloud-cancel-login', async () => cloudAccount.cancelLogin());
   ipcMain.handle('rtai:cloud-logout', async () => {
     if (isOverlayRunning()) stopRunningOverlay();
     const res = await cloudAccount.logout();

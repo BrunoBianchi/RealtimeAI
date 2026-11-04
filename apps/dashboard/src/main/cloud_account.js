@@ -1,11 +1,6 @@
 // Cue cloud account (dashboard side). Signing in is mandatory: the
 // dashboard shows only the sign-in screen until there is a device token.
-// Three ways in, all ending in the same device token:
-//   * Google and SSO (SAML/OIDC of the user's company): the OAuth 2.0 device
-//     authorization grant (RFC 8628) with a `provider` hint. The dashboard
-//     opens the browser on the server's page (which redirects to Google or to
-//     the company IdP) and polls until the user approves;
-//   * e-mail + password: POST /v1/auth/login (and /v1/auth/signup). The resulting device token goes to config.ini [servidor] token,
+// Sign-in is e-mail + password: POST /v1/auth/login (and /v1/auth/signup). The resulting device token goes to config.ini [servidor] token,
 // where the engine (rtai_app) encrypts it with DPAPI and exchanges it for
 // short-lived STT/LLM credentials at each session (POST /v1/session).
 //
@@ -40,8 +35,6 @@ function effectiveServerUrl(configured) {
 // pt-BR text for the device-flow errors of RFC 8628 §3.5 and HTTP failures.
 function describeError(code, status) {
   switch (code) {
-    case 'access_denied': return 'Access denied in the browser.';
-    case 'expired_token': return 'The code expired. Try signing in again.';
     case 'invalid_token': return 'Session expired: sign in to your account again.';
     case 'network': return 'No connection to the Cue server.';
     case 'no_server': return 'No server configured.';
@@ -52,7 +45,6 @@ function describeError(code, status) {
     case 'email_not_verified': return 'Confirm your e-mail with the link we sent, then sign in again.';
     case 'sso_not_configured': return 'SSO is not set up for this domain. Contact your company administrator.';
     case 'rate_limited': return 'Too many attempts. Wait a moment and try again.';
-    case 'signin_unavailable': return 'Google and SSO sign-in are not available yet. Sign in with e-mail and password.';
     case 'file_too_large': return 'Files can have up to 20 MB.';
     case 'storage_full': return 'Your cloud storage is full.';
     case 'billing_unavailable': return 'Upgrades are not available yet. Try again later.';
@@ -74,13 +66,10 @@ function describeError(code, status) {
  * @param {(event: object) => void} [deps.emit]     progress events for the renderer
  * @param {string} deps.appVersion
  * @param {typeof fetch} [deps.fetchImpl]
- * @param {(ms: number) => Promise<void>} [deps.sleep]
  */
 function createCloudAccount(deps) {
   const fetchImpl = deps.fetchImpl || globalThis.fetch;
-  const sleep = deps.sleep || ((ms) => new Promise((r) => setTimeout(r, ms)));
   const emit = deps.emit || (() => {});
-  let login = null; // { cancelled: boolean }
   let cache = null; // { at, value }
 
   async function request(method, path, { body, token, timeoutMs } = {}) {
@@ -161,59 +150,6 @@ function createCloudAccount(deps) {
     }
     cache = { at: Date.now(), value };
     return value;
-  }
-
-  // provider: 'google' | 'sso' (login_hint = work e-mail or company domain).
-  async function startLogin(options) {
-    if (!serverInfo().available) return { ok: false, error: describeError('no_server') };
-    const provider = options && ['google', 'sso'].includes(options.provider) ? options.provider : 'google';
-    const hint = String((options && options.hint) || '').trim();
-    if (provider === 'sso' && !hint) return { ok: false, error: 'Enter your work e-mail or company domain.' };
-    if (login) login.cancelled = true;
-    const mine = { cancelled: false };
-    login = mine;
-    const start = await request('POST', '/v1/auth/device', {
-      body: { client_id: 'rtai-dashboard', app_version: deps.appVersion || '', provider, ...(hint ? { login_hint: hint } : {}) }
-    });
-    if (!start.ok || !start.data || !start.data.device_code) {
-      login = null;
-      return { ok: false, error: describeError(start.error, start.status) };
-    }
-    const d = start.data;
-    const verifyUrl = d.verification_uri_complete || d.verification_uri;
-    if (verifyUrl) deps.openBrowser(verifyUrl);
-    emit({ type: 'pending', userCode: d.user_code || '', verificationUri: d.verification_uri || verifyUrl || '' });
-
-    // Poll in the background; the IPC call returns the code right away.
-    (async () => {
-      let interval = Math.max(1, Number(d.interval) || 5) * 1000;
-      const deadline = Date.now() + Math.max(60, Number(d.expires_in) || 600) * 1000;
-      while (!mine.cancelled && Date.now() < deadline) {
-        await sleep(interval);
-        if (mine.cancelled) return;
-        const r = await request('POST', '/v1/auth/device/token', {
-          body: { device_code: d.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code', client_id: 'rtai-dashboard' }
-        });
-        if (mine.cancelled) return;
-        if (r.ok && r.data && r.data.access_token) {
-          deps.saveToken(String(r.data.access_token));
-          cache = null;
-          login = null;
-          emit({ type: 'signed_in', account: r.data.account || null });
-          return;
-        }
-        if (r.error === 'authorization_pending' || r.error === 'network') continue;
-        if (r.error === 'slow_down') { interval += 5000; continue; }
-        login = null;
-        emit({ type: 'error', error: describeError(r.error, r.status) });
-        return;
-      }
-      if (!mine.cancelled) {
-        login = null;
-        emit({ type: 'error', error: describeError('expired_token') });
-      }
-    })();
-    return { ok: true, userCode: d.user_code || '', verificationUri: d.verification_uri || verifyUrl || '', expiresIn: Number(d.expires_in) || 600 };
   }
 
   // Token responses from password sign-in / sign-up.
@@ -303,6 +239,40 @@ function createCloudAccount(deps) {
     }
   }
 
+  // Raw access to the account's cloud data (/v1/sync), used by cloud_sync.js.
+  async function syncRequest(method, itemPath, bytes, query) {
+    const base = effectiveServerUrl(deps.getServerUrl());
+    const token = deps.readToken();
+    if (!base || !token) return { ok: false, code: 'invalid_token' };
+    const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = ctrl ? setTimeout(() => ctrl.abort(), UPLOAD_TIMEOUT_MS) : null;
+    try {
+      const res = await fetchImpl(`${base}/v1/sync/${itemPath}${query || ''}`, {
+        method,
+        headers: { 'Content-Type': 'application/octet-stream', Authorization: `Bearer ${token}`, 'X-RTAI-Version': deps.appVersion || '' },
+        body: bytes,
+        signal: ctrl ? ctrl.signal : undefined
+      });
+      if (res.ok) return { ok: true, bytes: method === 'GET' ? Buffer.from(await res.arrayBuffer()) : null };
+      const data = await res.json().catch(() => null);
+      return { ok: false, status: res.status, code: data && data.error && data.error.code };
+    } catch (_e) {
+      return { ok: false, status: 0, code: 'network' };
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+  const syncPath = (kind, id) => `${encodeURIComponent(kind)}/${encodeURIComponent(id)}`;
+  const syncClient = {
+    list: async () => {
+      const r = await api('GET', '/v1/sync');
+      return r.ok && r.data ? { ok: true, ...r.data } : { ok: false, error: describeError(r.error, r.status) };
+    },
+    get: (kind, id) => syncRequest('GET', syncPath(kind, id)),
+    put: (kind, id, bytes, updatedAt) => syncRequest('PUT', syncPath(kind, id), bytes, `?updated_at=${Math.round(updatedAt) || 0}`),
+    remove: (kind, id) => syncRequest('DELETE', syncPath(kind, id))
+  };
+
   async function listFiles() {
     const r = await api('GET', '/v1/files');
     return r.ok ? { ok: true, ...r.data } : { ok: false, error: describeError(r.error, r.status) };
@@ -313,12 +283,6 @@ function createCloudAccount(deps) {
     return r.ok ? { ok: true } : { ok: false, error: describeError(r.error, r.status) };
   }
 
-  function cancelLogin() {
-    if (login) login.cancelled = true;
-    login = null;
-    return { ok: true };
-  }
-
   async function logout() {
     const token = deps.readToken();
     if (token) await request('POST', '/v1/auth/logout', { token }); // best effort revoke
@@ -327,7 +291,7 @@ function createCloudAccount(deps) {
     return { ok: true };
   }
 
-  return { status, startLogin, cancelLogin, loginWithPassword, signup, resetPassword, billing, logout, serverInfo, api, aiEndpoint, uploadFile, listFiles, deleteFile };
+  return { syncClient, status, loginWithPassword, signup, resetPassword, billing, logout, serverInfo, api, aiEndpoint, uploadFile, listFiles, deleteFile };
 }
 
 module.exports = { createCloudAccount, effectiveServerUrl, normalizeBaseUrl, describeError, BUILTIN_SERVER_URL };

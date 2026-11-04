@@ -30,15 +30,19 @@ contextBridge.exposeInMainWorld('rtai', {
   saveConfig: (config) => ipcRenderer.invoke('rtai:save-config', config),
   // RealTimeAI cloud account: device sign-in, status, sign-out.
   cloudStatus: (force) => ipcRenderer.invoke('rtai:cloud-status', Boolean(force)),
-  cloudLogin: (options) => ipcRenderer.invoke('rtai:cloud-login', options || {}),
   cloudPasswordLogin: (creds) => ipcRenderer.invoke('rtai:cloud-password-login', creds),
   cloudSignup: (data) => ipcRenderer.invoke('rtai:cloud-signup', data),
   cloudResetPassword: (email) => ipcRenderer.invoke('rtai:cloud-reset-password', email),
+  cloudSync: () => ipcRenderer.invoke('rtai:cloud-sync'),
+  onCloudSynced: (cb) => {
+    const handler = (_ev, payload) => cb(payload);
+    ipcRenderer.on('rtai:cloud-synced', handler);
+    return () => ipcRenderer.removeListener('rtai:cloud-synced', handler);
+  },
   cloudFiles: () => ipcRenderer.invoke('rtai:cloud-files'),
   cloudFileDelete: (id) => ipcRenderer.invoke('rtai:cloud-file-delete', id),
   cloudFilesBackup: () => ipcRenderer.invoke('rtai:cloud-files-backup'),
   cloudBilling: (kind, pack) => ipcRenderer.invoke('rtai:cloud-billing', kind, pack),
-  cloudCancelLogin: () => ipcRenderer.invoke('rtai:cloud-cancel-login'),
   cloudLogout: () => ipcRenderer.invoke('rtai:cloud-logout'),
   onCloudEvent: (cb) => {
     const handler = (_event, msg) => cb(msg);

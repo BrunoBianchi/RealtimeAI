@@ -3090,17 +3090,8 @@ button.status-chip:hover {
   background: var(--btn-primary-hover);
 }
 
-.auth-btn .g-logo {
-  width: 18px;
-  height: 18px;
-  flex: none;
-}
 
 /* Google brand colors, kept out of the markup. */
-.g-logo .g-y { fill: #FFC107; }
-.g-logo .g-r { fill: #FF3D00; }
-.g-logo .g-g { fill: #4CAF50; }
-.g-logo .g-b { fill: #1976D2; }
 
 .auth-btn .spinner {
   position: absolute;

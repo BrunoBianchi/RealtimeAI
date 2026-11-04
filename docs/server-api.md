@@ -333,3 +333,16 @@ Variáveis equivalentes: `RTAI_SERVER_MODE`, `RTAI_SERVER_URL`, `RTAI_SERVER_REG
 O servidor padrão é definido no build: `cmake --preset windows-release -DRTAI_SERVER_URL=https://api...`
 (engine) e `BUILTIN_SERVER_URL` em `apps/dashboard/src/main/cloud_account.js` (dashboard).
 Um build open-source sem esses valores pede o endereço do servidor na própria tela de login.
+
+## Sincronização
+
+Cópia na nuvem dos dados do usuário. O app define o formato; o servidor guarda bytes e aplica o plano. `kind`: `session`, `history` ou `bank` (`id` = `main`).
+
+- `GET /v1/sync` → `{ items: [{kind, id, size, sha256, updated_at}], used_bytes, limit_bytes, limits: {session, history} }` (limite `0` = sem limite).
+- `GET /v1/sync/{kind}/{id}` → os bytes (`404` se não existir ou for de outra conta).
+- `PUT /v1/sync/{kind}/{id}?updated_at=<ms>` (corpo cru, até 20 MB) → o item. Erros: `402 cloud_limit`, `413 storage_full`, `413 item_too_large`.
+- `DELETE /v1/sync/{kind}/{id}` → `{ ok: true }`.
+
+Free: 3 sessões e 5 itens de histórico. PRO: sem limite de quantidade. A cota de bytes é compartilhada com `/v1/files`.
+
+Os endpoints `/v1/auth/device*` (login por dispositivo) foram removidos: o login é por e-mail e senha. `/v1/billing/*` responde `503 billing_unavailable` até haver um provedor de pagamento.

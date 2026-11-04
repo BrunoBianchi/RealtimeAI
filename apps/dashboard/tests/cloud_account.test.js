@@ -41,39 +41,6 @@ const waitFor = async (pred) => {
   assert.ok(pred(), 'condition not reached');
 };
 
-test('device sign-in: shows the code, honours slow_down and stores the token', async () => {
-  let polls = 0;
-  const server = fakeServer((url) => {
-    if (url.endsWith('/v1/auth/device')) {
-      return { status: 200, body: { device_code: 'dc', user_code: 'ABCD-EFGH', verification_uri: 'https://rt.test/ativar', verification_uri_complete: 'https://rt.test/ativar?c=ABCD-EFGH', interval: 1, expires_in: 600 } };
-    }
-    polls += 1;
-    if (polls === 1) return { status: 400, body: { error: 'authorization_pending' } };
-    if (polls === 2) return { status: 400, body: { error: 'slow_down' } };
-    return { status: 200, body: { access_token: 'device-token', account: { email: 'a@b.c' } } };
-  });
-  const { acc, events, store } = account(server);
-  const res = await acc.startLogin();
-  assert.strictEqual(res.ok, true);
-  assert.strictEqual(res.userCode, 'ABCD-EFGH');
-  assert.deepStrictEqual(events[0], { type: 'browser', url: 'https://rt.test/ativar?c=ABCD-EFGH' });
-  await waitFor(() => events.some((e) => e.type === 'signed_in'));
-  assert.strictEqual(store.token, 'device-token');
-  assert.strictEqual(server.calls[0].url, 'https://api.test.local/v1/auth/device');
-  assert.strictEqual(server.calls[1].body.grant_type, 'urn:ietf:params:oauth:grant-type:device_code');
-});
-
-test('device sign-in: a denial ends the flow with a pt-BR message', async () => {
-  const server = fakeServer((url) => url.endsWith('/v1/auth/device')
-    ? { status: 200, body: { device_code: 'dc', user_code: 'X', verification_uri: 'https://rt.test/a', interval: 1 } }
-    : { status: 400, body: { error: 'access_denied' } });
-  const { acc, events, store } = account(server);
-  await acc.startLogin();
-  await waitFor(() => events.some((e) => e.type === 'error'));
-  assert.match(events.find((e) => e.type === 'error').error, /denied/);
-  assert.strictEqual(store.token, '');
-});
-
 test('status: 401 means the sign-in expired; offline keeps the sign-in', async () => {
   let mode = 401;
   const server = fakeServer(() => (mode === 401 ? { status: 401, body: { error: 'invalid_token' } } : { status: 503, body: null }));
@@ -157,14 +124,14 @@ test('Conta e servidor: signed out only the login screen exists; signed in no ke
   await settle();
   assert.strictEqual(r.Cue.isLocked(), true);
   const view = r.page('view').innerHTML;
-  for (const a of ['auth-google', 'auth-password']) assert.strictEqual(tags(view, { 'data-action': a }).length, 1, a);
-  assert.ok(tags(view, { 'data-action': 'auth-mode', 'data-mode': 'sso' }).length === 1, 'SSO');
+  for (const a of ['auth-password']) assert.strictEqual(tags(view, { 'data-action': a }).length, 1, a);
+  assert.ok(!view.includes('auth-google') && !view.includes('data-mode="sso"'), 'no sign-in that does not exist');
   assert.ok(tags(view, { 'data-action': 'auth-mode', 'data-mode': 'signup' }).length === 1, 'criar conta');
   assert.strictEqual(r.page('sidebar').hidden, true, 'no sidebar while signed out');
   // Any other action is ignored while locked.
   r.location.hash = '#/settings/ai';
   await settle();
-  assert.ok(r.page('view').innerHTML.includes('data-action="auth-google"'), 'settings stay locked');
+  assert.ok(r.page('view').innerHTML.includes('data-action="auth-password"'), 'settings stay locked');
 
   // Signed in: settings render, the account card offers Sair, own keys not needed.
   r = loadRenderer({ state: { config: { ...base, has_server_token: true } } });
@@ -179,21 +146,6 @@ test('Conta e servidor: signed out only the login screen exists; signed in no ke
   // No server configured: the login screen asks for its address.
   r = loadRenderer({ state: { auth: { signedIn: false }, config: { ...base, server_url_effective: '', has_server_token: false } } });
   assert.strictEqual(tags(render(r.Cue, 'login'), { 'data-change': 'auth-server' }).length, 1);
-});
-
-test('Google and SSO go through the browser with a provider hint; SSO needs the company', async () => {
-  const server = fakeServer(() => ({ status: 200, body: { device_code: 'dc', user_code: 'C', verification_uri: 'https://rt.test/a', interval: 1, expires_in: 1 } }));
-  const { acc } = account(server);
-  assert.strictEqual((await acc.startLogin({ provider: 'sso', hint: '' })).ok, false, 'SSO without e-mail/domain');
-  assert.strictEqual(server.calls.length, 0);
-  await acc.startLogin({ provider: 'sso', hint: 'ana@empresa.com' });
-  assert.deepStrictEqual([server.calls[0].body.provider, server.calls[0].body.login_hint], ['sso', 'ana@empresa.com']);
-  acc.cancelLogin();
-  await acc.startLogin({ provider: 'google' });
-  const google = server.calls.filter((c) => c.url.endsWith('/v1/auth/device')).pop();
-  assert.strictEqual(google.body.provider, 'google');
-  assert.ok(!('login_hint' in google.body));
-  acc.cancelLogin();
 });
 
 test('e-mail + password: sign in, wrong password, sign-up and verification', async () => {

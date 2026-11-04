@@ -141,6 +141,39 @@
       ${C.proAd('card', 'What PRO adds')}`;
   }
 
+  // Sessions, history and question bank in the account (cloud_sync.js).
+  let cloudSyncInfo = null; // null = not synced from this screen yet
+  async function runCloudSync() {
+    cloudSyncInfo = (await C.guard(() => api.cloudSync(), 'Could not sync with the cloud.')) || { ok: false };
+    C.refresh();
+  }
+  function cloudSyncCard() {
+    if (!(S.auth && S.auth.signedIn)) return '';
+    if (cloudSyncInfo === null) {
+      cloudSyncInfo = { loading: true };
+      runCloudSync();
+    }
+    const r = cloudSyncInfo;
+    const of = (n, max) => (max ? C.t('{n} of {total}', { n: n || 0, total: max }) : String(n || 0));
+    const counts = r.counts || {};
+    const limits = r.limits || {};
+    const kept = (r.limited && (r.limited.session || r.limited.history)) || 0;
+    return card('Cloud sync', 'Your sessions, history and question bank are saved to your account and follow you to other computers.',
+      `${r.ok === false ? '<div class="small" role="alert" style="color:var(--danger)">Could not sync with the cloud. Your data is safe on this computer.</div>' : ''}
+       ${r.counts ? `<div class="shortcut-row"><span>Sessions</span><span class="small" data-no-i18n>${esc(of(counts.session, limits.session))}</span></div>
+       <div class="shortcut-row"><span>History</span><span class="small" data-no-i18n>${esc(of(counts.history, limits.history))}</span></div>
+       <div class="shortcut-row"><span>Question bank</span><span class="small">${counts.bank ? 'Saved' : 'Empty'}</span></div>` : ''}
+       ${kept || r.full ? '<div class="small" role="status" style="margin-top:8px">Your plan limit was reached: the newest items are in the cloud and the rest stay only on this computer. PRO has no limit on the number of items.</div>' : ''}
+       <div class="row between" style="margin-top:12px"><span class="small faint">${r.loading ? 'Syncing…' : r.skipped ? 'Syncs when the live session ends.' : ''}</span>
+       <button type="button" class="btn" data-action="cloud-sync">${icon('upload')}Sync now</button></div>`);
+  }
+  C.actions['cloud-sync'] = async () => {
+    cloudSyncInfo = { ...(cloudSyncInfo || {}), loading: true };
+    C.refresh();
+    await runCloudSync();
+    C.toast('Cloud sync finished.');
+  };
+
   // Cloud backup of the session documents (GET/POST/DELETE /v1/files).
   let cloudFiles = null; // null = not loaded yet
   async function loadCloudFiles() {
@@ -197,6 +230,7 @@
         <button type="button" class="btn" data-action="cloud-logout">${icon('sign-out')}Sign out</button></div>`;
     const active = C.cloudActive();
     return `
+      ${cloudSyncCard()}
       ${cloudFilesCard()}
       ${card('Cue account', active ? 'Next session uses the Cue servers' : 'Next session uses your API keys', body)}
       ${card('Where the AI runs', 'Audio goes straight to the transcription provider; the server only issues temporary credentials. Plan minutes count in both modes.',
@@ -611,6 +645,8 @@
       ['Extra tokens', '—', 'From $0.08 per minute', 'From $0.08 per minute'],
       ['Answer speed', `+${d} ms per answer`, 'Instant', 'Instant'],
       ['Cloud backup of files', '—', '25 MB', '500 MB'],
+      ['Sessions saved in the cloud', '—', '3', 'Unlimited'],
+      ['History saved in the cloud', '—', '5', 'Unlimited'],
       ['Sync across devices', '—', '—', 'Included'],
       ['Google Calendar', '—', '—', 'Included']
     ];

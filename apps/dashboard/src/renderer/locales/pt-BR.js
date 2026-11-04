@@ -24,6 +24,20 @@
     ],
 
     strings: {
+      'Could not sync with the cloud.': 'Não foi possível sincronizar com a nuvem.',
+      'Cloud sync': 'Sincronização na nuvem',
+      'Your sessions, history and question bank are saved to your account and follow you to other computers.': 'Suas sessões, seu histórico e seu banco de perguntas ficam salvos na sua conta e acompanham você em outros computadores.',
+      'Could not sync with the cloud. Your data is safe on this computer.': 'Não foi possível sincronizar com a nuvem. Seus dados continuam seguros neste computador.',
+      'Saved': 'Salvo',
+      'Empty': 'Vazio',
+      'Your plan limit was reached: the newest items are in the cloud and the rest stay only on this computer. PRO has no limit on the number of items.': 'O limite do seu plano foi atingido: os itens mais recentes estão na nuvem e o restante fica só neste computador. O PRO não tem limite de quantidade de itens.',
+      'Syncing…': 'Sincronizando…',
+      'Syncs when the live session ends.': 'Sincroniza quando a sessão ao vivo terminar.',
+      'Sync now': 'Sincronizar agora',
+      'Cloud sync finished.': 'Sincronização concluída.',
+      'Sessions saved in the cloud': 'Sessões salvas na nuvem',
+      'History saved in the cloud': 'Histórico salvo na nuvem',
+      'Unlimited': 'Ilimitado',
       'Re-evaluate': 'Reavaliar',
       'cancelled': 'cancelada',
       'Live ·': 'Ao vivo ·',
@@ -1167,6 +1181,7 @@
     },
 
     templates: {
+      '{n} of {total}': '{n} de {total}',
       '{what} · reference culture: {company}': '{what} · cultura de referência: {company}',
       'Per month. Includes {n} tokens a month, across as many sessions as you like.': 'Por mês. Inclui {n} tokens por mês, em quantas sessões quiser.',
       'PRO includes {n} tokens every month for ${d}: {what} per minute, the lowest price. Purchased tokens are used after the plan\'s minutes.': 'O PRO inclui {n} tokens todo mês por US$ {d}: {what} por minuto, o menor preço. Os tokens comprados são usados depois dos minutos do plano.',

@@ -1023,7 +1023,7 @@ Cue.actions['open-url'] = async (el) => {
 };
 
 // The only actions that work before signing in (sign-in screen + window).
-const AUTH_ACTIONS = new Set(['auth-google', 'auth-sso', 'auth-password', 'auth-signup', 'auth-mode', 'auth-reset', 'auth-cancel', 'auth-reopen', 'auth-local', 'open-url']);
+const AUTH_ACTIONS = new Set(['auth-password', 'auth-signup', 'auth-mode', 'auth-reset', 'auth-cancel', 'auth-reopen', 'auth-local', 'open-url']);
 
 function bindDelegation() {
   document.addEventListener('click', (e) => {
@@ -1171,6 +1171,15 @@ function subscribe() {
       if (S.route.view === 'questions' || S.route.view === 'home') refresh();
     }
   });
+  // Another device changed something: show it.
+  if (api.onCloudSynced) {
+    api.onCloudSynced(async () => {
+      await refreshState();
+      await loadQuestionBank(true);
+      renderShell();
+      refresh();
+    });
+  }
   // Clock on the live button (ticked in place; full shell only if it is missing).
   setInterval(() => {
     if (S.overlayStatus && S.overlayStatus.running && !tickLiveClock()) renderShell();
