@@ -23,10 +23,10 @@ function isLoopbackUrl(url) {
   }
 }
 
-// The server URL to use when running from source: an explicit RTAI_SERVER_URL
-// or config wins; otherwise the local backend if the repo has one.
+// Running from source talks to the built-in server too. RTAI_LOCAL_BACKEND=1
+// asks for the local backend instead (when the repo has one and nothing else is set).
 function devServerUrl({ packaged, env = process.env, repoRoot, configuredUrl = '' }) {
-  if (packaged || env.RTAI_LOCAL_BACKEND === '0') return '';
+  if (packaged || env.RTAI_LOCAL_BACKEND !== '1') return '';
   if (env.RTAI_SERVER_URL || configuredUrl) return '';
   return fs.existsSync(path.join(repoRoot, COMPOSE_FILE)) ? DEFAULT_URL : '';
 }

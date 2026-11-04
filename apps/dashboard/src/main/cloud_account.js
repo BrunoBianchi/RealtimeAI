@@ -16,11 +16,12 @@
 const { entitlement } = require('./plans');
 
 // Official builds set this (keep it in sync with CMake -DRTAI_SERVER_URL).
-// Empty = open-source build: sign-in is offered only when [servidor] url is set.
-const BUILTIN_SERVER_URL = '';
+// For now the Droplet by address, over plain HTTP: move to https://<domain> as soon as there is one.
+const BUILTIN_SERVER_URL = 'http://167.172.147.53';
 
 const STATUS_TTL_MS = 60 * 1000;
 const REQUEST_TIMEOUT_MS = 8000;
+const UPLOAD_TIMEOUT_MS = 120000;
 
 function normalizeBaseUrl(url) {
   const u = String(url || '').trim().replace(/\/+$/, '');
@@ -52,6 +53,8 @@ function describeError(code, status) {
     case 'sso_not_configured': return 'SSO is not set up for this domain. Contact your company administrator.';
     case 'rate_limited': return 'Too many attempts. Wait a moment and try again.';
     case 'signin_unavailable': return 'Google and SSO sign-in are not available yet. Sign in with e-mail and password.';
+    case 'file_too_large': return 'Files can have up to 20 MB.';
+    case 'storage_full': return 'Your cloud storage is full.';
     case 'billing_unavailable': return 'Upgrades are not available yet. Try again later.';
     default:
       if (status === 401) return 'Session expired: sign in to your account again.';
@@ -273,6 +276,43 @@ function createCloudAccount(deps) {
     return { ok: false, error: describeError(r.error, r.status) };
   }
 
+  // Cloud backup of a document (POST /v1/files, raw bytes).
+  async function uploadFile(bytes, { name, tag, agentId } = {}) {
+    const base = effectiveServerUrl(deps.getServerUrl());
+    const token = deps.readToken();
+    if (!base || !token) return { ok: false, error: describeError('invalid_token') };
+    const q = new URLSearchParams({ name: String(name || '') });
+    if (tag) q.set('tag', String(tag));
+    if (agentId) q.set('agent_id', String(agentId));
+    const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = ctrl ? setTimeout(() => ctrl.abort(), UPLOAD_TIMEOUT_MS) : null;
+    try {
+      const res = await fetchImpl(`${base}/v1/files?${q}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/octet-stream', Authorization: `Bearer ${token}`, 'X-RTAI-Version': deps.appVersion || '' },
+        body: bytes,
+        signal: ctrl ? ctrl.signal : undefined
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok) return { ok: true, file: data };
+      return { ok: false, status: res.status, error: describeError(data && data.error, res.status) };
+    } catch (_e) {
+      return { ok: false, status: 0, error: describeError('network') };
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  async function listFiles() {
+    const r = await api('GET', '/v1/files');
+    return r.ok ? { ok: true, ...r.data } : { ok: false, error: describeError(r.error, r.status) };
+  }
+
+  async function deleteFile(id) {
+    const r = await api('DELETE', `/v1/files/${encodeURIComponent(String(id))}`);
+    return r.ok ? { ok: true } : { ok: false, error: describeError(r.error, r.status) };
+  }
+
   function cancelLogin() {
     if (login) login.cancelled = true;
     login = null;
@@ -287,7 +327,7 @@ function createCloudAccount(deps) {
     return { ok: true };
   }
 
-  return { status, startLogin, cancelLogin, loginWithPassword, signup, resetPassword, billing, logout, serverInfo, api, aiEndpoint };
+  return { status, startLogin, cancelLogin, loginWithPassword, signup, resetPassword, billing, logout, serverInfo, api, aiEndpoint, uploadFile, listFiles, deleteFile };
 }
 
 module.exports = { createCloudAccount, effectiveServerUrl, normalizeBaseUrl, describeError, BUILTIN_SERVER_URL };

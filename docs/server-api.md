@@ -158,6 +158,20 @@ Bearer. Resposta `200`:
 
 `401` = login expirado (o app volta para a tela de login).
 
+## Arquivos
+
+Backup dos documentos do usuário. Bearer em todas as rotas.
+
+| Rota | O que faz |
+|---|---|
+| `GET /v1/files` | `{files: [{id, name, tag, agent_id, size, sha256, created_at}], used_bytes, limit_bytes}` |
+| `POST /v1/files?name=&tag=&agent_id=` | corpo = bytes do arquivo. `201` novo, `200` se o mesmo nome e conteúdo já existe |
+| `GET /v1/files/{id}` | baixa o arquivo |
+| `DELETE /v1/files/{id}` | `{ok: true}` |
+
+Até 20 MB por arquivo (`413 file_too_large`). Cota: Free 25 MB, PRO 500 MB (`413 storage_full`).
+Arquivo de outra conta responde `404`.
+
 ## Planos
 
 | Plano | Limite | Sessões | Renova |

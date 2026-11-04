@@ -69,12 +69,12 @@ test('main process: AI, research, calendar and question sharing go to the server
 
 test('local backend: dev default URL only from source, never over an explicit server', { skip: NO_BACKEND }, () => {
   const repoRoot = path.join(__dirname, '..', '..', '..');
-  assert.strictEqual(localBackend.devServerUrl({ packaged: false, env: {}, repoRoot }), 'http://localhost:8787');
-  assert.strictEqual(localBackend.devServerUrl({ packaged: true, env: {}, repoRoot }), '');
+  assert.strictEqual(localBackend.devServerUrl({ packaged: false, env: { RTAI_LOCAL_BACKEND: '1' }, repoRoot }), 'http://localhost:8787');
+  assert.strictEqual(localBackend.devServerUrl({ packaged: true, env: { RTAI_LOCAL_BACKEND: '1' }, repoRoot }), '');
   assert.strictEqual(localBackend.devServerUrl({ packaged: false, env: { RTAI_SERVER_URL: 'https://api.x' }, repoRoot }), '');
-  assert.strictEqual(localBackend.devServerUrl({ packaged: false, env: {}, repoRoot, configuredUrl: 'https://mine' }), '');
+  assert.strictEqual(localBackend.devServerUrl({ packaged: false, env: { RTAI_LOCAL_BACKEND: '1' }, repoRoot, configuredUrl: 'https://mine' }), '');
   assert.strictEqual(localBackend.devServerUrl({ packaged: false, env: { RTAI_LOCAL_BACKEND: '0' }, repoRoot }), '');
-  assert.strictEqual(localBackend.devServerUrl({ packaged: false, env: {}, repoRoot: os.tmpdir() }), '', 'no backend folder');
+  assert.strictEqual(localBackend.devServerUrl({ packaged: false, env: { RTAI_LOCAL_BACKEND: '1' }, repoRoot: os.tmpdir() }), '', 'no backend folder');
   assert.ok(localBackend.isLoopbackUrl('http://127.0.0.1:8787'));
   assert.ok(!localBackend.isLoopbackUrl('https://localhost:8787'));
   assert.ok(!localBackend.isLoopbackUrl('http://localhost.evil.com'));

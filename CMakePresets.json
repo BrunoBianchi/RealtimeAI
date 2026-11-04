@@ -26,6 +26,7 @@
         "rhs": "Windows"
       },
       "cacheVariables": {
+        "RTAI_SERVER_URL": "http://167.172.147.53",
         "RTAI_ENABLE_EMBEDDINGS": "ON"
       }
     },

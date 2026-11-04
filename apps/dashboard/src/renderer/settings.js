@@ -141,6 +141,42 @@
       ${C.proAd('card', 'What PRO adds')}`;
   }
 
+  // Cloud backup of the session documents (GET/POST/DELETE /v1/files).
+  let cloudFiles = null; // null = not loaded yet
+  async function loadCloudFiles() {
+    const res = await C.guard(() => api.cloudFiles(), 'Could not load your cloud files.');
+    cloudFiles = res && res.ok ? res : { files: [], used_bytes: 0, limit_bytes: 0, error: (res && res.error) || 'Could not load your cloud files.' };
+    C.refresh();
+  }
+  const mb = (n) => `${(n / 1048576).toFixed(n < 10485760 ? 1 : 0)} MB`;
+  function cloudFilesCard() {
+    if (!(S.auth && S.auth.signedIn)) return '';
+    if (cloudFiles === null) loadCloudFiles();
+    const f = cloudFiles || { files: [], used_bytes: 0, limit_bytes: 0 };
+    const rows = f.files.map((x) => `<div class="shortcut-row"><span data-no-i18n>${esc(x.name)}</span><span class="keys"><span class="small faint" data-no-i18n>${mb(x.size)}</span>
+      <button type="button" class="btn sm ghost" data-action="cloud-file-delete" data-id="${esc(x.id)}">Delete</button></span></div>`).join('');
+    return card('Cloud files', 'Send your documents to your Cue account as a backup. The originals stay on this computer.',
+      `${f.error ? `<div class="small" role="alert" style="color:var(--danger)">${esc(f.error)}</div>` : ''}
+       ${rows || '<div class="empty">No files in the cloud yet.</div>'}
+       <div class="row between" style="margin-top:12px"><span class="small faint" data-no-i18n>${mb(f.used_bytes)} / ${mb(f.limit_bytes)}</span>
+       <button type="button" class="btn primary" data-action="cloud-files-backup">${icon('upload')}Send my files</button></div>`);
+  }
+  C.actions['cloud-files-backup'] = async () => {
+    C.toast('Sending your files…');
+    const res = await C.guard(() => api.cloudFilesBackup(), 'Could not send your files.');
+    if (!res) return;
+    if (res.failed.length) C.toast(res.failed[0].title + ': ' + C.t(res.failed[0].error), 'error');
+    else C.toast('Files sent.');
+    await loadCloudFiles();
+  };
+  C.actions['cloud-file-delete'] = async (el) => {
+    const ok = await C.confirm('Delete this file from the cloud?', 'The original on your computer is not changed.', 'Delete');
+    if (!ok) return;
+    const res = await C.guard(() => api.cloudFileDelete(el.dataset.id), 'Could not delete the file.');
+    if (res && !res.ok) C.toast(res.error, 'error');
+    await loadCloudFiles();
+  };
+
   function account() {
     if (C.localMode()) return localAccount();
     const cfg = S.config;
@@ -161,6 +197,7 @@
         <button type="button" class="btn" data-action="cloud-logout">${icon('sign-out')}Sign out</button></div>`;
     const active = C.cloudActive();
     return `
+      ${cloudFilesCard()}
       ${card('Cue account', active ? 'Next session uses the Cue servers' : 'Next session uses your API keys', body)}
       ${card('Where the AI runs', 'Audio goes straight to the transcription provider; the server only issues temporary credentials. Plan minutes count in both modes.',
         `<div class="option-cards">${[
@@ -573,7 +610,7 @@
       ['Live minutes', 'Pay your providers', '15 min, once', '200 min / month'],
       ['Extra tokens', '—', 'From $0.08 per minute', 'From $0.08 per minute'],
       ['Answer speed', `+${d} ms per answer`, 'Instant', 'Instant'],
-      ['Cloud backup of files', '—', '—', 'Included'],
+      ['Cloud backup of files', '—', '25 MB', '500 MB'],
       ['Sync across devices', '—', '—', 'Included'],
       ['Google Calendar', '—', '—', 'Included']
     ];

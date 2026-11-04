@@ -3571,6 +3571,28 @@ app.whenReady().then(() => {
   ipcMain.handle('rtai:cloud-password-login', async (_ev, p) => cloudAccount.loginWithPassword(p && p.email, p && p.password));
   ipcMain.handle('rtai:cloud-signup', async (_ev, p) => cloudAccount.signup(p && p.name, p && p.email, p && p.password));
   ipcMain.handle('rtai:cloud-reset-password', async (_ev, email) => cloudAccount.resetPassword(email));
+  ipcMain.handle('rtai:cloud-files', async () => cloudAccount.listFiles());
+  ipcMain.handle('rtai:cloud-file-delete', async (_ev, id) => cloudAccount.deleteFile(id));
+  // Sends the documents of every session as the text the app extracted from
+  // them (the originals' paths are not kept); the server skips what it has.
+  ipcMain.handle('rtai:cloud-files-backup', async () => {
+    let sent = 0;
+    const failed = [];
+    const seen = new Set();
+    for (const agent of loadAllAgents()) {
+      for (const doc of agent.documents || []) {
+        if (!doc.content) continue;
+        const name = /\.(txt|md)$/i.test(doc.title) ? doc.title : `${doc.title}.txt`;
+        const key = `${name}\n${doc.content}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const r = await cloudAccount.uploadFile(Buffer.from(doc.content, 'utf8'), { name, tag: doc.tag, agentId: agent.id });
+        if (r.ok) sent += 1;
+        else failed.push({ title: doc.title, error: r.error });
+      }
+    }
+    return { ok: true, sent, failed };
+  });
   ipcMain.handle('rtai:cloud-billing', async (_ev, kind, pack) => cloudAccount.billing(kind === 'portal' ? 'portal' : 'checkout', pack));
   ipcMain.handle('rtai:cloud-cancel-login', async () => cloudAccount.cancelLogin());
   ipcMain.handle('rtai:cloud-logout', async () => {
