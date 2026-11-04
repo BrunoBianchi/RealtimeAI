@@ -273,6 +273,16 @@ function createCloudAccount(deps) {
     remove: (kind, id) => syncRequest('DELETE', syncPath(kind, id))
   };
 
+  // Erases the account on the server (asks for the password again).
+  async function deleteAccount(password) {
+    if (!password) return { ok: false, error: 'Enter your password.' };
+    const r = await api('DELETE', '/v1/me', { password: String(password) });
+    if (!r.ok) return { ok: false, error: r.status === 401 ? 'Wrong password.' : describeError(r.error, r.status) };
+    deps.saveToken('');
+    cache = null;
+    return { ok: true };
+  }
+
   async function listFiles() {
     const r = await api('GET', '/v1/files');
     return r.ok ? { ok: true, ...r.data } : { ok: false, error: describeError(r.error, r.status) };
@@ -291,7 +301,7 @@ function createCloudAccount(deps) {
     return { ok: true };
   }
 
-  return { syncClient, status, loginWithPassword, signup, resetPassword, billing, logout, serverInfo, api, aiEndpoint, uploadFile, listFiles, deleteFile };
+  return { deleteAccount, syncClient, status, loginWithPassword, signup, resetPassword, billing, logout, serverInfo, api, aiEndpoint, uploadFile, listFiles, deleteFile };
 }
 
 module.exports = { createCloudAccount, effectiveServerUrl, normalizeBaseUrl, describeError, BUILTIN_SERVER_URL };

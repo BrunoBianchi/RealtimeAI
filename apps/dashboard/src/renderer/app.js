@@ -923,7 +923,10 @@ function renderShell() {
   }
 
   // Profile
-  const name = fixText((S.profile && S.profile.name) || '');
+  const acct = (S.auth && S.auth.signedIn && S.auth.account) || {};
+  const name = fixText((S.profile && S.profile.name) || acct.name || '');
+  const signOutBtn = document.getElementById('sidebarSignOut');
+  if (signOutBtn) signOutBtn.hidden = !(S.auth && S.auth.signedIn);
   const setText = (id, t) => {
     const el = document.getElementById(id);
     if (el) el.textContent = t;

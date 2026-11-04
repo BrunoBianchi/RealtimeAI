@@ -210,6 +210,12 @@
     await loadCloudFiles();
   };
 
+  function dangerCard() {
+    return `<div style="--line:var(--danger);border-radius:14px;border:1px solid var(--danger)">${card('Danger zone', 'Permanent actions on your account.',
+      `<div class="row between" style="gap:14px"><span class="small">Delete your account and erase all your data, in the cloud and on this computer.</span>
+       <button type="button" class="btn danger nowrap" data-action="delete-account">Delete account</button></div>`)}</div>`;
+  }
+
   function account() {
     if (C.localMode()) return localAccount();
     const cfg = S.config;
@@ -232,6 +238,7 @@
     return `
       ${cloudSyncCard()}
       ${cloudFilesCard()}
+      ${dangerCard()}
       ${card('Cue account', active ? 'Next session uses the Cue servers' : 'Next session uses your API keys', body)}
       ${card('Where the AI runs', 'Audio goes straight to the transcription provider; the server only issues temporary credentials. Plan minutes count in both modes.',
         `<div class="option-cards">${[

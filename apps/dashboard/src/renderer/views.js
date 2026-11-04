@@ -184,7 +184,7 @@
   }
 
   C.views.home = function home() {
-    const name = firstName(fixText(S.profile.name || ''));
+    const name = firstName(fixText(S.profile.name || (S.auth && S.auth.account && S.auth.account.name) || ''));
     const agents = S.agents.filter((a) => !a.archived);
     const up = C.upcomingAgents();
     const week = up.filter(({ iv }) => iv.days <= 7).length;

@@ -689,6 +689,21 @@ async function runCloudSync() {
   }
   return res;
 }
+// Everything of the user's in the data folder. What stays holds nothing personal:
+// the downloaded speech model, the install id and the feature flags.
+const KEEP_ON_ERASE = new Set(['models', 'install-id', 'flags-active.json', 'flags-cache.json', 'flags-overrides.json']);
+function eraseLocalUserData() {
+  const dir = getAppDataDir();
+  for (const name of fs.readdirSync(dir)) {
+    if (KEEP_ON_ERASE.has(name)) continue;
+    try {
+      fs.rmSync(path.join(dir, name), { recursive: true, force: true });
+    } catch (err) {
+      console.warn('[erase]', name, err && err.message); // e.g. a log still open
+    }
+  }
+  getAppDataDir(); // recreates the empty folders
+}
 let cloudSyncTimer = null;
 function scheduleCloudSync() {
   clearTimeout(cloudSyncTimer);
@@ -2574,6 +2589,7 @@ function loadPastSessions() {
 // ---------------------------------------------------------------------------
 // User Profile Persistence
 // ---------------------------------------------------------------------------
+const SAMPLE_PROFILE_EMAIL = 'bruno@realtimeai.dev';
 function loadUserProfile(cachedSessions) {
   const p = path.join(getAppDataDir(), 'dashboard_profile.json');
   let data = null;
@@ -2592,6 +2608,12 @@ function loadUserProfile(cachedSessions) {
       themePreference: 'dark',
       loggedIn: true
     };
+  }
+  if (data.email === SAMPLE_PROFILE_EMAIL) {
+    for (const k of ['name', 'email', 'headline', 'seniority', 'linkedin']) data[k] = '';
+    try {
+      fs.writeFileSync(p, JSON.stringify(data, null, 2), 'utf8');
+    } catch (_e) {}
   }
   if (!data.themePreference) data.themePreference = 'dark';
   if (!data.plan) data.plan = 'free';
@@ -3603,6 +3625,15 @@ app.whenReady().then(() => {
   ipcMain.handle('rtai:cloud-password-login', async (_ev, p) => cloudAccount.loginWithPassword(p && p.email, p && p.password));
   ipcMain.handle('rtai:cloud-signup', async (_ev, p) => cloudAccount.signup(p && p.name, p && p.email, p && p.password));
   ipcMain.handle('rtai:cloud-reset-password', async (_ev, email) => cloudAccount.resetPassword(email));
+  // The server copy goes first: a refused password or no network erases nothing.
+  ipcMain.handle('rtai:cloud-delete-account', async (_ev, password) => {
+    if (isOverlayRunning()) stopRunningOverlay();
+    const res = await cloudAccount.deleteAccount(password);
+    if (!res.ok) return res;
+    clearTimeout(cloudSyncTimer);
+    eraseLocalUserData();
+    return { ok: true, config: readConfigIni() };
+  });
   ipcMain.handle('rtai:cloud-sync', async () => (isSignedIn() ? runCloudSync() : { ok: false, error: 'not_signed_in' }));
   ipcMain.handle('rtai:cloud-files', async () => cloudAccount.listFiles());
   ipcMain.handle('rtai:cloud-file-delete', async (_ev, id) => cloudAccount.deleteFile(id));

@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld('rtai', {
   cloudPasswordLogin: (creds) => ipcRenderer.invoke('rtai:cloud-password-login', creds),
   cloudSignup: (data) => ipcRenderer.invoke('rtai:cloud-signup', data),
   cloudResetPassword: (email) => ipcRenderer.invoke('rtai:cloud-reset-password', email),
+  cloudDeleteAccount: (password) => ipcRenderer.invoke('rtai:cloud-delete-account', password),
   cloudSync: () => ipcRenderer.invoke('rtai:cloud-sync'),
   onCloudSynced: (cb) => {
     const handler = (_ev, payload) => cb(payload);

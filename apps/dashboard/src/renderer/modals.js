@@ -401,15 +401,16 @@
   // ----------------------------------------------------------- profile --
   MODALS.profile = () => {
     const p = S.profile || {};
+    const acct = (S.auth && S.auth.signedIn && S.auth.account) || null;
     const entry = mount(`<div class="modal">
       ${headHtml('Profile', 'Saved only on this computer')}
       <div class="modal-body">
-        <label class="field">Name<input class="input" id="pfName" value="${esc(fixText(p.name || ''))}" autofocus/></label>
-        <label class="field">E-mail<input class="input" id="pfEmail" type="email" value="${esc(p.email || '')}"/></label>
+        <label class="field">Name<input class="input" id="pfName" value="${esc(fixText(p.name || (acct && acct.name) || ''))}" autofocus/></label>
+        <label class="field">E-mail<input class="input" id="pfEmail" type="email" value="${esc((acct && acct.email) || p.email || '')}" ${acct ? 'disabled title="The e-mail of your Cue account"' : ''}/></label>
         <div class="form-grid"><label class="field">Current role<input class="input" id="pfHeadline" value="${esc(fixText(p.headline || ''))}"/></label><label class="field">Seniority<input class="input" id="pfSeniority" value="${esc(fixText(p.seniority || ''))}"/></label></div>
         <label class="field">LinkedIn<input class="input" id="pfLinkedin" value="${esc(p.linkedin || '')}" placeholder="linkedin.com/in/…"/></label>
       </div>
-      <div class="modal-foot"><button type="button" class="btn lg" data-action="modal-close">Cancel</button><button type="button" class="btn primary lg" id="pfSave">Save</button></div>
+      <div class="modal-foot">${acct ? `<button type="button" class="btn lg left" data-action="cloud-logout">${C.icon('sign-out')}Sign out</button>` : ''}<button type="button" class="btn lg" data-action="modal-close">Cancel</button><button type="button" class="btn primary lg" id="pfSave">Save</button></div>
     </div>`);
     const L = entry.layer;
     L.querySelector('#pfSave').addEventListener('click', async () => {
@@ -433,6 +434,39 @@
     });
   };
   C.actions['open-profile'] = () => MODALS.profile();
+
+  // ---------------------------------------------------- delete account --
+  MODALS['delete-account'] = () => {
+    const entry = mount(`<div class="modal">
+      ${headHtml('Delete account', 'This cannot be undone')}
+      <div class="modal-body">
+        <p class="small" style="margin:0">Your account, plan, remaining minutes, cloud files and synced data are erased from the server. Your sessions, history, question bank, settings and API keys are erased from this computer.</p>
+        <label class="field">Enter your password to confirm<input class="input" id="delPassword" type="password" autocomplete="current-password" autofocus/></label>
+        <div class="small" id="delError" role="alert" style="color:var(--danger)"></div>
+      </div>
+      <div class="modal-foot"><button type="button" class="btn lg" data-action="modal-close">Cancel</button><button type="button" class="btn danger lg" id="delConfirm">Delete everything</button></div>
+    </div>`);
+    const L = entry.layer;
+    L.querySelector('#delConfirm').addEventListener('click', async (ev) => {
+      const btn = ev.currentTarget;
+      btn.disabled = true;
+      const res = await C.guard(() => api.cloudDeleteAccount(L.querySelector('#delPassword').value), 'Could not delete the account.');
+      btn.disabled = false;
+      if (!res) return;
+      if (!res.ok) {
+        L.querySelector('#delError').textContent = C.t(res.error || 'Could not delete the account.');
+        return;
+      }
+      if (res.config) S.config = res.config;
+      S.auth = { signedIn: false };
+      S.profile = {};
+      close(entry);
+      await C.refreshState();
+      await C.authRefresh(true);
+      C.toast('Your account and data were deleted.');
+    });
+  };
+  C.actions['delete-account'] = () => MODALS['delete-account']();
 
   // ----------------------------------------------------------- summary --
   MODALS.summary = (summary) => {

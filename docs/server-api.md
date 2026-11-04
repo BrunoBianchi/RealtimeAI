@@ -346,3 +346,7 @@ Cópia na nuvem dos dados do usuário. O app define o formato; o servidor guarda
 Free: 3 sessões e 5 itens de histórico. PRO: sem limite de quantidade. A cota de bytes é compartilhada com `/v1/files`.
 
 Os endpoints `/v1/auth/device*` (login por dispositivo) foram removidos: o login é por e-mail e senha. `/v1/billing/*` responde `503 billing_unavailable` até haver um provedor de pagamento.
+
+## Excluir conta
+
+`DELETE /v1/me` com `{ "password": "..." }` → `{ ok: true }`. Apaga a conta, tokens, sessões, arquivos e dados sincronizados. Senha errada: `401 invalid_credentials`. As perguntas anônimas do banco da comunidade ficam, sem o vínculo com a conta.
