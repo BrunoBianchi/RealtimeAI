@@ -34,7 +34,9 @@ TEST(DelayedLlm, HoldsTheRequestThenStreamsTheAnswer) {
     std::string text;
     const auto t0 = std::chrono::steady_clock::now();
     std::atomic<long long> first_ms{-1};
-    llm.start(LlmRequest{.model = "m"},
+    LlmRequest request;
+    request.model = "m";
+    llm.start(request,
               {.on_delta = [&](std::string_view d) {
                    long long expected = -1;
                    first_ms.compare_exchange_strong(expected, std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -49,7 +51,9 @@ TEST(DelayedLlm, HoldsTheRequestThenStreamsTheAnswer) {
     EXPECT_FALSE(text.empty());
     EXPECT_GE(first_ms.load(), 110);
     EXPECT_GE(r.total_ms, 120); // the wait is part of the reported latency
-    if (r.ttft_ms >= 0) EXPECT_GE(r.ttft_ms, 120);
+    if (r.ttft_ms >= 0) {
+        EXPECT_GE(r.ttft_ms, 120);
+    }
 }
 
 TEST(DelayedLlm, CancelDuringTheWaitNeverReachesTheProvider) {
