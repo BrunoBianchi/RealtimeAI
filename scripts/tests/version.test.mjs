@@ -115,6 +115,8 @@ test('release.yml uses semantic-release and builds real-time update installer as
 
   assert.ok(pkg.devDependencies && pkg.devDependencies['semantic-release']);
   assert.ok(pkg.release && Array.isArray(pkg.release.plugins));
-  assert.ok(pkg.release.plugins.includes('@semantic-release/github'));
+  // A draft: build-windows.yml publishes it once its files are attached.
+  const github = pkg.release.plugins.find((p) => Array.isArray(p) && p[0] === '@semantic-release/github');
+  assert.ok(github && github[1].draftRelease === true);
 });
 
