@@ -365,42 +365,161 @@
     return d.toLocaleString(C.state.lang.locale, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   }
 
-  const SHORTCUTS = [
-    ['During the interview (HUD)', [
-      [['Ctrl', 'Alt', 'Enter'], 'Answer now'],
-      [['Alt', 'Space'], 'Answer now (alternative)'],
-      [['Ctrl', 'Space'], 'Answer now (alternative)'],
-      [['Ctrl', 'Alt', 'S'], 'Analyze the screen (screenshot)'],
-      [['Ctrl', 'Alt', 'K'], 'Open the chat'],
-      [['Ctrl', 'Alt', 'R'], 'Conversation recap'],
-      [['Ctrl', 'Alt', 'Tab'], 'Show the next queued suggestion'],
-      [['Ctrl', 'Alt', '←'], 'Previous answer'],
-      [['Ctrl', 'Alt', '→'], 'Next answer'],
-      [['Alt', '↑'], 'History: previous'],
-      [['Alt', '↓'], 'History: next'],
-      [['Alt', '1 / 2 / 3'], 'Quick actions'],
-      [['Ctrl', 'Alt', 'P'], 'Pause capture'],
-      [['Ctrl', 'Alt', 'M'], 'Transcription-only mode'],
-      [['Ctrl', 'Alt', 'Backspace'], 'Clear answers'],
-      [['Ctrl', 'Alt', 'Shift', 'Backspace'], 'Clear the transcript strip'],
-      [['Ctrl', 'Alt', 'T'], 'Clicks pass through the HUD'],
-      [['Ctrl', 'Alt', 'H'], 'Hide / show the HUD'],
-      [['Alt', 'H'], 'Panic: hide everything'],
-      [['Ctrl', 'Alt', 'O'], 'Open settings'],
-      [['Ctrl', 'Alt', 'Q'], 'Stop and save the session']
-    ]],
-    ['In this window', [
-      [['Ctrl', 'K'], 'Search and commands'],
-      [['Ctrl', 'Alt', 'S'], 'Hide the panel from captures (global)'],
-      [['Ctrl', 'Shift', 'H'], 'Show / hide the panel (global)'],
-      [['Esc'], 'Close dialogs']
-    ]]
+  // HUD shortcuts: same actions as src/core/include/rtai/hotkeys.hpp.
+  const HUD_SHORTCUTS = [
+    ['responder', 'Answer now', 'Ctrl+Alt+Enter'],
+    ['responder_alt', 'Answer now (alternative)', 'Alt+Space'],
+    ['responder_alt2', 'Answer now (alternative)', 'Ctrl+Space'],
+    ['captura', 'Analyze the screen (screenshot)', 'Ctrl+Alt+S'],
+    ['chat', 'Open the chat', 'Ctrl+Alt+K'],
+    ['resumo', 'Conversation recap', 'Ctrl+Alt+R'],
+    ['proxima_sugestao', 'Show the next queued suggestion', 'Ctrl+Alt+Tab'],
+    ['resposta_anterior', 'Previous answer', 'Ctrl+Alt+Left'],
+    ['proxima_resposta', 'Next answer', 'Ctrl+Alt+Right'],
+    ['historico_anterior', 'History: previous', 'Alt+Up'],
+    ['historico_proximo', 'History: next', 'Alt+Down'],
+    ['acao_rapida_1', 'Quick action: shorter answer', 'Alt+1'],
+    ['acao_rapida_2', 'Quick action: example from my resume', 'Alt+2'],
+    ['acao_rapida_3', 'Quick action: code and complexity', 'Alt+3'],
+    ['pausar', 'Pause capture', 'Ctrl+Alt+P'],
+    ['so_transcricao', 'Transcription-only mode', 'Ctrl+Alt+M'],
+    ['limpar_respostas', 'Clear answers', 'Ctrl+Alt+Backspace'],
+    ['limpar_transcricao', 'Clear the transcript strip', 'Ctrl+Alt+Shift+Backspace'],
+    ['clique_atravessa', 'Clicks pass through the HUD', 'Ctrl+Alt+T'],
+    ['esconder', 'Hide / show the HUD', 'Ctrl+Alt+H'],
+    ['panico', 'Panic: hide everything', 'Alt+H'],
+    ['configuracoes', 'Open settings', 'Ctrl+Alt+O'],
+    ['encerrar', 'Stop and save the session', 'Ctrl+Alt+Q']
   ];
+  const WINDOW_SHORTCUTS = [
+    [['Ctrl', 'K'], 'Search and commands'],
+    [['Ctrl', 'Alt', 'S'], 'Hide the panel from captures (global)'],
+    [['Ctrl', 'Shift', 'H'], 'Show / hide the panel (global)'],
+    [['Esc'], 'Close dialogs']
+  ];
+  const HOTKEY_OFF = 'nenhum';
+  const defaultHotkeys = () => Object.fromEntries(HUD_SHORTCUTS.map(([k, , d]) => [k, d]));
+  const HOTKEY_MAPS = {
+    default: { label: 'Default (Ctrl+Alt)', build: defaultHotkeys },
+    ctrl_shift: {
+      label: 'Ctrl+Shift',
+      build() {
+        const map = defaultHotkeys();
+        for (const k of Object.keys(map)) {
+          if (map[k].startsWith('Ctrl+Alt+') && k !== 'limpar_transcricao') map[k] = map[k].replace('Ctrl+Alt+', 'Ctrl+Shift+');
+        }
+        map.esconder = 'Ctrl+Shift+J'; // Ctrl+Shift+H shows and hides this window
+        return map;
+      }
+    },
+    function_keys: {
+      label: 'Function keys',
+      build: () => ({
+        ...defaultHotkeys(),
+        responder: 'F9', responder_alt: HOTKEY_OFF, responder_alt2: HOTKEY_OFF,
+        captura: 'F8', chat: 'F7', resumo: 'F6', proxima_sugestao: 'F10', pausar: 'F4', esconder: 'F2'
+      })
+    }
+  };
+  const currentHotkeys = () => ({ ...defaultHotkeys(), ...((S.config && S.config.hotkeys) || {}) });
+  const sameMap = (a, b) => HUD_SHORTCUTS.every(([k]) => String(a[k]).toLowerCase() === String(b[k]).toLowerCase());
+  const currentMapId = () => Object.keys(HOTKEY_MAPS).find((id) => sameMap(currentHotkeys(), HOTKEY_MAPS[id].build())) || 'custom';
+
+  const KEY_LABELS = { Left: '←', Right: '→', Up: '↑', Down: '↓' };
+  const comboKeys = (combo) => String(combo).split('+').map((k) => KEY_LABELS[k] || k);
+  const kbds = (keys) => keys.map((k) => `<span class="kbd">${esc(k)}</span>`).join('');
+
+  let recordingHotkey = '';
+
+  // KeyboardEvent -> "Ctrl+Alt+Enter" (the format config.ini takes); '' while
+  // only modifiers are down or for a key the HUD cannot register.
+  function comboFromEvent(e) {
+    const c = e.code;
+    let key = '';
+    if (/^Key[A-Z]$/.test(c)) key = c.slice(3);
+    else if (/^Digit\d$/.test(c)) key = c.slice(5);
+    else if (/^F([1-9]|1\d|2[0-4])$/.test(c)) key = c;
+    else if (c.startsWith('Arrow')) key = c.slice(5);
+    else if (c === 'NumpadEnter') key = 'Enter';
+    else if (['Enter', 'Tab', 'Space', 'Backspace', 'Delete', 'Insert', 'Home', 'End', 'PageUp', 'PageDown'].includes(c)) key = c;
+    if (!key) return '';
+    const mods = [e.ctrlKey && 'Ctrl', e.altKey && 'Alt', e.shiftKey && 'Shift'].filter(Boolean);
+    return [...mods, key].join('+');
+  }
+
+  async function saveHotkeys(map, msg) {
+    await C.saveConfig({ hotkeys: map }, msg);
+    C.refresh();
+  }
+
+  window.addEventListener('keydown', async (e) => {
+    if (!recordingHotkey) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const action = recordingHotkey;
+    if (e.code === 'Escape') {
+      recordingHotkey = '';
+      C.refresh();
+      return;
+    }
+    if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return;
+    const combo = comboFromEvent(e);
+    const mods = e.ctrlKey || e.altKey || e.shiftKey;
+    if (!combo || (!mods && !/^F\d/.test(combo))) {
+      C.toast('Use Ctrl, Alt or Shift with the key, or a function key.', 'error');
+      return;
+    }
+    if (combo === 'Ctrl+Shift+H') {
+      C.toast('This shortcut is already used by this window.', 'error');
+      return;
+    }
+    const map = currentHotkeys();
+    const taken = HUD_SHORTCUTS.find(([k]) => k !== action && String(map[k]).toLowerCase() === combo.toLowerCase());
+    if (taken) {
+      C.toast(`${C.t('Already used by:')} ${C.t(taken[1])}`, 'error');
+      return;
+    }
+    recordingHotkey = '';
+    map[action] = combo;
+    await saveHotkeys(map, 'Shortcut saved.');
+  }, true);
+
+  C.actions['hotkey-record'] = (el) => {
+    recordingHotkey = el.dataset.key;
+    C.refresh();
+  };
+  C.actions['hotkey-off'] = async (el) => {
+    await saveHotkeys({ ...currentHotkeys(), [el.dataset.key]: HOTKEY_OFF }, 'Shortcut turned off.');
+  };
+  C.actions['hotkey-reset'] = async () => {
+    recordingHotkey = '';
+    await saveHotkeys(defaultHotkeys(), 'Default shortcuts restored.');
+  };
+  C.changes['hotkey-map'] = async (el) => {
+    const map = HOTKEY_MAPS[el.value];
+    if (map) await saveHotkeys(map.build(), 'Shortcut map changed.');
+  };
 
   function shortcuts() {
-    return SHORTCUTS.map(([title, list]) =>
-      card(esc(title), '', list.map(([keys, label]) => `<div class="shortcut-row"><span>${esc(label)}</span><span class="keys">${keys.map((k) => `<span class="kbd">${esc(k)}</span>`).join('')}</span></div>`).join(''))
-    ).join('');
+    const hotkeys = currentHotkeys();
+    const mapId = currentMapId();
+    const row = ([key, label]) => {
+      const combo = hotkeys[key];
+      const off = String(combo).toLowerCase() === HOTKEY_OFF;
+      const keys = recordingHotkey === key
+        ? '<span class="muted small">Press the keys… (Esc cancels)</span>'
+        : off ? '<span class="muted small">Off</span>' : kbds(comboKeys(combo));
+      return `<div class="shortcut-row"><span>${esc(label)}</span><span class="keys">
+        <button type="button" class="hotkey-edit" data-action="hotkey-record" data-key="${key}" title="Change shortcut">${keys}</button>
+        ${off ? '' : `<button type="button" class="btn sm ghost" data-action="hotkey-off" data-key="${key}">Turn off</button>`}</span></div>`;
+    };
+    return card('Shortcut map', 'Pick a ready-made map or click a shortcut below to set your own. A running copilot restarts to apply it.',
+        `<div class="row" style="gap:12px"><select class="select grow" data-change="hotkey-map" aria-label="Shortcut map">
+          ${Object.entries(HOTKEY_MAPS).map(([id, m]) => `<option value="${id}" ${id === mapId ? 'selected' : ''}>${esc(m.label)}</option>`).join('')}
+          ${mapId === 'custom' ? '<option value="custom" selected>Custom</option>' : ''}
+        </select><button type="button" class="btn" data-action="hotkey-reset">Restore default</button></div>`)
+      + card('During the interview (HUD)', '', HUD_SHORTCUTS.map(row).join(''))
+      + card('In this window', '', WINDOW_SHORTCUTS.map(([keys, label]) => `<div class="shortcut-row"><span>${esc(label)}</span><span class="keys">${kbds(keys)}</span></div>`).join(''));
   }
 
   // Account plan from the server (S.auth.entitlement): Free = one session of up
@@ -451,7 +570,7 @@
       ['Account', 'Not needed', 'Required', 'Required'],
       ['API keys', 'Your own', 'Not needed', 'Not needed'],
       ['Price', 'Free', 'Free', `$${PRO_PRICE} / month`],
-      ['Live minutes', 'Pay your providers', '15 min, once', '200 tokens / month'],
+      ['Live minutes', 'Pay your providers', '15 min, once', '200 min / month'],
       ['Extra tokens', '—', 'From $0.08 per minute', 'From $0.08 per minute'],
       ['Answer speed', `+${d} ms per answer`, 'Instant', 'Instant'],
       ['Cloud backup of files', '—', '—', 'Included'],
@@ -491,7 +610,7 @@
       ${tokenPacks()}
       ${card('Usage by month', 'Calculated from recorded sessions',
         months.length
-          ? months.map(([key, v]) => `<div class="meter-row" style="padding:8px 0"><div class="lbl"><span>${esc(C.MONTHS_LONG[v.d.getMonth()])} ${v.d.getFullYear()}</span><span class="num">${Math.round(v.sec / 60)} min · ${plural(v.n, 'session', 'sessions')}</span></div>${C.pctBar((v.sec / max) * 100, 'thick')}</div>`).join('')
+          ? months.map(([key, v]) => `<div class="meter-row" style="padding:8px 0"><div class="lbl"><span data-no-i18n>${esc(v.d.toLocaleDateString(S.lang.locale, { month: 'long', year: 'numeric' }))}</span><span class="num">${Math.round(v.sec / 60)} min · ${plural(v.n, 'session', 'sessions')}</span></div>${C.pctBar((v.sec / max) * 100, 'thick')}</div>`).join('')
           : '<div class="empty">No recorded sessions yet.</div>')}`;
   }
 

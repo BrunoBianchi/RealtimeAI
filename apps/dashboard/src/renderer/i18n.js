@@ -127,11 +127,16 @@
       if (out !== null) node.nodeValue = out;
       return;
     }
+    if (node.nodeType === 1 && node.matches('textarea') && !node.closest('[data-no-i18n]')) translateAttrs(node, cat);
     if (node.nodeType !== 1 || skipped(node)) return;
     translateAttrs(node, cat);
     const doc = node.ownerDocument;
     const walker = doc.createTreeWalker(node, 1 | 4, {
-      acceptNode: (n) => (n.nodeType === 1 && n.matches(SKIP) ? 2 /* REJECT subtree */ : 1)
+      acceptNode: (n) => {
+        if (n.nodeType !== 1 || !n.matches(SKIP)) return 1;
+        if (n.matches('textarea') && !n.matches('[data-no-i18n]')) translateAttrs(n, cat); // its placeholder is interface text
+        return 2; // REJECT subtree
+      }
     });
     for (let n = walker.nextNode(); n; n = walker.nextNode()) {
       if (n.nodeType === 3) {

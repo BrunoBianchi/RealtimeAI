@@ -87,5 +87,7 @@ Só por variável: `RTAI_CONFIG` (caminho do config).
 | Ctrl+Alt+O | Abrir o `config.ini` |
 | Ctrl+Alt+Q | Encerrar salvando a sessão |
 
-Os atalhos usam Ctrl+Alt para não colidir com Ctrl+Enter de apps de chat. Se algum já
+Dá para trocar os atalhos do HUD em **Configurações > Atalhos** (mapa pronto ou tecla por tecla) ou na seção `[atalhos]` do `config.ini` (ex.: `responder = Ctrl+Shift+Enter`, `chat = nenhum` para desligar; lista em `src/core/include/rtai/hotkeys.hpp`).
+
+Por padrão, os atalhos usam Ctrl+Alt para não colidir com Ctrl+Enter de apps de chat. Se algum já
 estiver ocupado por outro app, o HUD avisa qual.

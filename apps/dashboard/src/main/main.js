@@ -19,6 +19,14 @@ const { createFlagStore } = require('./feature_flags');
 const { createUpdater } = require('./updater');
 const { createCloudAccount, effectiveServerUrl } = require('./cloud_account');
 const { normalizeUiLanguage, resolveUiLocale, systemLanguages, SUPPORTED: UI_LOCALES } = require('./ui_locale');
+const I18n = require('../renderer/i18n.js');
+require('../renderer/locales/pt-BR.js');
+
+// Interface text shown by the main process itself; same catalogs as the renderer.
+function tm(text, vars) {
+  I18n.locale = resolveUiLocale(readConfigIni().ui_language, systemLanguages(app));
+  return I18n.t(text, vars);
+}
 const localBackend = require('./local_backend');
 const { settingsSectionFromArgv } = require('./launch_args');
 const jevEngine = require('./jev_engine');
@@ -290,6 +298,7 @@ function readConfigIni() {
     energy_threshold: parseFloat(audio.limiar_energia || '0.015'),
     save_sessions: (sessao.salvar ?? 'sim') !== 'nao' && (sessao.salvar ?? 'sim') !== 'false',
     last_agent: sessao.ultimo_agente || '',
+    hotkeys: { ...(ini.atalhos || {}) },
     overlay_width: parseInt(overlay.largura || '620', 10),
     overlay_max_height_pct: parseInt(overlay.altura_max_pct || '92', 10),
     stealth_dock: (stealth.invisivel_barra_tarefas ?? stealth.dock ?? stealth.taskbar ?? 'sim') !== 'nao' &&
@@ -522,6 +531,11 @@ function writeConfigIni(updates) {
     '[overlay]',
     `largura = ${overlayWidth}`,
     `altura_max_pct = ${overlayMaxHeightPct}`,
+    '',
+    '[atalhos]',
+    ...Object.entries(updates.hotkeys && typeof updates.hotkeys === 'object' ? updates.hotkeys : current.hotkeys || {})
+      .filter(([k, v]) => /^[a-z0-9_]+$/.test(k) && /^[\w+]+$/.test(String(v)))
+      .map(([k, v]) => `${k} = ${v}`),
     '',
     '[stealth]',
     `invisivel_barra_tarefas = ${stealthDock}`,
@@ -1254,7 +1268,7 @@ function scheduleInterviewNotification(goal) {
         const { Notification } = require('electron');
         if (Notification.isSupported()) {
           new Notification({
-            title: `Interview in 1 hour: ${goal.name}`,
+            title: tm('Interview in 1 hour: {name}', { name: goal.name }),
             body: `Your interview with ${goal.company || goal.name} starts at ${ni.time}. Open Cue to review the Prep tab.`
           }).show();
         }
@@ -3185,7 +3199,7 @@ function refreshTrayMenu() {
   const stealthActive = Boolean(cfg.electron_stealth);
 
   const items = [
-    { label: 'Open Cue', click: () => showMainWindow() },
+    { label: tm('Open Cue'), click: () => showMainWindow() },
     {
       label: stealthActive ? '🛡️ Stealth Mode (Active)' : '🛡️ Stealth Mode (Off)',
       type: 'checkbox',
@@ -3202,11 +3216,11 @@ function refreshTrayMenu() {
     },
     { type: 'separator' }
   ];
-  if (active.length) items.push({ label: `In a call: ${active.map((m) => m.name).join(', ')}`, enabled: false });
+  if (active.length) items.push({ label: tm('In a call: {names}', { names: active.map((m) => m.name).join(', ') }), enabled: false });
   items.push(running
     ? { label: 'Stop copilot', click: () => stopOverlayGracefully() }
     : {
-        label: 'Start copilot',
+        label: tm('Start copilot'),
         click: async () => {
           const r = await startCopilotForMeeting(pickDefaultAgentId(loadAllAgents()));
           if (!r.ok) notify('Could not start the copilot', r.error || '');
@@ -3214,10 +3228,10 @@ function refreshTrayMenu() {
       });
   items.push(
     { type: 'separator' },
-    { label: 'Detect meetings', type: 'checkbox', checked: s.enabled, click: (item) => saveMeetingSettings({ enabled: item.checked }) },
-    { label: 'Show a test popup', click: () => showTestMeetingPopup() },
+    { label: tm('Detect meetings'), type: 'checkbox', checked: s.enabled, click: (item) => saveMeetingSettings({ enabled: item.checked }) },
+    { label: tm('Show a test popup'), click: () => showTestMeetingPopup() },
     { type: 'separator' },
-    { label: 'Quit Cue', click: () => { isQuitting = true; app.quit(); } }
+    { label: tm('Quit Cue'), click: () => { isQuitting = true; app.quit(); } }
   );
   try {
     tray.setContextMenu(Menu.buildFromTemplate(items));
@@ -3447,7 +3461,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle('rtai:pick-files', async (_ev, defaultTag = 'resume') => {
     const res = await dialog.showOpenDialog(mainWindow, {
-      title: 'Select files for the goal RAG (resume, job description, projects)',
+      title: tm('Select files for the goal RAG (resume, job description, projects)'),
       properties: ['openFile', 'multiSelections'],
       filters: [
         {
@@ -3518,7 +3532,7 @@ app.whenReady().then(() => {
   });
   ipcMain.handle('rtai:gcal-import-client', async () => {
     const res = await dialog.showOpenDialog(mainWindow, {
-      title: 'Google OAuth client file (client_secret_....json)',
+      title: tm('Google OAuth client file (client_secret_....json)'),
       properties: ['openFile'],
       filters: [{ name: 'Google OAuth client', extensions: ['json'] }]
     });

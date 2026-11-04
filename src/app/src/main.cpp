@@ -1264,6 +1264,7 @@ int run_app(AppConfig cfg) {
         oo.stealth_activity_monitor = cfg.st.stealth_activity_monitor;
         oo.stealth_click_through = cfg.st.stealth_click_through;
         oo.stealth_screen_capture = cfg.st.stealth_screen_capture;
+        oo.hotkeys = cfg.st.hotkeys;
         if (cfg.st.stealth_activity_monitor) {
             SetPriorityClass(GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS);
             HWND con = GetConsoleWindow();

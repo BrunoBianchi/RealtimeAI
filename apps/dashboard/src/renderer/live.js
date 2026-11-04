@@ -357,7 +357,7 @@
         <button type="button" class="icon-btn ${a && a.vote < 0 ? 'on' : ''}" data-action="live-rate" data-vote="-1" title="Bad answer" ${!a || !running ? 'disabled' : ''}>${icon('thumbs-down')}</button>
         <button type="button" class="btn sm raised" data-action="live-cmd" data-cmd="recap" ${!running ? 'disabled' : ''} title="Recap of the conversation so far">${icon('scroll')}Recap</button>
         <button type="button" class="btn sm raised" data-action="live-cmd" data-cmd="followup" ${!running ? 'disabled' : ''} title="Suggest a follow-up question">${icon('chat')}Follow-up</button>
-        <button type="button" class="btn sm raised" data-action="live-cmd" data-cmd="answer" ${!running ? 'disabled' : ''} title="Generate an answer now (Ctrl+Alt+Enter)">${icon('refresh')}Answer now</button>
+        <button type="button" class="btn sm raised" data-action="live-cmd" data-cmd="answer" ${!running ? 'disabled' : ''} title="Generate an answer now">${icon('refresh')}Answer now</button>
       </div>`;
   }
 
@@ -405,7 +405,7 @@
         <div class="live-col">
           <div class="live-bar">
             <div class="segmented sm">${tabs.map(([id, label]) => `<button type="button" class="${S.ui.liveTab === id ? 'active' : ''}" data-action="live-tab" data-tab="${id}">${esc(label)}</button>`).join('')}</div>
-            <label class="row small muted ml-auto" style="cursor:pointer" title="Ctrl+Alt+M in the HUD">${C.sw(`data-change="live-mode" ${running ? '' : 'disabled'}`, L.transcriptionOnly, !running)}Transcription only</label>
+            <label class="row small muted ml-auto" style="cursor:pointer" title="Transcription-only mode">${C.sw(`data-change="live-mode" ${running ? '' : 'disabled'}`, L.transcriptionOnly, !running)}Transcription only</label>
             <span class="row" style="gap:2px" id="liveAnswerNav">${answerNavHtml()}</span>
           </div>
           <div class="answer-pane" id="liveAnswer" data-tour="live-answer">${answerHtml()}</div>

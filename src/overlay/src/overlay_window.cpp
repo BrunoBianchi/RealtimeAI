@@ -1,3 +1,4 @@
+#include "rtai/hotkeys.hpp"
 #include "rtai/overlay_window.hpp"
 
 #include <windows.h>
@@ -487,6 +488,7 @@ struct OverlayWindow::Impl {
     bool ensure_surface(int w, int h);
     void release_surface();
     void register_hotkeys();
+    std::string hotkey_text(const char* action) const;
     void unregister_hotkeys();
     void load_state(int& x, int& y);
     void save_state();
@@ -760,50 +762,41 @@ bool OverlayWindow::Impl::create(std::string* error) {
 }
 
 void OverlayWindow::Impl::register_hotkeys() {
-    struct Key { int id; UINT mods; UINT vk; const char* name; };
-    // Ctrl+Alt scheme: the base MOD_CONTROL | MOD_ALT is added to each entry's
-    // extra mods below.
+    static_assert(hotkeys::kModAlt == MOD_ALT && hotkeys::kModControl == MOD_CONTROL &&
+                  hotkeys::kModShift == MOD_SHIFT && hotkeys::kModWin == MOD_WIN);
+    struct Key { int id; const char* action; };
     const Key keys[] = {
-        {kHkAnswer, 0, VK_RETURN, "Enter"}, {kHkShot, 0, 'S', "S"}, {kHkChat, 0, 'K', "K"},
-        {kHkPrev, 0, VK_LEFT, "Left arrow"}, {kHkNext, 0, VK_RIGHT, "Right arrow"}, {kHkRecap, 0, 'R', "R"},
-        {kHkPause, 0, 'P', "P"}, {kHkClearAnswers, 0, VK_BACK, "Backspace"},
-        {kHkClearStrip, MOD_SHIFT, VK_BACK, "Shift+Backspace"}, {kHkHide, 0, 'H', "H"}, {kHkClick, 0, 'T', "T"},
-        {kHkConfig, 0, 'O', "O"},
-        // [Tab]: promote the next queued suggestion into the visible card and
-        // clear the "nova pergunta" pill (Req 9.3). Kept under the shared
-        // Ctrl+Alt modifier scheme so it never steals a bare Tab from the
-        // interview app.
-        {kHkTab, 0, VK_TAB, "Tab"},
-        {kHkMode, 0, 'M', "M"},
-        {kHkQuit, 0, 'Q', "Q"}};
+        {kHkAnswer, "responder"}, {kHkAnswerNow, "responder_alt"}, {kHkAnswerNow2, "responder_alt2"},
+        {kHkShot, "captura"}, {kHkChat, "chat"}, {kHkRecap, "resumo"},
+        // Promotes the next queued suggestion into the visible card (Req 9.3).
+        {kHkTab, "proxima_sugestao"},
+        {kHkPrev, "resposta_anterior"}, {kHkNext, "proxima_resposta"},
+        {kHkHistPrev, "historico_anterior"}, {kHkHistNext, "historico_proximo"},
+        {kHkQuick1, "acao_rapida_1"}, {kHkQuick2, "acao_rapida_2"}, {kHkQuick3, "acao_rapida_3"},
+        {kHkPause, "pausar"}, {kHkMode, "so_transcricao"},
+        {kHkClearAnswers, "limpar_respostas"}, {kHkClearStrip, "limpar_transcricao"},
+        {kHkClick, "clique_atravessa"}, {kHkHide, "esconder"}, {kHkPanic, "panico"},
+        {kHkConfig, "configuracoes"}, {kHkQuit, "encerrar"}};
+    // A failure names the conflicting shortcut and leaves the others registered (Req 12.10).
     std::string failed;
     for (const auto& k : keys) {
-        if (!RegisterHotKey(hwnd, k.id, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT | k.mods, k.vk)) {
+        const std::string text = hotkey_text(k.action);
+        if (text.empty()) continue; // turned off by the user
+        const auto combo = hotkeys::parse(text);
+        if (!combo || !RegisterHotKey(hwnd, k.id, combo->mods | MOD_NOREPEAT, combo->vk)) {
             failed += failed.empty() ? "" : ", ";
-            failed += "Ctrl+Alt+";
-            failed += k.name;
-        }
-    }
-    // Req 12 combos: discreet, under MOD_ALT (and MOD_CONTROL for Ctrl+Espaço),
-    // with the full modifier set carried in `mods` (plus MOD_NOREPEAT). A
-    // failure here names the full conflicting shortcut and leaves the others
-    // registered (Req 12.10).
-    const Key req12[] = {
-        {kHkAnswerNow, MOD_ALT, VK_SPACE, "Alt+Space"},
-        {kHkAnswerNow2, MOD_CONTROL, VK_SPACE, "Ctrl+Space"},
-        {kHkHistPrev, MOD_ALT, VK_UP, "Alt+Up"},
-        {kHkHistNext, MOD_ALT, VK_DOWN, "Alt+Down"},
-        {kHkQuick1, MOD_ALT, '1', "Alt+1"},
-        {kHkQuick2, MOD_ALT, '2', "Alt+2"},
-        {kHkQuick3, MOD_ALT, '3', "Alt+3"},
-        {kHkPanic, MOD_ALT, 'H', "Alt+H"}};
-    for (const auto& k : req12) {
-        if (!RegisterHotKey(hwnd, k.id, k.mods | MOD_NOREPEAT, k.vk)) {
-            failed += failed.empty() ? "" : ", ";
-            failed += k.name;
+            failed += text;
         }
     }
     if (!failed.empty()) set_notice(NoticeLevel::Warning, "Shortcut " + failed + " is already used by another app", false);
+}
+
+// The combo of an action as text; empty when the user turned it off.
+std::string OverlayWindow::Impl::hotkey_text(const char* action) const {
+    const auto it = opts.hotkeys.find(action);
+    if (it != opts.hotkeys.end()) return hotkeys::is_disabled(it->second) ? std::string{} : it->second;
+    const hotkeys::Action* a = hotkeys::find_action(action);
+    return a ? a->fallback : std::string{};
 }
 
 void OverlayWindow::Impl::unregister_hotkeys() {
@@ -1512,7 +1505,10 @@ void OverlayWindow::Impl::set_click_through(bool on) {
     ex = on ? (ex | WS_EX_TRANSPARENT) : (ex & ~static_cast<LONG_PTR>(WS_EX_TRANSPARENT));
     SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex);
     set_notice(NoticeLevel::Info,
-               on ? "Click-through on: the HUD ignores clicks (Ctrl+Alt+T to turn off)." : "Click-through off.",
+               on ? (hotkey_text("clique_atravessa").empty()
+                         ? std::string("Click-through on: the HUD ignores clicks.")
+                         : "Click-through on: the HUD ignores clicks (" + hotkey_text("clique_atravessa") + " to turn off).")
+                  : std::string("Click-through off."),
                false);
 }
 

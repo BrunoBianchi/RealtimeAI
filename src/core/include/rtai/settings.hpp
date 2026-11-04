@@ -8,10 +8,12 @@
 
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <optional>
 #include <string>
 #include <vector>
 
+#include "rtai/hotkeys.hpp"
 #include "rtai/ini.hpp"
 #include "rtai/text_util.hpp"
 
@@ -67,6 +69,8 @@ struct Settings {
     bool stealth_activity_monitor{true};
     bool stealth_click_through{false};
     bool stealth_screen_capture{true};
+    // [atalhos]: only the valid values; an action not listed uses its default.
+    std::map<std::string, std::string> hotkeys;
     // [calendario]
     std::string calendar_ics_url;
     std::string calendar_token;
@@ -303,6 +307,13 @@ inline Settings load_settings(const ini::File& f, const EnvLookup& env, const Se
     boolean("stealth", "invisivel_gravacao", "RTAI_STEALTH_SCREEN_CAPTURE", s.stealth_screen_capture);
     boolean("stealth", "screen_capture", "RTAI_STEALTH_SCREEN_CAPTURE", s.stealth_screen_capture);
 
+    for (const auto& action : hotkeys::kActions) {
+        std::string raw;
+        if (!str("atalhos", action.key, nullptr, raw)) continue;
+        if (hotkeys::is_disabled(raw) || hotkeys::parse(raw)) s.hotkeys[action.key] = raw;
+        else s.warnings.push_back(std::string("[atalhos] ") + action.key + ": invalid shortcut (\"" + raw + "\")");
+    }
+
     str("calendario", "url_ics", "RTAI_CALENDAR_ICS", s.calendar_ics_url);
     {
         std::string source;
@@ -358,6 +369,7 @@ inline bool is_known_setting(std::string_view section, std::string_view key) {
         {"servidor", "modo"}, {"servidor", "url"}, {"servidor", "token"}, {"servidor", "regiao"},
     };
     const std::string s = ini::lower(section), k = ini::lower(key);
+    if (s == "atalhos") return hotkeys::find_action(k) != nullptr;
     for (const auto& e : known) {
         if (s == e.s && k == e.k) return true;
     }

@@ -191,3 +191,33 @@ TEST(Settings, Base64RoundTrip) {
     EXPECT_FALSE(base64_decode("abc").has_value());
     EXPECT_FALSE(base64_decode("a=bc").has_value());
 }
+
+TEST(Hotkeys, ParsesCombosAndRefusesBareKeys) {
+    const auto enter = rtai::hotkeys::parse("Ctrl+Alt+Enter");
+    ASSERT_TRUE(enter.has_value());
+    EXPECT_EQ(enter->mods, rtai::hotkeys::kModControl | rtai::hotkeys::kModAlt);
+    EXPECT_EQ(enter->vk, 0x0Du);
+    const auto f9 = rtai::hotkeys::parse("f9");
+    ASSERT_TRUE(f9.has_value());
+    EXPECT_EQ(f9->mods, 0u);
+    EXPECT_EQ(f9->vk, 0x78u);
+    EXPECT_EQ(rtai::hotkeys::parse("alt + k")->vk, static_cast<unsigned>('K'));
+    EXPECT_FALSE(rtai::hotkeys::parse("K").has_value());
+    EXPECT_FALSE(rtai::hotkeys::parse("Ctrl+Alt").has_value());
+    EXPECT_FALSE(rtai::hotkeys::parse("Ctrl+Nope").has_value());
+    EXPECT_FALSE(rtai::hotkeys::parse("Ctrl+A+B").has_value());
+    EXPECT_FALSE(rtai::hotkeys::parse("").has_value());
+    for (const auto& a : rtai::hotkeys::kActions) EXPECT_TRUE(rtai::hotkeys::parse(a.fallback).has_value()) << a.key;
+}
+
+TEST(Hotkeys, SettingsKeepValidValuesAndWarnOnBadOnes) {
+    const auto f = rtai::ini::File::parse("[atalhos]\nresponder = F9\nchat = nenhum\nresumo = banana\noutra = F1\n");
+    const auto s = rtai::load_settings(f, nullptr, nullptr);
+    EXPECT_EQ(s.hotkeys.at("responder"), "F9");
+    EXPECT_EQ(s.hotkeys.at("chat"), "nenhum");
+    EXPECT_EQ(s.hotkeys.count("resumo"), 0u);
+    EXPECT_EQ(s.hotkeys.count("outra"), 0u);
+    EXPECT_EQ(s.warnings.size(), 1u);
+    EXPECT_TRUE(rtai::is_known_setting("atalhos", "chat"));
+    EXPECT_FALSE(rtai::is_known_setting("atalhos", "outra"));
+}

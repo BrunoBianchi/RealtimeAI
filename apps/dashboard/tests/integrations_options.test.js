@@ -102,12 +102,17 @@ test('Integrations & Options: every setting the dashboard writes reads back the 
   const { main, restore } = loadMain();
   try {
     for (const key of keys) {
+      if (key === 'hotkeys') continue; // a map, checked below
       const canonical = ALIASES[key] || key;
       const before = main.readConfigIni()[canonical];
       const value = typeof before === 'boolean' ? !before : typeof before === 'number' ? before + 1 : `x-${key}`;
       main.writeConfigIni({ [key]: value });
       assert.strictEqual(String(main.readConfigIni()[canonical]), String(value), `${key} does not survive config.ini`);
     }
+    main.writeConfigIni({ hotkeys: { responder: 'F9', chat: 'nenhum', 'bad key': 'F1', resumo: 'Ctrl+K\nx=1' } });
+    assert.deepStrictEqual(main.readConfigIni().hotkeys, { responder: 'F9', chat: 'nenhum' });
+    main.writeConfigIni({ model: 'x-other' });
+    assert.deepStrictEqual(main.readConfigIni().hotkeys, { responder: 'F9', chat: 'nenhum' }, 'other saves keep the shortcuts');
   } finally {
     restore();
   }

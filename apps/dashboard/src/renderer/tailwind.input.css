@@ -2646,6 +2646,24 @@ button.status-chip:hover {
   font-size: 13px;
 }
 
+.hotkey-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 5px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.hotkey-edit:hover,
+.hotkey-edit:focus-visible {
+  border-color: var(--border);
+  background: var(--hover-wash);
+}
+
 .shortcut-row:first-child {
   border-top: 0;
 }
@@ -2938,13 +2956,20 @@ button.status-chip:hover {
 .auth::before {
   content: '';
   position: absolute;
-  inset: -20% -10% auto;
-  height: 70%;
+  inset: 0;
   z-index: -1;
+  /* Every glow fades out before the box edge, so no straight line shows. */
   background:
-    radial-gradient(40% 50% at 30% 40%, var(--accent-soft), transparent 70%),
-    radial-gradient(35% 45% at 70% 55%, rgba(173, 198, 255, 0.07), transparent 70%);
-  filter: blur(20px);
+    radial-gradient(ellipse 42% 48% at 38% 42%,
+      color-mix(in srgb, var(--accent) 12%, transparent) 0%,
+      color-mix(in srgb, var(--accent) 8%, transparent) 30%,
+      color-mix(in srgb, var(--accent) 3%, transparent) 62%,
+      transparent 100%),
+    radial-gradient(ellipse 38% 44% at 64% 54%,
+      rgba(173, 198, 255, 0.07) 0%,
+      rgba(173, 198, 255, 0.045) 32%,
+      rgba(173, 198, 255, 0.016) 64%,
+      transparent 100%);
   animation: auth-drift 18s ease-in-out infinite alternate;
   pointer-events: none;
 }

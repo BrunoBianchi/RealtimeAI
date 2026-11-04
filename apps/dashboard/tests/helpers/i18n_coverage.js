@@ -187,6 +187,85 @@ function covered(I18n, cat, s) {
   return I18n.lookup(cat, s) !== null;
 }
 
+// Every string and template literal of a source file (holes become {x}): a
+// screen that needs live data the samples lack is still checked this way.
+function literals(src) {
+  const res = [];
+  let i = 0;
+  const str = (q) => {
+    let s = '';
+    i++;
+    while (i < src.length && src[i] !== q) {
+      if (src[i] === '\\') { s += src[i + 1] === 'n' ? ' ' : src[i + 1]; i += 2; } else s += src[i++];
+    }
+    i++;
+    return s;
+  };
+  const tmpl = () => {
+    let s = '';
+    i++;
+    while (i < src.length && src[i] !== '`') {
+      if (src[i] === '\\') { s += src[i + 1]; i += 2; } else if (src[i] === '$' && src[i + 1] === '{') { i += 2; code(true); s += '{x}'; } else s += src[i++];
+    }
+    i++;
+    res.push(s);
+  };
+  const code = (inHole) => {
+    let depth = 0;
+    let prev = '';
+    while (i < src.length) {
+      const c = src[i];
+      if (c === '/' && src[i + 1] === '/') { while (i < src.length && src[i] !== '\n') i++; continue; }
+      if (c === '/' && src[i + 1] === '*') { i = src.indexOf('*/', i) + 2; continue; }
+      if (c === '/' && /[(,=:[!&|?{};\n]|^$/.test(prev)) {
+        i++;
+        let cls = false;
+        while (i < src.length && (src[i] !== '/' || cls) && src[i] !== '\n') {
+          if (src[i] === '\\') i++; else if (src[i] === '[') cls = true; else if (src[i] === ']') cls = false;
+          i++;
+        }
+        i++;
+        prev = 'r';
+        continue;
+      }
+      if (c === "'" || c === '"') { res.push(str(c)); prev = 's'; continue; }
+      if (c === '`') { tmpl(); prev = 's'; continue; }
+      if (c === '{') depth++;
+      if (c === '}') { if (inHole && depth === 0) { i++; return; } depth--; }
+      if (!/\s/.test(c)) prev = c;
+      i++;
+    }
+  };
+  code(false);
+  return res;
+}
+
+// Literals that read as interface text and the catalog does not translate.
+function sourceMissing(I18n, cat) {
+  const out = new Set();
+  const known = (p) => I18n.lookup(cat, p) !== null || I18n.lookup(cat, p.replace(/\{x\}/g, '3')) !== null || I18n.lookup(cat, '3 ' + p) !== null;
+  for (const [file, src] of Object.entries(sources)) {
+    if (!file.endsWith('.js') || file === 'i18n.js' || file === 'icons.js' || file.startsWith('locales') || file.includes('vendor')) continue;
+    for (const lit of literals(src)) {
+      const pieces = [...lit.matchAll(/\b(?:title|placeholder|aria-label|data-label)="([^"]+)"/g)].map((m) => m[1]);
+      lit.replace(/<[^>]*>/g, '\u0001').split('\u0001').forEach((p) => pieces.push(p));
+      for (const raw of pieces) {
+        const p = raw.replace(/\s+/g, ' ').trim().replace(/^\{x\}/, '');
+        const bare = p.replace(/\{x\}/g, ' ').trim();
+        if (!/[A-Za-z]{2}/.test(bare)) continue;
+        // Prose only: at least two lowercase words, not code or a key combo.
+        if (!/^[A-Z(+]/.test(bare) || !/[a-z]+ [a-z]+/.test(bare)) continue;
+        if (/[{}<>=;]|=>|\bfunction\b|https?:|\dpx\b|\.(js|css|png|json|ini)\b|rtai:|var\(|\[data-|document\./.test(bare)) continue;
+        if (known(p)) continue;
+        const frags = p.split('{x}').map((x) => x.trim()).filter((x) => /[A-Za-z]{2}/.test(x));
+        if (frags.length && frags.every((x) => I18n.lookup(cat, x) !== null)) continue;
+        out.add(p);
+      }
+    }
+  }
+  return [...out];
+}
+
 // Strings the catalog of `locale` has no translation for.
 async function missing(locale) {
   const I18n = require('../../src/renderer/i18n.js');
@@ -194,7 +273,7 @@ async function missing(locale) {
   const cat = I18n.catalogs[locale];
   if (!cat) throw new Error(`no catalog for ${locale}`);
   const all = await collect();
-  return all.filter((s) => !covered(I18n, cat, s));
+  return [...new Set([...all.filter((s) => !covered(I18n, cat, s)), ...sourceMissing(I18n, cat)])];
 }
 
 module.exports = { extract, collect, missing, SAMPLE };
