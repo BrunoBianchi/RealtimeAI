@@ -1,7 +1,7 @@
 @echo off
 rem ---------------------------------------------------------------------------
 rem INSTALLER: builds everything and creates dist\Cue-Setup-<version>.exe,
-rem the same one-click installer the releases ship (Start menu shortcut,
+rem the same installer wizard the releases ship (Start menu shortcut,
 rem uninstaller, auto-update).
 rem   scripts\windows\package.bat                 version 2.1.0-local.<date-time>
 rem   scripts\windows\package.bat 2.1.0-beta.2    any explicit semver

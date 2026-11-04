@@ -21,6 +21,12 @@ on:
         required: false
       GOOGLE_OAUTH_CLIENT_JSON:
         required: false
+      # Code signing certificate (base64 .pfx or URL) and its password. Without
+      # them the installer is unsigned and Windows SmartScreen warns about it.
+      WIN_CSC_LINK:
+        required: false
+      WIN_CSC_KEY_PASSWORD:
+        required: false
 
 # Permissions come from the caller (CI: read-only; Release/Beta: contents write).
 jobs:
@@ -114,7 +120,10 @@ jobs:
           RELEASES_REPO: ${{ vars.RELEASES_REPO }}
           RELEASES_TOKEN: ${{ secrets.RELEASES_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
         run: |
+          if (-not $env:CSC_LINK) { echo "::warning::No WIN_CSC_LINK secret: the installer is unsigned and SmartScreen will warn." }
           npm ci
           npm run build:css
           $version = (Get-Content package.json | ConvertFrom-Json).version
