@@ -222,7 +222,7 @@
       )}
       ${liveBanner}${setupBanner}${C.proAd('card', 'Get more with lipcue.com PRO')}
 
-      <section class="card" data-tour="home-upcoming" style="gap:16px">
+      <section class="card aurora" data-tour="home-upcoming" style="gap:16px">
         <div class="row top" style="gap:12px">
           <span class="icon-tile">${icon('calendar')}</span>
           <div class="stack gap-4 grow" style="gap:0"><span class="h2">Upcoming interviews</span><span class="small faint">${gconn ? `Synced with Google Calendar${S.gcal.status.email ? ` · ${esc(S.gcal.status.email)}` : ''}` : 'Dates set in your sessions'}</span></div>

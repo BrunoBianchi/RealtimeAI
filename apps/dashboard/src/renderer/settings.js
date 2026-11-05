@@ -62,8 +62,8 @@
 
   // data-card: a stable anchor for the guided tour (tour.js), from the English title.
   const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  function card(title, sub, body, right) {
-    return `<section class="card" data-card="${slug(title)}"><div class="card-head"><div class="stack" style="gap:0"><span class="t">${title}</span>${sub ? `<span class="s">${sub}</span>` : ''}</div>${right || ''}</div><div>${body}</div></section>`;
+  function card(title, sub, body, right, extraClass) {
+    return `<section class="card ${extraClass || ''}" data-card="${slug(title)}"><div class="card-head"><div class="stack" style="gap:0"><span class="t">${title}</span>${sub ? `<span class="s">${sub}</span>` : ''}</div>${right || ''}</div><div>${body}</div></section>`;
   }
 
   // ----------------------------------------------------------- sections --
@@ -358,7 +358,9 @@
         `${row('Invisible in screen sharing and recording', 'You see the HUD on your screen; the capture does not.', cfgSwitch('stealth_screen_capture', 'Invisible in captures', cfg.stealth_screen_capture !== false))}
          ${row('Off the taskbar and Alt+Tab', '', cfgSwitch('stealth_dock', 'Off the taskbar', cfg.stealth_dock !== false))}
          ${row('Discreet in Task Manager', '', cfgSwitch('stealth_activity_monitor', 'Discreet in Task Manager', cfg.stealth_activity_monitor !== false))}
-         ${row('Clicks pass through the HUD', 'Click the app underneath. Toggle live with Ctrl+Alt+T.', cfgSwitch('stealth_click_through', 'Clicks pass through', cfg.stealth_click_through))}`)}
+         ${row('Clicks pass through the HUD', 'Click the app underneath. Toggle live with Ctrl+Alt+T.', cfgSwitch('stealth_click_through', 'Clicks pass through', cfg.stealth_click_through))}`,
+        '',
+        'aurora')}
       ${card('Sharing', '',
         `${row('Contribute anonymized questions', 'At the end of a session, only the interviewer questions (no names, none of your answers) feed the Question bank.', C.sw('data-change="share-questions"', cfg.share_anonymized_questions !== false))}`)}`;
   }
