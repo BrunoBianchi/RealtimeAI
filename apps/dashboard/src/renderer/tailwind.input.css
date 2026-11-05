@@ -1,8 +1,8 @@
 /*
- * lipcue.com — dashboard design system.
- * Quiet, dense, dark-first. Tokens follow the "lipcue.com Executive" spec:
- * near-black surfaces, hairline borders, one emerald accent, Geist for text,
- * JetBrains Mono for numbers and eyebrow labels.
+ * lipcue.com v2.7.5 — dashboard design system.
+ * Quiet, dense, dark-first. Neutral dark surfaces with selective aurora ray cards.
+ * Tokens follow the "lipcue.com Executive" spec: near-black surfaces, hairline
+ * borders, emerald accents, Geist for text, JetBrains Mono for numbers and labels.
  *
  * Built into styles.css by `npm run build:css` (plain CSS, no utilities).
  */
