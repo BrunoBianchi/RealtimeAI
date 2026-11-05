@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">LipCue</title>
+  <desc id="desc">Balão de conversa com waveform, representando orientação em tempo real para entrevistas.</desc>
+  <path d="M22 34C22 22.954 30.954 14 42 14H101C112.046 14 121 22.954 121 34V78C121 89.046 112.046 98 101 98H65L40 120V98H42C30.954 98 22 89.046 22 78V34Z"
+    stroke="#22c55e" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M49 53V65" stroke="#ffffff" stroke-width="8" stroke-linecap="round"/>
+  <path d="M69 42V76" stroke="#ffffff" stroke-width="8" stroke-linecap="round"/>
+  <path d="M89 49V69" stroke="#22c55e" stroke-width="8" stroke-linecap="round"/>
+  <path d="M109 37V81" stroke="#22c55e" stroke-width="8" stroke-linecap="round"/>
+</svg>

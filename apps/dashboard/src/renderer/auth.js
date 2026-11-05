@@ -77,7 +77,7 @@
     return `<div class="auth">
       <section class="auth-panel" aria-labelledby="authTitle">
         <header class="auth-head">
-          <div class="auth-logo" aria-hidden="true">${icon('lipcue')}</div>
+          <div class="auth-logo" aria-label="LipCue">${C.fullLogo ? C.fullLogo('auth-logo-svg') : icon('lipcue')}</div>
           <div class="stack" style="gap:6px;align-items:center"><h1 class="auth-title" id="authTitle">${esc(title)}</h1><p class="auth-sub">${esc(sub)}</p></div>
         </header>
         <div class="auth-body">

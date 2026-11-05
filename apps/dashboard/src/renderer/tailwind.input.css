@@ -266,18 +266,36 @@ html[data-theme='light'] ::-webkit-scrollbar-thumb {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 6px;
+  padding: 0 4px;
   -webkit-app-region: drag;
+  min-height: 32px;
+}
+
+.brand-logo {
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+
+.brand-logo-svg {
+  height: 26px;
+  width: auto;
+  max-width: 116px;
+  display: block;
+}
+
+.brand-logo-collapsed-svg {
+  display: none;
+  height: 26px;
+  width: 26px;
 }
 
 .brand-mark {
   width: 28px;
   height: 28px;
   border-radius: 7px;
-  /* Official LipCue Brand Mark: deep dark canvas + brand green border/accent */
-  background: #0b0f0c;
-  border: 1px solid rgba(34, 197, 94, 0.35);
-  box-shadow: 0 0 10px rgba(34, 197, 94, 0.12);
+  /* Official LipCue Brand Mark */
+  background: transparent;
   display: grid;
   place-items: center;
   font-size: 15px;
@@ -2904,12 +2922,20 @@ button.status-chip:hover {
   .sidebar .nav-label,
   .sidebar .nav-count,
   .sidebar .brand-name,
+  .sidebar .brand-logo-svg,
   .sidebar .brand .pill,
   .sidebar .sidebar-section,
   .sidebar .usage-card,
   .sidebar .profile-meta,
   .sidebar .new-session-label {
     display: none;
+  }
+  .sidebar .brand {
+    justify-content: center;
+    padding: 0;
+  }
+  .sidebar .brand-logo-collapsed-svg {
+    display: block;
   }
   .page {
     padding: 24px 20px 40px;
@@ -2992,18 +3018,22 @@ button.status-chip:hover {
   gap: 14px;
 }
 
-/* Logo: five bars breathing like a voice level. */
+/* Logo: full brand lockup. */
 .auth-logo {
-  width: 52px;
-  height: 52px;
-  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  background: var(--surface-card);
-  border: 1px solid var(--border-strong);
-  box-shadow: 0 0 0 6px var(--hover-wash);
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  margin-bottom: 6px;
+}
+
+.auth-logo-svg {
+  height: 42px;
+  width: auto;
+  max-width: 180px;
+  display: block;
 }
 
 .auth-logo span {

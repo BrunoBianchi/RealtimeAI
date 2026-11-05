@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="570" height="160" viewBox="0 0 570 160" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">LipCue — AI Interview Copilot</title>
+  <desc id="desc">Logo LipCue, um copiloto com inteligência artificial para ajudar durante entrevistas.</desc>
+  <g transform="translate(0 8)">
+    <path d="M22 34C22 22.954 30.954 14 42 14H101C112.046 14 121 22.954 121 34V78C121 89.046 112.046 98 101 98H65L40 120V98H42C30.954 98 22 89.046 22 78V34Z"
+      stroke="#22c55e" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M49 53V65" stroke="#ffffff" stroke-width="8" stroke-linecap="round"/>
+    <path d="M69 42V76" stroke="#ffffff" stroke-width="8" stroke-linecap="round"/>
+    <path d="M89 49V69" stroke="#22c55e" stroke-width="8" stroke-linecap="round"/>
+    <path d="M109 37V81" stroke="#22c55e" stroke-width="8" stroke-linecap="round"/>
+  </g>
+  <!-- Wordmark converted to vector contours so kerning and appearance do not depend on installed fonts. -->
+  <g aria-label="LipCue"><path d="M135 0H1083V253H440V1490H135Z" transform="translate(154.000 116.000) scale(0.05078125 -0.05078125)" fill="#ffffff"/><path d="M128 0H428V1118H128ZM278 1264C368 1264 443 1332 443 1418C443 1503 368 1572 278 1572C187 1572 113 1503 113 1418C113 1332 187 1264 278 1264Z" transform="translate(208.605 116.000) scale(0.05078125 -0.05078125)" fill="#ffffff"/><path d="M128 -418H428V179H437C479 89 571 -19 754 -19C1012 -19 1209 185 1209 557C1209 939 1004 1132 756 1132C566 1132 478 1019 437 930H423V1118H128ZM662 222C509 222 421 356 421 558C421 761 508 892 662 892C819 892 902 754 902 558C902 361 818 222 662 222Z" transform="translate(232.588 116.000) scale(0.05078125 -0.05078125)" fill="#ffffff"/><path d="M786 -20C1162 -20 1394 233 1428 510H1119C1089 348 961 251 791 251C561 251 404 421 404 744C404 1060 559 1239 792 1239C962 1239 1090 1143 1118 981H1427C1383 1316 1125 1510 786 1510C393 1510 94 1231 94 744C94 260 389 -20 786 -20Z" transform="translate(286.947 116.000) scale(0.05078125 -0.05078125)" fill="#22c55e"/><path d="M513 -14C683 -14 797 74 860 232L864 0H1148V1118H847V471C847 323 757 237 630 237C504 237 428 320 428 459V1118H128V407C128 145 281 -14 513 -14Z" transform="translate(359.680 116.000) scale(0.05078125 -0.05078125)" fill="#22c55e"/><path d="M633 -22C893 -22 1071 99 1126 285L854 336C822 250 743 204 638 204C487 204 385 298 378 481H1143V565C1143 947 910 1132 618 1132C291 1132 81 898 81 553C81 200 291 -22 633 -22ZM380 669C392 807 478 906 621 906C760 906 839 815 854 669Z" transform="translate(420.227 116.000) scale(0.05078125 -0.05078125)" fill="#22c55e"/></g>
+</svg>

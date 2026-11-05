@@ -6,7 +6,7 @@
 'use strict';
 
 const api = window.rtai;
-const { icon, hydrateIcons } = window.CueIcons;
+const { icon, fullLogo, hydrateIcons } = window.CueIcons;
 
 const Cue = (window.Cue = {
   views: {},
@@ -59,6 +59,7 @@ function esc(v) {
 }
 Cue.esc = esc;
 Cue.icon = icon;
+Cue.fullLogo = fullLogo;
 
 // Older engine builds wrote some UTF-8 text through cp1252 ("NubankÂ·").
 function fixText(s) {
