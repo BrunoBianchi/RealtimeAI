@@ -1,4 +1,4 @@
-// App <-> RealTimeAI server integration: the dashboard's server-side features
+// App <-> lipcue.com server integration: the dashboard's server-side features
 // (AI relay, research, community questions, Google Calendar broker) and the
 // local backend wiring used when running from source. No network.
 const test = require('node:test');
@@ -167,7 +167,7 @@ test('Google Calendar through the server: no client file, the server exchanges t
     }
   });
   const before = g.status();
-  assert.deepStrictEqual([before.configured, before.brokered, before.clientSource], [true, true, 'Cue server']);
+  assert.deepStrictEqual([before.configured, before.brokered, before.clientSource], [true, true, 'lipcue.com server']);
   const st = await g.connect();
   assert.strictEqual(new URL(authUrl).searchParams.get('client_id'), 'srv.apps.googleusercontent.com');
   assert.deepStrictEqual(Object.keys(exchanged[0]).sort(), ['code', 'code_verifier', 'grant_type', 'redirect_uri']);

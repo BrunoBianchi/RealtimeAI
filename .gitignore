@@ -1,5 +1,5 @@
 # =============================================================================
-# RealTimeAI - files that never belong in the repository
+# lipcue.com - files that never belong in the repository
 # =============================================================================
 
 # ---- Secrets (scripts/check-secrets.mjs also blocks them on commit) ---------

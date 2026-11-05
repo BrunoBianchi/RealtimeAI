@@ -1,4 +1,4 @@
-// Cue dashboard — sign-in. Until the user signs in or picks local mode,
+// lipcue.com dashboard — sign-in. Until the user signs in or picks local mode,
 // app.js renders only this screen (no sidebar, tabs or settings) and ignores
 // every other action. Ways in, handled by the main process (cloud_account.js):
 // e-mail + password (with sign-up and password reset), or "Continue locally" ([servidor]
@@ -30,7 +30,7 @@
     const cfg = S.config || {};
     const st = S.auth || {};
     if (st.available || cfg.server_url_effective) return '';
-    return `<div class="auth-server"><span>This build has no Cue server configured. Enter its address to sign in.</span>
+    return `<div class="auth-server"><span>This build has no lipcue.com server configured. Enter its address to sign in.</span>
       <input class="input sm" type="text" value="${esc(cfg.server_url || '')}" placeholder="https://server.example.com" data-change="auth-server" aria-label="Server address"/></div>`;
   }
 
@@ -63,7 +63,7 @@
     </div>`;
   }
 
-  const TITLES = { signin: 'Welcome to Cue', signup: 'Create your account', reset: 'Reset your password' };
+  const TITLES = { signin: 'Welcome to lipcue.com', signup: 'Create your account', reset: 'Reset your password' };
   const SUBS = {
     signin: 'Your real-time interview copilot. Sign in to continue.',
     signup: 'Start on the Free plan: one session of up to 15 minutes.',
@@ -77,7 +77,7 @@
     return `<div class="auth">
       <section class="auth-panel" aria-labelledby="authTitle">
         <header class="auth-head">
-          <div class="auth-logo" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+          <div class="auth-logo" aria-hidden="true">${icon('lipcue')}</div>
           <div class="stack" style="gap:6px;align-items:center"><h1 class="auth-title" id="authTitle">${esc(title)}</h1><p class="auth-sub">${esc(sub)}</p></div>
         </header>
         <div class="auth-body">
@@ -87,7 +87,7 @@
           ${A.info ? `<div class="auth-msg info" role="status">${esc(A.info)}</div>` : ''}
         </div>
         ${localBlock()}
-        <p class="auth-foot">By continuing you agree to the Cue Terms and Privacy Policy.</p>
+        <p class="auth-foot">By continuing you agree to the lipcue.com Terms and Privacy Policy.</p>
       </section></div>`;
   };
 

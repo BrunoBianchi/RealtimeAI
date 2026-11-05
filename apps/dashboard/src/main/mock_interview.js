@@ -226,7 +226,7 @@ function createMockInterviews(deps) {
     const r = await deps.api('POST', '/v1/mock/start', { agent_id: agent.id });
     if (!r.ok) {
       const code = r.error || (r.data && r.data.error && r.data.error.code) || '';
-      if (r.status === 404) return { ok: false, code: 'server_outdated', error: 'The Cue server has not been updated for mock interviews yet. Nothing was charged.' };
+      if (r.status === 404) return { ok: false, code: 'server_outdated', error: 'The lipcue.com server has not been updated for mock interviews yet. Nothing was charged.' };
       return { ok: false, code, error: code === 'mock_not_included' ? 'Mock interviews need PRO or an interview credit.' : 'Mock interviews are unavailable right now. Nothing was charged.' };
     }
     const others = agents.filter((a) => a.id !== agent.id);

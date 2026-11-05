@@ -1,6 +1,6 @@
 @echo off
 rem ---------------------------------------------------------------------------
-rem INSTALLER: builds everything and creates dist\Cue-Setup-<version>.exe,
+rem INSTALLER: builds everything and creates dist\lipcue-Setup-<version>.exe,
 rem the same installer wizard the releases ship (Start menu shortcut,
 rem uninstaller, auto-update).
 rem   scripts\windows\package.bat                 version 2.1.0-local.<date-time>
@@ -24,7 +24,7 @@ set "VERSION=%~1"
 if not defined VERSION for /f "delims=" %%v in ('node scripts\version.mjs --local') do set "VERSION=%%v"
 if not defined VERSION goto :failed
 for /f "delims=" %%c in ('git rev-parse --short HEAD 2^>nul') do set "COMMIT=%%c"
-echo == RealTimeAI installer %VERSION% ==
+echo == lipcue.com installer %VERSION% ==
 
 echo [1/3] Native overlay...
 set "RTAI_VERSION=%VERSION%"
@@ -46,10 +46,10 @@ call npx electron-builder --win nsis --x64 --publish never -c.extraMetadata.vers
 popd
 
 if not exist dist mkdir dist
-copy /Y "apps\dashboard\release\Cue-Setup-%VERSION%.exe" dist\ >nul || goto :failed
+copy /Y "apps\dashboard\release\lipcue-Setup-%VERSION%.exe" dist\ >nul || goto :failed
 echo.
-echo Installer ready: dist\Cue-Setup-%VERSION%.exe
-explorer /select,"%CD%\dist\Cue-Setup-%VERSION%.exe"
+echo Installer ready: dist\lipcue-Setup-%VERSION%.exe
+explorer /select,"%CD%\dist\lipcue-Setup-%VERSION%.exe"
 goto :end
 
 :failed

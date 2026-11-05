@@ -1,5 +1,5 @@
 # WinHTTP adapters: WebSocket (Deepgram), streaming HTTPS (LLM providers),
-# analytics, web search and the RealTimeAI cloud session broker.
+# analytics, web search and the lipcue.com cloud session broker.
 add_library(rtai_net STATIC
     src/winhttp_websocket.cpp
     src/winhttp_llm_client.cpp

@@ -1,4 +1,4 @@
-# Cue
+# lipcue.com
 
 [![CI](https://github.com/BrunoBianchi/RealtimeAI/actions/workflows/ci.yml/badge.svg)](https://github.com/BrunoBianchi/RealtimeAI/actions/workflows/ci.yml)
 [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-fe5196.svg)](https://www.conventionalcommits.org)
@@ -53,7 +53,7 @@ Node.js 22 LTS e Git.
 ```bat
 scripts\windows\setup-dev.bat   :: uma vez: dependências Node e hooks do git
 scripts\windows\dev.bat         :: versão de teste: recompila e abre o app com o código atual
-scripts\windows\package.bat     :: instalador: dist\Cue-Setup-<versão>.exe
+scripts\windows\package.bat     :: instalador: dist\lipcue-Setup-<versão>.exe
 ```
 
 - **Versão de teste (`dev.bat`)**: recompila só o que mudou e abre o dashboard direto do código, usando o
@@ -65,7 +65,7 @@ scripts\windows\package.bat     :: instalador: dist\Cue-Setup-<versão>.exe
   uma versão explícita.
 
 Para usar, entre na sua conta ou escolha o modo local e configure as chaves do Deepgram e do LLM no dashboard (Settings) ou no
-`%LOCALAPPDATA%\Cue\config.ini` (ver [docs/configuration.md](docs/configuration.md)).
+`%LOCALAPPDATA%\RealTimeAI\config.ini` (ver [docs/configuration.md](docs/configuration.md)).
 O modelo de embeddings do RAG híbrido é baixado uma vez com
 `scripts\windows\download-embeddings-model.bat`.
 

@@ -115,15 +115,21 @@ TEST(TranscriptionModeProperties, Property3_EveryEffectiveChangeIsPropagated) {
 
         engine.set_transcription_only(requested);
 
-        // Wait a short moment for orchestrator thread to process if enqueued
-        std::this_thread::sleep_for(2ms);
-
-        const auto events = col->all<TranscriptionModeEvent>();
         if (requested == current) {
-            // Idempotent: same value => 0 new events
-            EXPECT_EQ(events.size(), count_before) << "Trial " << trial;
+            // Idempotent: same value => 0 new events. Nothing to wait for, so
+            // give a stray event a moment to show up.
+            std::this_thread::sleep_for(2ms);
+            EXPECT_EQ(col->all<TranscriptionModeEvent>().size(), count_before) << "Trial " << trial;
         } else {
+            // Propagation is asynchronous: wait (bounded) for the orchestrator
+            // thread to publish.
+            const auto deadline = std::chrono::steady_clock::now() + 2s;
+            while (col->all<TranscriptionModeEvent>().size() <= count_before &&
+                   std::chrono::steady_clock::now() < deadline) {
+                std::this_thread::sleep_for(1ms);
+            }
             // Changed: exactly 1 new event with enabled == requested
+            const auto events = col->all<TranscriptionModeEvent>();
             ASSERT_EQ(events.size(), count_before + 1) << "Trial " << trial;
             EXPECT_EQ(events.back().enabled, requested) << "Trial " << trial;
             EXPECT_EQ(engine.transcription_only(), requested) << "Trial " << trial;

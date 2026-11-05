@@ -1,4 +1,4 @@
-// Cue dashboard — guided tours (popover + highlight), built on driver.js
+// lipcue.com dashboard — guided tours (popover + highlight), built on driver.js
 // (vendor/driver, MIT).
 //
 // A tour is a list of steps. A step may name a route (the tour navigates
@@ -29,7 +29,7 @@
   const TOURS = {
     welcome: {
       steps: (m) => [
-        { title: 'Welcome to Cue', text: 'A one-minute tour of the app. Leave at any time and replay it from the ? button in the top bar.' },
+        { title: 'Welcome to lipcue.com', text: 'A one-minute tour of the app. Leave at any time and replay it from the ? button in the top bar.' },
         { element: '#btnNewSession', title: 'Create a session', text: 'A session is one interview: the role, the company, the job description and your files. The copilot reads all of it before every answer.', side: 'right' },
         { element: nav('sessions'), title: 'Sessions', text: 'Your interviews, upcoming and past, and how prepared each one is.', side: 'right' },
         { element: nav('files'), title: 'Files', text: 'Your resume, job descriptions and portfolio. Attach them to a session so answers are about your real experience.', side: 'right' },
@@ -38,7 +38,7 @@
         { element: '#engineStatusPill', title: 'Copilot status', text: '“Ready” means transcription and AI are set up. “Set up” means a key is missing.', side: 'bottom' },
         { element: '#btnStealthChip', title: 'Hidden from captures', text: 'Keeps this window and the floating panel out of screen sharing and recordings. Shortcut: Ctrl+Alt+S.', side: 'bottom' },
         { element: '#searchTrigger', title: 'Search', text: 'Find sessions, files, questions and actions. Shortcut: Ctrl+K.', side: 'bottom' },
-        { element: '#sidebarUsage', title: m.local ? 'PRO features' : 'Plan and usage', text: m.local ? 'What Cue PRO adds to local mode: cloud backup, sync across devices, Google Calendar and faster answers.' : 'Minutes used this month and when the plan renews.', side: 'right' },
+        { element: '#sidebarUsage', title: m.local ? 'PRO features' : 'Plan and usage', text: m.local ? 'What lipcue.com PRO adds to local mode: cloud backup, sync across devices, Google Calendar and faster answers.' : 'Minutes used this month and when the plan renews.', side: 'right' },
         { element: nav('settings'), title: 'Next: set up the copilot', text: 'The setup guide walks through keys, audio and privacy, one screen at a time.', side: 'right', next: 'Start setup', then: () => start('setup') }
       ]
     },
@@ -48,7 +48,7 @@
         { route: 'settings/general', element: card('appearance'), title: 'Theme and language', text: 'Dark, light or the Windows theme. The interface language follows Windows by default; change it here.' },
         m.local
           ? { route: 'settings/account', element: card('local-mode'), title: 'Local mode', text: 'No account and no server: transcription and answers use your own keys, with a 500 ms wait before each answer.' }
-          : { route: 'settings/account', element: card('where-the-ai-runs'), title: 'Where the AI runs', text: 'Cue servers need no keys. “My keys” uses your own provider keys instead.' },
+          : { route: 'settings/account', element: card('where-the-ai-runs'), title: 'Where the AI runs', text: 'lipcue.com servers need no keys. “My keys” uses your own provider keys instead.' },
         { route: 'settings/ai', element: card('api-keys'), title: 'API keys', text: m.local ? 'Required in local mode: a Deepgram key for transcription and one AI key (OpenRouter is the simplest). Windows encrypts them on this computer.' : 'Only needed with “My keys”: a Deepgram key for transcription and one AI key. Windows encrypts them on this computer.' },
         { route: 'settings/ai', element: card('answer-model'), title: 'Answer model', text: 'Fast has the lowest latency and suits most interviews. Ultra reasons more for system design and code.' },
         { route: 'settings/ai', element: card('behavior'), title: 'How it answers', text: 'Automatic suggestions, the language answers are written in and how long they are.' },

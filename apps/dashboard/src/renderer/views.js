@@ -1,4 +1,4 @@
-// Cue dashboard — page views: home, sessions, session detail, review, files
+// lipcue.com dashboard — page views: home, sessions, session detail, review, files
 // and question bank. Each view returns HTML built from Cue.state.
 'use strict';
 
@@ -220,7 +220,7 @@
          <button type="button" class="status-chip" data-action="go" data-to="settings/privacy">${icon('shield-check')}${cfg.save_sessions === false ? 'Not recording' : 'Local recording'}<span class="vsep">|</span><span class="sub">${stealthOn ? 'Hidden' : 'Visible'} in captures</span></button>`,
         true
       )}
-      ${liveBanner}${setupBanner}${C.proAd('card', 'Get more with Cue PRO')}
+      ${liveBanner}${setupBanner}${C.proAd('card', 'Get more with lipcue.com PRO')}
 
       <section class="card" data-tour="home-upcoming" style="gap:16px">
         <div class="row top" style="gap:12px">

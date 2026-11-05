@@ -704,7 +704,7 @@ bool OverlayWindow::Impl::create(std::string* error) {
         ex_style |= WS_EX_TRANSPARENT;
     }
     hwnd = CreateWindowExW(ex_style, wc.lpszClassName,
-                           L"Cue", WS_POPUP, x, y, static_cast<int>(width), 120, nullptr, nullptr, inst, this);
+                           L"lipcue.com", WS_POPUP, x, y, static_cast<int>(width), 120, nullptr, nullptr, inst, this);
     if (!hwnd) return fail("CreateWindowEx failed");
 
     dpi = GetDpiForWindow(hwnd);

@@ -3,7 +3,7 @@
 # Conventional Commits, tags `vX.Y.Z`, and creates the GitHub Release as a draft
 # (build-windows.yml publishes it once its files are attached).
 # Then `installer` builds the C++ overlay + Electron NSIS installer and uploads
-# `Cue-Setup-X.Y.Z.exe`, `.blockmap`, `latest.yml`, and `beta.yml` to the
+# `lipcue-Setup-X.Y.Z.exe`, `.blockmap`, `latest.yml`, and `beta.yml` to the
 # release so `electron-updater` updates installed apps in real time.
 name: Release
 
@@ -51,7 +51,7 @@ jobs:
             VERSION="${AFTER_TAG#v}"
             echo "release_created=true" >> "$GITHUB_OUTPUT"
             echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-            echo "### RealTimeAI v$VERSION" >> "$GITHUB_STEP_SUMMARY"
+            echo "### lipcue.com v$VERSION" >> "$GITHUB_STEP_SUMMARY"
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "$AFTER_TAG" ]; then
             VERSION="${AFTER_TAG#v}"
             echo "release_created=true" >> "$GITHUB_OUTPUT"

@@ -2,7 +2,7 @@
   "name": "realtimeai",
   "version": "2.0.0",
   "private": true,
-  "description": "RealTimeAI: real-time meeting and interview copilot (native C++ overlay + Electron dashboard)",
+  "description": "lipcue.com: real-time meeting and interview copilot (native C++ overlay + Electron dashboard)",
   "author": "Bruno Raiado Bianchi",
   "repository": {
     "type": "git",

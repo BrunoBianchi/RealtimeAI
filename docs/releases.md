@@ -31,7 +31,7 @@ Hooks (husky):
 ### Estável
 
 1. Push na `main` → o workflow **Release** abre (ou atualiza) um PR `chore(release): vX.Y.Z` com a versão nova, o `CHANGELOG.md` e os números atualizados em `package.json`, `apps/dashboard/package.json` e `CMakeLists.txt`.
-2. Merge desse PR → tag `vX.Y.Z` → o workflow compila o overlay C++ e o instalador Electron no Windows, roda os testes, confere que o `rtai_app.exe` diz a versão certa e publica `Cue-Setup-X.Y.Z.exe` + `latest.yml` com as notas da versão.
+2. Merge desse PR → tag `vX.Y.Z` → o workflow compila o overlay C++ e o instalador Electron no Windows, roda os testes, confere que o `rtai_app.exe` diz a versão certa e publica `lipcue-Setup-X.Y.Z.exe` + `latest.yml` com as notas da versão.
 3. Os apps instalados checam a cada 4 h (e ao abrir), baixam em segundo plano e instalam ao reiniciar. Settings → General → Updates mostra o estado e tem "Check now".
 
 ### Pré-release (beta)
@@ -91,7 +91,7 @@ As flags ficam em `apps/dashboard/flags.json`:
 - `variants`: divide quem recebeu a flag entre variantes (A/B/n), por peso.
 - `channels`, `default`, `min_version`: restringem por canal, valor padrão e versão mínima.
 - Na interface: `data-flag="chave"` esconde o elemento quando a flag está desligada; `data-ab="chave" data-ab-<variante>="texto"` troca o texto por variante. No JS: `isFlagEnabled('chave')` e `flagVariant('chave')`.
-- O overlay C++ pode ler o resultado em `%LOCALAPPDATA%\Cue\flags-active.json`.
+- O overlay C++ pode ler o resultado em `%LOCALAPPDATA%\RealTimeAI\flags-active.json`.
 
 Mudar o `flags.json` na `main` já vale para os apps instalados (com `RELEASES_REPO`, o workflow **Feature flags** copia o arquivo para lá). Os apps buscam a cada 30 min, então dá pra liberar uma feature para 10%, 50%, 100% sem lançar versão nova. Em Settings, cada flag pode ser forçada (On/Off/variante) na própria máquina para testar.
 
@@ -107,4 +107,4 @@ O repositório `BrunoBianchi/RealtimeAI` é **público**, então os instaladores
 
 Sem `RELEASES_REPO`, o instalador é anexado à release deste repositório e os apps buscam as flags em `apps/dashboard/flags.json` da `main`.
 
-Instalador local (sem publicar): `scripts\windows\package.bat` compila o overlay com a versão `<próxima>-local.<data-hora>`, coloca o `rtai_app.exe` e o `onnxruntime.dll` em `apps\dashboard\native\`, gera as notas e cria `dist\Cue-Setup-<versão>.exe`. Um build local instalado se atualiza sozinho para a próxima release publicada.
+Instalador local (sem publicar): `scripts\windows\package.bat` compila o overlay com a versão `<próxima>-local.<data-hora>`, coloca o `rtai_app.exe` e o `onnxruntime.dll` em `apps\dashboard\native\`, gera as notas e cria `dist\lipcue-Setup-<versão>.exe`. Um build local instalado se atualiza sozinho para a próxima release publicada.

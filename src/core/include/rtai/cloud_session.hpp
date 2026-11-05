@@ -1,4 +1,4 @@
-// Pure core: the RealTimeAI cloud backend ("nuvem") contract, client side.
+// Pure core: the lipcue.com cloud backend ("nuvem") contract, client side.
 //
 // The server is a credential broker, not a media proxy. At engine start the
 // app makes ONE call, POST {server}/v1/session, and gets back where to stream

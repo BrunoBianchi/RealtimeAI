@@ -1,6 +1,6 @@
 @echo off
 rem ---------------------------------------------------------------------------
-rem RealTimeAI LIVE: microphone (You) + system audio (Others) -> Deepgram ->
+rem lipcue.com LIVE: microphone (You) + system audio (Others) -> Deepgram ->
 rem LLM suggestions on the HUD. Sessions go to %LOCALAPPDATA%\RealTimeAI\sessions.
 rem Keys and options: dashboard Settings (rtai_app.exe --config or Ctrl+Alt+O).
 rem Without the Deepgram key the app opens the dashboard Settings and exits.
@@ -11,7 +11,7 @@ chcp 65001 >nul
 set ELECTRON_RUN_AS_NODE=
 cd /d "%~dp0..\.."
 if exist "apps\dashboard\node_modules\electron\dist\electron.exe" (
-    echo == Starting RealTimeAI Dashboard ==
+    echo == Starting lipcue.com Dashboard ==
     call "%~dp0start-dashboard.bat"
 )
 set "EXE=build\bin\Release\rtai_app.exe"
@@ -19,7 +19,7 @@ if not exist "%EXE%" (
     echo [ERROR] %EXE% not found. Build it first: scripts\windows\build.bat
     goto :end
 )
-echo == RealTimeAI live ==
+echo == lipcue.com live ==
 echo You = microphone, Others = system audio.
 echo Ctrl+Alt+Enter answers, Ctrl+Alt+S screen, Ctrl+Alt+K chat, Ctrl+Alt+Q quits and saves.
 echo.

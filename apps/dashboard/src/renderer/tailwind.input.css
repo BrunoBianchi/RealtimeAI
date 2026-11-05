@@ -1,6 +1,6 @@
 /*
- * Cue — dashboard design system.
- * Quiet, dense, dark-first. Tokens follow the "RealTimeAI Executive" spec:
+ * lipcue.com — dashboard design system.
+ * Quiet, dense, dark-first. Tokens follow the "lipcue.com Executive" spec:
  * near-black surfaces, hairline borders, one emerald accent, Geist for text,
  * JetBrains Mono for numbers and eyebrow labels.
  *
@@ -274,13 +274,14 @@ html[data-theme='light'] ::-webkit-scrollbar-thumb {
   width: 28px;
   height: 28px;
   border-radius: 7px;
-  /* The logo: the same in both themes, and the same as the app icon. */
-  background: #1c1e24;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  /* Official LipCue Brand Mark: deep dark canvas + brand green border/accent */
+  background: #0b0f0c;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.12);
   display: grid;
   place-items: center;
   font-size: 15px;
-  color: #ffffff;
+  color: #22c55e;
 }
 
 .brand-name {

@@ -2,7 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Cue is a Windows real-time interview/meeting copilot: a native C++20 engine with a Direct2D HUD (`src/`) plus an Electron dashboard (`apps/dashboard/`). User-facing strings (dashboard, HUD, engine notices and errors) are in English; keep new ones in English. LLM prompts, Portuguese question/filler detection, speaker tags ("Você"/"Outros") and config.ini keys stay in Portuguese on purpose.
+lipcue.com is a Windows real-time interview/meeting copilot: a native C++20 engine with a Direct2D HUD (`src/`) plus an Electron dashboard (`apps/dashboard/`). User-facing strings (dashboard, HUD, engine notices and errors) are in English; keep new ones in English. LLM prompts, Portuguese question/filler detection, speaker tags ("Você"/"Outros") and config.ini keys stay in Portuguese on purpose.
+
+The product was called Cue and RealTimeAI before. These old names stay on purpose, because changing them breaks existing installs: `appId` (`com.raiado.realtimeai`), the data folder (`%LOCALAPPDATA%\RealTimeAI`, `%APPDATA%\RealTimeAI`), the DPAPI entropy (`RealTimeAI.config.v1`), the HUD window class and the GitHub repository. The `window.Cue` renderer global and `rtai_*` names are internal. The executable and installer are `lipcue.exe` and `lipcue-Setup-*` (no `.com`, which would read as a double extension).
 
 ## Commands
 
@@ -12,7 +14,7 @@ Root (`package.json`):
 |---|---|
 | `npm run setup` | install root + dashboard deps |
 | `npm run dev` | run the dashboard from source (`apps/dashboard`, `npm start`) |
-| `npm run backend` | local Cue server (`../backend/`, Go, run with Docker; see its README). `backend:docker` / `backend:docker:down` run it detached. `npm run dev` uses the built-in server; `RTAI_LOCAL_BACKEND=1` starts and uses this one instead (`local_backend.js`) |
+| `npm run backend` | local lipcue.com server (`../backend/`, Go, run with Docker; see its README). `backend:docker` / `backend:docker:down` run it detached. `npm run dev` uses the built-in server; `RTAI_LOCAL_BACKEND=1` starts and uses this one instead (`local_backend.js`) |
 | `npm run test:backend` / `lint:backend` | `go test` / `go vet` for `../backend/` (`scripts/backend-go.mjs`: local Go, else the `golang` Docker image) |
 | `npm run build:native` | `cmake --preset windows-release` + build |
 | `npm run test:native` | `ctest --preset windows-release` |
@@ -41,7 +43,7 @@ Conventional Commits enforced by commitlint (husky `commit-msg` hook); release-p
 - `core/` — all logic, platform-free and unit-tested: `CopilotEngine` (single thread owns state: turns, trigger policy, context), Deepgram stream protocol/backoff/reconnect, VAD, prompt building, SSE/LLM parsing, RAG (BM25 + optional e5 embeddings fused by RRF), `SessionStore`, and `server_protocol.hpp`.
 - `net/` (WinHTTP WebSocket/HTTPS), `deepgram/`, `audio_wasapi/` (mic = "Você", loopback = "Outros"), `overlay/` (Win32 + Direct2D HUD), `vad_onnx/` and `embed_onnx/` (optional ONNX), `app/` (the `rtai_app` executable: wiring, config, lifecycle).
 - Threading rule: producers only push into queues; the UI thread never blocks (one coalesced render per ≤16 ms). One writer thread per socket.
-- Every session writes `sessions/<YYYY-MM-DD_HH-MM-SS_xxxx>.jsonl` (append-only events: `session_start`, `turn`, `suggestion`, `jev`, `feedback`, `pause`, `link`, `notice`, `session_end`) plus a `.md` summary on exit, under `%LOCALAPPDATA%\Cue\`.
+- Every session writes `sessions/<YYYY-MM-DD_HH-MM-SS_xxxx>.jsonl` (append-only events: `session_start`, `turn`, `suggestion`, `jev`, `feedback`, `pause`, `link`, `notice`, `session_end`) plus a `.md` summary on exit, under `%LOCALAPPDATA%\RealTimeAI\`.
 
 ### Latency
 
@@ -53,12 +55,12 @@ The dashboard spawns `rtai_app.exe --no-launcher --server [--agent <id>]` and ta
 - stdin (UI → engine): `answer`, `chat`, `recap`, `followup`, `pause`, `rate`, `clear_chat`, `set_mode`, `set_config`, `quit`.
 Both sides are defined in `src/core/include/rtai/server_protocol.hpp`; `apps/dashboard/src/main/main.js` (`launchOverlay`, `LIVE_EVENT_TYPES`, `sendOverlayCommand`) forwards events to the renderer as `rtai:live-event`. Change both ends together.
 
-### Shared state on disk (`%LOCALAPPDATA%\Cue\`)
+### Shared state on disk (`%LOCALAPPDATA%\RealTimeAI\`)
 - `config.ini` — shared by dashboard and engine; Portuguese section/key names (`[deepgram] idioma`, `[llm] modelo`, `[stealth] invisivel_gravacao`…). The dashboard maps them to English keys in `readConfigIni()` / `writeConfigIni()` in `main.js`; add new settings in both. The engine reads config only at start, so `rtai:save-config` restarts a running overlay.
 - `agents/<id>.json` — a "goal"/session (company, role, job description, documents with extracted text, playbook, mini_compact). `saveAgentToDisk()` normalizes and **drops unknown fields** — new agent fields must be added there.
 - `question_bank.json` (JEV engine, `jev_engine.js`), `dashboard_profile.json`, `playbooks.json`, flags files.
 
-### Cue cloud backend (`docs/server-api.md`)
+### lipcue.com cloud backend (`docs/server-api.md`)
 - Sign-in (e-mail + password) or local mode is required: otherwise the renderer shows only `auth.js`'s login view (`Cue.isLocked()`, `AUTH_ACTIONS` gate in `app.js`) and `launchOverlay` refuses (`canUseApp()` in `main.js`); the engine answers `hello.needs = "login"`.
 - Local mode (`[servidor] modo = local`, "Continue locally" on the login view): no account and no server call at all, the user's own keys only (`cloud::local_mode`, `isLocalMode()` / `Cue.localMode()`). PRO features (cloud backup, sync across devices, Google Calendar) are shown as ads (`Cue.proAd`) and every live answer waits `cloud::kLocalAnswerDelayMs` (`DelayedLlmClient`, mirrored by `LOCAL_ANSWER_DELAY_MS` in `app.js`; keep both in sync and keep the delay disclosed in the UI).
 - Plans (`plans.js` ↔ `cloud::PlanRules`): Free = one session of up to 15 min, once; PRO = $19, 200 min and 1 mock interview/month (`renderer/mock.js`, `main/mock_interview.js`; Free and local see only the ad and video, any account can buy `mock_credits`); token packs (1 token = 1 minute, `credit_minutes`, never expire) are spent after the plan's minutes. The server is authoritative (`402` → `needs = "upgrade"`); the engine's plan guard ends the session at the budget.

@@ -1,4 +1,4 @@
-# Contexto para o RealTimeAI
+# Contexto para o lipcue.com
 
 Copie este arquivo, preencha e aponte a variável `RTAI_CONTEXT_FILE` para ele.
 O texto vai junto em cada pedido de sugestão (até 16 KB), então seja direto.

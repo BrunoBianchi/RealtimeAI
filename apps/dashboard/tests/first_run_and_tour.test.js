@@ -145,7 +145,7 @@ test('tours: start, close and the seen list saved in the profile', async () => {
   assert.strictEqual(r.Cue.tourActive(), 'welcome');
   await new Promise((resolve) => setImmediate(resolve));
   const [first] = d.shown;
-  assert.strictEqual(first.popover.title, 'Welcome to Cue');
+  assert.strictEqual(first.popover.title, 'Welcome to lipcue.com');
   assert.strictEqual(first.popover.progressText, `1 / ${r.Cue.tours.welcome.steps({ local: false, running: false }).length}`);
   assert.deepStrictEqual([...first.popover.disableButtons], ['previous']);
 

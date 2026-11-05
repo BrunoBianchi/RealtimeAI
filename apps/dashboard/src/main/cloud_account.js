@@ -1,4 +1,4 @@
-// Cue cloud account (dashboard side). Signing in is mandatory: the
+// lipcue.com cloud account (dashboard side). Signing in is mandatory: the
 // dashboard shows only the sign-in screen until there is a device token.
 // Sign-in is e-mail + password: POST /v1/auth/login (and /v1/auth/signup). The resulting device token goes to config.ini [servidor] token,
 // where the engine (rtai_app) encrypts it with DPAPI and exchanges it for
@@ -36,7 +36,7 @@ function effectiveServerUrl(configured) {
 function describeError(code, status) {
   switch (code) {
     case 'invalid_token': return 'Session expired: sign in to your account again.';
-    case 'network': return 'No connection to the Cue server.';
+    case 'network': return 'No connection to the lipcue.com server.';
     case 'no_server': return 'No server configured.';
     case 'invalid_credentials': return 'Wrong e-mail or password.';
     case 'email_taken': return 'An account with this e-mail already exists. Sign in or reset the password.';

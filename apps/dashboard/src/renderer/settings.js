@@ -1,4 +1,4 @@
-// Cue dashboard — settings. Every control reads and writes config.ini (via
+// lipcue.com dashboard — settings. Every control reads and writes config.ini (via
 // saveConfig) or a dedicated main-process API (stealth, calendar, updates,
 // flags, meeting detection). The overlay restarts itself when needed.
 'use strict';
@@ -115,7 +115,7 @@
          <div class="set-row" style="margin-top:8px">${languageRow()}</div>`)}
       ${card('Meeting detection', esc(meetingStatus),
         `${row('Alert when a meeting starts', 'A popup offers to start the copilot with the right session.', m ? C.sw('data-change="meeting" data-field="enabled"', m.enabled, !m.supported) : '')}
-         ${row('Keep in the tray when closed', 'Cue keeps watching for meetings with the window closed.', m ? C.sw('data-change="meeting" data-field="keepInTray"', m.keepInTray, !m.enabled) : '')}
+         ${row('Keep in the tray when closed', 'lipcue.com keeps watching for meetings with the window closed.', m ? C.sw('data-change="meeting" data-field="keepInTray"', m.keepInTray, !m.enabled) : '')}
          ${muted.length ? row('Muted apps', esc(muted.join(', ')), '<button type="button" class="btn sm" data-action="meeting-unmute">Unmute all</button>') : ''}
          ${row('Test the alert', 'Shows the popup as if a meeting had started.', '<button type="button" class="btn sm" data-action="meeting-test">Show popup</button>')}`)}
       ${card('Local data', 'Everything stays on this machine: sessions, files and settings',
@@ -127,7 +127,7 @@
   }
 
   // ----------------------------------------------------- cloud account --
-  // The Cue account is mandatory (auth.js locks the app while signed
+  // The lipcue.com account is mandatory (auth.js locks the app while signed
   // out). This tab shows who is signed in and where STT + IA run.
   // Local mode: no account. Says what that means and how to get PRO.
   function localAccount() {
@@ -135,7 +135,7 @@
       ${card('Local mode', 'No account: transcription and answers use your own API keys, straight from this computer.',
         `<div class="row" style="gap:14px"><span class="avatar" style="width:40px;height:40px;font-size:13px">${icon('key')}</span>
           <div class="stack grow" style="gap:0"><span class="strong">Running locally</span>
-          <span class="small faint">Nothing goes to the Cue servers. Answers start ${C.LOCAL_ANSWER_DELAY_MS} ms later than with PRO.</span></div>
+          <span class="small faint">Nothing goes to the lipcue.com servers. Answers start ${C.LOCAL_ANSWER_DELAY_MS} ms later than with PRO.</span></div>
           <button type="button" class="btn" data-action="go" data-to="settings/ai">${icon('key')}API keys</button>
           <button type="button" class="btn primary" data-action="go-pro">Sign in or create account</button></div>`)}
       ${C.proAd('card', 'What PRO adds')}`;
@@ -188,7 +188,7 @@
     const f = cloudFiles || { files: [], used_bytes: 0, limit_bytes: 0 };
     const rows = f.files.map((x) => `<div class="shortcut-row"><span data-no-i18n>${esc(x.name)}</span><span class="keys"><span class="small faint" data-no-i18n>${mb(x.size)}</span>
       <button type="button" class="btn sm ghost" data-action="cloud-file-delete" data-id="${esc(x.id)}">Delete</button></span></div>`).join('');
-    return card('Cloud files', 'Send your documents to your Cue account as a backup. The originals stay on this computer.',
+    return card('Cloud files', 'Send your documents to your lipcue.com account as a backup. The originals stay on this computer.',
       `${f.error ? `<div class="small" role="alert" style="color:var(--danger)">${esc(f.error)}</div>` : ''}
        ${rows || '<div class="empty">No files in the cloud yet.</div>'}
        <div class="row between" style="margin-top:12px"><span class="small faint" data-no-i18n>${mb(f.used_bytes)} / ${mb(f.limit_bytes)}</span>
@@ -239,22 +239,22 @@
       ${cloudSyncCard()}
       ${cloudFilesCard()}
       ${dangerCard()}
-      ${card('Cue account', active ? 'Next session uses the Cue servers' : 'Next session uses your API keys', body)}
+      ${card('lipcue.com account', active ? 'Next session uses the lipcue.com servers' : 'Next session uses your API keys', body)}
       ${card('Where the AI runs', 'Audio goes straight to the transcription provider; the server only issues temporary credentials. Plan minutes count in both modes.',
         `<div class="option-cards">${[
-          ['auto', 'Cue servers', 'Transcription and answers through your account, no API keys.'],
+          ['auto', 'lipcue.com servers', 'Transcription and answers through your account, no API keys.'],
           ['proprio', 'My keys', 'Uses the keys in AI and models (open-source mode).']
         ].map(([v, l, d]) => {
           const on = v === 'proprio' ? mode === 'proprio' : mode !== 'proprio';
           return `<button type="button" class="option-card ${on ? 'active' : ''}" aria-pressed="${on}" data-action="cloud-mode" data-mode="${v}"><span class="t">${on ? '<span class="dot"></span>' : ''}${l}</span><span class="s">${d}</span></button>`;
         }).join('')}</div>`)}
       ${card('Advanced', 'Your own or a test server',
-        `${row('Server address', available && !cfg.server_url ? `Default: <span class="mono">${esc(cfg.server_url_effective)}</span>` : 'Any server that implements the Cue v1 API.', cfgText('server_url', 'Server address', cfg.server_url || '', cfg.server_url_effective || 'https://server.example.com', 280))}
+        `${row('Server address', available && !cfg.server_url ? `Default: <span class="mono">${esc(cfg.server_url_effective)}</span>` : 'Any server that implements the lipcue.com v1 API.', cfgText('server_url', 'Server address', cfg.server_url || '', cfg.server_url_effective || 'https://server.example.com', 280))}
          ${row('Region', 'Automatic picks the closest one (lowest latency).', cfgSelect('server_region', 'Region', [['auto', 'Automatic'], ['sa-east-1', 'South America (São Paulo)'], ['us-east-1', 'US (East)'], ['eu-west-1', 'Europe (Ireland)']], cfg.server_region || 'auto'))}`)}`;
   }
 
   C.actions['cloud-logout'] = async () => {
-    const ok = await C.confirm('Sign out of Cue?', 'Cue stays locked until you sign in again. A live session in progress is stopped.', 'Sign out');
+    const ok = await C.confirm('Sign out of lipcue.com?', 'lipcue.com stays locked until you sign in again. A live session in progress is stopped.', 'Sign out');
     if (!ok) return;
     const res = await C.guard(() => api.cloudLogout(), 'Could not sign out.');
     if (res && res.config) S.config = res.config;
@@ -344,14 +344,14 @@
     const disguise = cfg.process_disguise || 'none';
     const opacity = Math.round((cfg.interface_opacity ?? cfg.electron_opacity ?? 1) * 100);
     return `
-      ${card('This window', 'How the Cue window appears to other people',
+      ${card('This window', 'How the lipcue.com window appears to other people',
         `${row('Hide from recordings and screen sharing', 'Windows excludes this window from captures (Meet, Zoom, Teams, OBS). Shortcut: Ctrl+Alt+S.', C.sw('data-change="stealth" data-field="active"', st.active))}
          ${row('Screen protection', 'Keeps capture exclusion on whenever the panel is hidden.', C.sw('data-change="stealth" data-field="screenProtection"', st.screenProtection ?? cfg.electron_screen_protection))}
          ${row('Hide from the taskbar and Alt+Tab', 'Open it from the tray or with Ctrl+Shift+H.', C.sw('data-change="stealth" data-field="skipTaskbar"', st.skipTaskbar ?? cfg.electron_skip_taskbar))}
          ${row('Discreet title', 'Changes the window title to "Settings".', C.sw('data-change="stealth" data-field="disguise"', st.disguise ?? cfg.electron_disguise))}
          <div class="set-row"><div class="txt"><span class="t">Window opacity</span><span class="s">Makes the panel translucent over other windows.</span></div><div class="ctl" style="gap:10px"><input type="range" min="40" max="100" step="5" value="${opacity}" data-input="opacity" data-change="opacity-save" style="width:180px;accent-color:var(--accent)"/><span class="num" id="opacityLabel" style="width:40px;text-align:right">${opacity}%</span></div></div>
-         <div class="set-row stacked"><div class="txt"><span class="t">Process name</span><span class="s">How Cue appears in Task Manager.</span></div>
-           <div class="option-cards">${[['none', 'Cue', 'Normal'], ['settings', 'Settings', 'Windows Settings'], ['cmd', 'Command Prompt', 'cmd.exe'], ['taskmgr', 'Task Manager', 'Task Manager']]
+         <div class="set-row stacked"><div class="txt"><span class="t">Process name</span><span class="s">How lipcue.com appears in Task Manager.</span></div>
+           <div class="option-cards">${[['none', 'lipcue.com', 'Normal'], ['settings', 'Settings', 'Windows Settings'], ['cmd', 'Command Prompt', 'cmd.exe'], ['taskmgr', 'Task Manager', 'Task Manager']]
              .map(([v, t, s]) => `<button type="button" class="option-card ${disguise === v ? 'active' : ''}" aria-pressed="${disguise === v}" data-action="set-disguise" data-mode="${v}" data-label="${esc(t)}"><span class="t">${esc(t)}</span><span class="s">${esc(s)}</span></button>`)
              .join('')}</div></div>`)}
       ${card('Floating panel (HUD)', 'What the interviewer does not see during the call',
@@ -375,7 +375,7 @@
   function calendar() {
     // Google Calendar is a PRO feature: local mode only shows what it does.
     if (C.localMode()) {
-      return `${card('Google Calendar', 'Available with Cue PRO',
+      return `${card('Google Calendar', 'Available with lipcue.com PRO',
         `<div class="empty boxed">${icon('lock')}<span class="t">Your interviews, straight from Google Calendar</span><span>Upcoming interviews appear on the home screen with a reminder to go live. Sign in with PRO to connect your calendar.</span><button type="button" class="btn primary sm" data-action="go-pro">Get PRO</button></div>`)}
         ${C.proAd('card')}`;
     }
@@ -388,7 +388,7 @@
     let dot = 'off';
     if (configured && !connected) {
       title = 'Ready to connect';
-      detail = st.lastError || (st.brokered ? 'Ready to connect through your Cue account.' : `OAuth client: ${st.clientType === 'web' ? 'web application' : 'desktop app'}${st.projectId ? ` (${st.projectId})` : ''}`);
+      detail = st.lastError || (st.brokered ? 'Ready to connect through your lipcue.com account.' : `OAuth client: ${st.clientType === 'web' ? 'web application' : 'desktop app'}${st.projectId ? ` (${st.projectId})` : ''}`);
       dot = 'warn';
     } else if (connected) {
       title = 'Connected';
@@ -633,7 +633,7 @@
     const action = ent.isPro
       ? `<button type="button" class="btn" data-action="cloud-billing" data-kind="portal">${icon('external')}Manage subscription</button>`
       : `<button type="button" class="btn primary" data-action="cloud-billing" data-kind="checkout">Upgrade to PRO</button>`;
-    return card('Current plan', 'From your Cue account',
+    return card('Current plan', 'From your lipcue.com account',
       `<div class="row" style="gap:16px"><span class="metric">${esc(ent.planLabel)}</span><span class="muted grow">${sub}</span>${action}</div>
        <div class="meter-row" style="margin-top:14px"><div class="lbl"><span>${u.usedMin} of ${u.limit} min ${ent.isPro ? `in ${esc(u.monthLabel)}` : 'used'}</span><span class="num">${u.left} min left</span></div>${C.pctBar(u.pct, tone)}</div>
        ${ent.creditMinutes > 0 ? `<div class="small muted" style="margin-top:10px"><span class="num">${Math.round(ent.creditMinutes)}</span> <span>purchased tokens, they never expire</span></div>` : ''}
@@ -1055,7 +1055,7 @@
     const v = f === 'autoSync' ? el.checked : f === 'reminderMin' ? Number(el.value) : el.value;
     const res = await C.guard(() => api.gcalSaveSettings({ [f]: v }), 'Could not save.');
     if (res && res.status) S.gcal.status = res.status;
-    C.toast(f === 'autoSync' ? (v ? 'Scheduled interviews go to Google Calendar.' : 'Interviews stay only in Cue.') : 'Preference saved.');
+    C.toast(f === 'autoSync' ? (v ? 'Scheduled interviews go to Google Calendar.' : 'Interviews stay only in lipcue.com.') : 'Preference saved.');
     if (f === 'calendarId') {
       reloadCalendar();
     }

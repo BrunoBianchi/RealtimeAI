@@ -1,4 +1,4 @@
-// RealTimeAI cloud account: device sign-in (RFC 8628), account status and
+// lipcue.com cloud account: device sign-in (RFC 8628), account status and
 // the [servidor] section of config.ini shared with the engine.
 const test = require('node:test');
 const assert = require('node:assert');
