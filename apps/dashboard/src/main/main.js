@@ -3346,9 +3346,9 @@ function createWindow() {
     minWidth: 1100,
     minHeight: 720,
     frame: false,
-    backgroundColor: initialTheme.resolved === 'dark' ? '#0D0D10' : '#FFFFFF',
+    backgroundColor: initialTheme.resolved === 'dark' ? '#070908' : '#FFFFFF',
     title: 'lipcue.com — Interview Copilot',
-    icon: path.join(APP_ROOT, 'assets', 'icon.png'),
+    icon: path.join(APP_ROOT, 'assets', process.platform === 'win32' && fs.existsSync(path.join(APP_ROOT, 'assets', 'icon.ico')) ? 'icon.ico' : 'icon.png'),
     webPreferences: {
       preload: path.join(PRELOAD_DIR, 'preload.js'),
       contextIsolation: true,
