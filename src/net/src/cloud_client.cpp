@@ -66,7 +66,7 @@ bool post_json(HINTERNET connection, bool secure, const std::wstring& path,
 CloudClient::CloudClient(CloudClientOptions opts) : opts_(std::move(opts)), http_(std::make_shared<Http>()) {
     const ParsedUrl u = parse_url(opts_.base_url);
     if (!u.ok) return;
-    HINTERNET s = win::open_session(L"RealTimeAI/" RTAI_VERSION_WSTRING L" (WinHTTP)");
+    HINTERNET s = win::open_session(L"lipcue.com/" RTAI_VERSION_WSTRING L" (WinHTTP)");
     if (!s) return;
     win::enable_modern_tls(s);
     win::enable_low_latency(s);

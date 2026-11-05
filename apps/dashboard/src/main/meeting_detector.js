@@ -67,8 +67,8 @@ const WEB_APPS = [
 const BROWSERS = ['chrome.exe', 'msedge.exe', 'firefox.exe', 'brave.exe', 'opera.exe', 'vivaldi.exe',
   'arc.exe', 'chromium.exe', 'iexplore.exe', 'zen.exe', 'librewolf.exe', 'waterfox.exe', 'thorium.exe'];
 
-// Never a meeting: Cue itself holds the mic while the copilot runs.
-const SELF_EXES = ['rtai_app.exe', 'rtai_overlay.exe', 'electron.exe', 'realtimeai.exe', 'cue.exe'];
+// Never a meeting: lipcue.com itself holds the mic while the copilot runs.
+const SELF_EXES = ['rtai_app.exe', 'rtai_overlay.exe', 'electron.exe', 'realtimeai.exe', 'cue.exe', 'lipcue.exe'];
 
 const APP_NAMES = Object.fromEntries([...DESKTOP_APPS, ...WEB_APPS].map((a) => [a.id, a.name]));
 

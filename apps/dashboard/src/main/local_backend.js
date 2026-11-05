@@ -1,5 +1,5 @@
 'use strict';
-// Development wiring for the local Cue server (backend/ next to the repo
+// Development wiring for the local lipcue.com server (backend/ next to the repo
 // folder, a Go service run with Docker). Running from source with no server
 // configured, the dashboard and the engine it spawns use
 // http://localhost:8787, and the dashboard starts the container itself if

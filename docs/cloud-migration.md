@@ -1,7 +1,7 @@
-# Migração para os servidores Cue
+# Migração para os servidores lipcue.com
 
 Objetivo: o app continua open-source e funcional com chaves próprias, mas o caminho padrão
-passa a ser a conta Cue (sem chaves de API), sem perder latência (meta < 200 ms).
+passa a ser a conta lipcue.com (sem chaves de API), sem perder latência (meta < 200 ms).
 
 ## O que já está no app (lado cliente)
 
@@ -56,7 +56,7 @@ Implementar `docs/server-api.md`. Sugestão de arquitetura, pensando em latênci
 - **Servidor fora do ar**: sessões novas não iniciam (`needs = "server"`) e o motivo
   aparece no HUD/dashboard; o dashboard continua aberto para quem já entrou. Sessões em andamento não dependem do
   servidor (os tokens só são verificados no handshake do STT; o LLM depende do relay, se usado).
-- **Privacidade**: o áudio não passa pelos servidores Cue (vai direto ao Deepgram).
+- **Privacidade**: o áudio não passa pelos servidores lipcue.com (vai direto ao Deepgram).
   Com relay de LLM, o texto da pergunta passa pelo relay: documentar na política.
 - **Open-source**: nenhum segredo do servidor fica no app; qualquer um pode apontar
   `[servidor] url` para uma implementação própria da API v1.

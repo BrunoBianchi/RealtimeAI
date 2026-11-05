@@ -1,6 +1,6 @@
-# API do servidor Cue (v1)
+# API do servidor lipcue.com (v1)
 
-Contrato entre o app (engine `rtai_app` + dashboard) e os servidores Cue. O app
+Contrato entre o app (engine `rtai_app` + dashboard) e os servidores lipcue.com. O app
 continua open-source e funciona sem servidor (modo **chaves próprias**); com uma conta, o
 usuário não precisa de chave nenhuma (modo **nuvem**).
 
@@ -10,7 +10,7 @@ Implementação do lado do cliente:
 |---|---|
 | Contrato puro (parse/validação, escolha do backend) | `src/core/include/rtai/cloud_session.hpp` |
 | Cliente HTTP do engine (bootstrap, renovação, fim de sessão) | `src/net/include/rtai/cloud_client.hpp`, `src/net/src/cloud_client.cpp` |
-| Ligação no engine | `src/app/src/main.cpp` (seção "Cue cloud bootstrap") |
+| Ligação no engine | `src/app/src/main.cpp` (seção "lipcue.com cloud bootstrap") |
 | Login e conta no dashboard | `apps/dashboard/src/main/cloud_account.js`, aba **Conta e servidor** |
 | Servidor local para testes | `../backend/` em Go, fora deste repositório, roda no Docker (`npm run backend`, veja `../backend/README.md`) |
 | Testes | `tests/core_tests/test_cloud_session.cpp`, `test_deepgram_stream.cpp`, `apps/dashboard/tests/cloud_account.test.js` |
@@ -19,7 +19,7 @@ Implementação do lado do cliente:
 
 ```
               (1x por sessão, em paralelo com o start do áudio)
- rtai_app ── POST /v1/session ──────────────► API Cue
+ rtai_app ── POST /v1/session ──────────────► API lipcue.com
     │        ◄── stt{url,token} llm{url,token} ──┘   (tokens de curta duração)
     │
     ├── WebSocket de áudio ──────────────────► Deepgram (direto, token temporário)
@@ -92,8 +92,8 @@ Resposta `200`:
 {
   "device_code": "opaque",
   "user_code": "ABCD-EFGH",
-  "verification_uri": "https://app.realtimeai.example/ativar",
-  "verification_uri_complete": "https://app.realtimeai.example/ativar?code=ABCD-EFGH",
+  "verification_uri": "https://app.lipcue.example/ativar",
+  "verification_uri_complete": "https://app.lipcue.example/ativar?code=ABCD-EFGH",
   "expires_in": 600,
   "interval": 5
 }
@@ -255,11 +255,11 @@ Resposta `200`:
     "extra_query": "tag=sess_01J..."
   },
   "llm": {
-    "url": "https://llm-gru.realtimeai.example/v1/chat/completions",
+    "url": "https://llm-gru.lipcue.example/v1/chat/completions",
     "token": "<token de sessão>",
     "model": "qwen/qwen3.6-flash",
     "background_model": "qwen/qwen3.6-flash",
-    "fallback": {"url": "https://llm-iad.realtimeai.example/v1/chat/completions", "token": "...", "model": "..."}
+    "fallback": {"url": "https://llm-iad.lipcue.example/v1/chat/completions", "token": "...", "model": "..."}
   },
   "account": {"plan": "pro", "minutes_left": 85, "max_session_s": 5100},
   "notice": "Mensagem opcional mostrada no HUD"
@@ -325,7 +325,7 @@ servidor (uso do Deepgram por `tag`, tokens do LLM no relay).
 
 ```ini
 [servidor]
-; auto / nuvem = transcrição e IA pelos servidores Cue
+; auto / nuvem = transcrição e IA pelos servidores lipcue.com
 ; proprio = suas chaves de API (o login e a cota do plano continuam valendo)
 ; local = suas chaves, sem conta e sem nenhuma chamada a este servidor
 ;         (modo open-source; cada resposta espera +500 ms, recursos PRO desligados)

@@ -28,7 +28,7 @@ contextBridge.exposeInMainWorld('rtai', {
   companyRecon: (payload) => ipcRenderer.invoke('rtai:company-recon', payload),
   syncCalendar: (icsUrl) => ipcRenderer.invoke('rtai:calendar-sync', icsUrl),
   saveConfig: (config) => ipcRenderer.invoke('rtai:save-config', config),
-  // RealTimeAI cloud account: device sign-in, status, sign-out.
+  // lipcue.com cloud account: device sign-in, status, sign-out.
   cloudStatus: (force) => ipcRenderer.invoke('rtai:cloud-status', Boolean(force)),
   cloudPasswordLogin: (creds) => ipcRenderer.invoke('rtai:cloud-password-login', creds),
   cloudSignup: (data) => ipcRenderer.invoke('rtai:cloud-signup', data),

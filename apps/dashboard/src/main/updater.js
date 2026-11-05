@@ -93,7 +93,7 @@ function createUpdater(opts) {
       status: 'available',
       hasUpdate: true,
       latestVersion: info.version,
-      releaseName: info.releaseName || `Cue ${info.version}`,
+      releaseName: info.releaseName || `lipcue.com ${info.version}`,
       releaseNotes: notesToText(info.releaseNotes),
       releaseDate: info.releaseDate || '',
       prerelease: /-/.test(info.version)

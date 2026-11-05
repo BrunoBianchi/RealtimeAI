@@ -60,7 +60,7 @@ struct Hello {
     std::string config_path;
     std::string session_path;  // .jsonl being written, empty if not saving
     std::string app_version;   // engine build version ("2.1.0-beta.3"), lets the UI spot a mismatch
-    std::string backend;       // "nuvem" (RealTimeAI servers) | "proprio" (own keys, signed in) | "local" (own keys, no account)
+    std::string backend;       // "nuvem" (lipcue.com servers) | "proprio" (own keys, signed in) | "local" (own keys, no account)
     std::string plan;          // cloud plan id, empty on own keys
 };
 

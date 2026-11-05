@@ -3,7 +3,8 @@
 # locally: scripts/windows/package.bat). Updates come from this repository's
 # GitHub releases; CI points publish at vars.RELEASES_REPO when it is set.
 appId: com.raiado.realtimeai
-productName: Cue
+productName: lipcue.com
+executableName: lipcue
 copyright: Copyright © 2026 Bruno Raiado Bianchi
 
 directories:
@@ -35,7 +36,7 @@ win:
     - target: nsis
       arch: [x64]
   icon: assets/icon.png
-  artifactName: Cue-Setup-${version}.${ext}
+  artifactName: lipcue-Setup-${version}.${ext}
 
 nsis:
   # A wizard: the window opens right away and shows progress (one-click shows
@@ -47,7 +48,7 @@ nsis:
   createDesktopShortcut: true
   runAfterFinish: true
   deleteAppDataOnUninstall: false
-  shortcutName: Cue
+  shortcutName: lipcue.com
 
 # Stable releases also write beta.yml, so beta testers get stable builds too.
 generateUpdatesFilesForAllChannels: true

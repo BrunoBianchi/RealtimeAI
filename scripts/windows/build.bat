@@ -27,8 +27,8 @@ goto :args
 
 if not exist build mkdir build
 set "LOG=%CD%\build\build.log"
-echo RealTimeAI build (%PRESET%) %date% %time% > "%LOG%"
-echo == RealTimeAI: building %PRESET% (a few minutes the first time) ==
+echo lipcue.com build (%PRESET%) %date% %time% > "%LOG%"
+echo == lipcue.com: building %PRESET% (a few minutes the first time) ==
 
 rem The running overlay locks its .exe: close it first.
 taskkill /F /T /IM rtai_overlay.exe /IM rtai_app.exe >nul 2>&1

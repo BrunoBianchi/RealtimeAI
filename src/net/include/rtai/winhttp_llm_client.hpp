@@ -70,7 +70,7 @@ struct WinHttpLlmOptions {
     bool secure{true};
     std::string path{"/api/v1/chat/completions"};
     std::string referer;            // optional OpenRouter app attribution
-    std::string title{"Cue"};
+    std::string title{"lipcue.com"};
     int resolve_timeout_ms{3000};
     int connect_timeout_ms{4000};
     int send_timeout_ms{5000};

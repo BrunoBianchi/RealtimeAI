@@ -1,4 +1,4 @@
-// Cue dashboard — core: state, helpers, router, actions, shell and boot.
+// lipcue.com dashboard — core: state, helpers, router, actions, shell and boot.
 // Views live in views.js, live.js, settings.js and modals.js; they register
 // renderers and actions on window.Cue. Every number on screen comes from the
 // main process (agents, session files, config.ini, question bank, engine
@@ -534,7 +534,7 @@ Cue.localMode = localMode;
 const LOCAL_ANSWER_DELAY_MS = 500;
 Cue.LOCAL_ANSWER_DELAY_MS = LOCAL_ANSWER_DELAY_MS;
 
-// Signed in to the Cue servers: they provide STT and the LLM, no keys
+// Signed in to the lipcue.com servers: they provide STT and the LLM, no keys
 // needed. Mirrors cloud::choose_backend in the engine.
 function cloudActive() {
   const c = S.config || {};
@@ -561,7 +561,7 @@ function proAd(kind = 'banner', title) {
   }
   const perks = PRO_PERKS.map(([ic, t, s]) => `<li class="pro-perk">${icon(ic)}<span class="stack" style="gap:0"><span class="t">${esc(t)}</span><span class="s">${esc(s)}</span></span></li>`).join('');
   return `<section class="card pro-ad-card" style="gap:12px">
-      <div class="row" style="gap:10px">${icon('sparkle')}<span class="strong grow">${esc(title || 'Unlock Cue PRO')}</span><span class="pill">Local mode</span></div>
+      <div class="row" style="gap:10px">${icon('sparkle')}<span class="strong grow">${esc(title || 'Unlock lipcue.com PRO')}</span><span class="pill">Local mode</span></div>
       <ul class="pro-perks">${perks}</ul>
       <div class="row" style="gap:8px"><span class="small faint grow">Local mode keeps working with your own keys, with a ${LOCAL_ANSWER_DELAY_MS} ms wait before each answer.</span>${cta}</div>
     </section>`;
@@ -1015,7 +1015,7 @@ Cue.actions['stop-copilot'] = () => stopCopilot();
 // Local mode -> account: back to the sign-in screen, on "Create account".
 // Local sessions and keys stay; the account's plan applies once signed in.
 Cue.actions['go-pro'] = async () => {
-  const ok = await Cue.confirm('Get Cue PRO', 'Create an account or sign in to get PRO. Your local sessions, files and keys stay on this computer.', 'Continue');
+  const ok = await Cue.confirm('Get lipcue.com PRO', 'Create an account or sign in to get PRO. Your local sessions, files and keys stay on this computer.', 'Continue');
   if (!ok) return;
   if (Cue.authMode) Cue.authMode('signup');
   await saveConfig({ server_mode: 'auto' });

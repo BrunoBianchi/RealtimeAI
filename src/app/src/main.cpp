@@ -1,4 +1,4 @@
-﻿// Cue: visible, consented real-time meeting copilot.
+﻿// lipcue.com: visible, consented real-time meeting copilot.
 //
 // Modes:
 //   (default)   Live: WASAPI mic ("Você") + loopback ("Outros") -> VAD ->
@@ -161,7 +161,7 @@ struct AppConfig {
     fs::path session_dir;
     fs::path silero_model;
     std::vector<std::string> notes; // shown as notices after start
-    // Cue cloud: set when the session broker handed out credentials.
+    // lipcue.com cloud: set when the session broker handed out credentials.
     std::shared_ptr<CloudClient> cloud;
     std::optional<cloud::Session> cloud_session;
     // True when STT/LLM use the server credentials ([servidor] modo != proprio).
@@ -640,7 +640,7 @@ int run_app(AppConfig cfg) {
     AsyncLog log(cfg.server ? stderr : stdout);
     std::FILE* log_file = open_log_file(cfg.app_dir);
     if (log_file) log.set_tee(log_file);
-    log.line(std::string("Cue ") + rtai::build::kVersion);
+    log.line(std::string("lipcue.com ") + rtai::build::kVersion);
     // --server: protocol lines only on stdout, written by one thread.
     std::unique_ptr<LineChannel> out;
     if (cfg.server) {
@@ -658,7 +658,7 @@ int run_app(AppConfig cfg) {
         return 0;
     }
 
-    // ---------------- Cue cloud bootstrap ----------------
+    // ---------------- lipcue.com cloud bootstrap ----------------
     // One POST /v1/session, started now so its round trip overlaps the agent,
     // RAG and audio set-up below; joined just before the transports are built.
     // Signing in is mandatory for live sessions: this call is also where the
@@ -793,8 +793,8 @@ int run_app(AppConfig cfg) {
     // user's own keys only.
     if (!cloud::local_mode(cfg.st) && !cloud::signed_in(cfg.st)) {
         const char* why = cloud::server_known(cfg.st)
-                              ? "Sign in to your Cue account in the dashboard to use the copilot."
-                              : "No Cue server configured: set [servidor] url and sign in from the dashboard.";
+                              ? "Sign in to your lipcue.com account in the dashboard to use the copilot."
+                              : "No lipcue.com server configured: set [servidor] url and sign in from the dashboard.";
         log.line(std::string("Cloud: ") + why);
         if (out) {
             cfg.notes.push_back(why);
@@ -823,7 +823,7 @@ int run_app(AppConfig cfg) {
                                 : (cloud_http_status == 402 || cloud_http_status == 403) ? "upgrade"
                                                                                          : "server";
             if (out) {
-                cfg.notes.push_back("Servidor Cue: " + cloud_error);
+                cfg.notes.push_back("Servidor lipcue.com: " + cloud_error);
                 return run_setup_mode(cfg, *out, log, needs);
             }
             std::cerr << "[servidor] " << cloud_error << "\n";
@@ -1441,7 +1441,7 @@ int run_app(AppConfig cfg) {
         }
     }
 
-    log.line("== Cue live: You = microphone, Others = system audio ==");
+    log.line("== lipcue.com live: You = microphone, Others = system audio ==");
     if (store) log.line("Session: " + path_utf8(store->jsonl_path()));
 
     // ---------------- main loop ----------------
@@ -1590,7 +1590,7 @@ int run_app(AppConfig cfg) {
 int main(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         if (std::string_view(argv[i]) == "--version") {
-            std::cout << "Cue " << rtai::build::kVersion << "\n";
+            std::cout << "lipcue.com " << rtai::build::kVersion << "\n";
             return 0;
         }
     }

@@ -1,6 +1,6 @@
 # Arquitetura
 
-O Cue tem duas partes:
+O lipcue.com tem duas partes:
 
 - **Motor nativo** (`src/`, C++20, Win32): captura o microfone ("Você") e o áudio do sistema
   ("Outros"), transcreve com o Deepgram Nova-3 em streaming, decide quando responder e mostra a

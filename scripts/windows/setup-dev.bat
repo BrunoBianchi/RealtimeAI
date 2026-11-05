@@ -2,7 +2,7 @@
 rem Installs the Node tooling (git hooks, dashboard) for development.
 setlocal
 cd /d "%~dp0..\.."
-echo == RealTimeAI: preparing the development environment ==
+echo == lipcue.com: preparing the development environment ==
 where git >nul 2>&1 || (echo Install Git for Windows: https://git-scm.com/download/win & goto :end)
 where npm >nul 2>&1 || (echo Install Node.js 22 LTS: https://nodejs.org & goto :end)
 echo [1/2] Root tooling (husky, commitlint)...

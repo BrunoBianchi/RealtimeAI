@@ -1,4 +1,4 @@
-// WinHTTP client for the RealTimeAI cloud backend (credential broker).
+// WinHTTP client for the lipcue.com cloud backend (credential broker).
 //
 // Lifecycle (see docs/server-api.md):
 //   * fetch()      blocking POST /v1/session; the app runs it on a worker

@@ -1,4 +1,4 @@
-// RealTimeAI cloud backend, client side: backend choice, the /v1/session
+// lipcue.com cloud backend, client side: backend choice, the /v1/session
 // request/response contract and how it maps onto the Deepgram stream.
 #include <gtest/gtest.h>
 

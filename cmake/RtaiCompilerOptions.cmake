@@ -1,4 +1,4 @@
-# Compiler/linker settings shared by every RealTimeAI target.
+# Compiler/linker settings shared by every lipcue.com target.
 #
 #   rtai::options  INTERFACE target: warnings and per-target flags. Every
 #                  first-party target links it PRIVATE (third-party code such
@@ -36,7 +36,7 @@ if (RTAI_ENABLE_LTO)
         set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
         set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO ON)
     else()
-        message(STATUS "RealTimeAI: LTO not supported by this toolchain (${_rtai_ipo_msg})")
+        message(STATUS "lipcue.com: LTO not supported by this toolchain (${_rtai_ipo_msg})")
     endif()
 endif()
 

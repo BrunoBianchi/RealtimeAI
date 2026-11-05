@@ -1,4 +1,4 @@
-// Cue dashboard — interface translation.
+// lipcue.com dashboard — interface translation.
 //
 // English is the source text. A catalog (locales/<locale>.js) maps English
 // strings to the locale, either exactly ("Sign out") or as a template with

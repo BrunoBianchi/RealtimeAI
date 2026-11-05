@@ -1,5 +1,5 @@
 ---
-name: Cue Executive
+name: lipcue.com Executive
 colors:
   surface: '#121315'
   surface-dim: '#121315'
@@ -145,9 +145,9 @@ spacing:
   space-xl: 2rem
 ---
 
-# Cue Executive — Design System & Guidelines (DESIGN.md)
+# lipcue.com Executive — Design System & Guidelines (DESIGN.md)
 
-Guia visual e arquitetura de design extraídos da interface clean, minimalista e profissional do **Cue** (Tela de Configurações e Aplicação Desktop).
+Guia visual e arquitetura de design extraídos da interface clean, minimalista e profissional do **lipcue.com** (Tela de Configurações e Aplicação Desktop).
 
 ---
 

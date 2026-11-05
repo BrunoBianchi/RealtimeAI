@@ -1,4 +1,4 @@
-// Cue dashboard — live view. Mirrors the engine's protocol events
+// lipcue.com dashboard — live view. Mirrors the engine's protocol events
 // (server_protocol.hpp): transcript, streaming answers, audio levels and
 // notices; sends commands back (answer, chat, recap, follow-up, pause, rate).
 'use strict';
@@ -116,7 +116,7 @@
           C.toast('Your plan has no minutes left. Upgrade to PRO to continue.', 'error');
           if (C.authRefresh) C.authRefresh(true).then(() => C.navigate('settings/plan'));
         } else if (msg.ready === false && msg.needs === 'server') {
-          C.toast('Cue server unavailable. Try again in a moment.', 'error');
+          C.toast('lipcue.com server unavailable. Try again in a moment.', 'error');
         }
         if (S.ui.pendingChat) {
           const text = S.ui.pendingChat;

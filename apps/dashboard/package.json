@@ -2,7 +2,7 @@
   "name": "realtimeai-dashboard",
   "version": "2.0.0",
   "private": true,
-  "description": "Cue: interview copilot dashboard, session manager and overlay control",
+  "description": "lipcue.com: interview copilot dashboard, session manager and overlay control",
   "author": {
     "name": "Bruno Raiado Bianchi"
   },
@@ -22,7 +22,7 @@
   },
   "devDependencies": {
     "caniuse-lite": "^1.0.30001820",
-    "electron": "^35.0.0",
+    "electron": "^45.2.2",
     "electron-builder": "^26.0.12",
     "tailwindcss": "^3.4.19"
   },

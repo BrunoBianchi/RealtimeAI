@@ -34,7 +34,7 @@ inline bool spawn_detached(const fs::path& exe, const std::wstring& args, const 
     return true;
 }
 
-// Installed: <app>\resources\native\rtai_app.exe next to <app>\Cue.exe.
+// Installed: <app>\resources\native\rtai_app.exe next to <app>\lipcue.exe.
 // From source: build\bin\Release\rtai_app.exe under the repo, with the
 // dashboard run by its local Electron.
 inline bool open_settings(const std::wstring& section = L"general") {
@@ -43,7 +43,7 @@ inline bool open_settings(const std::wstring& section = L"general") {
     const fs::path dir = own_exe_dir();
 
     const fs::path app_root = dir.parent_path().parent_path();
-    const fs::path installed = app_root / L"Cue.exe";
+    const fs::path installed = app_root / L"lipcue.exe";
     if (fs::exists(installed, ec)) return spawn_detached(installed, flag, app_root);
 
     for (fs::path p = dir; !p.empty(); p = p.parent_path()) {

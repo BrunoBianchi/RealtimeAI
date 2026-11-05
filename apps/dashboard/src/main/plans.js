@@ -1,4 +1,4 @@
-// Plans of the Cue account. The server is the authority (it refuses a
+// Plans of the lipcue.com account. The server is the authority (it refuses a
 // session when the quota is gone); these rules mirror cloud::PlanRules in the
 // engine (src/core/include/rtai/cloud_session.hpp) and fill in what the
 // server did not send, so the dashboard can explain the limit before a start.

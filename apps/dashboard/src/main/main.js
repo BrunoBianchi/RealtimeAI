@@ -55,7 +55,7 @@ let updater = null;
 // Windows shows this ID as the name on notifications, so it is the app's name.
 // The packaged app also keeps the profile it had before its rename, so sign-ins
 // and preferences survive.
-if (typeof app.setAppUserModelId === 'function') app.setAppUserModelId('Cue');
+if (typeof app.setAppUserModelId === 'function') app.setAppUserModelId('lipcue.com');
 if (app.isPackaged) app.setPath('userData', path.join(app.getPath('appData'), 'RealTimeAI'));
 
 const gotSingleInstanceLock =
@@ -124,7 +124,7 @@ function getAppDataDir() {
 
 // Google Calendar (see google_calendar.js). The OAuth client file is looked up
 // in the app data folder, next to this file and in the project folder; without
-// one, a signed-in app uses the Cue server's client (it does the token
+// one, a signed-in app uses the lipcue.com server's client (it does the token
 // exchanges, so the client secret stays on the server).
 let googleCalendar = null;
 let googleBroker = { client: null, at: 0 };
@@ -331,7 +331,7 @@ function readConfigIni() {
                                 (stealth.share_anonymized_questions ?? stealth.contribuir_perguntas ?? 'sim') !== 'false',
     calendar_ics_url: agenda.google_ics_url || '',
     calendar_oauth_token: agenda.google_oauth_token || '',
-    // Cue cloud ([servidor]): auto = our servers when signed in,
+    // lipcue.com cloud ([servidor]): auto = our servers when signed in,
     // nuvem = always, proprio = only the user's own keys (open-source mode).
     // Stored as written; the engine validates it (unknown values act as auto).
     server_mode: servidor.modo || 'auto',
@@ -343,7 +343,7 @@ function readConfigIni() {
   };
 }
 
-// Signed in to a Cue account (mirrors cloud::signed_in). The whole app
+// Signed in to a lipcue.com account (mirrors cloud::signed_in). The whole app
 // is gated on it: the renderer shows only the sign-in screen and nothing
 // starts the copilot without it.
 function isSignedIn(cfg) {
@@ -371,7 +371,7 @@ function cloudBackendActive(cfg) {
   return c.server_mode !== 'proprio' && !isLocalMode(c) && isSignedIn(c);
 }
 
-const LOGIN_REQUIRED = { ok: false, needsLogin: true, error: 'Sign in to your Cue account, or continue locally with your own API keys.' };
+const LOGIN_REQUIRED = { ok: false, needsLogin: true, error: 'Sign in to your lipcue.com account, or continue locally with your own API keys.' };
 
 function hasOwnAiKey(c) {
   return Boolean(c.has_llm_key || c.has_cerebras_key || c.has_groq_key || c.has_openai_key || c.has_anthropic_key || c.has_gemini_key);
@@ -389,7 +389,7 @@ async function checkCanStartLive() {
   }
   if (!isSignedIn(cfg)) return LOGIN_REQUIRED;
   if (!cloudBackendActive(cfg) && !cfg.has_deepgram_key) {
-    return { ok: false, error: '"My keys" mode: set the Deepgram key or switch back to the Cue servers.' };
+    return { ok: false, error: '"My keys" mode: set the Deepgram key or switch back to the lipcue.com servers.' };
   }
   // Fresh: the session that just ended may have used the last minutes.
   const st = await cloudAccount.status(true);
@@ -472,7 +472,7 @@ function writeConfigIni(updates) {
   const serverToken = updates.server_token !== undefined ? pickKey(updates.server_token, raw.servidor?.token) : (raw.servidor?.token || '');
 
   const managedLines = [
-    '# Cue settings (shared by the dashboard and the overlay HUD)',
+    '# lipcue.com settings (shared by the dashboard and the overlay HUD)',
     '# Plain-text keys are encrypted automatically with Windows DPAPI by the overlay.',
     '',
     '[deepgram]',
@@ -756,14 +756,14 @@ function getOpenRouterApiKey() {
 }
 
 // Where the dashboard's own AI calls go (compaction, JEV, dossier, OCR):
-// the Cue server when signed in, so no key is needed, or OpenRouter
+// the lipcue.com server when signed in, so no key is needed, or OpenRouter
 // with the user's key in "My keys" mode. null when neither is available.
 const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
-function aiTarget(title = 'Cue Studio') {
+function aiTarget(title = 'lipcue.com Studio') {
   const cfg = readConfigIni();
   const ownKey = getOpenRouterApiKey();
   const direct = ownKey
-    ? { url: OPENROUTER_CHAT_URL, headers: { Authorization: `Bearer ${ownKey}`, 'HTTP-Referer': 'https://realtimeai.local', 'X-Title': title } }
+    ? { url: OPENROUTER_CHAT_URL, headers: { Authorization: `Bearer ${ownKey}`, 'HTTP-Referer': 'https://lipcue.com', 'X-Title': title } }
     : null;
   if (isLocalMode(cfg)) return direct; // never the server in local mode
   if (cfg.server_mode === 'proprio' && direct) return direct;
@@ -797,7 +797,7 @@ function aiPost(target, payload, timeoutMs) {
 }
 
 function callOpenRouterSol61(messagesOrSystem, userOrMaxTokens = 1800, maybeMaxTokens = 1800) {
-  const target = aiTarget('Cue Studio');
+  const target = aiTarget('lipcue.com Studio');
   if (!target) return Promise.resolve('');
 
   let messages;
@@ -1314,7 +1314,7 @@ function scheduleInterviewNotification(goal) {
         if (Notification.isSupported()) {
           new Notification({
             title: tm('Interview in 1 hour: {name}', { name: goal.name }),
-            body: `Your interview with ${goal.company || goal.name} starts at ${ni.time}. Open Cue to review the Prep tab.`
+            body: `Your interview with ${goal.company || goal.name} starts at ${ni.time}. Open lipcue.com to review the Prep tab.`
           }).show();
         }
       }, delayMs);
@@ -1446,8 +1446,8 @@ function jevPairs(events) {
 }
 
 function callOpenRouterJson(messages, maxTokens, timeoutMs) {
-  const target = aiTarget('Cue JEV');
-  if (!target) return Promise.resolve({ ok: false, error: 'Sign in to your Cue account (or set the OpenRouter key) to use the JEV evaluation.' });
+  const target = aiTarget('lipcue.com JEV');
+  if (!target) return Promise.resolve({ ok: false, error: 'Sign in to your lipcue.com account (or set the OpenRouter key) to use the JEV evaluation.' });
   const payload = JSON.stringify({
     model: SOL_ANALYSIS_MODEL,
     messages,
@@ -1683,7 +1683,7 @@ function sessionQuestionLines(events, { withChat }) {
 const bankClassifier = (questions, ctx) => classifyQuestionsWithJev(questions, ctx);
 
 // "Share anonymized questions": after a session, the generalist questions JEV
-// kept go to the Cue community bank, and the questions other candidates
+// kept go to the lipcue.com community bank, and the questions other candidates
 // reported for that company come back into the local bank. Never blocks.
 async function shareSessionQuestions(extraction) {
   try {
@@ -2275,7 +2275,7 @@ async function searchDuckDuckGoHtml(query) {
   }
 }
 
-// Company research runs on the Cue server when signed in (scraping +
+// Company research runs on the lipcue.com server when signed in (scraping +
 // dossier, no keys on this machine); the local version stays for offline use.
 async function runCompanyRecon(input) {
   const { company, role, job_description } = input || {};
@@ -3088,7 +3088,7 @@ function applyElectronStealthMode(overrides = {}) {
 
     try {
       if (typeof mainWindow.setTitle === 'function') {
-        let title = 'Cue — Interview Copilot';
+        let title = 'lipcue.com — Interview Copilot';
         if (activeDisguise === 'settings') title = 'Settings';
         else if (activeDisguise === 'cmd') title = 'Command Prompt';
         else if (activeDisguise === 'taskmgr') title = 'Task Manager';
@@ -3205,7 +3205,7 @@ function getMeetingPopup() {
       const m = payload && payload.meeting;
       if (reason === 'mute' && m && m.id && m.via !== 'test') {
         saveMeetingSettings({ mutedApps: [...getMeetingSettings().mutedApps, m.id] });
-        notify(`Cue won't ask for ${m.name} again`, 'Turn it back on in Settings > General > Meeting detection.');
+        notify(`lipcue.com won't ask for ${m.name} again`, 'Turn it back on in Settings > General > Meeting detection.');
       }
     },
     onOpenDashboard: () => showMainWindow()
@@ -3257,7 +3257,7 @@ function refreshTrayMenu() {
   const stealthActive = Boolean(cfg.electron_stealth);
 
   const items = [
-    { label: tm('Open Cue'), click: () => showMainWindow() },
+    { label: tm('Open lipcue.com'), click: () => showMainWindow() },
     {
       label: stealthActive ? '🛡️ Stealth Mode (Active)' : '🛡️ Stealth Mode (Off)',
       type: 'checkbox',
@@ -3289,13 +3289,13 @@ function refreshTrayMenu() {
     { label: tm('Detect meetings'), type: 'checkbox', checked: s.enabled, click: (item) => saveMeetingSettings({ enabled: item.checked }) },
     { label: tm('Show a test popup'), click: () => showTestMeetingPopup() },
     { type: 'separator' },
-    { label: tm('Quit Cue'), click: () => { isQuitting = true; app.quit(); } }
+    { label: tm('Quit lipcue.com'), click: () => { isQuitting = true; app.quit(); } }
   );
   try {
     tray.setContextMenu(Menu.buildFromTemplate(items));
     const stealthPrefix = stealthActive ? '🛡️ [Stealth] ' : '';
-    tray.setToolTip(running ? `${stealthPrefix}Cue · copilot on`
-      : active.length ? `${stealthPrefix}Cue · ${active[0].name} detected` : `${stealthPrefix}Cue`);
+    tray.setToolTip(running ? `${stealthPrefix}lipcue.com · copilot on`
+      : active.length ? `${stealthPrefix}lipcue.com · ${active[0].name} detected` : `${stealthPrefix}lipcue.com`);
   } catch (_e) {}
 }
 
@@ -3347,7 +3347,7 @@ function createWindow() {
     minHeight: 720,
     frame: false,
     backgroundColor: initialTheme.resolved === 'dark' ? '#0D0D10' : '#FFFFFF',
-    title: 'Cue — Interview Copilot',
+    title: 'lipcue.com — Interview Copilot',
     icon: path.join(APP_ROOT, 'assets', 'icon.png'),
     webPreferences: {
       preload: path.join(PRELOAD_DIR, 'preload.js'),
@@ -3377,7 +3377,7 @@ function createWindow() {
       trayHintShown = true;
       const pt = resolveUiLocale(readConfigIni().ui_language, systemLanguages(app)).startsWith('pt');
       notify(
-        pt ? 'O Cue continua ativo' : 'Cue is still running',
+        pt ? 'O lipcue.com continua ativo' : 'lipcue.com is still running',
         pt ? 'Ele fica na bandeja e avisa quando uma reunião começar.' : 'It stays in the tray and lets you know when a meeting starts.'
       );
     }
@@ -3394,7 +3394,7 @@ function createWindow() {
   if (settingsSection) showSettingsWindow(settingsSection);
 }
 
-// Running from source: use (and start, with Docker) the local Cue
+// Running from source: use (and start, with Docker) the local lipcue.com
 // server in ../backend/ unless a server is configured. The engine inherits the env var.
 let localBackendHandle = null;
 function startLocalBackendForDev() {
@@ -3627,7 +3627,7 @@ app.whenReady().then(() => {
     gcalCall((g) => g.updateEvent(p && p.calendarId, p && p.eventId, (p && p.event) || {})));
   ipcMain.handle('rtai:gcal-delete-event', async (_ev, p) => gcalCall((g) => g.deleteEvent(p && p.calendarId, p && p.eventId)));
   // Provider consoles linked from Settings > Account (fixed allowlist).
-  // ---- Cue cloud account (device sign-in; docs/server-api.md) ----
+  // ---- lipcue.com cloud account (device sign-in; docs/server-api.md) ----
   ipcMain.handle('rtai:cloud-status', async (_ev, force) => {
     const st = await cloudAccount.status(Boolean(force));
     const account = st && st.account;
@@ -3691,7 +3691,7 @@ app.whenReady().then(() => {
     }
   });
   ipcMain.handle('rtai:mock-start', async (_ev, agentId, lang) => {
-    if (isLocalMode(readConfigIni())) return { ok: false, error: 'Mock interviews need a Cue account.' };
+    if (isLocalMode(readConfigIni())) return { ok: false, error: 'Mock interviews need a lipcue.com account.' };
     return mockInterviews.start({ agentId, lang });
   });
   ipcMain.handle('rtai:mock-turn', async (_ev, text) => mockInterviews.turn(text));
@@ -4092,7 +4092,7 @@ app.whenReady().then(() => {
   ipcMain.handle('rtai:set-process-disguise', async (_ev, disguise) => {
     const valid = ['none', 'settings', 'cmd', 'taskmgr'].includes(disguise) ? disguise : 'none';
     writeConfigIni({ process_disguise: valid });
-    let title = 'Cue — Interview Copilot';
+    let title = 'lipcue.com — Interview Copilot';
     if (valid === 'settings') title = 'Settings';
     else if (valid === 'cmd') title = 'Command Prompt';
     else if (valid === 'taskmgr') title = 'Task Manager';

@@ -3,6 +3,7 @@
 (function () {
   const P = {
     waveform: '<path d="M3 12h2M7 8v8M11 4v16M15 7v10M19 10v4M21 12h0"/>',
+    lipcue: '<path d="M3.7 5.7C3.7 3.8 5.2 2.3 7 2.3h9.8c1.8 0 3.3 1.5 3.3 3.4v7.3c0 1.9-1.5 3.4-3.3 3.4h-6L6.7 20v-3.7H7c-1.8 0-3.3-1.5-3.3-3.4V5.7z" stroke="currentColor" stroke-width="1.6"/><path d="M8.2 8.8v2M11.5 7v5.7" stroke="var(--text-strong, #fff)" stroke-width="1.7"/><path d="M14.8 8.2v3.3M18.2 6.2v7.3" stroke="currentColor" stroke-width="1.7"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
     minus: '<path d="M5 12h14"/>',
     square: '<rect x="5" y="5" width="14" height="14" rx="1.5"/>',

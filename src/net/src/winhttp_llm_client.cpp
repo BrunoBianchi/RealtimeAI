@@ -136,7 +136,7 @@ struct WinHttpLlmClient::Shared {
 
 WinHttpLlmClient::WinHttpLlmClient(WinHttpLlmOptions opts)
     : opts_(std::move(opts)), shared_(std::make_shared<Shared>()) {
-    shared_->session.reset(win::open_session(L"RealTimeAI/" RTAI_VERSION_WSTRING L" (WinHTTP)"));
+    shared_->session.reset(win::open_session(L"lipcue.com/" RTAI_VERSION_WSTRING L" (WinHTTP)"));
     if (!shared_->session) {
         shared_->session_error = "WinHttpOpen: " + win::winhttp_error_text(GetLastError());
         return;
