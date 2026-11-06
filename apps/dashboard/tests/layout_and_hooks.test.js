@@ -35,9 +35,7 @@ test('Feature: dashboard-ui-redesign, Property 6: Preservação dos ganchos de s
 
   // Every window.rtai method the renderer calls is exposed by the preload.
   const exposed = new Set([...preload.matchAll(/^\s{2}(\w+)\s*:/gm)].map((m) => m[1]));
-  // The bundled LiveAvatar SDK is third-party code and may mention globals that
-  // happen to share names with our preload bridge.
-  for (const [file, src] of Object.entries(sources).filter(([f]) => f !== 'liveavatar.bundle.js')) {
+  for (const [file, src] of Object.entries(sources)) {
     for (const m of src.matchAll(/\b(?:api|window\.rtai)\.(\w+)/g)) {
       assert.ok(exposed.has(m[1]), `${file} calls window.rtai.${m[1]}, which the preload does not expose`);
     }
@@ -54,7 +52,7 @@ test('Feature: dashboard-ui-redesign, Property 5: Preservação da estrutura de 
   // Scripts load core first, then the views that register on window.Cue.
   assert.deepStrictEqual(
     [...indexHtml.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]),
-    ['i18n.js', 'locales/pt-BR.js', 'icons.js', 'app.js', 'views.js', 'live.js', 'settings.js', 'liveavatar.bundle.js', 'mock.js', 'modals.js', 'auth.js', 'vendor/driver/driver.iife.js', 'tour.js']
+    ['i18n.js', 'locales/pt-BR.js', 'icons.js', 'app.js', 'views.js', 'live.js', 'settings.js', 'mock.js', 'modals.js', 'auth.js', 'vendor/driver/driver.iife.js', 'tour.js']
   );
   // Every view the sidebar links to is registered.
   const { Cue } = loadRenderer();

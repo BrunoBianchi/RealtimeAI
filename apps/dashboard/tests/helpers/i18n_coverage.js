@@ -245,7 +245,7 @@ function sourceMissing(I18n, cat) {
   const out = new Set();
   const known = (p) => I18n.lookup(cat, p) !== null || I18n.lookup(cat, p.replace(/\{x\}/g, '3')) !== null || I18n.lookup(cat, '3 ' + p) !== null;
   for (const [file, src] of Object.entries(sources)) {
-    if (!file.endsWith('.js') || file === 'i18n.js' || file === 'icons.js' || file === 'liveavatar.bundle.js' || file.startsWith('locales') || file.includes('vendor')) continue;
+    if (!file.endsWith('.js') || file === 'i18n.js' || file === 'icons.js' || file.startsWith('locales') || file.includes('vendor')) continue;
     for (const lit of literals(src)) {
       const pieces = [...lit.matchAll(/\b(?:title|placeholder|aria-label|data-label)="([^"]+)"/g)].map((m) => m[1]);
       lit.replace(/<[^>]*>/g, '\u0001').split('\u0001').forEach((p) => pieces.push(p));

@@ -41,15 +41,6 @@
   --danger: #f43f5e;
   --danger-soft: rgba(244, 63, 94, 0.1);
   --danger-border: rgba(244, 63, 94, 0.28);
-  --mock-avatar-bg-start: #173422;
-  --mock-avatar-bg-end: #0b1710;
-  --mock-avatar-shirt: #274b38;
-  --mock-avatar-hair: #34261f;
-  --mock-avatar-skin: #d8a77f;
-  --mock-avatar-face-detail: #332923;
-  --mock-avatar-nose: #b57d5c;
-  --mock-avatar-mouth: #743f3a;
-  --mock-avatar-collar: #e5efe6;
   --info: #adc6ff;
   --btn-primary-bg: #22c55e;
   --btn-primary-hover: #16a34a;
@@ -101,15 +92,6 @@ html[data-theme='light'] {
   --danger-soft: rgba(190, 18, 60, 0.08);
   --danger-border: rgba(190, 18, 60, 0.26);
   --info: #3b5bdb;
-  --mock-avatar-bg-start: #173422;
-  --mock-avatar-bg-end: #0b1710;
-  --mock-avatar-shirt: #274b38;
-  --mock-avatar-hair: #34261f;
-  --mock-avatar-skin: #d8a77f;
-  --mock-avatar-face-detail: #332923;
-  --mock-avatar-nose: #b57d5c;
-  --mock-avatar-mouth: #743f3a;
-  --mock-avatar-collar: #e5efe6;
   --btn-primary-bg: #15803d;
   --btn-primary-hover: #166534;
   --btn-primary-text: #ffffff;
@@ -3830,13 +3812,6 @@ table.compare td.strong {
 .mock-consent input { flex: none; margin-top: 2px; accent-color: var(--accent); }
 .mock-buy-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .mock-live-stage { display: flex; align-items: center; justify-content: center; gap: 24px; width: 100%; flex-wrap: wrap; }
-.mock-avatar { display: flex; flex-direction: column; align-items: center; gap: 7px; color: var(--text-secondary); font-size: 11px; }
-.mock-avatar svg { width: 144px; height: 144px; border: 1px solid var(--border-muted); border-radius: 22px; box-shadow: 0 10px 34px rgba(0,0,0,.22); }
-.mock-live-avatar { display: flex; flex-direction: column; align-items: center; gap: 7px; width: min(100%, 420px); color: var(--text-secondary); font-size: 11px; }
-.mock-live-avatar video { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border: 1px solid var(--border-muted); border-radius: 18px; background: var(--surface-sunken); box-shadow: 0 10px 34px rgba(0,0,0,.22); }
-.mock-avatar .mouth { transform-box: fill-box; transform-origin: center; }
-.mock-avatar.speaking .mouth { animation: mock-lips .22s ease-in-out infinite alternate; }
-@keyframes mock-lips { from { transform: scaleY(.45); } to { transform: scaleY(3.2); } }
 .mock-camera { display: flex; flex-direction: column; gap: 5px; width: min(100%, 320px); text-align: left; }
 .mock-camera video { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border: 1px solid var(--border-muted); border-radius: var(--radius-md); background: var(--surface-sunken); transform: scaleX(-1); }
 .mock-stage > .mock-live-stage + .strong { margin-top: 3px; }
@@ -3844,4 +3819,3 @@ table.compare td.strong {
 @keyframes mock-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); } 100% { box-shadow: 0 0 0 20px transparent; } }
 @keyframes mock-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .mock-orb i, .mock-orb .core { animation: none !important; } .mock-orb i { height: 34%; } }
-@media (prefers-reduced-motion: reduce) { .mock-avatar.speaking .mouth { animation: none; transform: scaleY(1.7); } }

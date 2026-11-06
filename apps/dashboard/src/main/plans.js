@@ -19,7 +19,7 @@ const PRICING = {
     { id: 'tokens_150', minutes: 150, price: 16 },
     { id: 'tokens_400', minutes: 400, price: 40 }
   ],
-  // Basic is text-only; Advanced includes voice, camera analysis and face avatar.
+  // Basic is text-only with Orby; Advanced adds voice and camera image analysis.
   // PRO's monthly mock is Advanced. Purchased credits are mode-specific.
   mockPacks: [
     { id: 'mock_basic_1', mode: 'basic', interviews: 1, price: 2.99 },

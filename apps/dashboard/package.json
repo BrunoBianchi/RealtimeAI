@@ -9,15 +9,13 @@
   "main": "src/main/main.js",
   "scripts": {
     "start": "npm run build:css && node -e \"delete process.env.ELECTRON_RUN_AS_NODE; require('child_process').spawn(require('electron'), ['.', ...process.argv.slice(1)], {stdio:'inherit'}).on('exit', c => process.exit(c || 0))\" --",
-    "build:css": "node ../../scripts/run-tailwind-css.mjs && npm run build:liveavatar",
-    "build:liveavatar": "esbuild src/renderer/liveavatar-client.js --bundle --platform=browser --format=iife --global-name=LiveAvatarSDK --outfile=src/renderer/liveavatar.bundle.js --target=chrome120",
+    "build:css": "node ../../scripts/run-tailwind-css.mjs",
     "test": "node --test \"tests/**/*.test.js\"",
     "flags:validate": "node ../../scripts/validate-flags.mjs",
     "dist": "npm run build:css && electron-builder --win nsis --x64 --publish never",
     "dist:dir": "npm run build:css && electron-builder --win dir --x64 --publish never"
   },
   "dependencies": {
-    "@heygen/liveavatar-web-sdk": "0.0.20",
     "driver.js": "1.10.2",
     "electron-updater": "^6.6.2",
     "pdf-parse": "^1.1.1"

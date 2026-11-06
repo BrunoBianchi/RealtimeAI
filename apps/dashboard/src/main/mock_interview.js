@@ -220,13 +220,12 @@ function createMockInterviews(deps) {
     return active ? Math.max(0, active.maxS - (deps.now() - active.startedAt) / 1000) : 0;
   }
 
-  async function start({ agentId, lang, mode = 'advanced', avatar = 'face' }) {
+  async function start({ agentId, lang, mode = 'advanced' }) {
     const agents = deps.agents();
     const agent = agents.find((a) => a.id === agentId);
     if (!agent) return { ok: false, error: 'Choose a session first.' };
     const chosenMode = mode === 'basic' ? 'basic' : 'advanced';
-    const chosenAvatar = avatar === 'realistic' ? 'realistic' : avatar === 'orb' ? 'orb' : 'face';
-    const r = await deps.api('POST', '/v1/mock/start', { agent_id: agent.id, mode: chosenMode, avatar: chosenAvatar });
+    const r = await deps.api('POST', '/v1/mock/start', { agent_id: agent.id, mode: chosenMode });
     if (!r.ok) {
       const code = r.error || (r.data && r.data.error && r.data.error.code) || '';
       if (r.status === 404) return { ok: false, code: 'server_outdated', error: 'The lipcue.com server has not been updated for mock interviews yet. Nothing was charged.' };
@@ -237,11 +236,11 @@ function createMockInterviews(deps) {
     }
     const others = agents.filter((a) => a.id !== agent.id);
     active = {
-      id: r.data.id, agent, lang: LANGUAGES[lang] ? lang : 'en', mode: r.data.mode || chosenMode, avatar: r.data.avatar || chosenAvatar, messages: [], visualFeedback: [], startedAt: deps.now(), maxS: r.data.max_s,
+      id: r.data.id, agent, lang: LANGUAGES[lang] ? lang : 'en', mode: r.data.mode || chosenMode, messages: [], visualFeedback: [], startedAt: deps.now(), maxS: r.data.max_s,
       index: buildIndex(agent, others), resume: resumeText(agent, others), abort: null,
       bank: bankQuestionsFor(agent, deps.bank ? deps.bank() : null), bankUsed: new Set(), bankAsked: false, bankFollowUps: 0
     };
-    return { ok: true, id: active.id, maxS: active.maxS, lang: active.lang, mode: active.mode, avatar: r.data.avatar || chosenAvatar, avatarEnabled: Boolean(r.data.avatar_enabled), avatarMaxS: Number(r.data.avatar_max_s) || 0, vision: Boolean(r.data.vision_enabled), stt: r.data.stt, source: r.data.source };
+    return { ok: true, id: active.id, maxS: active.maxS, lang: active.lang, mode: active.mode, vision: Boolean(r.data.vision_enabled), stt: r.data.stt, source: r.data.source };
   }
 
   // One interviewer turn. text is the candidate's answer ('' for the opening).
@@ -333,15 +332,6 @@ function createMockInterviews(deps) {
     }).catch(() => null);
     if (!res || !res.ok) return null;
     return new Uint8Array(await res.arrayBuffer());
-  }
-
-  async function avatarConfig() {
-    return deps.api('GET', '/v1/mock/avatar/config');
-  }
-
-  async function avatarSession() {
-    if (!active || active.mode !== 'advanced' || active.avatar !== 'realistic') return { ok: false, error: 'avatar_unavailable' };
-    return deps.api('POST', `/v1/mock/${active.id}/avatar/session`, {});
   }
 
   async function analyzeFrame(image, previousImage = '') {
@@ -446,7 +436,7 @@ function createMockInterviews(deps) {
     return { total: questions.length, questions: questions.slice(0, 5).map(({ text, category, reports }) => ({ text, category, reports })) };
   }
 
-  return { prep, start, turn, cancelTurn, speak, analyzeFrame, avatarConfig, avatarSession, end, list, coach, sttToken, isActive: () => Boolean(active) };
+  return { prep, start, turn, cancelTurn, speak, analyzeFrame, end, list, coach, sttToken, isActive: () => Boolean(active) };
 }
 
 module.exports = { bankQuestionsFor, bankStep, withBankQuestion, LANGUAGES, languageName, createMockInterviews, interviewPairs, buildIndex, retrieve, systemPrompt, takeSentences, resumeText, FINISH_MARK };
