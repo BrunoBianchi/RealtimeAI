@@ -653,7 +653,7 @@
       ['Live minutes', 'Pay your providers', '15 min, once', '200 min / month'],
       ['Extra tokens', '—', 'From $0.10 per minute', 'From $0.10 per minute'],
       ['Answer speed', `+${d} ms per answer`, 'Instant', 'Instant'],
-      ['AI mock interviews', '—', 'From $4.99 each', '1 per month'],
+      ['AI mock interviews', '—', 'Basic from $2.99 · Advanced from $7.99', '1 Advanced per month'],
       ['Cloud backup of files', '—', '25 MB', '500 MB'],
       ['Sessions saved in the cloud', '—', '3', 'Unlimited'],
       ['History saved in the cloud', '—', '5', 'Unlimited'],

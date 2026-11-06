@@ -19,10 +19,13 @@ const PRICING = {
     { id: 'tokens_150', minutes: 150, price: 16 },
     { id: 'tokens_400', minutes: 400, price: 40 }
   ],
-  // AI mock interviews: one a month on PRO, or bought by any account.
+  // Basic is text-only; Advanced includes voice, camera analysis and face avatar.
+  // PRO's monthly mock is Advanced. Purchased credits are mode-specific.
   mockPacks: [
-    { id: 'mock_1', interviews: 1, price: 4.99 },
-    { id: 'mock_3', interviews: 3, price: 11.99 }
+    { id: 'mock_basic_1', mode: 'basic', interviews: 1, price: 2.99 },
+    { id: 'mock_basic_3', mode: 'basic', interviews: 3, price: 7.99 },
+    { id: 'mock_advanced_1', mode: 'advanced', interviews: 1, price: 7.99 },
+    { id: 'mock_advanced_3', mode: 'advanced', interviews: 3, price: 20.99 }
   ]
 };
 
@@ -44,6 +47,8 @@ function entitlement(account) {
   const mocksLimit = Math.max(0, num(p.mocks_limit) ?? (rules.id === 'pro' ? 1 : 0));
   const mocksUsed = Math.max(0, num(p.mocks_used) ?? 0);
   const mockCredits = Math.max(0, num(p.mock_credits) ?? 0);
+  const mockBasicCredits = Math.max(0, num(p.mock_basic_credits) ?? 0);
+  const mockAdvancedCredits = Math.max(0, num(p.mock_advanced_credits) ?? mockCredits);
   const mocksLeft = Math.max(0, mocksLimit - mocksUsed);
   const trialUsed = rules.id === 'free' && sessionsUsed >= rules.maxSessions;
   const left = trialUsed && credit > 0 ? 0 : Math.max(0, limit - used);
@@ -75,7 +80,9 @@ function entitlement(account) {
     mocksLimit,
     mocksLeft,
     mockCredits,
-    canMock: mocksLeft + mockCredits > 0,
+    mockBasicCredits,
+    mockAdvancedCredits,
+    canMock: mocksLeft + mockBasicCredits + mockAdvancedCredits > 0,
     reason
   };
 }

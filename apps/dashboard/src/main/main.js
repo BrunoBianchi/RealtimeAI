@@ -3690,13 +3690,16 @@ app.whenReady().then(() => {
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('rtai:mock-event', event);
     }
   });
-  ipcMain.handle('rtai:mock-start', async (_ev, agentId, lang) => {
+  ipcMain.handle('rtai:mock-start', async (_ev, agentId, lang, mode, avatar) => {
     if (isLocalMode(readConfigIni())) return { ok: false, error: 'Mock interviews need a lipcue.com account.' };
-    return mockInterviews.start({ agentId, lang });
+    return mockInterviews.start({ agentId, lang, mode, avatar });
   });
+  ipcMain.handle('rtai:mock-analyze', async (_ev, image, previousImage) => mockInterviews.analyzeFrame(image, previousImage));
   ipcMain.handle('rtai:mock-turn', async (_ev, text) => mockInterviews.turn(text));
   ipcMain.handle('rtai:mock-cancel-turn', async () => mockInterviews.cancelTurn());
   ipcMain.handle('rtai:mock-speak', async (_ev, text) => mockInterviews.speak(text));
+  ipcMain.handle('rtai:mock-avatar-config', async () => mockInterviews.avatarConfig());
+  ipcMain.handle('rtai:mock-avatar-session', async () => mockInterviews.avatarSession());
   ipcMain.handle('rtai:mock-end', async () => mockInterviews.end());
   ipcMain.handle('rtai:mock-prep', async (_ev, agentId) => mockInterviews.prep(agentId));
   ipcMain.handle('rtai:mock-coach', async (_ev, id, question) => mockInterviews.coach(id, question));

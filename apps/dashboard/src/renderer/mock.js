@@ -1,6 +1,5 @@
-// Mock interview page (#/mock). Free and local accounts see the ad and the
-// how-it-works video; PRO (one a month) and anyone with a purchased credit can
-// run a voice interview of up to 30 minutes against one of their sessions.
+// Mock interview page (#/mock). Basic is text-only; Advanced adds voice,
+// consented camera snapshots and a face-synced interviewer avatar.
 (function mockPage() {
   const C = window.Cue;
   const S = C.state;
@@ -9,8 +8,10 @@
 
   // Same catalog as main/plans.js and the server.
   const MOCK_PACKS = [
-    { id: 'mock_1', interviews: 1, price: 4.99 },
-    { id: 'mock_3', interviews: 3, price: 11.99 }
+    { id: 'mock_basic_1', interviews: 1, price: 2.99 },
+    { id: 'mock_basic_3', interviews: 3, price: 7.99 },
+    { id: 'mock_advanced_1', interviews: 1, price: 7.99 },
+    { id: 'mock_advanced_3', interviews: 3, price: 20.99 }
   ];
   // Same list as main/mock_interview.js. Names stay in their own language.
   const LANGUAGES = [['pt-BR', 'Português (Brasil)'], ['en', 'English'], ['es', 'Español'], ['fr', 'Français'], ['it', 'Italiano'], ['ja', '日本語'], ['hi', 'हिन्दी'], ['zh', '中文']];
@@ -24,7 +25,7 @@
     return /[.!?…。！？।]$/.test(text) ? SILENCE_AFTER_SENTENCE_MS : SILENCE_AFTER_PAUSE_MS;
   };
 
-  const M = { phase: 'idle', agentId: '', lang: '', lines: [], partial: '', state: '', error: '', record: null, history: null, endsAt: 0, id: '' };
+  const M = { phase: 'idle', agentId: '', lang: '', mode: 'basic', modeTouched: false, avatar: 'face', avatarTouched: false, avatarChecked: false, avatarAvailable: false, avatarMaxS: 1200, avatarSession: null, avatarReady: null, avatarTimer: null, avatarSpeakCancel: null, avatarError: '', consent: false, cameraStream: null, cameraTimer: null, cameraBusy: false, visualCount: 0, previousFrame: '', cameraJob: null, lines: [], partial: '', state: '', error: '', record: null, history: null, endsAt: 0, id: '' };
   S.mock = M;
   let ws = null;
   let audio = null; // { ctx, stream, node }
@@ -41,16 +42,36 @@
 
   const entitlement = () => (S.auth && S.auth.entitlement) || null;
   const canRun = () => Boolean(entitlement() && entitlement().canMock);
+  const canRunMode = (mode) => {
+    const e = entitlement();
+    if (!e) return false;
+    return mode === 'basic'
+      ? e.mockBasicCredits > 0
+      : e.mocksLeft + e.mockAdvancedCredits > 0;
+  };
+
+  function loadAvatarConfig() {
+    if (M.avatarChecked || !api.mockAvatarConfig) return;
+    M.avatarChecked = true;
+    api.mockAvatarConfig().then((r) => {
+      const data = r && r.data || {};
+      M.avatarAvailable = Boolean(r && r.ok && data.enabled);
+      M.avatarMaxS = Number(data.max_s) || 1200;
+      if (M.avatarAvailable && !M.avatarTouched) M.avatar = 'realistic';
+      C.renderView();
+    }).catch(() => { M.avatarAvailable = false; });
+  }
 
   function clock(seconds) {
     const s = Math.max(0, Math.ceil(seconds));
     return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
   }
 
-  const buyCards = () => `<div class="option-cards" style="grid-template-columns:repeat(2,minmax(0,1fr))">${MOCK_PACKS.map((p) => `
-      <div class="option-card"><span class="t">${p.interviews === 1 ? '1 interview' : `${p.interviews} interviews`}</span>
-        <span class="metric">$${p.price}</span>
-        <span class="s">No subscription. Never expires.</span>
+  const buyCards = () => `<div class="option-cards mock-buy-grid">${MOCK_PACKS.map((p) => `
+      <div class="option-card"><span class="t">${p.id.includes('basic') ? 'Basic · chat only' : 'Advanced · camera + voice'}</span>
+        <span class="s">${p.interviews === 1 ? '1 interview' : `${p.interviews} interviews`}</span>
+        <span class="metric">US$${p.price.toFixed(2)}</span>
+        <span class="s">No subscription. Credits never expire.</span>
         <button type="button" class="btn sm" style="margin-top:10px" data-action="mock-buy" data-pack="${p.id}">Buy</button>
       </div>`).join('')}</div>`;
   C.mockBuyCards = buyCards;
@@ -58,7 +79,7 @@
   // Ad used on the Home page for accounts without access.
   C.mockAd = function mockAd() {
     if (canRun() && !C.localMode()) return '';
-    return `<div class="banner pro-ad">${icon('microphone')}<span class="grow"><span class="strong">Practice with an AI mock interview.</span> <span class="muted">30 minutes by voice, based on the job and your résumé.</span></span><a class="btn sm primary" href="#/mock">See how it works</a></div>`;
+    return `<div class="banner pro-ad">${icon('microphone')}<span class="grow"><span class="strong">Practice with an AI mock interview.</span> <span class="muted">Choose Basic text chat or Advanced camera, voice and visual feedback.</span></span><a class="btn sm primary" href="#/mock">See how it works</a></div>`;
   };
 
   function adView() {
@@ -66,16 +87,16 @@
     const cta = local
       ? '<button type="button" class="btn primary" data-action="go-pro">Create an account</button>'
       : '<button type="button" class="btn primary" data-action="cloud-billing" data-kind="checkout">Upgrade to PRO</button>';
-    return `${C.head('Mock interview', 'A realistic voice interview with AI, built from the job, your résumé and your files.')}
+    return `${C.head('Mock interview', 'Practice by text in Basic, or choose Advanced for voice, camera analysis and visual feedback.')}
       <section class="card pro-ad-card" style="gap:14px" data-tour="mock-ad">
         <div class="row" style="gap:10px">${icon('sparkle')}<span class="strong grow">Rehearse before the real one</span><span class="pill">PRO</span></div>
         <video src="media/mock-how-it-works.webm" controls preload="metadata" style="width:100%;border-radius:10px"></video>
         <ul class="pro-perks">
-          <li class="pro-perk">${icon('microphone')}<span class="stack" style="gap:0"><span class="t">Spoken, like the real thing</span><span class="s">Up to 30 minutes, with follow-up questions on what you say.</span></span></li>
+          <li class="pro-perk">${icon('chat')}<span class="stack" style="gap:0"><span class="t">Basic or Advanced</span><span class="s">Text-only chat, or voice with a camera review and face-synced interviewer avatar.</span></span></li>
           <li class="pro-perk">${icon('folder')}<span class="stack" style="gap:0"><span class="t">Based on your application</span><span class="s">It uses the job description, your résumé and your uploaded files.</span></span></li>
           <li class="pro-perk">${icon('chart')}<span class="stack" style="gap:0"><span class="t">Feedback at the end</span><span class="s">A score, strengths, weak points and how to improve.</span></span></li>
         </ul>
-        <div class="row" style="gap:8px"><span class="small faint grow">PRO includes 1 mock interview per month.</span>${cta}</div>
+        <div class="row" style="gap:8px"><span class="small faint grow">PRO includes 1 Advanced mock interview per month.</span>${cta}</div>
       </section>
       <section class="card" style="gap:12px"><span class="strong">No subscription? Buy interviews</span>
         ${local ? '<span class="small muted">You need a free account to buy and use interviews.</span>' : buyCards()}
@@ -84,6 +105,19 @@
 
   // The animated interviewer: its motion says who has the floor.
   const orb = (state, large) => `<div class="mock-orb ${large ? 'lg' : ''} ${state || ''}" aria-hidden="true"><span class="core"></span>${[1, 2, 3, 4, 5].map((n) => `<i style="--n:${n}"></i>`).join('')}</div>`;
+  const faceAvatar = (state) => `<div class="mock-avatar ${state === 'speaking' ? 'speaking' : ''}" role="img" aria-label="AI interviewer face avatar">
+    <svg viewBox="0 0 192 192" aria-hidden="true">
+      <defs><linearGradient id="mockAvatarBg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#173422"/><stop offset="1" stop-color="#0b1710"/></linearGradient></defs>
+      <rect width="192" height="192" rx="28" fill="url(#mockAvatarBg)"/>
+      <path d="M36 192c5-34 25-52 60-52s55 18 60 52" fill="#274b38"/>
+      <path d="M49 83c0-39 18-60 48-60 33 0 48 24 48 59v28H49z" fill="#34261f"/>
+      <ellipse cx="96" cy="91" rx="39" ry="48" fill="#d8a77f"/>
+      <path d="M57 78c5-30 21-47 42-47 23 0 37 15 42 41-13-2-28-10-39-22-9 13-24 23-45 28" fill="#34261f"/>
+      <path d="M74 87h10m24 0h10" stroke="#332923" stroke-width="4" stroke-linecap="round"/>
+      <path d="M94 94l-3 12h8" fill="none" stroke="#b57d5c" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <ellipse class="mouth" cx="96" cy="119" rx="10" ry="2.5" fill="#743f3a"/>
+      <path d="M77 154l19 13 19-13" fill="none" stroke="#e5efe6" stroke-width="4" stroke-linecap="round"/>
+    </svg><span>AI interviewer</span></div>`;
 
   function readiness(a) {
     const docs = (a && a.documents) || [];
@@ -98,25 +132,36 @@
   }
 
   function setupView() {
+    loadAvatarConfig();
     const ent = entitlement();
+    if (!M.modeTouched && !canRunMode(M.mode) && canRunMode(M.mode === 'basic' ? 'advanced' : 'basic')) {
+      M.mode = M.mode === 'basic' ? 'advanced' : 'basic';
+    }
     const agents = S.agents.filter((x) => !x.archived);
     if (!M.agentId || !agents.some((x) => x.id === M.agentId)) M.agentId = (agents[0] && agents[0].id) || '';
     const a = agents.find((x) => x.id === M.agentId);
     const lang = M.lang || (String((window.CueI18n && window.CueI18n.locale) || '').toLowerCase().startsWith('pt') ? 'pt-BR' : 'en');
     M.lang = lang;
-    const left = (ent.mocksLeft > 0 ? [`${ent.mocksLeft} left this month`] : []).concat(ent.mockCredits > 0 ? [`${ent.mockCredits} purchased`] : []).join(' · ');
+    const left = [
+      ent.mocksLeft > 0 ? `${ent.mocksLeft} Advanced included this month` : '',
+      ent.mockBasicCredits > 0 ? `${ent.mockBasicCredits} Basic credits` : '',
+      ent.mockAdvancedCredits > 0 ? `${ent.mockAdvancedCredits} Advanced credits` : ''
+    ].filter(Boolean).join(' · ');
     if (!agents.length) {
-      return `${C.head('Mock interview', 'Up to 30 minutes by voice, with feedback at the end.')}
+      return `${C.head('Mock interview', 'Choose Basic text-only or Advanced voice with camera feedback.')}
         <div class="empty boxed">${icon('stack')}<span class="t">Create a session first</span><span>The interview is based on the job and files of a session.</span><a class="btn sm primary" href="#/sessions">Go to sessions</a></div>`;
     }
     const { items, done, prep } = readiness(a);
-    const steps = [['microphone', 'Talk', 'It asks out loud and follows up on what you say.'], ['chart', 'See your score', 'JEV scores each answer against the job.'], ['sparkle', 'Train with the copilot', 'Ask what to improve and practice again.']];
+    const steps = M.mode === 'basic'
+      ? [['chat', 'Chat by text', 'No camera or microphone; a lighter, lower-cost interview.'], ['chart', 'See your score', 'JEV scores each answer against the job.'], ['sparkle', 'Train with the copilot', 'Ask what to improve and practice again.']]
+      : [['camera', 'Practice on camera', 'Voice interview with a face-synced interviewer avatar.'], ['eye', 'Get visual feedback', 'Framing, eye direction, posture, clothing, background organization and visible movement.'], ['chart', 'Review everything', 'Speech score plus camera coaching at the end.']];
+    const canStartMode = canRunMode(M.mode);
     return `<section class="mock-hero" data-tour="mock-setup">
         ${orb('idle', true)}
         <div class="stack grow" style="gap:6px;min-width:0">
           <span class="eyebrow">Rehearsal room</span>
           <h1 class="h1">Mock interview</h1>
-          <span class="muted">Up to 30 minutes by voice, with feedback at the end.</span>
+          <span class="muted">Basic is text-only. Advanced adds voice, camera analysis and feedback.</span>
           ${left ? `<span class="row" style="margin-top:6px"><span class="pill">${esc(left)}</span></span>` : ''}
         </div>
       </section>
@@ -124,15 +169,33 @@
       <section class="mock-grid">
         <div class="card" style="gap:16px">
           <label class="field">Which job is this for?<select class="select" data-change="mock-agent" data-no-i18n>${agents.map((x) => `<option value="${esc(x.id)}" ${x.id === M.agentId ? 'selected' : ''}>${esc(`${C.agentCompany(x) || x.name || '—'} · ${x.role || '—'}`)}</option>`).join('')}</select></label>
+          <div class="field"><span>Interview type</span>
+            <div class="mock-mode-grid" role="radiogroup">
+              <button type="button" role="radio" aria-checked="${M.mode === 'basic'}" class="mock-mode ${M.mode === 'basic' ? 'active' : ''}" data-action="mock-mode-set" data-mode="basic"><span class="strong">Basic · US$2.99</span><span class="small muted">Text chat only. No camera or microphone. Lower AI usage.</span></button>
+              <button type="button" role="radio" aria-checked="${M.mode === 'advanced'}" class="mock-mode ${M.mode === 'advanced' ? 'active' : ''}" data-action="mock-mode-set" data-mode="advanced"><span class="strong">Advanced · US$7.99</span><span class="small muted">Voice, camera analysis and optional realistic interviewer video.</span></button>
+            </div>
+            ${!canStartMode ? `<span class="small muted">${M.mode === 'basic' ? 'You need a Basic credit for this mode.' : 'You need an Advanced credit or the monthly PRO interview.'}</span>` : ''}
+          </div>
           <div class="field"><span>Interview language</span>
             <div class="mock-langs" role="radiogroup" data-no-i18n>${LANGUAGES.map(([code, name]) => `<button type="button" role="radio" aria-checked="${code === lang}" class="mock-lang ${code === lang ? 'active' : ''}" data-action="mock-lang-set" data-lang="${code}">${name}</button>`).join('')}</div>
             <span class="small muted">The interviewer speaks, listens and gives feedback in this language.</span>
           </div>
+          ${M.mode === 'advanced' ? `<div class="field"><span>Interviewer display</span>
+            <div class="mock-langs" role="radiogroup">
+              <button type="button" role="radio" aria-checked="${M.avatar === 'realistic'}" class="mock-lang ${M.avatar === 'realistic' ? 'active' : ''}" data-action="mock-avatar-set" data-avatar="realistic" ${!M.avatarAvailable ? 'disabled' : ''}>${M.avatarAvailable ? C.t('Realistic AI avatar') : C.t('Realistic AI avatar unavailable')}</button>
+              <button type="button" role="radio" aria-checked="${M.avatar === 'face'}" class="mock-lang ${M.avatar === 'face' ? 'active' : ''}" data-action="mock-avatar-set" data-avatar="face">Face avatar · lip sync</button>
+              <button type="button" role="radio" aria-checked="${M.avatar === 'orb'}" class="mock-lang ${M.avatar === 'orb' ? 'active' : ''}" data-action="mock-avatar-set" data-avatar="orb">Voice orb</button>
+            </div>
+            ${M.avatarAvailable ? `<span class="small muted">${C.t('Real-time avatar video up to {minutes} minutes.', { minutes: Math.ceil(M.avatarMaxS / 60) })}</span>` : `<span class="small muted">${C.t('Realistic video requires LiveAvatar to be configured on the server.')}</span>`}
+          </div>
           <div class="stack" style="gap:8px"><div class="row" style="gap:8px"><button type="button" class="btn sm" data-action="mock-mic-test">${icon('microphone')}Test microphone</button><div class="mock-meter grow"><span id="mockMeter"></span></div></div>
             <span class="small muted" id="mockMicNote">Speak after clicking: the bar should move.</span></div>
+          <label class="mock-consent"><input type="checkbox" data-change="mock-consent" ${M.consent ? 'checked' : ''}/><span>I agree to send occasional camera snapshots to AI for visual coaching.</span></label>
+          <span class="small muted">About once a minute, a camera still is sent to AI; when available, it is compared with the previous still for framing, eye direction, posture, clothing, background organization and visible movement. The app does not record video or save camera images.</span>` : ''}
           ${M.error ? `<div class="banner warn" role="alert">${icon('alert')}<span class="grow">${esc(M.error)}</span></div>` : ''}
-          <button type="button" class="btn primary lg mock-start" data-action="mock-start">${icon('microphone')}Start interview</button>
-          <span class="small faint" style="text-align:center">Interviews under a minute are not counted.</span>
+          <button type="button" class="btn primary lg mock-start" data-action="mock-start" ${!canStartMode || (M.mode === 'advanced' && !M.consent) ? 'disabled' : ''}>${icon(M.mode === 'basic' ? 'chat' : 'camera')}Start ${M.mode === 'basic' ? 'Basic' : 'Advanced'} interview</button>
+          <span class="small faint" style="text-align:center">${M.mode === 'basic' ? '30 minutes of text chat. Your chosen mode uses one matching credit.' : 'Up to 30 minutes. Advanced uses one Advanced credit.'}</span>
+          ${!canStartMode ? buyCards() : ''}
         </div>
         <div class="stack" style="gap:16px;min-width:0">
           <div class="card" style="gap:12px">
@@ -158,7 +221,7 @@
       <button type="button" class="row btn ghost" style="gap:8px;justify-content:flex-start" data-action="mock-open" data-id="${esc(r.id)}"><span class="grow" style="text-align:left" data-no-i18n>${esc(r.company || '—')} · ${esc(r.role || '—')}</span>${r.evaluation && r.evaluation.score != null ? `<span class="pill num">${r.evaluation.score}</span>` : ''}<span class="small faint">${esc(new Date(r.startedAt).toLocaleDateString())}</span></button>`).join('')}</section>`;
   }
 
-  const STATE_LABEL = { speaking: 'Interviewer is speaking', thinking: 'Interviewer is thinking', listening: 'Your turn: answer out loud', connecting: 'Connecting' };
+  const STATE_LABEL = { speaking: 'Interviewer is speaking', thinking: 'Interviewer is thinking', listening: 'Your turn: answer out loud', typing: 'Your turn: type your answer', connecting: 'Connecting' };
 
   function linesHtml() {
     // One turn arrives sentence by sentence: same speaker, same block.
@@ -175,10 +238,14 @@
 
   function liveView() {
     return `${C.head('Mock interview', '', `<span class="pill"><span class="num" id="mockClock">${clock((M.endsAt - Date.now()) / 1000)}</span></span>`)}
-      <section class="mock-stage" id="mockStage">${orb(M.state, true)}<span class="strong" id="mockState">${esc(STATE_LABEL[M.state] || '')}</span></section>
+      <section class="mock-stage" id="mockStage">
+        ${M.mode === 'advanced' ? `<div class="mock-live-stage">${M.avatar === 'realistic' ? `<div class="mock-live-avatar"><video id="mockAvatarVideo" autoplay playsinline></video><span class="small muted">${C.t('AI interviewer')}</span></div>` : M.avatar === 'face' ? faceAvatar(M.state) : orb(M.state, true)}<div class="mock-camera"><video id="mockCameraPreview" autoplay muted playsinline></video><span class="small faint">Your camera · snapshots analyzed about once a minute</span><span class="small muted" id="mockVisionStatus">Camera analysis is on. The app does not save the images.</span></div></div>` : orb(M.state, true)}
+        ${M.avatarError ? `<span class="small muted" role="status">${esc(M.avatarError)}</span>` : ''}
+        <span class="strong" id="mockState">${esc(STATE_LABEL[M.state] || '')}</span>
+      </section>
       <section class="card" style="gap:12px">
         <div id="mockLines" class="stack" style="gap:10px;max-height:46vh;overflow:auto">${linesHtml()}</div>
-        <div class="row" style="gap:8px"><input class="input grow" id="mockTyped" placeholder="Or type your answer"/><button type="button" class="btn" data-action="mock-send">Send answer</button><button type="button" class="btn danger" data-action="mock-finish">End interview</button></div>
+        <div class="row" style="gap:8px"><input class="input grow" id="mockTyped" placeholder="${M.mode === 'basic' ? 'Type your answer' : 'Or type your answer'}"/><button type="button" class="btn" data-action="mock-send">Send answer</button><button type="button" class="btn danger" data-action="mock-finish" ${M.id ? '' : 'disabled'}>End interview</button></div>
         ${M.error ? `<div class="small" role="alert" style="color:var(--danger)">${esc(M.error)}</div>` : ''}
       </section>`;
   }
@@ -195,6 +262,12 @@
       </section>
       <section class="grid-2">${list('Strengths', 'check-circle', J.fortes || [])}${list('To improve', 'arrow-up-right', J.melhorar || [])}</section>
       <section class="card" style="gap:12px"><span class="strong">Question by question</span>${(J.items || []).map((it) => `<div class="stack" style="gap:3px"><div class="row" style="gap:8px"><span class="grow strong" data-no-i18n>${esc(it.pergunta)}</span><span class="pill num">${it.score == null ? '—' : it.score}</span></div><span class="small muted" data-no-i18n>${esc(it.veredito)}</span><span class="small" data-no-i18n>${esc(it.dica)}</span></div>`).join('')}</section>`;
+  }
+
+  function visualFeedbackHtml(r) {
+    const notes = r.visualFeedback || [];
+    if (!notes.length) return '';
+    return `<section class="card" style="gap:10px"><div class="row">${icon('camera')}<span class="strong">Camera feedback</span></div><span class="small muted">Based on snapshots from your Advanced interview. The camera images were not saved.</span>${notes.map((n) => `<div class="small" data-no-i18n>${esc(n.text || n)}</div>`).join('')}</section>`;
   }
 
   function coachHtml(r) {
@@ -215,7 +288,7 @@
     const r = M.record;
     return `${C.head('Interview feedback', r ? `${r.company || '—'} · ${r.role || '—'}` : '')}
       ${M.phase === 'finishing' ? `<section class="card"><div class="row" style="gap:8px">${icon('sparkle')}<span>Writing your feedback…</span></div></section>` : ''}
-      ${r ? evaluationHtml(r) + coachHtml(r) + transcriptHtml(r) : ''}
+      ${r ? evaluationHtml(r) + visualFeedbackHtml(r) + coachHtml(r) + transcriptHtml(r) : ''}
       ${M.phase === 'done' && !r ? `<section class="card"><div class="muted">${esc(M.refunded ? 'The interview ended before any answer and was not counted.' : 'The interview ended before any answer.')}</div></section>` : ''}
       ${M.phase === 'done' ? '<div class="row"><button type="button" class="btn primary" data-action="mock-reset">Back</button></div>' : ''}`;
   }
@@ -237,6 +310,8 @@
     }
     const box = document.getElementById('mockLines');
     if (box) box.scrollTop = box.scrollHeight;
+    const preview = document.getElementById('mockCameraPreview');
+    if (preview && M.cameraStream && preview.srcObject !== M.cameraStream) preview.srcObject = M.cameraStream;
     if (M.agentId && api.mockPrep && !(M.prep && M.prep[M.agentId]) && M.phase === 'idle') {
       const id = M.agentId;
       M.prep = { ...(M.prep || {}), [id]: { total: 0, questions: [] } };
@@ -255,6 +330,8 @@
     }
     const stageOrb = document.querySelector('#mockStage .mock-orb');
     if (stageOrb) stageOrb.className = `mock-orb lg ${M.state || ''}`;
+    const avatar = document.querySelector('#mockStage .mock-avatar');
+    if (avatar) avatar.classList.toggle('speaking', M.state === 'speaking');
     const st = document.getElementById('mockState');
     if (st) st.textContent = C.t ? C.t(STATE_LABEL[M.state] || '') : STATE_LABEL[M.state] || '';
   }
@@ -276,6 +353,49 @@
       audio.stream.getTracks().forEach((t) => t.stop());
       audio.ctx.close().catch(() => {});
       audio = null;
+    }
+  }
+
+  function stopCamera() {
+    clearTimeout(M.cameraTimer);
+    M.cameraTimer = null;
+    if (M.cameraStream) M.cameraStream.getTracks().forEach((track) => track.stop());
+    M.cameraStream = null;
+  }
+
+  async function captureCameraFrame() {
+    if (M.phase !== 'live' || M.mode !== 'advanced' || !M.cameraStream || M.cameraBusy || M.visualCount >= 30) return;
+    const video = document.getElementById('mockCameraPreview');
+    if (!video || video.readyState < 2) {
+      M.cameraTimer = setTimeout(captureCameraFrame, 5000);
+      return;
+    }
+    M.cameraBusy = true;
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 288;
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    const image = canvas.toDataURL('image/jpeg', 0.62);
+    canvas.width = 0;
+    canvas.height = 0;
+    const status = document.getElementById('mockVisionStatus');
+    if (status) status.textContent = 'Reviewing a camera snapshot…';
+    M.cameraJob = api.mockAnalyze(image, M.previousFrame);
+    M.previousFrame = image;
+    try {
+      const result = await M.cameraJob;
+      if (result && result.ok) {
+        M.visualCount += 1;
+        if (status) status.textContent = C.t('Snapshot {n} reviewed. The app does not save the images.', { n: M.visualCount });
+      } else if (status) {
+        status.textContent = 'Camera feedback could not be generated. The interview can continue.';
+      }
+    } catch (_e) {
+      if (status) status.textContent = 'Camera feedback could not be generated. The interview can continue.';
+    } finally {
+      M.cameraJob = null;
+      M.cameraBusy = false;
+      if (M.phase === 'live' && M.visualCount < 30) M.cameraTimer = setTimeout(captureCameraFrame, 60000);
     }
   }
 
@@ -355,11 +475,175 @@
     }
     answer = '';
     M.partial = '';
-    setState('listening');
+    setState(M.mode === 'basic' ? 'typing' : 'listening');
+  }
+
+  async function mp3ToPcm24k(bytes) {
+    const Audio = window.AudioContext || window.webkitAudioContext;
+    const OfflineAudio = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (!Audio || !OfflineAudio) throw new Error('Audio conversion is unavailable.');
+    const decoder = new Audio();
+    let decoded;
+    try {
+      const raw = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      decoded = await decoder.decodeAudioData(raw);
+    } finally {
+      await decoder.close().catch(() => {});
+    }
+    const length = Math.max(1, Math.ceil(decoded.duration * 24000));
+    const context = new OfflineAudio(1, length, 24000);
+    const source = context.createBufferSource();
+    source.buffer = decoded;
+    source.connect(context.destination);
+    source.start();
+    const mono = await context.startRendering();
+    const samples = mono.getChannelData(0);
+    const rawPcm = new Uint8Array(samples.length * 2);
+    const view = new DataView(rawPcm.buffer);
+    for (let i = 0; i < samples.length; i += 1) {
+      const sample = Math.max(-1, Math.min(1, samples[i]));
+      view.setInt16(i * 2, sample < 0 ? sample * 32768 : sample * 32767, true);
+    }
+    let binary = '';
+    for (let i = 0; i < rawPcm.length; i += 0x8000) binary += String.fromCharCode(...rawPcm.subarray(i, i + 0x8000));
+    return { audio: btoa(binary), duration: decoded.duration };
+  }
+
+  async function startLiveAvatar() {
+    const r = await api.mockAvatarSession();
+    const token = r && r.ok && r.data && r.data.session_token;
+    const sdk = window.LiveAvatarSDK;
+    if (!token || !sdk || !sdk.LiveAvatarSession) throw new Error('The realistic interviewer could not be started.');
+    if (M.phase !== 'live' || M.avatar !== 'realistic') return;
+    const avatarDeadline = Date.now() + Math.min(M.avatarMaxS * 1000, Math.max(0, M.endsAt - Date.now()));
+    const session = new sdk.LiveAvatarSession(token, { autoKeepAlive: true, voiceChat: { defaultMuted: true } });
+    M.avatarSession = session;
+    let readyTimer = null;
+    let onReady;
+    let onState;
+    const streamReady = new Promise((resolve, reject) => {
+      const clean = () => {
+        if (readyTimer) clearTimeout(readyTimer);
+        session.off(sdk.SessionEvent.SESSION_STREAM_READY, onReady);
+        session.off(sdk.SessionEvent.SESSION_STATE_CHANGED, onState);
+      };
+      onReady = () => {
+        const video = document.getElementById('mockAvatarVideo');
+        if (!video) {
+          clean();
+          reject(new Error('The avatar video element is unavailable.'));
+          return;
+        }
+        session.attach(video);
+        video.play().catch(() => {});
+        clean();
+        resolve();
+      };
+      onState = (state) => {
+        if (state === sdk.SessionState.DISCONNECTED) {
+          clean();
+          reject(new Error('The realistic interviewer disconnected.'));
+        }
+      };
+      session.on(sdk.SessionEvent.SESSION_STREAM_READY, onReady);
+      session.on(sdk.SessionEvent.SESSION_STATE_CHANGED, onState);
+      readyTimer = setTimeout(() => {
+        clean();
+        reject(new Error('The realistic interviewer took too long to connect.'));
+      }, 45000);
+    });
+    try {
+      await Promise.all([session.start(), streamReady]);
+      if (M.phase !== 'live' || M.avatar !== 'realistic') {
+        if (M.avatarSession === session) M.avatarSession = null;
+        await session.stop().catch(() => {});
+        return;
+      }
+      M.avatarTimer = setTimeout(async () => {
+        if (M.avatarSession !== session || M.phase !== 'live' || M.avatar !== 'realistic') return;
+        M.avatar = 'face';
+        M.avatarError = C.t('Realistic video ended; continuing with the illustrated avatar.');
+        const stopping = stopLiveAvatar();
+        C.renderView();
+        await stopping;
+      }, Math.max(1000, avatarDeadline - Date.now()));
+      session.on(sdk.SessionEvent.SESSION_STATE_CHANGED, (state) => {
+        if (state === sdk.SessionState.DISCONNECTED && M.phase === 'live' && M.avatar === 'realistic') {
+          clearTimeout(M.avatarTimer);
+          M.avatarTimer = null;
+          if (M.avatarSpeakCancel) M.avatarSpeakCancel();
+          M.avatarSession = null;
+          M.avatar = 'face';
+          M.avatarError = C.t('Realistic video ended; continuing with the illustrated avatar.');
+          C.renderView();
+        }
+      });
+      session.on(sdk.AgentEventsEnum.AVATAR_SPEAK_STARTED, () => { if (M.phase === 'live') setState('speaking'); });
+      session.on(sdk.AgentEventsEnum.AVATAR_SPEAK_ENDED, () => { if (M.phase === 'live') setState('listening'); });
+    } catch (error) {
+      M.avatarSession = null;
+      try { if (session.state === sdk.SessionState.CONNECTED) await session.stop(); } catch (_e) {}
+      throw error;
+    }
+  }
+
+  async function stopLiveAvatar() {
+    const session = M.avatarSession;
+    M.avatarSession = null;
+    clearTimeout(M.avatarTimer);
+    M.avatarTimer = null;
+    if (M.avatarSpeakCancel) M.avatarSpeakCancel();
+    if (!session) return;
+    try { await session.stop(); } catch (_e) {}
+  }
+
+  async function speakWithLiveAvatar(bytes) {
+    const sdk = window.LiveAvatarSDK;
+    const session = M.avatarSession;
+    if (!session || !sdk || session.state !== sdk.SessionState.CONNECTED) return false;
+    const { audio: pcm, duration } = await mp3ToPcm24k(bytes);
+    return new Promise((resolve, reject) => {
+      let eventId = '';
+      let complete = false;
+      const finish = (ok) => {
+        cleanup();
+        resolve(ok);
+      };
+      const timeout = setTimeout(() => {
+        cleanup();
+        try { session.interrupt(); } catch (_e) {}
+        resolve(false);
+      }, Math.min(120000, Math.max(10000, duration * 2000 + 6000)));
+      const onEnded = (event) => {
+        if (eventId && event.source_event_id !== eventId && event.event_id !== eventId) return;
+        finish(true);
+      };
+      const cleanup = () => {
+        if (complete) return;
+        complete = true;
+        clearTimeout(timeout);
+        session.off(sdk.AgentEventsEnum.AVATAR_SPEAK_ENDED, onEnded);
+        if (M.avatarSpeakCancel === cancel) M.avatarSpeakCancel = null;
+      };
+      const cancel = () => finish(false);
+      M.avatarSpeakCancel = cancel;
+      session.on(sdk.AgentEventsEnum.AVATAR_SPEAK_ENDED, onEnded);
+      try {
+        eventId = session.repeatAudio(pcm);
+      } catch (error) {
+        cleanup();
+        reject(error);
+      }
+    });
   }
 
   // Sentences are requested as they arrive and played in order.
   function speakSentence(text) {
+    if (M.mode === 'basic') {
+      M.lines.push({ who: 'ai', text });
+      paint();
+      return;
+    }
     mayResume = false;
     M.lines.push({ who: 'ai', text });
     pending += 1;
@@ -369,6 +653,16 @@
       if (M.phase !== 'live') return;
       setState('speaking');
       if (!bytes) return;
+      if (M.avatar === 'realistic' && M.avatarSession) {
+        try {
+          if (M.avatarReady) {
+            await Promise.race([M.avatarReady, new Promise((resolve) => setTimeout(resolve, 5000))]);
+          }
+          if (M.phase !== 'live') return;
+          if (await speakWithLiveAvatar(bytes)) return;
+        } catch (_e) { /* play the audio locally if avatar audio encoding fails */ }
+      }
+      if (M.phase !== 'live') return;
       const blobUrl = URL.createObjectURL(new Blob([bytes], { type: 'audio/mpeg' }));
       await new Promise((resolve) => {
         player = new Audio(blobUrl);
@@ -416,7 +710,7 @@
   function submitAnswer(typed) {
     clearTimeout(silence);
     const text = String(typed || answer).trim();
-    if (!text || M.phase !== 'live' || M.state !== 'listening') return;
+    if (!text || M.phase !== 'live' || (M.mode === 'basic' ? M.state !== 'typing' : M.state !== 'listening')) return;
     M.lines.push({ who: 'me', text });
     lastAnswer = text;
     mayResume = !typed;
@@ -431,7 +725,12 @@
     M.phase = 'finishing';
     clearInterval(timer);
     stopCapture();
+    stopCamera();
+    await stopLiveAvatar();
+    M.previousFrame = '';
+    M.consent = false;
     if (player) player.pause();
+    if (M.cameraJob) await M.cameraJob.catch(() => null);
     C.renderView();
     const r = await C.guard(() => api.mockEnd(), 'Could not end the interview.');
     M.record = (r && r.record) || null;
@@ -443,28 +742,74 @@
   }
 
   C.actions['mock-start'] = async () => {
+    if (M.phase !== 'idle') return;
     M.error = '';
     if (!M.agentId) return;
+    if (M.mode === 'advanced' && !M.consent) {
+      M.error = 'Agree to camera analysis before starting Advanced.';
+      C.renderView();
+      return;
+    }
+    let cameraStream = null;
+    if (M.mode === 'advanced') {
+      try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 360 }, facingMode: 'user' }, audio: false });
+      } catch (_e) {
+        M.error = 'Camera unavailable. Allow camera access, or switch to Basic.';
+        C.renderView();
+        return;
+      }
+    }
     M.phase = 'live';
+    M.cameraStream = cameraStream;
+    M.visualCount = 0;
     M.lines = [];
     M.partial = '';
     M.record = null;
+    M.id = '';
+    M.avatarError = '';
     finishing = false;
     M.state = 'connecting';
     C.renderView();
-    const r = await C.guard(() => api.mockStart(M.agentId, M.lang), 'Could not start the interview.');
+    const requestedMode = M.mode;
+    const requestedAvatar = M.avatar;
+    const r = await C.guard(() => api.mockStart(M.agentId, M.lang, requestedMode, requestedAvatar), 'Could not start the interview.');
     if (!r || !r.ok) {
+      stopCamera();
       M.phase = 'idle';
       M.error = (r && r.error) || 'Could not start the interview.';
       C.renderView();
       return;
     }
+    if (r.mode === 'advanced' && requestedMode !== 'advanced') {
+      M.phase = 'idle';
+      M.mode = 'advanced';
+      M.error = 'An active Advanced interview was found. Agree to camera analysis to resume it.';
+      C.renderView();
+      return;
+    }
     M.id = r.id;
+    M.mode = r.mode || M.mode;
+    M.avatar = r.avatar || M.avatar;
+    if (Number(r.avatarMaxS) > 0) M.avatarMaxS = Number(r.avatarMaxS);
+    if (M.mode === 'basic') stopCamera();
+    if (M.mode === 'advanced' && !M.cameraStream) {
+      try {
+        M.cameraStream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 360 }, facingMode: 'user' }, audio: false });
+      } catch (_e) {
+        M.phase = 'idle';
+        M.error = 'This active Advanced interview needs camera access to continue.';
+        C.renderView();
+        return;
+      }
+    }
     M.endsAt = Date.now() + r.maxS * 1000;
-    try {
-      await startCapture(r.stt);
-    } catch (_e) {
-      M.error = 'Microphone unavailable: you can type your answers.';
+    if (M.mode === 'advanced') {
+      try {
+        await startCapture(r.stt);
+      } catch (_e) {
+        M.error = 'Microphone unavailable: you can type your answers.';
+      }
     }
     timer = setInterval(() => {
       const left = (M.endsAt - Date.now()) / 1000;
@@ -473,18 +818,36 @@
       if (left <= 0) finish();
     }, 500);
     C.renderView();
+    if (M.mode === 'advanced') {
+      M.cameraTimer = setTimeout(captureCameraFrame, 15000);
+      if (M.avatar === 'realistic' && r.avatarEnabled) {
+        M.avatarReady = startLiveAvatar().catch(() => {
+          if (M.phase !== 'live') return;
+          M.avatarSession = null;
+          M.avatar = 'face';
+          M.avatarError = C.t('Realistic avatar unavailable; continuing with the illustrated avatar.');
+          C.renderView();
+        });
+      } else if (M.avatar === 'realistic') {
+        M.avatar = 'face';
+        M.avatarError = C.t('Realistic avatar unavailable; continuing with the illustrated avatar.');
+        C.renderView();
+      }
+    }
+    if (M.phase !== 'live') return;
     runTurn('');
   };
   C.actions['mock-finish'] = () => finish();
   C.actions['mock-send'] = () => {
     const input = document.getElementById('mockTyped');
     const text = input ? input.value : '';
-    if (input && text.trim() && M.state === 'listening') input.value = '';
+    if (input && text.trim() && (M.state === 'listening' || M.state === 'typing')) input.value = '';
     submitAnswer(text);
   };
   C.actions['mock-reset'] = () => {
     M.phase = 'idle';
     M.record = null;
+    M.consent = false;
     C.renderView();
   };
   C.actions['mock-open'] = (el) => {
@@ -518,6 +881,23 @@
   };
   C.actions['mock-lang-set'] = (el) => {
     M.lang = el.dataset.lang;
+    C.renderView();
+  };
+  C.actions['mock-mode-set'] = (el) => {
+    M.mode = el.dataset.mode === 'advanced' ? 'advanced' : 'basic';
+    M.modeTouched = true;
+    M.error = '';
+    M.consent = false;
+    C.renderView();
+  };
+  C.actions['mock-avatar-set'] = (el) => {
+    const avatar = el.dataset.avatar;
+    M.avatar = avatar === 'orb' || avatar === 'realistic' ? avatar : 'face';
+    M.avatarTouched = true;
+    C.renderView();
+  };
+  C.changes['mock-consent'] = (el) => {
+    M.consent = Boolean(el.checked);
     C.renderView();
   };
   // A few seconds of the microphone's level, before spending an interview.

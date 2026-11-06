@@ -202,12 +202,15 @@ passa a mostrar `pro`.
 
 ### Entrevista simulada (`/v1/mock`)
 
-Até 30 min. PRO tem 1 por mês (`plan.mocks_limit`, `plan.mocks_used`); qualquer conta usa créditos comprados (`plan.mock_credits`, pacotes `mock_1` US$ 4,99 e `mock_3` US$ 11,99, nunca expiram), gastos depois da entrevista do plano.
+Até 30 min. PRO tem 1 entrevista Avançada por mês (`plan.mocks_limit`, `plan.mocks_used`). Créditos comprados são específicos por modo e não expiram: Básico de chat (`mock_basic_1` US$ 2,99; `mock_basic_3` US$ 7,99) ou Avançado (`mock_advanced_1` US$ 7,99; `mock_advanced_3` US$ 20,99). Créditos antigos `mock_credits` continuam valendo como Avançado. A entrevista Avançada inclui voz e análise visual com consentimento; o avatar fotorrealista em tempo real é opcional e tem limite de 20 min por padrão, alinhado à sessão essencial do LiveAvatar.
 
-- `POST /v1/mock/start` `{agent_id}` → `{id, source, max_s, stt}`. Gasta uma entrevista; uma em andamento é retomada sem nova cobrança. `402 mock_not_included` sem direito; `503` sem chaves, sem gastar nada.
-- `POST /v1/mock/{id}/chat`: corpo chat/completions; o servidor impõe modelo e `max_tokens`. Aceito até 3 min depois do limite (feedback final).
-- `POST /v1/mock/{id}/tts` `{text}` (até 500 caracteres; 15 mil por entrevista) → áudio mp3 (`TTS_MODEL`, padrão `elevenlabs/eleven-turbo-v2.5`; `TTS_VOICE`, padrão `sarah`; o modelo detecta o idioma do texto).
-- `POST /v1/mock/{id}/stt` → nova credencial de transcrição.
+- `POST /v1/mock/start` `{agent_id, mode: "basic" | "advanced", avatar?: "face" | "orb" | "realistic"}` → `{id, source, mode, avatar, max_s, vision_enabled, avatar_enabled, avatar_max_s, stt?}`. Básico usa somente chat e não solicita áudio; Avançado inclui voz e pede consentimento para analisar imagens ocasionais da câmera. `avatar: "realistic"` seleciona o avatar fotorrealista LiveAvatar, quando configurado; o tempo máximo dessa entrevista respeita `LIVEAVATAR_MAX_SESSION_S`. Gasta um crédito do modo; a entrevista do mês do PRO é Avançada. Uma entrevista em andamento é retomada sem nova cobrança. `402 mock_not_included` sem crédito; `503` sem chaves/serviços, sem gastar nada.
+- `GET /v1/mock/avatar/config` → `{enabled, max_s, sandbox}`. `enabled` só fica ativo quando `LIVEAVATAR_API_KEY` e `LIVEAVATAR_AVATAR_ID` estão configurados.
+- `POST /v1/mock/{id}/avatar/session` → token de curta duração (`session_token`) para o SDK LiveAvatar. Só funciona para uma entrevista Avançada ativa que selecionou `realistic`; a chave do provedor nunca sai do servidor. Configure `LIVEAVATAR_SANDBOX=1` para desenvolvimento sem cobrança e `LIVEAVATAR_SANDBOX=0` para streaming pago.
+- `POST /v1/mock/{id}/chat`: corpo chat/completions; o servidor impõe o modelo de conversa e `max_tokens`. Aceito até 3 min depois do limite (feedback final).
+- `POST /v1/mock/{id}/tts` `{text}` (até 500 caracteres; 15 mil por entrevista Avançada) → áudio mp3 (`TTS_MODEL`, padrão `elevenlabs/eleven-turbo-v2.5`; `TTS_VOICE`, padrão `sarah`; o modelo detecta o idioma do texto). Indisponível no Básico.
+- `POST /v1/mock/{id}/stt` → nova credencial de transcrição. Indisponível no Básico.
+- `POST /v1/mock/{id}/vision` `{image, previous_image?, language}` analisa até dois JPEGs pequenos, com limite de 30 chamadas por entrevista e intervalo mínimo de 55 s. Usa `MOCK_VISION_MODEL` (padrão `openai/gpt-5.4-mini` via OpenRouter) para observações de enquadramento, direção do olhar, postura, vestimenta, organização do fundo e movimentos visíveis. As imagens são retransmitidas para o modelo e não são armazenadas pelo servidor.
 - `POST /v1/mock/{id}/end` → `{refunded}`: devolve a entrevista encerrada em menos de 1 min.
 - Depois do limite: `410 mock_over`.
 
