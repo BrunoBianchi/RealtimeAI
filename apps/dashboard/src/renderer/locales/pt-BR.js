@@ -13,7 +13,7 @@
 
     // Same text in Portuguese: brands, products, models, key names.
     keep: [
-      'Pro', 'Português (Brasil)', 'Endpointing', 'you know', 'Copiloto', 'Cargo', 'Ritmo', 'Documento', 'Empresas', 'Entrevista', 'Criando…', 'Gerando…', 'Lendo os arquivos…', 'Pesquisando a empresa…', 'Pesquisando…', 'A pesquisa falhou.', 'Como melhorar:', '1h antes',
+      'Pro', 'Português (Brasil)', 'Endpointing', 'you know', 'Copiloto', 'Cargo', 'Ritmo', 'Documento', 'Empresas', 'Entrevista', 'Criando…', 'Gerando…', 'Lendo os arquivos…', 'Pesquisando a empresa…', 'Pesquisando…', 'A pesquisa falhou.', 'Como melhorar:', '1h antes', 'US$2.99', 'US$7.99', 'US$20.99',
       'lipcue.com', 'LipCue', 'PRO', 'Free', 'Deepgram', 'OpenRouter', 'Cerebras', 'Groq', 'OpenAI', 'Anthropic', 'Google Gemini',
       'LinkedIn', 'Python', 'JavaScript', 'TypeScript', 'Java', 'Go', 'C++', 'C#', 'Kotlin', 'Rust', 'SQL',
       'Qwen 3.6 Flash', 'Llama 3.3 70B', 'GPT-OSS 120B', 'qwen/qwen3.6-flash', 'llama3', 'cmd.exe', 'Beta', 'Ultra', 'Streaming',
@@ -24,6 +24,16 @@
     ],
 
     strings: {
+      'Practice by text in Basic, or choose Advanced for voice, camera analysis and visual feedback.': 'Pratique por texto no modo Básico ou escolha o Avançado para usar voz, análise da câmera e feedback visual.',
+      'AI interviewer face avatar': 'Avatar facial do entrevistador de IA',
+      'Advanced included this month': 'entrevista Avançada incluída este mês',
+      'Basic credits': 'créditos Básicos',
+      'Advanced credits': 'créditos Avançados',
+      'Audio conversion is unavailable.': 'A conversão de áudio está indisponível.',
+      'The realistic interviewer could not be started.': 'Não foi possível iniciar o entrevistador realista.',
+      'The avatar video element is unavailable.': 'O elemento de vídeo do avatar está indisponível.',
+      'The realistic interviewer disconnected.': 'O entrevistador realista foi desconectado.',
+      'The realistic interviewer took too long to connect.': 'O entrevistador realista demorou demais para se conectar.',
       'Rehearsal room': 'Sala de ensaio',
       'Talk': 'Converse',
       'It asks out loud and follows up on what you say.': 'A IA pergunta em voz alta e aprofunda o que você diz.',

@@ -101,6 +101,15 @@ html[data-theme='light'] {
   --danger-soft: rgba(190, 18, 60, 0.08);
   --danger-border: rgba(190, 18, 60, 0.26);
   --info: #3b5bdb;
+  --mock-avatar-bg-start: #173422;
+  --mock-avatar-bg-end: #0b1710;
+  --mock-avatar-shirt: #274b38;
+  --mock-avatar-hair: #34261f;
+  --mock-avatar-skin: #d8a77f;
+  --mock-avatar-face-detail: #332923;
+  --mock-avatar-nose: #b57d5c;
+  --mock-avatar-mouth: #743f3a;
+  --mock-avatar-collar: #e5efe6;
   --btn-primary-bg: #15803d;
   --btn-primary-hover: #166534;
   --btn-primary-text: #ffffff;
