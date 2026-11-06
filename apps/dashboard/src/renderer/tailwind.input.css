@@ -41,6 +41,15 @@
   --danger: #f43f5e;
   --danger-soft: rgba(244, 63, 94, 0.1);
   --danger-border: rgba(244, 63, 94, 0.28);
+  --mock-avatar-bg-start: #173422;
+  --mock-avatar-bg-end: #0b1710;
+  --mock-avatar-shirt: #274b38;
+  --mock-avatar-hair: #34261f;
+  --mock-avatar-skin: #d8a77f;
+  --mock-avatar-face-detail: #332923;
+  --mock-avatar-nose: #b57d5c;
+  --mock-avatar-mouth: #743f3a;
+  --mock-avatar-collar: #e5efe6;
   --info: #adc6ff;
   --btn-primary-bg: #22c55e;
   --btn-primary-hover: #16a34a;

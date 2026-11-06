@@ -107,16 +107,16 @@
   const orb = (state, large) => `<div class="mock-orb ${large ? 'lg' : ''} ${state || ''}" aria-hidden="true"><span class="core"></span>${[1, 2, 3, 4, 5].map((n) => `<i style="--n:${n}"></i>`).join('')}</div>`;
   const faceAvatar = (state) => `<div class="mock-avatar ${state === 'speaking' ? 'speaking' : ''}" role="img" aria-label="AI interviewer face avatar">
     <svg viewBox="0 0 192 192" aria-hidden="true">
-      <defs><linearGradient id="mockAvatarBg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#173422"/><stop offset="1" stop-color="#0b1710"/></linearGradient></defs>
+      <defs><linearGradient id="mockAvatarBg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="var(--mock-avatar-bg-start)"/><stop offset="1" stop-color="var(--mock-avatar-bg-end)"/></linearGradient></defs>
       <rect width="192" height="192" rx="28" fill="url(#mockAvatarBg)"/>
-      <path d="M36 192c5-34 25-52 60-52s55 18 60 52" fill="#274b38"/>
-      <path d="M49 83c0-39 18-60 48-60 33 0 48 24 48 59v28H49z" fill="#34261f"/>
-      <ellipse cx="96" cy="91" rx="39" ry="48" fill="#d8a77f"/>
-      <path d="M57 78c5-30 21-47 42-47 23 0 37 15 42 41-13-2-28-10-39-22-9 13-24 23-45 28" fill="#34261f"/>
-      <path d="M74 87h10m24 0h10" stroke="#332923" stroke-width="4" stroke-linecap="round"/>
-      <path d="M94 94l-3 12h8" fill="none" stroke="#b57d5c" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-      <ellipse class="mouth" cx="96" cy="119" rx="10" ry="2.5" fill="#743f3a"/>
-      <path d="M77 154l19 13 19-13" fill="none" stroke="#e5efe6" stroke-width="4" stroke-linecap="round"/>
+      <path d="M36 192c5-34 25-52 60-52s55 18 60 52" fill="var(--mock-avatar-shirt)"/>
+      <path d="M49 83c0-39 18-60 48-60 33 0 48 24 48 59v28H49z" fill="var(--mock-avatar-hair)"/>
+      <ellipse cx="96" cy="91" rx="39" ry="48" fill="var(--mock-avatar-skin)"/>
+      <path d="M57 78c5-30 21-47 42-47 23 0 37 15 42 41-13-2-28-10-39-22-9 13-24 23-45 28" fill="var(--mock-avatar-hair)"/>
+      <path d="M74 87h10m24 0h10" stroke="var(--mock-avatar-face-detail)" stroke-width="4" stroke-linecap="round"/>
+      <path d="M94 94l-3 12h8" fill="none" stroke="var(--mock-avatar-nose)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <ellipse class="mouth" cx="96" cy="119" rx="10" ry="2.5" fill="var(--mock-avatar-mouth)"/>
+      <path d="M77 154l19 13 19-13" fill="none" stroke="var(--mock-avatar-collar)" stroke-width="4" stroke-linecap="round"/>
     </svg><span>AI interviewer</span></div>`;
 
   function readiness(a) {

@@ -106,7 +106,7 @@ test('Feature: mojibake-self-heal, Property 7: loadAllAgents chama o self-heal e
 
 test('Feature: mojibake-self-heal, Property 8: build:css roda sem warning do Browserslist', () => {
   const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf8'));
-  assert.strictEqual(pkg.scripts['build:css'], 'node ../../scripts/run-tailwind-css.mjs');
+  assert.strictEqual(pkg.scripts['build:css'], 'node ../../scripts/run-tailwind-css.mjs && npm run build:liveavatar');
   assert.ok(
     fs.existsSync(path.resolve(__dirname, '../../../scripts/run-tailwind-css.mjs')),
     'run-tailwind-css.mjs wrapper must exist'
