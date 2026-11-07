@@ -27,7 +27,7 @@ test('Audio Usage & Premium: sidebar usage card shows real minutes against the p
   assert.ok(card.includes('>45<'), 'minutes transcribed this month');
   assert.ok(card.includes('/ 300 min'), 'monthly limit');
   assert.ok(card.includes('255 min left'), 'minutes left');
-  assert.ok(card.includes('usage-ticks'), 'progress ticks while there is a limit');
+  assert.ok(card.includes('usage-meter'), 'progress ticks while there is a limit');
   assert.strictEqual(free.page('profilePlan').textContent, 'Free plan');
 
   // Premium has no monthly limit: no ticks, the count of sessions instead.
@@ -36,7 +36,7 @@ test('Audio Usage & Premium: sidebar usage card shows real minutes against the p
   });
   pro.Cue.renderShell();
   const proCard = pro.page('sidebarUsage').innerHTML;
-  assert.ok(proCard.includes('min transcribed') && !proCard.includes('usage-ticks'));
+  assert.ok(proCard.includes('min transcribed') && !proCard.includes('usage-meter'));
   assert.ok(proCard.includes('1 session'));
   assert.strictEqual(pro.page('profilePlan').textContent, 'Pro plan');
 });

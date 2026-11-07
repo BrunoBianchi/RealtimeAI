@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { loadRenderer, indexHtml, tags, settle } = require('./helpers/renderer');
+const { loadRenderer, indexHtml, render, tags, settle } = require('./helpers/renderer');
 const { css } = require('./helpers/css');
 
 test('Clean Sidebar: brand, new session, navigation, next interviews, usage and profile', () => {
@@ -26,15 +26,58 @@ test('Clean Sidebar: brand, new session, navigation, next interviews, usage and 
   r.Cue.renderShell();
 
   const nav = r.page('sideNav').innerHTML;
-  assert.deepStrictEqual(tags(nav, { 'data-action': 'go' }).map((t) => t['data-to']), ['home', 'sessions', 'history', 'files', 'questions', 'mock', 'live', 'settings']);
+  assert.deepStrictEqual(tags(nav, { 'data-action': 'go' }).map((t) => t['data-to']), ['home', 'sessions', 'history', 'files', 'questions', 'mock', 'pair', 'live', 'settings']);
   assert.ok(/class="nav-item active"[^>]*data-to="sessions"/.test(nav), 'current route is highlighted');
   assert.ok(nav.includes('<span class="nav-count">2</span>'), 'active (non-archived) sessions are counted');
+  assert.match(nav, /aria-current="page"/);
+  assert.match(nav, /nav-count">new<\/span>/);
+  assert.match(nav, /nav-live-dot" title="Ready"/);
 
   const next = r.page('sidebarNext').innerHTML;
-  assert.ok(next.includes('Up next') && next.includes('Nubank · Backend') && next.includes('15:00') && next.includes('in 2 days'));
+  assert.ok(next.includes('Up next') && next.includes('company-tile nubank') && next.includes('Backend') && next.includes('15:00') && next.includes('in 2d'));
   assert.ok(!next.includes('Itaú'), 'archived sessions are not "up next"');
 
   assert.strictEqual(r.page('engineStatusLabel').textContent, 'Ready', 'both keys configured');
+});
+
+test('Home uses the scheduled job for preparation and links each recent record to its review', async () => {
+  const date = new Date(Date.now() + 5 * 864e5);
+  const iso = [date.getFullYear(), date.getMonth() + 1, date.getDate()].map((v) => String(v).padStart(2, '0')).join('-');
+  const agent = {
+    id: 'a1', company: 'Itaú Unibanco', role: 'Data Analyst', next_interview_date: iso,
+    job_description: 'SQL role', documents: [{ title: 'CV', tag: 'resume' }]
+  };
+  const r = loadRenderer({
+    state: {
+      agents: [agent],
+      sessions: [{ id: 's1', goalLabel: 'Itaú Unibanco · Data Analyst', startedAt: new Date(Date.now() - 864e5).toISOString(), jevScore: 78, questionsCount: 6 }],
+      meeting: { active: [{ name: 'Meet' }] },
+      questionBank: { companies: [{ id: 'itau', name: agent.company, questions: Array.from({ length: 5 }, (_, n) => ({ text: `SQL question ${n}` })) }] }
+    },
+    api: {
+      mockList: async () => [{ id: 'm1', agentId: 'other', startedAt: Date.now(), role: 'Backend', company: 'Nubank', evaluation: { score: 84, items: [{}] } }],
+      saveChecklist: async (_id, state) => ({ ok: true, agents: [{ ...agent, checklist_state: state }] })
+    }
+  });
+  r.Cue.loadMockRecords();
+  await settle();
+  const home = render(r.Cue, 'home');
+  assert.match(home, /3 prep steps left/);
+  assert.match(home, /Practice 5 SQL questions from the bank/);
+  assert.match(home, /data-action="mock-for-agent" data-agent="a1"/);
+  assert.match(home, /Meet detected/);
+  assert.match(home, /data-action="mock-open" data-id="m1"[\s\S]*data-to="review\/s1"/);
+  assert.match(home, /company-tile itau/);
+
+  await r.Cue.actions['home-checklist']({ dataset: { agent: 'a1', key: 'home_audio_tested' } });
+  assert.deepEqual(r.called('saveChecklist'), [['a1', { home_audio_tested: true }]]);
+  assert.match(render(r.Cue, 'home'), /2 prep steps left/);
+  await r.Cue.actions['home-practice-questions']({ dataset: { agent: 'a1' } });
+  assert.equal(r.S.ui.qCompany, 'itau');
+  assert.equal(r.S.ui.qQuery, 'SQL');
+  assert.equal(r.location.hash, '#/questions');
+  r.Cue.actions['mock-open']({ dataset: { id: 'm1' } });
+  assert.equal(r.location.hash, '#/mock');
 });
 
 test('Easy Goal Creation: the new-session wizard asks the essentials and creates the session', async () => {

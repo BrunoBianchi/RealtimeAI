@@ -612,6 +612,11 @@
     { id: 'tokens_150', minutes: 150, price: 16 },
     { id: 'tokens_400', minutes: 400, price: 40 }
   ];
+  const MOCK_PACKS = [
+    ['mock_tokens_24', 24, 2.99],
+    ['mock_tokens_72', 72, 7.99],
+    ['mock_tokens_144', 144, 14.99]
+  ];
   const perMinute = (price, minutes) => `$${(price / minutes).toFixed(3).replace(/0$/, '')}`;
 
   function tokenPacks() {
@@ -623,6 +628,39 @@
           <button type="button" class="btn sm" style="margin-top:10px" data-action="cloud-billing" data-kind="checkout" data-pack="${p.id}">Buy</button></div>`).join('')}
       </div>
       <div class="small muted" style="margin-top:12px">PRO includes ${PRO_MINUTES} tokens every month for $${PRO_PRICE}: ${perMinute(PRO_PRICE, PRO_MINUTES)} per minute, the lowest price. Purchased tokens are used after the plan's minutes.</div>`);
+  }
+
+  function interviewCredits() {
+    const wallet = S.auth?.entitlement?.mockTokens;
+    if (!wallet) return card('Interview credits', '', '<span class="small muted">The shared mock token balance is unavailable on this server.</span>');
+    const currency = new Intl.NumberFormat(S.lang.locale, { style: 'currency', currency: 'USD' });
+    const count = (n) => n.toLocaleString(S.lang.locale);
+    const balance = `<div class="row wrap small muted plan-interview-balance" data-no-i18n>
+      <span>${esc(C.t('Shared balance: {n} tokens', { n: count(wallet.balance) }))}</span>
+      <span>${esc(C.t('{left} of {limit} monthly tokens left', { left: count(wallet.includedLeft), limit: count(wallet.includedLimit) }))}</span>
+      <span>${esc(C.t('{n} purchased tokens', { n: count(wallet.purchased) }))}</span>
+      <span>${esc(C.t('Basic: {basic} tokens · Advanced: {advanced} tokens', { basic: wallet.basicCost, advanced: wallet.advancedCost }))}</span>
+    </div>`;
+    return card('Interview credits', 'Basic and Advanced share a token balance. Purchased mock tokens never expire.',
+      `${balance}<div class="option-cards plan-interview-packs">${MOCK_PACKS.map(([id, tokens, price]) => `
+        <div class="option-card"><span class="t" data-no-i18n>${esc(C.t('{n} mock tokens', { n: count(tokens) }))}</span>
+          <span class="metric" data-no-i18n>${esc(currency.format(price))}</span>
+          <button type="button" class="btn sm" data-action="cloud-billing" data-kind="checkout" data-pack="${id}">Buy</button></div>`).join('')}</div>`);
+  }
+
+  // The big meter at the top of Plan and usage. Forecasts only from real usage.
+  function usageHero(u) {
+    if (!u.limit) return '';
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const days = Math.max(1, (now - start) / 864e5);
+    const perDay = u.usedMin / days;
+    const forecast = perDay > 0 && u.left != null ? Math.floor(u.left / perDay) : null;
+    return `<section class="usage-hero" data-card="usage">
+      <div class="row between" style="align-items:baseline"><span class="row" style="align-items:baseline;gap:6px"><span class="usage-big">${u.usedMin}</span><span class="num" style="font-size:14px">/ ${u.limit} min</span></span><span class="num mid">${u.renewLabel ? `Renews on ${esc(u.renewLabel)}` : 'Does not renew'}</span></div>
+      <div class="usage-meter tall" aria-hidden="true">${C.usageMeter(u.pct).replace(/^<div[^>]*>|<\/div>$/g, '')}</div>
+      <div class="row wrap small muted" style="gap:20px"><span class="row" style="gap:6px"><span class="legend-sq on"></span>Used · ${u.usedMin} min</span><span class="row" style="gap:6px"><span class="legend-sq"></span>Left · ${u.left} min</span>${forecast != null && forecast < 31 ? `<span class="${forecast < 7 ? 'warn-text' : ''}">At this pace they last ${plural(forecast, 'more day', 'more days')}</span>` : ''}</div>
+    </section>`;
   }
 
   function planCard(u) {
@@ -653,7 +691,7 @@
       ['Live minutes', 'Pay your providers', '15 min, once', '200 min / month'],
       ['Extra tokens', '—', 'From $0.10 per minute', 'From $0.10 per minute'],
       ['Answer speed', `+${d} ms per answer`, 'Instant', 'Instant'],
-      ['AI mock interviews', '—', 'Basic from $2.99 · Advanced from $7.99', '1 Advanced per month'],
+      ['AI mock interviews', '—', 'Shared mock token packs', '72 mock tokens per month'],
       ['Cloud backup of files', '—', '25 MB', '500 MB'],
       ['Sessions saved in the cloud', '—', '3', 'Unlimited'],
       ['History saved in the cloud', '—', '5', 'Unlimited'],
@@ -684,7 +722,10 @@
     const months = Object.entries(byMonth).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 6);
     const max = Math.max(1, ...months.map(([, v]) => v.sec));
     return `
+      ${usageHero(u)}
+      ${C.referralInvite ? C.referralInvite() : ''}
       ${planCard(u)}
+      ${interviewCredits()}
       ${card('Plans', 'One token is one live minute. The server checks the limit on every session; when it runs out, the session ends.',
         `<div class="option-cards">
           <div class="option-card ${u.isPro ? '' : 'active'}"><span class="t">${u.isPro ? '' : '<span class="dot"></span>'}Free</span><span class="s">A single session of up to 15 minutes to try it out. Does not renew.</span></div>
@@ -745,7 +786,7 @@
   C.views.settings = function settings(parts) {
     const tab = SECTIONS[parts[0]] ? parts[0] : 'general';
     const label = (TABS.find((t) => t[0] === tab) || TABS[0])[1];
-    return `<div class="page">
+    return `<div class="page design-page settings-page">
       ${C.head('Settings', 'Copilot, audio capture, privacy and account settings.')}
       <div class="settings-layout">
         <nav class="settings-nav">${TABS.map(([id, l, ic]) => `<button type="button" class="nav-item ${tab === id ? 'active' : ''}" data-action="go" data-to="settings/${id}">${icon(ic)}<span class="nav-label">${esc(l)}</span></button>`).join('')}</nav>
@@ -756,8 +797,13 @@
 
   // Calendar data is fetched once per visit to the tab (or on Refresh).
   let gcalLoaded = false;
+  let planJump = null;
   C.afterRender.settings = (parts) => {
     const tab = parts[0] || 'general';
+    if (tab === 'plan' && parts[1] === 'interviews' && planJump !== parts) {
+      planJump = parts;
+      document.querySelector('[data-card="interview-credits"]')?.scrollIntoView({ block: 'start' });
+    }
     if (tab === 'audio') {
       enumerateDevices();
       startMicMeter();

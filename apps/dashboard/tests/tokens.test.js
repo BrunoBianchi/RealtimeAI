@@ -34,9 +34,9 @@ test('Task 1.4: Valores determinísticos dos tokens de design (Requirements: 1.1
   const radii = ['--radius-sm', '--radius', '--radius-md', '--radius-lg'].map(px);
   assert.deepStrictEqual([...radii].sort((a, b) => a - b), radii, 'radius scale must grow');
 
-  // Typography: Geist with Segoe UI fallbacks; JetBrains Mono for numbers.
+  // Typography: Geist with Segoe UI fallbacks; Geist Mono for numbers.
   assert.match(dark['--font-sans'], /^Geist,.*'Segoe UI Variable Text'.*system-ui/);
-  assert.match(dark['--font-mono'], /^'JetBrains Mono',.*monospace$/);
+  assert.match(dark['--font-mono'], /^'Geist Mono',.*monospace$/);
 
   // One emerald accent, rose for danger, amber for warning, in both themes.
   const hue = (value) => {

@@ -8,14 +8,15 @@
 #
 # test_http2_transport_integration.cpp (task 10.2) adds the direct HTTP/2
 # transport integration tests: a pure Req 4.1/4.3 critical-endpoint static
-# guard that runs everywhere, plus self-skipping live tests for HTTP/2
-# negotiation (Req 4.4) and cancel+reissue connection reuse (Req 4.6), with the
-# by-hand procedure in tests/net_tests/MANUAL_CHECKLIST.md.
+# guard that runs everywhere, plus opt-in live tests for HTTP/2 negotiation
+# (Req 4.4) and connection reuse (Req 4.6), described in
+# tests/net_tests/MANUAL_CHECKLIST.md.
 add_executable(net_tests
     test_net_smoke.cpp
     test_jev_properties.cpp
     test_endpoint_selection_properties.cpp
     test_http2_transport_integration.cpp
+    test_keep_alive_targets.cpp
 )
 
 target_include_directories(net_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -25,6 +26,7 @@ target_link_libraries(net_tests PRIVATE
     rtai::net
     GTest::gtest
     GTest::gtest_main
+    iphlpapi ws2_32  # the live tests read this process's TCP connections
 )
 
 set_target_properties(net_tests PROPERTIES FOLDER "tests")

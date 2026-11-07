@@ -57,7 +57,7 @@ test('Prep Session & Goal Workspace Navigation: links go where they say', async 
   assert.strictEqual(r.page('crumb').textContent, 'Sessions / Nubank · Backend');
 
   // Every internal link on every screen points at a route the router knows.
-  const known = new Set(['home', 'sessions', 'history', 'session', 'review', 'files', 'questions', 'mock', 'live', 'settings']);
+  const known = new Set(['home', 'sessions', 'history', 'session', 'review', 'files', 'questions', 'mock', 'pair', 'profile', 'live', 'settings']);
   for (const path of ['home', 'sessions', 'history', 'session/a1', `review/${SESSION_ID}`, 'files', 'questions', 'live', 'settings/general']) {
     r.Cue.navigate(path);
     const links = tags(r.page('view').innerHTML + r.page('sideNav').innerHTML, { 'data-action': 'go' });

@@ -33,14 +33,22 @@ saltos de rede do modo chaves próprias. O único custo novo é uma chamada HTTP
 sessão, feita em paralelo com o carregamento do agente, do RAG e do áudio (o log mostra
 `Cloud: session ... waited N ms at start-up`: o alvo é 0 ms de espera).
 
-Orçamento de latência (meta < 200 ms do fim da fala à primeira palavra):
+Orçamento de latência. Menos de 200 ms do fim da fala à primeira palavra só acontece quando
+a especulação acerta: a resposta já estava sendo gerada antes de a fala terminar. Sem esse
+acerto, o tempo é dominado pelo TTFT do provedor, e a meta do modo nuvem é p50 ≤ 500 ms e
+p95 ≤ 1.000 ms (`specs/001-backend-latency/spec.md`, SC-002). Os budgets de 200 ms do servidor
+valem para o trecho medido nele (linha `llm_relay` do log), não para o caminho inteiro.
 
 | Etapa | Chaves próprias | Nuvem |
 |---|---|---|
 | Áudio → Deepgram | direto | direto (token temporário) |
-| Pergunta → 1º token do LLM | direto | direto ou +1 salto na borda (relay deve fazer streaming sem buffer, < 10 ms) |
+| Pergunta → 1º token do LLM | direto | +1 salto pelo relay, em streaming sem buffer (conexões mantidas abertas nos dois trechos) |
 | Reconexão do STT | imediata | imediata (token já renovado em segundo plano) |
 | Início da sessão | — | 1 RTT, sobreposto ao start |
+
+Quanto cada resposta gastou fica em dois lugares, sem conteúdo da conversa: a linha `llm_relay`
+no servidor e os campos `route` (em `session_start`) e `speech_end_to_visible_ms` (em
+`suggestion`) nos arquivos de sessão do app. `scripts/session-ttft.mjs` resume os arquivos.
 
 Regras para o servidor manter isso:
 
@@ -75,6 +83,11 @@ Três formas de entrar, todas terminam no mesmo token do dispositivo:
   sem suporte.
 - Erros: corpo JSON `{"error": "<codigo>"}` ou `{"error": {"code": "...", "message": "<texto pt-BR>"}}`.
   A `message` é mostrada ao usuário como está.
+- **`503 busy`** com `Retry-After`: o servidor limita o trabalho pesado para proteger as
+  respostas ao vivo. Vale para rotas que calculam hash de senha (login, cadastro, troca e
+  exclusão de senha) e para corpos acima de 1 MB em `POST /v1/ai/chat/completions`,
+  `POST /v1/files` e `PUT /v1/sync/{kind}/{id}`. Depois de até 2 s de espera, o servidor
+  recusa em vez de enfileirar. O relay ao vivo (`/v1/llm/`) nunca recebe esse erro.
 
 ## Endpoints
 
@@ -116,12 +129,13 @@ Requisição: `{"email": "...", "password": "...", "client_id": "rtai-dashboard"
 
 - `200` `{"access_token": "<token do dispositivo>", "account": {...}}`
 - `401` `{"error": "invalid_credentials"}` · `403` `{"error": "email_not_verified"}` ·
-  `429` `{"error": "rate_limited"}`
+  `429` `{"error": "rate_limited"}` · `503` `{"error": "busy"}` (não conta como tentativa errada)
 
 ### `POST /v1/auth/signup` — criar conta
 
-Requisição: `{"name": "...", "email": "...", "password": "...", "client_id": "rtai-dashboard"}`
-(o app exige senha com pelo menos 8 caracteres).
+Requisição: `{"name": "...", "email": "...", "password": "...", "client_id": "rtai-dashboard", "referral_code": "..."}`
+(o app exige senha com pelo menos 8 caracteres). `referral_code` é opcional: um código
+desconhecido ou esgotado é ignorado e nunca impede a criação da conta.
 
 - `201` `{"access_token": "...", "account": {...}}` (entra direto), ou
 - `201` `{"verification_required": true}` (o app pede para confirmar o e-mail e entrar);
@@ -200,16 +214,28 @@ Bearer. `checkout` recebe `{"plan": "pro"}` ou `{"pack": "tokens_60"}` (pacote i
 que o app abre no navegador. Só `https://` é aceito. Depois do pagamento, `GET /v1/me`
 passa a mostrar `pro`.
 
+### `GET /v1/referral` — convites
+
+Bearer. Devolve o código da conta (criado no primeiro uso) e o andamento:
+`{"code": "...", "url": "https://.../r/...", "invited": 2, "completed": 1, "limit": 5, "bonus_minutes": 30, "minutes_earned": 30}`.
+
+- A conta nova entra com `referral_code` no `signup`. Quando ela encerra a primeira sessão
+  de pelo menos 60 s, o servidor soma 30 `credit_minutes` às duas contas, uma única vez.
+- O dono do código recebe por no máximo 5 amigos; com 5 concluídos, o código deixa de valer
+  para contas novas. Os minutos valem como tokens comprados e não expiram.
+- `GET /r/{code}` é a página pública do link: explica como usar o código no app (`404` se o
+  código não existe). Excluir a conta invalida o código.
+
 ### Entrevista simulada (`/v1/mock`)
 
-Até 30 min. PRO tem 1 entrevista Avançada por mês (`plan.mocks_limit`, `plan.mocks_used`). Créditos comprados são específicos por modo e não expiram: Básico de chat com Orby (`mock_basic_1` US$ 2,99; `mock_basic_3` US$ 7,99) ou Avançado (`mock_advanced_1` US$ 7,99; `mock_advanced_3` US$ 20,99). Créditos antigos `mock_credits` continuam valendo como Avançado. O Básico usa somente chat por texto; a entrevista Avançada inclui voz e análise visual de imagens com consentimento.
+Até 30 min por simulado. O Básico custa 24 tokens de simulado e o Avançado, 48. O Pro inclui 72 tokens de simulado por mês, em saldo separado dos minutos ao vivo. Os dois modos usam primeiro a franquia mensal e depois os tokens comprados, que não expiram. Créditos antigos são convertidos pelo custo do modo original. O saldo em `GET /v1/me` fica em `plan.mock_tokens`, com `included_limit`, `included_left`, `purchased`, `basic_cost` e `advanced_cost`.
 
-- `POST /v1/mock/start` `{agent_id, mode: "basic" | "advanced"}` → `{id, source, mode, max_s, vision_enabled, stt?}`. Básico conversa com Orby por texto e não solicita áudio; Avançado inclui voz e pede consentimento para analisar imagens ocasionais da câmera. Gasta um crédito do modo; a entrevista do mês do PRO é Avançada. Uma entrevista em andamento é retomada sem nova cobrança. `402 mock_not_included` sem crédito; `503` sem chaves/serviços, sem gastar nada.
+- `POST /v1/mock/start` `{agent_id, mode: "basic" | "advanced"}` → `{id, source, mode, max_s, tokens_spent?, vision_enabled, stt?}`. Básico conversa com Orby por texto. Avançado inclui voz e pede consentimento para analisar imagens ocasionais da câmera. Uma entrevista em andamento é retomada sem nova cobrança. Saldo insuficiente retorna `402 mock_not_included`.
 - `POST /v1/mock/{id}/chat`: corpo chat/completions; o servidor impõe o modelo de conversa e `max_tokens`. Aceito até 3 min depois do limite (feedback final).
 - `POST /v1/mock/{id}/tts` `{text}` (até 500 caracteres; 15 mil por entrevista Avançada) → áudio mp3 (`TTS_MODEL`, padrão `elevenlabs/eleven-turbo-v2.5`; `TTS_VOICE`, padrão `sarah`; o modelo detecta o idioma do texto). Indisponível no Básico.
 - `POST /v1/mock/{id}/stt` → nova credencial de transcrição. Indisponível no Básico.
 - `POST /v1/mock/{id}/vision` `{image, previous_image?, language}` analisa até dois JPEGs pequenos, com limite de 30 chamadas por entrevista e intervalo mínimo de 55 s. Usa `MOCK_VISION_MODEL` (padrão `openai/gpt-5.4-mini` via OpenRouter) para observações de enquadramento, direção do olhar, postura, vestimenta, organização do fundo e movimentos visíveis. As imagens são retransmitidas para o modelo e não são armazenadas pelo servidor.
-- `POST /v1/mock/{id}/end` → `{refunded}`: devolve a entrevista encerrada em menos de 1 min.
+- `POST /v1/mock/{id}/end` → `{refunded}`. Encerrar em menos de 1 min estorna a cobrança para os saldos de origem, desde que a franquia mensal ainda esteja no mesmo ciclo.
 - Depois do limite: `410 mock_over`.
 
 ### `POST /v1/session` — credenciais da sessão (engine)
@@ -277,7 +303,16 @@ Validação no app (`cloud::parse_session`):
   desenvolvimento) compatível com OpenAI `chat/completions` com `stream: true`. O app envia
   `Authorization: Bearer <llm.token>`.
 - `llm.fallback` é opcional, só `https://`; o app troca para ele se o primário não mandar
-  o primeiro byte rápido.
+  o primeiro byte rápido. Um fallback em `http://` é descartado sem falhar a sessão. O
+  servidor só o envia com `PUBLIC_URL` em HTTPS e `LLM_FALLBACK_MODEL` definido: é o mesmo
+  relay, com o mesmo token e outro modelo.
+- **Relay em HTTPS**: `llm.url` segue `PUBLIC_URL`. Em HTTPS, o nginx fala HTTP/2 com o cliente
+  e mantém a conexão por 300 s. A porta 80 continua respondendo, sem redirecionar, para as
+  instalações antigas, porque um redirecionamento quebraria os POSTs delas.
+- `HEAD /v1/llm/models` responde `200` sem token e sem tocar no banco. O app usa essa rota
+  para manter a conexão com o relay aquecida (`keep_alive_relay`).
+- O servidor pode acrescentar `provider` ao corpo no relay ao vivo (`LLM_PROVIDER_ROUTING`). Um
+  `provider` enviado pelo cliente continua prevalecendo.
 - `background_model`: resumos e compactação de memória (fora do caminho ao vivo).
 
 - `account.max_session_s`: quanto esta sessão pode durar (Free: 900 na única sessão). O

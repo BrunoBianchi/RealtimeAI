@@ -6,13 +6,6 @@
   const { esc, icon } = C;
   const api = window.rtai || {};
 
-  // Same catalog as main/plans.js and the server.
-  const MOCK_PACKS = [
-    { id: 'mock_basic_1', interviews: 1, price: 2.99 },
-    { id: 'mock_basic_3', interviews: 3, price: 7.99 },
-    { id: 'mock_advanced_1', interviews: 1, price: 7.99 },
-    { id: 'mock_advanced_3', interviews: 3, price: 20.99 }
-  ];
   // Same list as main/mock_interview.js. Names stay in their own language.
   const LANGUAGES = [['pt-BR', 'Português (Brasil)'], ['en', 'English'], ['es', 'Español'], ['fr', 'Français'], ['it', 'Italiano'], ['ja', '日本語'], ['hi', 'हिन्दी'], ['zh', '中文']];
   // How much quiet ends an answer: less after a finished sentence, and more while
@@ -41,54 +34,49 @@
   let sttRetries = 0;
 
   const entitlement = () => (S.auth && S.auth.entitlement) || null;
-  const canRun = () => Boolean(entitlement() && entitlement().canMock);
-  const canRunMode = (mode) => {
+  const tokenCost = (wallet, mode) => mode === 'basic' ? wallet.basicCost : wallet.advancedCost;
+  const remaining = (mode) => {
     const e = entitlement();
-    if (!e) return false;
+    if (e?.mockTokens) return Math.floor(e.mockTokens.balance / tokenCost(e.mockTokens, mode));
     return mode === 'basic'
-      ? e.mockBasicCredits > 0
-      : e.mocksLeft + e.mockAdvancedCredits > 0;
+      ? (e?.mockBasicLeft || 0) + (e?.mockBasicCredits || 0)
+      : (e?.mocksLeft || 0) + (e?.mockAdvancedCredits || 0);
   };
+  const canRunMode = (mode) => remaining(mode) > 0 || M.resumeMode === mode;
+  const planLink = '<button type="button" class="btn sm" data-action="go" data-to="settings/plan/interviews">View plan and credits</button>';
+
+  function availability(mode) {
+    if (M.resumeMode === mode) return C.t('In progress');
+    if (!entitlement()) return C.t('Balance unavailable');
+    const wallet = entitlement().mockTokens;
+    if (wallet) return C.t('{n} tokens per interview', { n: tokenCost(wallet, mode) });
+    const n = remaining(mode);
+    return C.t(n === 1 ? '1 available' : '{n} available', { n });
+  }
 
   function clock(seconds) {
     const s = Math.max(0, Math.ceil(seconds));
     return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
   }
 
-  const buyCards = () => `<div class="option-cards mock-buy-grid">${MOCK_PACKS.map((p) => `
-      <div class="option-card"><span class="t">${p.id.includes('basic') ? 'Basic · Orby chat' : 'Advanced · camera + voice'}</span>
-        <span class="s">${p.interviews === 1 ? '1 interview' : `${p.interviews} interviews`}</span>
-        <span class="metric">US$${p.price.toFixed(2)}</span>
-        <span class="s">No subscription. Credits never expire.</span>
-        <button type="button" class="btn sm" style="margin-top:10px" data-action="mock-buy" data-pack="${p.id}">Buy</button>
-      </div>`).join('')}</div>`;
-  C.mockBuyCards = buyCards;
+  function intro() {
+    return `<section class="mock-hero mock-intro" data-tour="mock-setup">
+      ${C.orb('idle', 88, 'tight')}
+      <div class="stack grow" style="gap:5px;min-width:0">
+        <span class="eyebrow on-aurora">Rehearsal room</span>
+        <h1 class="h1 xl">Mock interview</h1>
+        <span class="on-aurora-soft">Practice for a real role with Orby and get feedback on your answers.</span>
+      </div>
+    </section>`;
+  }
 
-  // Ad used on the Home page for accounts without access.
-  C.mockAd = function mockAd() {
-    if (canRun() && !C.localMode()) return '';
-    return `<div class="banner pro-ad">${icon('microphone')}<span class="grow"><span class="strong">Practice with Orby.</span> <span class="muted">Choose a Basic text chat or Advanced voice with camera feedback.</span></span><a class="btn sm primary" href="#/mock">See how it works</a></div>`;
-  };
-
-  function adView() {
-    const local = C.localMode();
-    const cta = local
-      ? '<button type="button" class="btn primary" data-action="go-pro">Create an account</button>'
-      : '<button type="button" class="btn primary" data-action="cloud-billing" data-kind="checkout">Upgrade to PRO</button>';
-    return `${C.head('Mock interview', 'Chat with Orby in Basic, or choose Advanced for voice and camera image analysis.')}
-      <section class="card pro-ad-card" style="gap:14px" data-tour="mock-ad">
-        <div class="row" style="gap:10px">${icon('sparkle')}<span class="strong grow">Rehearse before the real one</span><span class="pill">PRO</span></div>
-        <video src="media/mock-how-it-works.webm" controls preload="metadata" style="width:100%;border-radius:10px"></video>
-        <ul class="pro-perks">
-          <li class="pro-perk">${icon('chat')}<span class="stack" style="gap:0"><span class="t">Basic or Advanced</span><span class="s">Chat with Orby by text, or add voice and camera feedback in Advanced.</span></span></li>
-          <li class="pro-perk">${icon('folder')}<span class="stack" style="gap:0"><span class="t">Based on your application</span><span class="s">It uses the job description, your résumé and your uploaded files.</span></span></li>
-          <li class="pro-perk">${icon('chart')}<span class="stack" style="gap:0"><span class="t">Feedback at the end</span><span class="s">A score, strengths, weak points and how to improve.</span></span></li>
-        </ul>
-        <div class="row" style="gap:8px"><span class="small faint grow">PRO includes 1 Advanced mock interview per month.</span>${cta}</div>
-      </section>
-      <section class="card" style="gap:12px"><span class="strong">No subscription? Buy interviews</span>
-        ${local ? '<span class="small muted">You need a free account to buy and use interviews.</span>' : buyCards()}
-      </section>`;
+  function localView() {
+    return `${intro()}<section class="card" data-tour="mock-ad">
+      <span class="strong">Sign in to practice with Orby</span>
+      <span class="muted">Choose text chat or rehearse with voice and camera using your LipCue account.</span>
+      <div class="row"><button type="button" class="btn primary" data-action="use-account">Sign in or create account</button></div>
+      <details class="mock-details small muted"><summary>How it works</summary><video class="mock-demo" src="media/mock-how-it-works.webm" controls preload="none"></video></details>
+    </section>${historyView()}`;
   }
 
   // The animated interviewer: its motion says who has the floor.
@@ -107,7 +95,6 @@
   }
 
   function setupView() {
-    const ent = entitlement();
     if (!M.modeTouched && !canRunMode(M.mode) && canRunMode(M.mode === 'basic' ? 'advanced' : 'basic')) {
       M.mode = M.mode === 'basic' ? 'advanced' : 'basic';
     }
@@ -116,52 +103,40 @@
     const a = agents.find((x) => x.id === M.agentId);
     const lang = M.lang || (String((window.CueI18n && window.CueI18n.locale) || '').toLowerCase().startsWith('pt') ? 'pt-BR' : 'en');
     M.lang = lang;
-    const left = [
-      ent.mocksLeft > 0 ? `${ent.mocksLeft} Advanced included this month` : '',
-      ent.mockBasicCredits > 0 ? `${ent.mockBasicCredits} Basic credits` : '',
-      ent.mockAdvancedCredits > 0 ? `${ent.mockAdvancedCredits} Advanced credits` : ''
-    ].filter(Boolean).join(' · ');
     if (!agents.length) {
-      return `${C.head('Mock interview', 'Chat with Orby in Basic, or choose Advanced for voice and camera image analysis.')}
-        <div class="empty boxed">${icon('stack')}<span class="t">Create a session first</span><span>The interview is based on the job and files of a session.</span><a class="btn sm primary" href="#/sessions">Go to sessions</a></div>`;
+      return `${intro()}<div class="empty boxed">${icon('stack')}<span class="t">Create a session first</span><span>The interview is based on the job and files of a session.</span><a class="btn sm primary" href="#/sessions">Go to sessions</a></div>${historyView()}`;
     }
     const { items, done, prep } = readiness(a);
-    const steps = M.mode === 'basic'
-      ? [['chat', 'Chat with Orby', 'Text only, without a camera or microphone; lower AI usage.'], ['chart', 'See your score', 'JEV scores each answer against the job.'], ['sparkle', 'Train with the copilot', 'Ask what to improve and practice again.']]
-      : [['camera', 'Talk with Orby', 'Voice interview with your camera enabled for visual feedback.'], ['eye', 'Get visual feedback', 'Framing, eye direction, posture, clothing, background organization and visible movement.'], ['chart', 'Review everything', 'Speech score plus camera coaching at the end.']];
+    const wallet = entitlement()?.mockTokens;
     const canStartMode = canRunMode(M.mode);
-    return `<section class="mock-hero" data-tour="mock-setup">
-        ${orb('idle', true)}
-        <div class="stack grow" style="gap:6px;min-width:0">
-          <span class="eyebrow">Rehearsal room</span>
-          <h1 class="h1">Mock interview</h1>
-          <span class="muted">Basic is a text chat with Orby. Advanced adds voice and camera image analysis.</span>
-          ${left ? `<span class="row" style="margin-top:6px"><span class="pill">${esc(left)}</span></span>` : ''}
-        </div>
-      </section>
-      <section class="mock-steps">${steps.map(([ic, t, d], i) => `<div class="mock-step"><span class="n num">${i + 1}</span><span class="stack" style="gap:2px"><span class="row" style="gap:6px">${icon(ic)}<span class="strong">${t}</span></span><span class="small muted">${d}</span></span></div>`).join('')}</section>
+    const modes = [
+      ['basic', 'chat', 'Basic mode', 'Text chat with Orby'],
+      ['advanced', 'camera', 'Advanced mode', 'Voice and camera feedback']
+    ];
+    return `${intro()}
       <section class="mock-grid">
-        <div class="card" style="gap:16px">
+        <div class="card mock-config">
+          <h2 class="h2">Set up your interview</h2>
           <label class="field">Which job is this for?<select class="select" data-change="mock-agent" data-no-i18n>${agents.map((x) => `<option value="${esc(x.id)}" ${x.id === M.agentId ? 'selected' : ''}>${esc(`${C.agentCompany(x) || x.name || '—'} · ${x.role || '—'}`)}</option>`).join('')}</select></label>
           <div class="field"><span>Interview type</span>
-            <div class="mock-mode-grid" role="radiogroup">
-              <button type="button" role="radio" aria-checked="${M.mode === 'basic'}" class="mock-mode ${M.mode === 'basic' ? 'active' : ''}" data-action="mock-mode-set" data-mode="basic"><span class="strong">Basic · US$2.99</span><span class="small muted">Text chat with Orby. No camera or microphone. Lower AI usage.</span></button>
-              <button type="button" role="radio" aria-checked="${M.mode === 'advanced'}" class="mock-mode ${M.mode === 'advanced' ? 'active' : ''}" data-action="mock-mode-set" data-mode="advanced"><span class="strong">Advanced · US$7.99</span><span class="small muted">Voice with Orby plus consented camera analysis and visual feedback.</span></button>
+            <div class="mock-mode-grid" role="group" aria-label="Interview type">
+              ${modes.map(([mode, ic, label, description]) => `<button type="button" aria-pressed="${M.mode === mode}" class="mock-mode ${M.mode === mode ? 'active' : ''}" data-action="mock-mode-set" data-mode="${mode}">
+                <span class="mock-mode-icon">${icon(ic)}</span><span class="strong">${label}</span><span class="small muted">${description}</span>
+                <span class="mock-availability" data-no-i18n>${esc(availability(mode))}</span>
+              </button>`).join('')}
             </div>
-            ${!canStartMode ? `<span class="small muted">${M.mode === 'basic' ? 'You need a Basic credit for this mode.' : 'You need an Advanced credit or the monthly PRO interview.'}</span>` : ''}
+            ${wallet ? `<span class="small muted" data-no-i18n>${esc(C.t('Shared balance: {n} tokens', { n: wallet.balance.toLocaleString(S.lang.locale) }))}</span>` : ''}
           </div>
-          <div class="field"><span>Interview language</span>
-            <div class="mock-langs" role="radiogroup" data-no-i18n>${LANGUAGES.map(([code, name]) => `<button type="button" role="radio" aria-checked="${code === lang}" class="mock-lang ${code === lang ? 'active' : ''}" data-action="mock-lang-set" data-lang="${code}">${name}</button>`).join('')}</div>
-            <span class="small muted">The interviewer speaks, listens and gives feedback in this language.</span>
-          </div>
+          <label class="field">Interview language<select class="select" data-change="mock-lang" data-no-i18n>${C.opts(LANGUAGES, lang)}</select></label>
           ${M.mode === 'advanced' ? `<div class="stack" style="gap:8px"><div class="row" style="gap:8px"><button type="button" class="btn sm" data-action="mock-mic-test">${icon('microphone')}Test microphone</button><div class="mock-meter grow"><span id="mockMeter"></span></div></div>
             <span class="small muted" id="mockMicNote">Speak after clicking: the bar should move.</span></div>
           <label class="mock-consent"><input type="checkbox" data-change="mock-consent" ${M.consent ? 'checked' : ''}/><span>I agree to send occasional camera snapshots to AI for visual coaching.</span></label>
-          <span class="small muted">About once a minute, a camera still is sent to AI; when available, it is compared with the previous still for framing, eye direction, posture, clothing, background organization and visible movement. The app does not record video or save camera images.</span>` : ''}
+          <details class="mock-details small muted"><summary>How camera analysis works</summary><p>About once a minute, a camera still is sent to AI; when available, it is compared with the previous still for framing, eye direction, posture, clothing, background organization and visible movement. The app does not record video or save camera images.</p></details>` : ''}
           ${M.error ? `<div class="banner warn" role="alert">${icon('alert')}<span class="grow">${esc(M.error)}</span></div>` : ''}
-          <button type="button" class="btn primary lg mock-start" data-action="mock-start" ${!canStartMode || (M.mode === 'advanced' && !M.consent) ? 'disabled' : ''}>${icon(M.mode === 'basic' ? 'chat' : 'camera')}Start ${M.mode === 'basic' ? 'Basic' : 'Advanced'} interview</button>
-          <span class="small faint" style="text-align:center">${M.mode === 'basic' ? '30 minutes of text chat. Your chosen mode uses one matching credit.' : 'Up to 30 minutes. Advanced uses one Advanced credit.'}</span>
-          ${!canStartMode ? buyCards() : ''}
+          <div class="mock-actions">
+            ${canStartMode ? `<button type="button" class="btn primary lg" data-action="mock-start" ${M.mode === 'advanced' && !M.consent ? 'disabled' : ''}>${icon(M.mode === 'basic' ? 'chat' : 'camera')}${M.resumeMode === M.mode ? 'Resume interview' : M.mode === 'basic' ? 'Start Basic interview' : 'Start Advanced interview'}</button><span class="small muted">Up to 30 minutes</span>`
+              : `<span class="small muted">${wallet ? 'Not enough tokens for this mode.' : entitlement() ? 'No interviews of this type are available.' : 'Could not read your interview balance.'}</span>${planLink}`}
+          </div>
         </div>
         <div class="stack" style="gap:16px;min-width:0">
           <div class="card" style="gap:12px">
@@ -169,12 +144,12 @@
             ${items.map((i) => `<div class="mock-check ${i.ok ? 'ok' : ''}">${icon(i.ok ? 'check-circle' : 'alert')}<span class="stack" style="gap:0"><span>${i.t}</span><span class="small muted">${i.s}</span></span></div>`).join('')}
             ${a && done < items.length && items.slice(0, 3).some((i) => !i.ok) ? `<a class="btn sm" href="#/session/${esc(a.id)}">Complete this session</a>` : ''}
           </div>
-          <div class="card" style="gap:10px" data-tour="mock-bank">
-            <div class="row" style="gap:8px">${icon('question')}<span class="strong grow">Questions that may come up</span>${prep && prep.total ? '<span class="pill">Question bank</span>' : ''}</div>
-            ${prep && prep.total ? `<span class="small muted">Asked in real interviews at this company. The interviewer prioritizes them, so you train on what may come up.</span>
-              ${prep.questions.map((q) => `<div class="mock-q"><span data-no-i18n>${esc(q.text)}</span>${q.category ? `<span class="tag">${esc(q.category)}</span>` : ''}</div>`).join('')}`
-              : '<span class="small muted">No questions from this company in the bank yet. The interview will use the job and your files.</span>'}
-          </div>
+          ${prep?.total ? `<details class="card mock-details" data-tour="mock-bank">
+            <summary class="strong">Questions that may come up</summary>
+            <div class="stack gap-8" style="margin-top:12px"><span class="small muted">Asked in real interviews at this company. The interviewer prioritizes them, so you train on what may come up.</span>
+              ${prep.questions.map((q) => `<div class="mock-q"><span data-no-i18n>${esc(q.text)}</span>${q.category ? `<span class="tag">${esc(q.category)}</span>` : ''}</div>`).join('')}
+            </div>
+          </details>` : ''}
         </div>
       </section>
       ${historyView()}`;
@@ -197,21 +172,63 @@
       else out.push({ ...l });
       return out;
     }, []);
-    const rows = turns.map((l) => `<div class="stack" style="gap:2px"><span class="small faint">${l.who === 'me' ? 'You' : 'Orby'}</span><span data-no-i18n>${esc(l.text)}</span></div>`);
+    const rows = turns.map((l) => `<div class="bubble ${l.who === 'me' ? 'me' : 'ai'}"><span class="bubble-who">${l.who === 'me' ? 'You' : 'Orby'}</span><span class="bubble-text" data-no-i18n>${esc(l.text)}</span></div>`);
     if (M.partial) rows.push(`<div class="stack" style="gap:2px;opacity:.65"><span class="small faint">You</span><span data-no-i18n>${esc(M.partial)}</span></div>`);
     return rows.join('');
   }
 
+  function lastOrbyLine() {
+    let text = '';
+    for (let i = M.lines.length - 1; i >= 0; i -= 1) {
+      if (M.lines[i].who !== 'ai') {
+        if (text) break;
+        continue;
+      }
+      text = text ? `${M.lines[i].text} ${text}` : M.lines[i].text;
+    }
+    return text;
+  }
+
+  function questionCount() {
+    let n = 0;
+    let prev = '';
+    for (const l of M.lines) {
+      if (l.who === 'ai' && prev !== 'ai') n += 1;
+      prev = l.who;
+    }
+    return n;
+  }
+
   function liveView() {
-    return `${C.head('Mock interview', '', `<span class="pill"><span class="num" id="mockClock">${clock((M.endsAt - Date.now()) / 1000)}</span></span>`)}
-      <section class="mock-stage" id="mockStage">
-        <div class="mock-live-stage">${orb(M.state, true)}<span class="small muted">Orby</span>${M.mode === 'advanced' ? `<div class="mock-camera"><video id="mockCameraPreview" autoplay muted playsinline></video><span class="small faint">Your camera · snapshots analyzed about once a minute</span><span class="small muted" id="mockVisionStatus">Camera analysis is on. The app does not save the images.</span></div>` : ''}</div>
-        <span class="strong" id="mockState">${esc(STATE_LABEL[M.state] || '')}</span>
-      </section>
-      <section class="card" style="gap:12px">
-        <div id="mockLines" class="stack" style="gap:10px;max-height:46vh;overflow:auto">${linesHtml()}</div>
-        <div class="row" style="gap:8px"><input class="input grow" id="mockTyped" placeholder="${M.mode === 'basic' ? 'Type your answer' : 'Or type your answer'}"/><button type="button" class="btn" data-action="mock-send">Send answer</button><button type="button" class="btn danger" data-action="mock-finish" ${M.id ? '' : 'disabled'}>End interview</button></div>
-        ${M.error ? `<div class="small" role="alert" style="color:var(--danger)">${esc(M.error)}</div>` : ''}
+    const a = S.agents.find((x) => x.id === M.agentId);
+    return `<section class="mock-room" id="mockStage">
+        <div class="mock-room-stage">
+          <div class="mock-room-bar">
+            <span class="pill ok"><span class="dot"></span>Mock · ${M.mode === 'advanced' ? 'Advanced' : 'Basic'}</span>
+            <span class="strong truncate" data-no-i18n>${esc(a ? `${C.agentCompany(a) || a.name || '—'} · ${a.role || '—'}` : '')}</span>
+            <span class="grow"></span>
+            <span class="small muted">Question <span class="mono" id="mockQIndex" style="color:var(--text)">${questionCount()}</span></span>
+            <span class="clock-chip" id="mockClock">${clock((M.endsAt - Date.now()) / 1000)}</span>
+          </div>
+          <div class="mock-room-center">
+            ${C.orb(M.state || 'idle', 360, 'room')}
+            <span class="state-pill ${M.state || ''}" id="mockStatePill"><span class="dot sm"></span><span id="mockState">${esc(STATE_LABEL[M.state] || '')}</span></span>
+            <p class="mock-caption" id="mockCaption" data-no-i18n>${esc(lastOrbyLine())}</p>
+          </div>
+          <div class="mock-room-controls">
+            <button type="button" class="btn pillish" data-action="mock-ask" data-ask="repeat">Repeat question</button>
+            <button type="button" class="btn pillish" data-action="mock-ask" data-ask="skip">Skip</button>
+            <button type="button" class="btn pillish accent" data-action="mock-ask" data-ask="hint">Orby hint</button>
+            <button type="button" class="btn pillish end" data-action="mock-finish" ${M.id ? '' : 'disabled'}><span class="stop-square"></span>End and see score</button>
+          </div>
+        </div>
+        <aside class="mock-room-side">
+          ${M.mode === 'advanced' ? `<div class="mock-cam"><div class="mock-camera"><video id="mockCameraPreview" autoplay muted playsinline></video><span class="cam-tag">CAMERA</span></div><span class="small muted" id="mockVisionStatus">Camera analysis is on. The app does not save the images.</span></div>` : ''}
+          <div class="row between" style="padding:14px 16px 6px"><span class="strong">Conversation</span></div>
+          <div id="mockLines" class="mock-lines">${linesHtml()}</div>
+          ${M.error ? `<div class="small" role="alert" style="color:var(--danger);padding:0 16px 8px">${esc(M.error)}</div>` : ''}
+          <div class="mock-input"><input class="input grow" id="mockTyped" placeholder="${M.mode === 'basic' ? 'Type your answer' : 'Or type your answer'}"/><button type="button" class="btn primary icon-only" data-action="mock-send" aria-label="Send answer" title="Send answer">${icon('send')}</button></div>
+        </aside>
       </section>`;
   }
 
@@ -221,9 +238,10 @@
     const J = r.evaluation;
     if (!J) return r.feedback ? `<section class="card"><pre class="md" style="white-space:pre-wrap">${esc(r.feedback)}</pre></section>` : '<section class="card"><div class="muted">Feedback is unavailable right now. Your transcript was saved.</div></section>';
     const list = (title, ic, rows) => `<div class="card tight"><div class="row">${icon(ic)}<span class="strong">${title}</span></div>${rows.map((x) => `<div class="small" data-no-i18n>${esc(x)}</div>`).join('') || '<div class="muted">—</div>'}</div>`;
-    return `<section class="card" style="gap:12px">
-        <div class="row" style="gap:12px"><span class="metric num">${J.score == null ? '—' : J.score}</span><span class="grow muted" data-no-i18n>${esc(J.resumo || '')}</span><span class="pill">JEV</span></div>
-        <div class="option-cards" style="grid-template-columns:repeat(5,minmax(0,1fr))">${JEV_LABELS.map(([k, label]) => `<div class="option-card"><span class="s">${label}</span><span class="t num">${J.criteria && J.criteria[k] != null ? J.criteria[k] : '—'}</span></div>`).join('')}</div>
+    return `<section class="card" style="gap:14px">
+        <span class="eyebrow">JEV criteria</span>
+        ${J.resumo ? `<span class="muted" data-no-i18n>${esc(J.resumo)}</span>` : ''}
+        ${JEV_LABELS.map(([k, label]) => { const v = J.criteria && J.criteria[k] != null ? J.criteria[k] : null; const tone = C.scoreTone(v); return `<div class="crit-row"><span class="strong">${label}</span>${C.pctBar(v || 0, tone.cls === 'ok' ? '' : tone.cls)}<span class="score-num" style="color:${tone.color}">${v == null ? '—' : (v / 10).toFixed(1)}</span></div>`; }).join('')}
       </section>
       <section class="grid-2">${list('Strengths', 'check-circle', J.fortes || [])}${list('To improve', 'arrow-up-right', J.melhorar || [])}</section>
       <section class="card" style="gap:12px"><span class="strong">Question by question</span>${(J.items || []).map((it) => `<div class="stack" style="gap:3px"><div class="row" style="gap:8px"><span class="grow strong" data-no-i18n>${esc(it.pergunta)}</span><span class="pill num">${it.score == null ? '—' : it.score}</span></div><span class="small muted" data-no-i18n>${esc(it.veredito)}</span><span class="small" data-no-i18n>${esc(it.dica)}</span></div>`).join('')}</section>`;
@@ -251,7 +269,12 @@
 
   function doneView() {
     const r = M.record;
-    return `${C.head('Interview feedback', r ? `${r.company || '—'} · ${r.role || '—'}` : '')}
+    const J = r && r.evaluation;
+    return `<section class="mock-hero mock-done-hero">
+        ${C.orb(M.phase === 'finishing' ? 'thinking' : 'happy', 120, 'tight')}
+        <div class="stack grow" style="gap:6px;min-width:0"><span class="eyebrow on-aurora">Mock result</span><h1 class="h1 xl">Interview feedback</h1><span class="on-aurora-soft" data-no-i18n>${esc(r ? `${r.company || '—'} · ${r.role || '—'}` : '')}</span></div>
+        ${J && J.score != null ? `<div class="score-disc" style="--p:${J.score}"><div><span class="v">${(J.score / 10).toFixed(1)}</span><span class="num">/ 10</span></div></div>` : ''}
+      </section>
       ${M.phase === 'finishing' ? `<section class="card"><div class="row" style="gap:8px">${icon('sparkle')}<span>Writing your feedback…</span></div></section>` : ''}
       ${r ? evaluationHtml(r) + visualFeedbackHtml(r) + coachHtml(r) + transcriptHtml(r) : ''}
       ${M.phase === 'done' && !r ? `<section class="card"><div class="muted">${esc(M.refunded ? 'The interview ended before any answer and was not counted.' : 'The interview ended before any answer.')}</div></section>` : ''}
@@ -262,19 +285,33 @@
     let body = setupView;
     if (M.phase === 'live') body = liveView;
     else if (M.phase === 'finishing' || M.phase === 'done') body = doneView;
-    else if (C.localMode() || !canRun()) body = adView;
-    return `<div class="page">${body()}</div>`;
+    else if (C.localMode()) body = localView;
+    return body === liveView ? body() : `<div class="page design-page mock-page">${body()}</div>`;
   };
-  C.afterRender.mock = function afterMock() {
+  C.mockRecords = () => M.history || [];
+  C.loadMockRecords = function loadMockRecords() {
     if (M.history === null && api.mockList) {
       M.history = [];
-      api.mockList().then((list) => {
-        M.history = list || [];
-        if (M.history.length && S.route.view === 'mock' && M.phase === 'idle' ) C.renderView();
+      C.guard(() => api.mockList()).then((list) => {
+        M.history = Array.isArray(list) ? list : [];
+        if (M.history.length && (S.route.view === 'home' || (S.route.view === 'mock' && M.phase === 'idle'))) C.renderView();
       });
     }
+  };
+  C.afterRender.mock = function afterMock() {
+    C.loadMockRecords();
+    C.startOrbs();
     const box = document.getElementById('mockLines');
     if (box) box.scrollTop = box.scrollHeight;
+    const typed = document.getElementById('mockTyped');
+    if (typed) {
+      typed.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          C.actions['mock-send']();
+        }
+      });
+    }
     const preview = document.getElementById('mockCameraPreview');
     if (preview && M.cameraStream && preview.srcObject !== M.cameraStream) preview.srcObject = M.cameraStream;
     if (M.agentId && api.mockPrep && !(M.prep && M.prep[M.agentId]) && M.phase === 'idle') {
@@ -293,8 +330,13 @@
       box.innerHTML = linesHtml();
       box.scrollTop = box.scrollHeight;
     }
-    const stageOrb = document.querySelector('#mockStage .mock-orb');
-    if (stageOrb) stageOrb.className = `mock-orb lg ${M.state || ''}`;
+    C.setOrbState(M.state);
+    const pill = document.getElementById('mockStatePill');
+    if (pill) pill.className = `state-pill ${M.state || ''}`;
+    const caption = document.getElementById('mockCaption');
+    if (caption) caption.textContent = lastOrbyLine();
+    const qi = document.getElementById('mockQIndex');
+    if (qi) qi.textContent = String(questionCount());
     const st = document.getElementById('mockState');
     if (st) st.textContent = C.t ? C.t(STATE_LABEL[M.state] || '') : STATE_LABEL[M.state] || '';
   }
@@ -536,7 +578,7 @@
   }
 
   C.actions['mock-start'] = async () => {
-    if (M.phase !== 'idle') return;
+    if (M.phase !== 'idle' || M.requestingCamera || !canRunMode(M.mode)) return;
     M.error = '';
     if (!M.agentId) return;
     if (M.mode === 'advanced' && !M.consent) {
@@ -545,12 +587,20 @@
       return;
     }
     let cameraStream = null;
+    const requestedMode = M.mode;
     if (M.mode === 'advanced') {
+      M.requestingCamera = true;
       try {
         cameraStream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 360 }, facingMode: 'user' }, audio: false });
       } catch (_e) {
         M.error = 'Camera unavailable. Allow camera access, or switch to Basic.';
         C.renderView();
+        return;
+      } finally {
+        M.requestingCamera = false;
+      }
+      if (M.mode !== requestedMode || !M.consent || S.route.view !== 'mock') {
+        cameraStream.getTracks().forEach((track) => track.stop());
         return;
       }
     }
@@ -564,22 +614,28 @@
     finishing = false;
     M.state = 'connecting';
     C.renderView();
-    const requestedMode = M.mode;
     const r = await C.guard(() => api.mockStart(M.agentId, M.lang, requestedMode), 'Could not start the interview.');
     if (!r || !r.ok) {
       stopCamera();
       M.phase = 'idle';
       M.error = (r && r.error) || 'Could not start the interview.';
+      if (r?.code === 'mock_not_included') {
+        M.resumeMode = '';
+        await C.authRefresh(true);
+      }
       C.renderView();
       return;
     }
     if (r.mode === 'advanced' && requestedMode !== 'advanced') {
       M.phase = 'idle';
       M.mode = 'advanced';
+      M.resumeMode = 'advanced';
+      M.consent = false;
       M.error = 'An active Advanced interview was found. Agree to camera analysis to resume it.';
       C.renderView();
       return;
     }
+    M.resumeMode = '';
     M.id = r.id;
     M.mode = r.mode || M.mode;
     if (M.mode === 'basic') stopCamera();
@@ -614,6 +670,17 @@
     if (M.phase !== 'live') return;
     runTurn('');
   };
+  // Repeat, skip and hint are ordinary turns, so the interviewer answers them in
+  // the interview language and they stay in the transcript.
+  const ASKS = {
+    repeat: { 'pt-BR': 'Pode repetir a pergunta, por favor?', es: '¿Puedes repetir la pregunta, por favor?', other: 'Could you repeat the question, please?' },
+    skip: { 'pt-BR': 'Prefiro pular esta pergunta. Pode fazer a próxima?', es: 'Prefiero saltar esta pregunta. ¿Puedes hacer la siguiente?', other: 'I would like to skip this question. Please ask the next one.' },
+    hint: { 'pt-BR': 'Pode me dar uma dica curta para esta pergunta, sem dar a resposta?', es: '¿Puedes darme una pista breve para esta pregunta, sin dar la respuesta?', other: 'Could you give me a short hint for this question, without the answer?' }
+  };
+  C.actions['mock-ask'] = (el) => {
+    const set = ASKS[el.dataset.ask];
+    if (set) submitAnswer(set[M.lang] || set.other);
+  };
   C.actions['mock-finish'] = () => finish();
   C.actions['mock-send'] = () => {
     const input = document.getElementById('mockTyped');
@@ -628,11 +695,22 @@
     C.renderView();
   };
   C.actions['mock-open'] = (el) => {
-    M.record = (M.history || []).find((r) => r.id === el.dataset.id) || null;
-    if (M.record) {
+    const record = C.mockRecords().find((r) => r.id === el.dataset.id);
+    if (!record) return;
+    if (M.phase === 'idle' || M.phase === 'done') {
+      M.record = record;
       M.phase = 'done';
-      C.renderView(true);
     }
+    C.navigate('mock');
+  };
+  C.actions['mock-for-agent'] = (el) => {
+    if (M.phase === 'idle' || M.phase === 'done') {
+      M.agentId = el.dataset.agent;
+      M.phase = 'idle';
+      M.record = null;
+      M.consent = false;
+    }
+    C.navigate('mock');
   };
   C.actions['mock-coach'] = async () => {
     const input = document.getElementById('mockCoachInput');
@@ -647,18 +725,12 @@
     M.history = null;
     C.renderView();
   };
-  C.actions['mock-buy'] = async (el) => {
-    const res = await C.guard(() => api.cloudBilling('checkout', el.dataset.pack), 'Could not open the payment page.');
-    if (res && res.ok) C.toast('Finish your purchase in the browser.');
-    else if (res) C.toast(res.error || 'Could not open the payment page.', 'error');
-  };
   C.changes['mock-agent'] = (el) => {
     M.agentId = el.value;
     C.renderView();
   };
-  C.actions['mock-lang-set'] = (el) => {
-    M.lang = el.dataset.lang;
-    C.renderView();
+  C.changes['mock-lang'] = (el) => {
+    M.lang = el.value;
   };
   C.actions['mock-mode-set'] = (el) => {
     M.mode = el.dataset.mode === 'advanced' ? 'advanced' : 'basic';

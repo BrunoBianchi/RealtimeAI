@@ -3,7 +3,7 @@
 // engine (src/core/include/rtai/cloud_session.hpp) and fill in what the
 // server did not send, so the dashboard can explain the limit before a start.
 //   Free: one single session of up to 15 minutes, once (a trial).
-//   PRO:  up to 200 minutes and 1 mock interview per calendar month.
+//   PRO:  up to 200 live minutes and a separate shared mock token allowance.
 'use strict';
 
 const PLANS = {
@@ -19,13 +19,10 @@ const PRICING = {
     { id: 'tokens_150', minutes: 150, price: 16 },
     { id: 'tokens_400', minutes: 400, price: 40 }
   ],
-  // Basic is text-only with Orby; Advanced adds voice and camera image analysis.
-  // PRO's monthly mock is Advanced. Purchased credits are mode-specific.
   mockPacks: [
-    { id: 'mock_basic_1', mode: 'basic', interviews: 1, price: 2.99 },
-    { id: 'mock_basic_3', mode: 'basic', interviews: 3, price: 7.99 },
-    { id: 'mock_advanced_1', mode: 'advanced', interviews: 1, price: 7.99 },
-    { id: 'mock_advanced_3', mode: 'advanced', interviews: 3, price: 20.99 }
+    { id: 'mock_tokens_24', tokens: 24, price: 2.99 },
+    { id: 'mock_tokens_72', tokens: 72, price: 7.99 },
+    { id: 'mock_tokens_144', tokens: 144, price: 14.99 }
   ]
 };
 
@@ -50,6 +47,20 @@ function entitlement(account) {
   const mockBasicCredits = Math.max(0, num(p.mock_basic_credits) ?? 0);
   const mockAdvancedCredits = Math.max(0, num(p.mock_advanced_credits) ?? mockCredits);
   const mocksLeft = Math.max(0, mocksLimit - mocksUsed);
+  const mockBasicLimit = Math.max(0, num(p.mock_basic_limit) ?? 0);
+  const mockBasicLeft = Math.max(0, mockBasicLimit - (num(p.mock_basic_used) ?? 0));
+  const wallet = p.mock_tokens;
+  const basicCost = num(wallet?.basic_cost);
+  const advancedCost = num(wallet?.advanced_cost);
+  let mockTokens = null;
+  if (basicCost > 0 && advancedCost > basicCost) {
+    const includedLeft = Math.max(0, num(wallet.included_left) ?? 0);
+    const purchased = Math.max(0, num(wallet.purchased) ?? 0);
+    mockTokens = {
+      includedLimit: Math.max(0, num(wallet.included_limit) ?? 0),
+      includedLeft, purchased, balance: includedLeft + purchased, basicCost, advancedCost
+    };
+  }
   const trialUsed = rules.id === 'free' && sessionsUsed >= rules.maxSessions;
   const left = trialUsed && credit > 0 ? 0 : Math.max(0, limit - used);
   const maxSession = Math.min(num(p.max_session_minutes) ?? rules.maxSessionMinutes, left + credit);
@@ -79,10 +90,13 @@ function entitlement(account) {
     canStart,
     mocksLimit,
     mocksLeft,
+    mockBasicLimit,
+    mockBasicLeft,
     mockCredits,
     mockBasicCredits,
     mockAdvancedCredits,
-    canMock: mocksLeft + mockBasicCredits + mockAdvancedCredits > 0,
+    mockTokens,
+    canMock: mockTokens ? mockTokens.balance >= mockTokens.basicCost : mocksLeft + mockBasicLeft + mockBasicCredits + mockAdvancedCredits > 0,
     reason
   };
 }

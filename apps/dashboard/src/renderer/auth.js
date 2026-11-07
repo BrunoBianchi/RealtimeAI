@@ -12,7 +12,7 @@
   const { esc, icon } = C;
 
   // Screen state. The password lives only here, only until it is sent.
-  const A = { mode: 'signin', email: '', name: '', password: '', busy: '', error: '', info: '' };
+  const A = { mode: 'signin', email: '', name: '', referralCode: '', password: '', busy: '', error: '', info: '' };
 
 
   function field(name, label, type, value, placeholder, autocomplete) {
@@ -46,6 +46,7 @@
       ${signup ? field('name', 'Name', 'text', A.name, 'Your name', 'name') : ''}
       ${field('email', 'E-mail', 'email', A.email, 'you@email.com', 'email')}
       ${field('password', 'Password', 'password', '', signup ? 'At least 8 characters' : '', signup ? 'new-password' : 'current-password')}
+      ${signup ? field('referralCode', 'Invite code (optional)', 'text', A.referralCode, 'From a friend\'s link', 'off') : ''}
       <button type="button" class="auth-btn primary" id="authSubmit" data-action="auth-password" ${dis()}>${spinner('password')}${signup ? 'Create account' : 'Sign in'}</button>
       <div class="auth-links ${signup ? 'center' : ''}">
         ${signup
@@ -112,14 +113,17 @@
 
   async function authRefresh(force) {
     const wasLocked = C.isLocked();
+    const previous = S.auth;
     const st = api.cloudStatus ? await C.guard(() => api.cloudStatus(Boolean(force))) : null;
     S.auth = st || { signedIn: false };
     if (S.auth.account) S.profile = { ...S.profile, name: S.auth.account.name || '', email: S.auth.account.email || '' };
+    const accountChanged = previous?.account?.email !== S.auth.account?.email || previous?.serverUrl !== S.auth.serverUrl;
     lastStatusAt = Date.now();
     if (wasLocked !== C.isLocked()) {
       if (!C.isLocked()) C.navigate('home', true);
       else C.renderView(true);
-    } else if (C.isLocked() || (S.route && S.route.view === 'settings')) {
+    } else if (C.isLocked() || S.route?.view === 'settings' || (S.route?.view === 'home' && accountChanged)
+      || (S.route?.view === 'pair' && (accountChanged || previous?.entitlement?.isPro !== S.auth.entitlement?.isPro))) {
       C.refresh();
     } else {
       C.renderShell && C.renderShell();
@@ -127,6 +131,11 @@
     return S.auth;
   }
   C.authRefresh = authRefresh;
+
+  C.actions['use-account'] = async () => {
+    C.authMode('signin');
+    if (await C.saveConfig({ server_mode: 'auto' })) C.navigate('home', true);
+  };
 
   async function signedIn(config) {
     A.busy = '';
@@ -206,7 +215,7 @@
     A.info = '';
     C.refresh();
     const res = await C.guard(
-      () => (signup ? api.cloudSignup({ name: A.name, email: A.email, password }) : api.cloudPasswordLogin({ email: A.email, password })),
+      () => (signup ? api.cloudSignup({ name: A.name, email: A.email, password, referralCode: A.referralCode }) : api.cloudPasswordLogin({ email: A.email, password })),
       'Could not sign in.'
     );
     A.busy = '';

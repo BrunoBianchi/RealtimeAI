@@ -93,6 +93,18 @@
       ]
     },
 
+    pair: {
+      steps: () => [
+        { element: tour('pair-next'), optional: true, title: 'Start here', text: 'Start with the next problem you have yet to solve.' },
+        { element: tour('pair-options'), optional: true, title: 'Practice settings', text: 'Choose a language. Pro members can also choose the interview style and turn Orby hints on or off.' },
+        { element: tour('pair-list'), optional: true, title: 'Your progress', text: 'A problem counts as solved once every test passes.' }
+      ]
+    },
+    profile: {
+      steps: () => [
+        { route: 'profile', element: tour('profile-badges'), title: 'Your record', text: 'Everything here comes from your real activity on this computer: sessions, mock interviews and problems.' }
+      ]
+    },
     questions: {
       steps: (m) => [
         { element: tour('questions-source'), title: 'Question bank', text: 'Fills up by itself: at the end of each recorded session, the interviewer questions are added here. Sharing them anonymized is up to you.' },
@@ -102,7 +114,7 @@
   };
 
   // Which tour a page starts with the first time it is opened.
-  const PAGE_TOUR = { home: 'welcome', session: 'session', live: 'live', files: 'files', questions: 'questions', settings: 'setup' };
+  const PAGE_TOUR = { home: 'welcome', session: 'session', live: 'live', files: 'files', questions: 'questions', settings: 'setup', pair: 'pair', profile: 'profile' };
 
   // ----------------------------------------------------------- runtime --
   const lib = () => (window.driver && window.driver.js && window.driver.js.driver) || null;

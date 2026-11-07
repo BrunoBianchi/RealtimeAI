@@ -75,21 +75,25 @@ test('a refused start is explained and opens nothing', async () => {
   const m = createMockInterviews(f.deps);
   const r = await m.start({ agentId: 'g1', lang: 'en' });
   assert.strictEqual(r.ok, false);
-  assert.ok(r.error.includes('PRO'));
+  assert.match(r.error, /No interviews of this type/);
   assert.strictEqual(m.isActive(), false);
   fs.rmSync(f.dir, { recursive: true });
 });
 
-test('entitlement: PRO has one a month, credits work on any plan', () => {
+test('entitlement reads older servers and prefers the shared wallet when available', () => {
   assert.strictEqual(entitlement({ plan: { id: 'free' } }).canMock, false);
   assert.strictEqual(entitlement({ plan: { id: 'free', mock_credits: 1 } }).canMock, true);
   assert.strictEqual(entitlement({ plan: { id: 'pro', mocks_limit: 1 } }).mocksLeft, 1);
   assert.strictEqual(entitlement({ plan: { id: 'pro', mocks_limit: 1, mocks_used: 1 } }).canMock, false);
+  assert.strictEqual(entitlement({ plan: { id: 'pro', mocks_limit: 1, mocks_used: 1, mock_basic_limit: 1 } }).mockBasicLeft, 1);
+  const shared = entitlement({ plan: { id: 'pro', mock_advanced_credits: 99999, mock_tokens: { included_left: 0, purchased: 12, basic_cost: 24, advanced_cost: 48 } } });
+  assert.strictEqual(shared.mockTokens.balance, 12);
+  assert.strictEqual(shared.canMock, false);
 });
 
-test('the page shows the same interview catalog as plans.js, and the video ships', () => {
-  const src = fs.readFileSync(path.join(__dirname, '../src/renderer/mock.js'), 'utf8');
-  for (const p of PRICING.mockPacks) assert.ok(src.includes(`{ id: '${p.id}', interviews: ${p.interviews}, price: ${p.price} }`), p.id);
+test('Plan shows the same interview catalog as plans.js, and the video ships', () => {
+  const src = fs.readFileSync(path.join(__dirname, '../src/renderer/settings.js'), 'utf8');
+  for (const p of PRICING.mockPacks) assert.ok(src.includes(`['${p.id}', ${p.tokens}, ${p.price}]`), p.id);
   assert.ok(fs.statSync(path.join(__dirname, '../src/renderer/media/mock-how-it-works.webm')).size > 100000);
 });
 
@@ -131,6 +135,55 @@ test('every interview language is offered and split into sentences', () => {
   assert.ok(p.includes('Fale somente em espanhol'));
   assert.deepStrictEqual(takeSentences('こんにちは。自己紹介をお願いします').sentences, ['こんにちは。']);
   assert.strictEqual(takeSentences('字'.repeat(300)).sentences[0].length, 220);
+});
+
+test('both modes show their shared token costs and Basic opens with a balance of 24', async () => {
+  const { entitlement } = require('../src/main/plans');
+  const { loadRenderer, render, tags } = require('./helpers/renderer');
+  const ent = entitlement({ plan: { id: 'pro', mock_tokens: { included_limit: 72, included_left: 0, purchased: 24, basic_cost: 24, advanced_cost: 48 } } });
+  const r = loadRenderer({
+    state: { agents: [job], auth: { signedIn: true, entitlement: ent } },
+    api: { mockStart: async () => ({ ok: true, id: 'm1', mode: 'basic', maxS: 1800 }) }
+  });
+  const mock = render(r.Cue, 'mock');
+  const [start] = tags(mock, { 'data-action': 'mock-start' });
+  assert.ok(start && !('disabled' in start));
+  assert.match(mock, /Start Basic interview/);
+  assert.match(mock, /24 tokens per interview[\s\S]*48 tokens per interview[\s\S]*Shared balance: 24 tokens/);
+  assert.doesNotMatch(mock, /data-pack=|Test microphone/);
+  await r.Cue.actions['mock-start']();
+  assert.deepEqual(r.called('mockStart'), [[job.id, 'en', 'basic']]);
+  assert.deepEqual(r.called('mockTurn'), [['']]);
+
+  const plan = render(r.Cue, 'settings/plan/interviews');
+  assert.match(plan, /data-card="interview-credits"/);
+  assert.equal(tags(plan, { 'data-pack': 'mock_tokens_24' }).length, 1);
+  assert.equal(tags(plan, { 'data-pack': 'mock_tokens_144' }).length, 1);
+
+  const free = loadRenderer({ state: { agents: [job], auth: { entitlement: entitlement({ plan: { id: 'free' } }) } } });
+  const unavailable = render(free.Cue, 'mock');
+  assert.match(unavailable, /data-to="settings\/plan\/interviews"/);
+  assert.doesNotMatch(unavailable, /data-action="mock-start"|data-pack=/);
+});
+
+test('Home keeps the referral card visible after a 404 and retries when requested', async () => {
+  const { loadRenderer, render, settle } = require('./helpers/renderer');
+  let attempts = 0;
+  const r = loadRenderer({
+    state: { auth: { signedIn: true, serverUrl: 'https://example.invalid', account: { email: 'one@example.invalid' } } },
+    api: { cloudReferral: async () => ++attempts === 1 ? { ok: false, status: 404 } : {
+      ok: true, data: { code: 'invite', url: 'https://example.invalid/r/invite', completed: 0, bonus_minutes: 30, minutes_earned: 0 }
+    } }
+  });
+  assert.match(render(r.Cue, 'home'), /Refer and earn/);
+  await settle();
+  const unavailable = render(r.Cue, 'home');
+  assert.match(unavailable, /This server does not offer referral links yet/);
+  assert.match(unavailable, /data-action="referral-retry"/);
+  await r.Cue.actions['referral-retry']();
+  const ready = render(r.Cue, 'home');
+  assert.match(ready, /data-action="referral-copy"/);
+  assert.match(ready, /0 friends · 0 min earned/);
 });
 
 test('Home still opens when the mock interview script failed to load', () => {

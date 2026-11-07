@@ -205,9 +205,9 @@ bool SessionStore::open(const SessionMeta& meta, std::string* error) {
         .field("mode", meta.mode)
         .field("stt_model", meta.stt_model)
         .field("language", meta.language)
-        .field("llm_model", meta.llm_model)
-        .field("version", kVersion)
-        .end_object();
+        .field("llm_model", meta.llm_model);
+    if (!meta.route.empty()) w.field("route", meta.route);
+    w.field("version", kVersion).end_object();
     out_ << w.str() << '\n';
     out_.flush();
     lines_written_.fetch_add(1);
@@ -318,7 +318,8 @@ std::optional<std::string> SessionStore::to_json_line(const EngineEvent& ev) {
                     .field("model", e.model)
                     .field_int("ttft_ms", e.ttft_ms)
                     .field_int("total_ms", e.total_ms)
-                    .field_int("visible_ms", e.visible_ms);
+                    .field_int("visible_ms", e.visible_ms)
+                    .field_int("speech_end_to_visible_ms", e.speech_end_to_visible_ms);
                 if (!e.error.empty()) w.field("error", e.error);
                 if (!e.interpreted_question.empty()) w.field("understood", e.interpreted_question);
                 w.end_object();

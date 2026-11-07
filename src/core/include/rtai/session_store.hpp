@@ -35,6 +35,9 @@ struct SessionMeta {
     std::string stt_model;
     std::string language;
     std::string llm_model;
+    // How the session reaches the LLM: "relay", "direct_openrouter",
+    // "direct_cerebras", "direct_other" or "local". Empty = no LLM.
+    std::string route;
 };
 
 struct SessionStoreConfig {

@@ -47,6 +47,7 @@ struct LlmResult {
     int http_status{0};
     std::int64_t ttft_ms{-1};  // time to first token
     std::int64_t total_ms{0};
+    bool http2{false};  // the response came over HTTP/2 (real network clients only)
 };
 
 // Contract for implementations:

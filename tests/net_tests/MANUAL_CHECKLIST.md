@@ -1,17 +1,12 @@
 # Direct HTTP/2 transport — manual verification checklist (task 10.2)
 
 Task 10.2 verifies the Dual-Path Hot_Path **direct HTTP/2 transport**
-(`src/net/src/winhttp_llm_client.cpp`). Part of it is automated in
-`test_http2_transport_integration.cpp` (the Req 4.1/4.3 critical-endpoint
-static guard, which runs everywhere with no network); the rest needs a **live
-network**, a **reachable provider endpoint**, **valid credentials**, and a
-**packet/ETW capture tool**, so it is verified by hand against a real socket.
+(`src/net/src/winhttp_llm_client.cpp`). Most of it is automated in
+`test_http2_transport_integration.cpp`. The live tests only run on request, so
+the suite stays green offline and in headless CI; see "Running" below. What's left
+by hand is what only a packet capture shows.
 
-The automated tests self-skip when no live endpoint is provided, so the suite
-stays green offline / in headless CI. The live tests opt in via environment
-variables; see "Running" below.
-
-Each item lists the requirement, how to reproduce it, and the pass condition.
+Each manual item lists the requirement, how to reproduce it, and the pass condition.
 
 ## Automated vs manual at a glance
 
@@ -21,18 +16,18 @@ Each item lists the requirement, how to reproduce it, and the pass condition.
 | Critical endpoints never resolve to `openrouter.ai` | 4.3 | automated (static guard) |
 | Endpoint selection / failover (`choose_endpoint`, `is_retryable`) | 4.2 | automated (property tests) |
 | Keep-alive timing (`should_ping`, 25 s) | 4.5 | automated (property tests) |
-| HTTP/2 is the negotiated wire protocol | 4.4 | **manual** (self-skipping live test) |
-| Cancel + reissue reuses the TCP/TLS connection (no new handshake) | 4.6 | **manual** (self-skipping live test) |
+| HTTP/2 is the negotiated wire protocol | 4.4 | automated, live: `GenerationNegotiatesHttp2` |
+| A second request reuses the connection | 4.6 | automated, live: `SecondRequestReusesConnection` |
+| Cancel in mid-stream, then reissue, reuses the connection | 4.6 | automated, live with a key: `CancelAndReissueReusesConnection` |
+| The cancel sends `RST_STREAM`; the fallback host also negotiates `h2` | 4.4, 4.6 | **manual** (M1, M2) |
 
 ## Opt-in environment variables
 
 | Variable | Purpose |
 | --- | --- |
-| `RTAI_NET_LIVE` | Set to `1`/`true` to enable the live tests at all. Unset = skip. |
-| `RTAI_LLM_API_KEY` | Cerebras (or compatible) API key used for the real generation request. |
-
-With neither set, `test_http2_transport_integration.cpp`'s live tests
-`GTEST_SKIP()` and only the pure static guard runs.
+| `RTAI_NET_LIVE` | Set to `1`/`true` to enable the live tests. They reach `openrouter.ai`. Unset = skip. |
+| `RTAI_LLM_API_KEY` | OpenRouter key. Spends a few tokens. Without it, only the cancel test skips. |
+| `RTAI_NET_MODEL` | Model for the requests with a key. Default: `qwen/qwen3.6-flash`. |
 
 ## Manual steps
 
@@ -80,10 +75,12 @@ cmake --build build --config Release --target net_tests
 # offline / headless: only the static guard runs; live tests skip cleanly
 build\bin\Release\net_tests.exe --gtest_filter=Http2Transport*
 
-# opt in to the live tests (real network + credentials), then run by hand with
-# a packet/ETW capture open per M1/M2 above:
+# live, no credentials: protocol and connection reuse
 $env:RTAI_NET_LIVE = "1"
-$env:RTAI_LLM_API_KEY = "<your-cerebras-key>"
+build\bin\Release\net_tests.exe --gtest_filter=Http2TransportLive.*
+
+# add a key to cancel in the middle of a real stream (spends a few tokens)
+$env:RTAI_LLM_API_KEY = "<your-openrouter-key>"
 build\bin\Release\net_tests.exe --gtest_filter=Http2TransportLive.*
 
 # or via ctest

@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <condition_variable>
 #include <cstdlib>
@@ -68,6 +69,18 @@ TEST(DeepgramLive, TranscribesSpeechWavToFinal) {
     std::string final_text;
     bool got_final = false;
     bool saw_interim_before_final = false;
+    bool link_error = false;
+    TransportStatus error_status;
+
+    // A refused key is a different problem from a missing transcript: stop and
+    // say so instead of waiting for words that will never come.
+    tx.set_status_callback([&](const TransportStatus& st) {
+        if (st.state != LinkState::Error) return;
+        std::lock_guard<std::mutex> lk(mu);
+        link_error = true;
+        error_status = st;
+        cv.notify_all();
+    });
 
     tx.open([&](const TranscriptEvent& ev) {
         std::lock_guard<std::mutex> lk(mu);
@@ -98,6 +111,10 @@ TEST(DeepgramLive, TranscribesSpeechWavToFinal) {
     // Send in 20 ms frames (320 samples @ 16 kHz) at real-time-ish pace.
     constexpr std::size_t frame = 320;
     for (std::size_t off = 0; off < pcm.size(); off += frame) {
+        {
+            std::lock_guard<std::mutex> lk(mu);
+            if (link_error) break;
+        }
         const std::size_t n = (std::min)(frame, pcm.size() - off);
         tx.send_audio(std::span<const std::int16_t>(pcm.data() + off, n));
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
@@ -107,12 +124,23 @@ TEST(DeepgramLive, TranscribesSpeechWavToFinal) {
     // Wait up to 10 s for a final transcript.
     {
         std::unique_lock<std::mutex> lk(mu);
-        cv.wait_for(lk, std::chrono::seconds(10), [&] { return got_final; });
+        cv.wait_for(lk, std::chrono::seconds(10), [&] { return got_final || link_error; });
     }
     tx.close();
 
+    std::lock_guard<std::mutex> lk(mu);
+    ASSERT_FALSE(link_error) << "Deepgram refused the connection (HTTP " << error_status.http_status
+                             << "). Check DEEPGRAM_API_KEY. " << error_status.detail;
     EXPECT_TRUE(got_final) << "No final transcript received from Deepgram.";
-    EXPECT_FALSE(final_text.empty());
+    // assets/sample_speech.wav says "Tell me about a project you are proud of...".
+    if (get_env("RTAI_SPEECH_WAV").empty()) {
+        std::string lower = final_text;
+        std::transform(lower.begin(), lower.end(), lower.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        EXPECT_NE(lower.find("project"), std::string::npos) << "Heard: " << final_text;
+    } else {
+        EXPECT_FALSE(final_text.empty());
+    }
     // Interim-before-final is expected with interim_results=true, but we don't
     // hard-fail on it since timing can vary.
     if (!saw_interim_before_final) {

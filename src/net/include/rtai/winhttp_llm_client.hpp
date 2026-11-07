@@ -27,6 +27,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "rtai/llm.hpp"
 
@@ -88,7 +89,24 @@ struct WinHttpLlmOptions {
     // Background keep-alive pinger (see start_keep_alive). Off for secondary
     // clients that are not on the live answer path.
     bool keep_alive{true};
+    // The host is the Lipcue relay (cloud mode): keep it warm too. Other
+    // single-host endpoints (a local Ollama...) stay out of the keep-alive.
+    bool keep_alive_relay{false};
 };
+
+// One host the keep-alive worker keeps warm.
+struct WarmTarget {
+    std::string host;
+    std::string key;
+    std::wstring method;
+    std::string path;
+    bool drain{false};      // read the (small) body so the connection is reused
+    bool immediately{true}; // first ping at start-up (no other warm-up covers it)
+};
+
+// The hosts to keep warm: the live endpoint, then the fallback provider so a
+// failover does not pay a cold handshake either. Pure, no network.
+[[nodiscard]] std::vector<WarmTarget> keep_alive_targets(const WinHttpLlmOptions& opts);
 
 // ---------------------------------------------------------------------------
 // Pure endpoint-selection / retry / keep-alive logic (no network; unit and

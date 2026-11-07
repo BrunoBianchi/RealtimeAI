@@ -92,16 +92,6 @@ std::string models_path(const std::string& chat_path) {
     return "/v1/models";
 }
 
-// One host the keep-alive worker keeps warm.
-struct WarmTarget {
-    std::string host;
-    std::string key;
-    std::wstring method;
-    std::string path;
-    bool drain{false};      // read the (small) body so the connection is reused
-    bool immediately{true}; // first ping at start-up (no other warm-up covers it)
-};
-
 // Outcome of a single endpoint attempt: the stream result plus the failover
 // classification the worker uses to decide whether to fall over (Req 4.2).
 struct AttemptOutcome {
@@ -134,6 +124,22 @@ struct WinHttpLlmClient::Shared {
     std::thread keep_alive;
 };
 
+std::vector<WarmTarget> keep_alive_targets(const WinHttpLlmOptions& opts) {
+    std::vector<WarmTarget> targets;
+    if (!opts.primary.host.empty()) {
+        targets.push_back({opts.primary.host, opts.primary.api_key, L"HEAD", models_path(opts.primary.path), false, true});
+    } else if (opts.keep_alive_relay) {
+        targets.push_back({opts.host, opts.api_key, L"HEAD", models_path(opts.path), false, true});
+    } else if (opts.host == "openrouter.ai") {
+        // warm_up() already opens this connection at start-up.
+        targets.push_back({opts.host, opts.api_key, L"GET", "/api/v1/key", true, false});
+    }
+    if (has_fallback(opts) && (targets.empty() || targets.front().host != opts.fallback.host)) {
+        targets.push_back({opts.fallback.host, opts.fallback.api_key, L"HEAD", models_path(opts.fallback.path), false, true});
+    }
+    return targets;
+}
+
 WinHttpLlmClient::WinHttpLlmClient(WinHttpLlmOptions opts)
     : opts_(std::move(opts)), shared_(std::make_shared<Shared>()) {
     shared_->session.reset(win::open_session(L"lipcue.com/" RTAI_VERSION_WSTRING L" (WinHTTP)"));
@@ -151,13 +157,11 @@ WinHttpLlmClient::WinHttpLlmClient(WinHttpLlmOptions opts)
     win::enable_low_latency(shared_->session.get(),
                             opts_.keep_alive ? static_cast<DWORD>(opts_.keep_alive_ms) : 0);
 
-    // Keep the connections warm (Req 4.1/4.5): the direct primary endpoint, or
-    // OpenRouter in single-host mode, plus a configured fallback provider. An
-    // idle TLS connection is dropped by the server after a while; without the
-    // ping the first question after a quiet stretch would pay DNS + TCP + TLS
-    // (often 100-300 ms) before any token.
-    if (opts_.keep_alive && (!opts_.primary.host.empty() || opts_.host == "openrouter.ai" || has_fallback(opts_)))
-        start_keep_alive();
+    // Keep the connections warm (Req 4.1/4.5): see keep_alive_targets. An idle
+    // TLS connection is dropped by the server after a while; without the ping
+    // the first question after a quiet stretch would pay DNS + TCP + TLS (often
+    // 100-300 ms) before any token.
+    if (opts_.keep_alive) start_keep_alive();
 }
 
 WinHttpLlmClient::~WinHttpLlmClient() { shutdown(std::chrono::milliseconds(1500)); }
@@ -167,18 +171,7 @@ WinHttpLlmClient::~WinHttpLlmClient() { shutdown(std::chrono::milliseconds(1500)
 // keep_alive_ms interval has elapsed. A ping failure is non-fatal — the next
 // real request re-establishes the connection on its own.
 void WinHttpLlmClient::start_keep_alive() {
-    // Hosts to keep warm: the live endpoint, then the fallback provider so a
-    // failover does not pay a cold handshake either.
-    std::vector<WarmTarget> targets;
-    if (!opts_.primary.host.empty()) {
-        targets.push_back({opts_.primary.host, opts_.primary.api_key, L"HEAD", models_path(opts_.primary.path), false, true});
-    } else if (opts_.host == "openrouter.ai") {
-        // warm_up() already opens this connection at start-up.
-        targets.push_back({opts_.host, opts_.api_key, L"GET", "/api/v1/key", true, false});
-    }
-    if (has_fallback(opts_) && (targets.empty() || targets.front().host != opts_.fallback.host)) {
-        targets.push_back({opts_.fallback.host, opts_.fallback.api_key, L"HEAD", models_path(opts_.fallback.path), false, true});
-    }
+    std::vector<WarmTarget> targets = keep_alive_targets(opts_);
     if (targets.empty()) return;
 
     {
@@ -352,6 +345,11 @@ std::shared_ptr<ILlmCall> WinHttpLlmClient::start(LlmRequest request, LlmCallbac
             }
             const DWORD status = win::query_status(hreq.get());
             out.res.http_status = static_cast<int>(status);
+            DWORD protocol = 0;
+            DWORD protocol_size = sizeof(protocol);
+            if (WinHttpQueryOption(hreq.get(), WINHTTP_OPTION_HTTP_PROTOCOL_USED, &protocol, &protocol_size)) {
+                out.res.http2 = (protocol & WINHTTP_PROTOCOL_FLAG_HTTP2) != 0;
+            }
             if (status != 200) {
                 // 4xx surfaces the error and does NOT fall over; 5xx is retryable.
                 fail(openrouter::parse_error_body(static_cast<int>(status),

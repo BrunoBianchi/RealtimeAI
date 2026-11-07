@@ -87,6 +87,10 @@ struct SuggestionDoneEvent {
     // speculation committed) to the first answer text on it. 0 when a
     // speculative buffer was already full at commit. -1 = no text shown.
     std::int64_t visible_ms{-1};
+    // From the last voice audio the local VAD detected to the first answer text
+    // on screen. Negative when the text came first. -1 = no data, which includes
+    // answers not started by speech (manual, chat, screenshot, recap, follow-up).
+    std::int64_t speech_end_to_visible_ms{-1};
 };
 
 struct NoticeEvent {

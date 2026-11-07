@@ -45,6 +45,7 @@ function describeError(code, status) {
     case 'email_not_verified': return 'Confirm your e-mail with the link we sent, then sign in again.';
     case 'sso_not_configured': return 'SSO is not set up for this domain. Contact your company administrator.';
     case 'rate_limited': return 'Too many attempts. Wait a moment and try again.';
+    case 'busy': return 'The server is busy right now. Try again in a few seconds.';
     case 'file_too_large': return 'Files can have up to 20 MB.';
     case 'storage_full': return 'Your cloud storage is full.';
     case 'billing_unavailable': return 'Upgrades are not available yet. Try again later.';
@@ -180,12 +181,22 @@ function createCloudAccount(deps) {
     return finishSignIn(r);
   }
 
-  async function signup(name, email, password) {
+  async function referral() {
+    return api('GET', '/v1/referral');
+  }
+
+  async function signup(name, email, password, referralCode) {
     if (!serverInfo().available) return { ok: false, error: describeError('no_server') };
     if (!validEmail(email)) return { ok: false, error: describeError('invalid_email') };
     if (String(password || '').length < 8) return { ok: false, error: describeError('weak_password') };
     const r = await request('POST', '/v1/auth/signup', {
-      body: { name: String(name || '').trim(), email: String(email).trim(), password: String(password), client_id: 'rtai-dashboard' }
+      body: {
+        name: String(name || '').trim(),
+        email: String(email).trim(),
+        password: String(password),
+        client_id: 'rtai-dashboard',
+        ...(String(referralCode || '').trim() ? { referral_code: String(referralCode).trim() } : {})
+      }
     });
     return finishSignIn(r);
   }
@@ -302,7 +313,7 @@ function createCloudAccount(deps) {
     return { ok: true };
   }
 
-  return { deleteAccount, syncClient, status, loginWithPassword, signup, resetPassword, billing, logout, serverInfo, api, aiEndpoint, uploadFile, listFiles, deleteFile };
+  return { deleteAccount, syncClient, status, loginWithPassword, signup, referral, resetPassword, billing, logout, serverInfo, api, aiEndpoint, uploadFile, listFiles, deleteFile };
 }
 
 module.exports = { createCloudAccount, effectiveServerUrl, normalizeBaseUrl, describeError, BUILTIN_SERVER_URL };

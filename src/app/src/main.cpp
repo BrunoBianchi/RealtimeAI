@@ -846,6 +846,7 @@ int run_app(AppConfig cfg) {
     std::shared_ptr<WinHttpLlmClient> openrouter;
     std::shared_ptr<WinHttpLlmClient> openrouter_sol_client;
     bool llm_on_openrouter = false; // live answers go to openrouter.ai
+    std::string llm_route;          // recorded in session_start
     if (cfg.cloud_credentials() && cfg.cloud_session->llm.valid()) {
         // Cloud: same OpenAI-compatible SSE client, pointed at the URL the
         // server chose (edge relay next to the provider, or the provider
@@ -868,9 +869,11 @@ int run_app(AppConfig cfg) {
                                       cs.llm_fallback.token};
         }
         lo.openrouter_provider_sort.clear(); // routing is the server's call
+        lo.keep_alive_relay = true;
         openrouter = std::make_shared<WinHttpLlmClient>(lo);
         llm = openrouter;
         openrouter_sol_client = openrouter;
+        llm_route = "relay";
     } else if (!cfg.st.cerebras_key.empty() || !cfg.st.llm_key.empty()) {
         const bool model_is_openrouter = cfg.st.model.find('/') != std::string::npos;
         const bool use_cerebras = !cfg.st.cerebras_key.empty() &&
@@ -887,6 +890,7 @@ int run_app(AppConfig cfg) {
         }
         WinHttpLlmOptions lo;
         llm_on_openrouter = !use_cerebras && url.host == "openrouter.ai";
+        llm_route = use_cerebras ? "direct_cerebras" : llm_on_openrouter ? "direct_openrouter" : "direct_other";
         lo.api_key = use_cerebras ? cfg.st.cerebras_key : cfg.st.llm_key;
         lo.host = url.host;
         lo.port = url.port;
@@ -941,6 +945,7 @@ int run_app(AppConfig cfg) {
     // Local mode has no plan: every live answer waits a little before going
     // out. The HUD says so, and the dashboard shows the difference to PRO.
     if (llm && cloud::local_mode(cfg.st)) {
+        llm_route = "local";
         llm = std::make_shared<DelayedLlmClient>(llm, std::chrono::milliseconds(cloud::kLocalAnswerDelayMs));
         cfg.notes.push_back("Local mode: answers start about " + std::to_string(cloud::kLocalAnswerDelayMs) +
                             " ms later than with PRO.");
@@ -1081,6 +1086,7 @@ int run_app(AppConfig cfg) {
         meta.stt_model = "nova-3";
         meta.language = cfg.st.language;
         meta.llm_model = llm ? cc.model : std::string();
+        meta.route = llm ? llm_route : std::string();
         std::string err;
         if (store->open(meta, &err)) {
             SessionStore* s = store.get();

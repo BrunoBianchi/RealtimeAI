@@ -1,5 +1,5 @@
 // AI mock interviews (Basic text chat or Advanced voice and opt-in camera review).
-// The server spends a mode-specific credit and enforces the 30-minute limit;
+// The server debits the shared token wallet and enforces the 30-minute limit;
 // this module grounds the interviewer in the job, résumé and uploads, and
 // streams interviewer turns as soon as each sentence is ready.
 'use strict';
@@ -229,7 +229,7 @@ function createMockInterviews(deps) {
     if (!r.ok) {
       const code = r.error || (r.data && r.data.error && r.data.error.code) || '';
       if (r.status === 404) return { ok: false, code: 'server_outdated', error: 'The lipcue.com server has not been updated for mock interviews yet. Nothing was charged.' };
-      const error = code === 'mock_not_included' ? 'Mock interviews need PRO or an interview credit.'
+      const error = code === 'mock_not_included' ? 'No interviews of this type are available on your account. Check your plan and credits.'
         : code === 'vision_unavailable' ? 'Camera analysis is unavailable right now. Nothing was charged.'
           : 'Mock interviews are unavailable right now. Nothing was charged.';
       return { ok: false, code, error };

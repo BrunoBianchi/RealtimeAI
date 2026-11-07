@@ -31,7 +31,7 @@ std::string write_tone_wav(std::uint32_t rate, double freq, double seconds) {
     }
 
     auto path = std::filesystem::temp_directory_path() /
-                ("rtai_tone_" + std::to_string(rate) + ".wav");
+                ("rtai_tone_" + std::to_string(rate) + "_" + std::to_string(static_cast<int>(freq)) + ".wav");
     std::ofstream f(path, std::ios::binary);
 
     auto w32 = [&](std::uint32_t v) { f.write(reinterpret_cast<const char*>(&v), 4); };

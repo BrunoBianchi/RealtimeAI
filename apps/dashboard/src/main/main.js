@@ -32,6 +32,7 @@ const localBackend = require('./local_backend');
 const { settingsSectionFromArgv } = require('./launch_args');
 const jevEngine = require('./jev_engine');
 const { createMockInterviews, languageName } = require('./mock_interview');
+const { createPairProgramming } = require('./pair_programming');
 const companyLogoService = require('./company_logo_service');
 
 // apps/dashboard (or the app.asar root once packaged) and the repository root.
@@ -39,6 +40,9 @@ const APP_ROOT = path.resolve(__dirname, '..', '..');
 const REPO_ROOT = path.resolve(APP_ROOT, '..', '..');
 const PRELOAD_DIR = path.join(__dirname, '..', 'preload');
 const RENDERER_DIR = path.join(__dirname, '..', 'renderer');
+const APP_ICON = path.join(APP_ROOT, 'assets', 'icon.png');
+// The installed app must match the ID on the shortcuts made by electron-builder.
+const WINDOWS_APP_ID = app.isPackaged ? 'com.raiado.realtimeai' : 'com.raiado.realtimeai.dev';
 
 let mainWindow = null;
 let overlayProcess = null;
@@ -52,10 +56,9 @@ let updater = null;
 
 // One dashboard at a time: it lives in the tray and watches for meetings, so a
 // second launch just brings the first one forward.
-// Windows shows this ID as the name on notifications, so it is the app's name.
 // The packaged app also keeps the profile it had before its rename, so sign-ins
 // and preferences survive.
-if (typeof app.setAppUserModelId === 'function') app.setAppUserModelId('lipcue.com');
+if (process.platform === 'win32') app.setAppUserModelId?.(WINDOWS_APP_ID);
 if (app.isPackaged) app.setPath('userData', path.join(app.getPath('appData'), 'RealTimeAI'));
 
 const gotSingleInstanceLock =
@@ -3348,7 +3351,7 @@ function createWindow() {
     frame: false,
     backgroundColor: initialTheme.resolved === 'dark' ? '#070908' : '#FFFFFF',
     title: 'lipcue.com — Interview Copilot',
-    icon: path.join(APP_ROOT, 'assets', process.platform === 'win32' && fs.existsSync(path.join(APP_ROOT, 'assets', 'icon.ico')) ? 'icon.ico' : 'icon.png'),
+    icon: APP_ICON,
     webPreferences: {
       preload: path.join(PRELOAD_DIR, 'preload.js'),
       contextIsolation: true,
@@ -3356,6 +3359,17 @@ function createWindow() {
       zoomFactor: UI_ZOOM
     }
   });
+  if (process.platform === 'win32') {
+    // Explorer cannot read icons inside app.asar. The installer embeds the
+    // icon in lipcue.exe, while the source build points at the on-disk ICO.
+    const executable = `"${process.execPath}"`;
+    mainWindow.setAppDetails({
+      appId: WINDOWS_APP_ID,
+      appIconPath: app.isPackaged ? process.execPath : path.join(APP_ROOT, 'assets', 'icon.ico'),
+      relaunchCommand: app.isPackaged ? executable : `${executable} "${APP_ROOT}"`,
+      relaunchDisplayName: 'lipcue.com'
+    });
+  }
 
   // Electron resets the zoom of file:// pages on loads and on some hash
   // (router) navigations, so put it back after each of them.
@@ -3638,7 +3652,8 @@ app.whenReady().then(() => {
     return st;
   });
   ipcMain.handle('rtai:cloud-password-login', async (_ev, p) => cloudAccount.loginWithPassword(p && p.email, p && p.password));
-  ipcMain.handle('rtai:cloud-signup', async (_ev, p) => cloudAccount.signup(p && p.name, p && p.email, p && p.password));
+  ipcMain.handle('rtai:cloud-signup', async (_ev, p) => cloudAccount.signup(p && p.name, p && p.email, p && p.password, p && p.referralCode));
+  ipcMain.handle('rtai:cloud-referral', async () => (isLocalMode(readConfigIni()) ? { ok: false, error: 'local_mode' } : cloudAccount.referral()));
   ipcMain.handle('rtai:cloud-reset-password', async (_ev, email) => cloudAccount.resetPassword(email));
   // The server copy goes first: a refused password or no network erases nothing.
   ipcMain.handle('rtai:cloud-delete-account', async (_ev, password) => {
@@ -3672,6 +3687,44 @@ app.whenReady().then(() => {
     }
     return { ok: true, sent, failed };
   });
+  async function canUsePairAi() {
+    const cfg = readConfigIni();
+    if (isLocalMode(cfg) || !isSignedIn(cfg)) return false;
+    const status = await cloudAccount.status(false);
+    return status.signedIn && status.entitlement?.isPro === true;
+  }
+  const pairProgramming = createPairProgramming({
+    dataDir: () => getAppDataDir(),
+    now: () => Date.now(),
+    canUseAi: canUsePairAi,
+    complete: async (operation, messages) => {
+      const res = await cloudAccount.api('POST', `/v1/pair/${operation}`, { messages }, { timeoutMs: 35000 });
+      return res.ok
+        ? { text: res.data?.text }
+        : { code: res.status === 401 || res.status === 402 ? 'pair_pro_required' : res.error };
+    }
+  });
+  ipcMain.handle('rtai:pair-catalog', async () => pairProgramming.catalog(await canUsePairAi()));
+  ipcMain.handle('rtai:pair-run', async (_ev, p) => pairProgramming.run(p || {}));
+  ipcMain.handle('rtai:pair-chat', async (_ev, p) => pairProgramming.chat(p || {}));
+  ipcMain.handle('rtai:pair-finish', async (_ev, p) => pairProgramming.finish(p || {}));
+  ipcMain.handle('rtai:pair-history', async () => pairProgramming.history(await canUsePairAi()));
+  ipcMain.handle('rtai:jev-history', async () => {
+    const dir = path.join(getAppDataDir(), 'sessions');
+    const out = [];
+    let names = [];
+    try {
+      names = fs.readdirSync(dir).filter((n) => n.endsWith('.jev.json'));
+    } catch (_e) {}
+    for (const name of names) {
+      try {
+        const ev = JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8'));
+        if (Number.isFinite(ev.score) && ev.criteria) out.push({ score: ev.score, criteria: ev.criteria });
+      } catch (_e) {}
+    }
+    return out;
+  });
+
   const mockInterviews = createMockInterviews({
     dataDir: () => getAppDataDir(),
     agents: () => loadAllAgents(),
@@ -3713,7 +3766,7 @@ app.whenReady().then(() => {
   ipcMain.handle('rtai:open-url', async (_ev, url) => {
     try {
       const u = new URL(String(url || ''));
-      const allowed = ['console.deepgram.com', 'openrouter.ai', 'cloud.cerebras.ai', 'console.groq.com'];
+      const allowed = ['console.deepgram.com', 'openrouter.ai', 'cloud.cerebras.ai', 'console.groq.com', 'www.linkedin.com'];
       if (u.protocol !== 'https:' || !allowed.includes(u.hostname.toLowerCase())) return { ok: false };
       await shell.openExternal(u.toString());
       return { ok: true };

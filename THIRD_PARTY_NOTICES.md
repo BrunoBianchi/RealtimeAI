@@ -31,3 +31,7 @@ MIT License, Copyright (c) 2020-present Silero Team.
 ## Referência de UX
 
 O layout do HUD (barra de ações, faixa de transcrição em chips, cartão de pergunta e resposta) foi inspirado no Natively e em apps parecidos. Nenhum código do Natively foi copiado.
+
+## Geist e Geist Mono (fontes do dashboard)
+
+`apps/dashboard/src/renderer/vendor/fonts/` traz as fontes variáveis do pacote `geist` 1.3.1 (Vercel e basement.studio), sob a SIL Open Font License 1.1. O texto completo da licença está em `vendor/fonts/LICENSE.txt`.

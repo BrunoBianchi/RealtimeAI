@@ -18,7 +18,7 @@ colors:
   surface-tint: '#4edea3'
   primary: '#4edea3'
   on-primary: '#003824'
-  primary-container: '#10b981'
+  primary-container: '#22c55e'
   on-primary-container: '#00422b'
   inverse-primary: '#006c49'
   secondary: '#c6c5cf'
@@ -115,7 +115,7 @@ typography:
     lineHeight: 2.125rem
     letterSpacing: -0.03em
   label-code:
-    fontFamily: JetBrains Mono
+    fontFamily: Geist Mono
     fontSize: 0.75rem
     fontWeight: '500'
     lineHeight: 1rem

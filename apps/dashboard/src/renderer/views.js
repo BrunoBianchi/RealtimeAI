@@ -38,42 +38,26 @@
   }
   C.companyLogo = companyLogo;
 
+  const COMPANY_MARKS = {
+    itau: ['itau', 'itaú'], itauunibanco: ['itau', 'itaú'],
+    mercadolivre: ['meli', 'meli'], mercadolibre: ['meli', 'meli'], meli: ['meli', 'meli'],
+    ifood: ['ifood', 'iFood'], nubank: ['nubank', 'nu']
+  };
+
+  function companyTile(name, fallback = name) {
+    const id = C.norm(name).replace(/[^a-z0-9]/g, '');
+    if (Object.hasOwn(COMPANY_MARKS, id)) {
+      const [style, label] = COMPANY_MARKS[id];
+      return `<span class="mono-tile company-tile ${style}" aria-hidden="true" data-no-i18n>${label}</span>`;
+    }
+    return monoTile(fallback, companyLogo(name));
+  }
+  C.companyTile = companyTile;
+
   // ================================================================ HOME ==
   function greeting() {
     const h = new Date().getHours();
     return h < 5 ? 'Good evening' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
-  }
-
-  function calCard(a, iv) {
-    const r = C.readiness(a);
-    const soon = iv.days <= 1;
-    const today = iv.days === 0;
-    const reminder = S.gcal.status && S.gcal.status.connected ? `${S.gcal.status.reminderMin ?? 60} min antes` : '1h antes';
-    return `<div class="cal-card ${soon ? 'soon' : ''}">
-      <div class="row top" style="gap:14px">
-        <div class="date-tile"><span class="d">${C.pad2(iv.at.getDate())}</span><span class="m">${C.MONTHS[iv.at.getMonth()]}</span></div>
-        <div class="stack gap-4 grow" style="gap:3px">
-          <span class="small muted truncate">${esc(C.agentCompany(a) || 'No company set')}</span>
-          <span class="truncate" style="font-size:14.5px;font-weight:500;letter-spacing:-.01em;line-height:1.35">${esc(C.agentRole(a) || a.name || 'Entrevista')}</span>
-        </div>
-        <span class="pill ${soon ? 'ok' : ''}"><span class="dot"></span>${esc(C.relDays(iv.days))}</span>
-      </div>
-      <div class="cal-meta">
-        <span>${icon('clock')}<span class="mono" style="font-size:11.5px">${iv.hasTime ? esc(iv.time) : 'No time set'}</span></span>
-        <span>${icon('users')}${esc(formatOf(a))}</span>
-        <span>${icon('bell')}${esc(reminder)}</span>
-      </div>
-      <div class="meter-row">
-        <div class="lbl small"><span class="faint">Prep</span><span class="num" style="color:var(--text)">${r.pct}%</span></div>
-        ${pctBar(r.pct)}
-      </div>
-      <div class="cal-actions">
-        ${today
-          ? `<button type="button" class="btn primary flex1" data-action="start-copilot" data-agent="${esc(a.id)}">${icon('video')}Join the room</button>`
-          : ''}
-        <button type="button" class="btn flex1" data-action="go" data-to="session/${esc(a.id)}">${icon('folder')}Context</button>
-      </div>
-    </div>`;
   }
 
   // Last sessions with a measured first-token latency, oldest → newest.
@@ -144,6 +128,8 @@
     </div>`;
   }
 
+  C.latencyChart = () => latencyChart(latencyPoints());
+
   // Behavioral = the "tell me about a time..." questions about you (JEV "pessoal").
   const CAT_LABEL = {
     Behavioral: 'Personal',
@@ -183,112 +169,184 @@
     };
   }
 
+  C.categoryBars = categoryBars;
+
+  function practiceQuestions(agent) {
+    const companies = (S.questionBank && S.questionBank.companies) || [];
+    const company = companies.find((entry) => C.norm(entry.name) === C.norm(C.agentCompany(agent)));
+    const sql = (company?.questions || []).filter((q) => /\bsql\b/i.test(`${q.text} ${q.subCategory || ''}`));
+    return { company: company?.id || 'all', sql: sql.length >= 5 };
+  }
+
+  C.actions['home-practice-questions'] = async (el) => {
+    const agent = C.agentById(el.dataset.agent);
+    if (!agent) return;
+    if (!S.questionBank) await C.loadQuestionBank();
+    const { company, sql } = practiceQuestions(agent);
+    Object.assign(S.ui, { qCompany: company, qQuery: sql ? 'SQL' : '', qCat: 'all', qOpen: '' });
+    C.navigate('questions');
+  };
+
+  function homePrep(agent, mocks) {
+    const contextReady = C.readiness(agent).items.filter((i) => i.key === 'resume' || i.key === 'job').every((i) => i.done);
+    const mockDone = mocks.some((record) => record.agentId === agent.id);
+    const sql = practiceQuestions(agent).sql;
+    const checklist = agent.checklist_state || {};
+    return [
+      ['Resume and job in context', contextReady, 'Complete', 'go', `session/${agent.id}`],
+      [sql ? 'Practice 5 SQL questions from the bank' : 'Practice questions from the bank', Boolean(checklist.home_questions_reviewed), 'Start', 'home-practice-questions', '', 'home_questions_reviewed'],
+      ['Behavioral mock interview with Orby', mockDone, 'Prepare', 'mock-for-agent'],
+      ['Test audio and the hidden panel', Boolean(checklist.home_audio_tested), 'Test', 'go', 'settings/audio', 'home_audio_tested']
+    ];
+  }
+
+  function prepRow(agent, [label, done, cta, action, to, key]) {
+    const checked = done ? icon('check') : '';
+    const mark = key
+      ? `<button type="button" class="prep-mark" data-action="home-checklist" data-agent="${esc(agent.id)}" data-key="${key}" aria-pressed="${done}" aria-label="${esc(C.t(label))}" title="${done ? 'Mark as pending' : 'Mark as complete'}">${checked}</button>`
+      : `<span class="prep-mark" ${done ? 'role="img" aria-label="Completed"' : 'aria-hidden="true"'}>${checked}</span>`;
+    return `<li class="prep-item ${done ? 'done' : ''}">${mark}<span class="grow">${esc(label)}</span>${done ? '' : `<button type="button" class="prep-cta" data-action="${action}" data-agent="${esc(agent.id)}"${to ? ` data-to="${esc(to)}"` : ''}>${cta}</button>`}</li>`;
+  }
+
+  C.actions['home-checklist'] = async (el) => {
+    const agent = C.agentById(el.dataset.agent);
+    const key = el.dataset.key;
+    if (!agent || !['home_questions_reviewed', 'home_audio_tested'].includes(key)) return;
+    el.disabled = true;
+    const res = await C.guard(() => api.saveChecklist(agent.id, { [key]: !agent.checklist_state?.[key] }), 'Could not save the session.');
+    el.disabled = false;
+    if (!res?.ok) return;
+    C.applyAgents(res.agents);
+    C.refresh();
+    document.querySelector(`[data-action="home-checklist"][data-key="${key}"]`)?.focus();
+  };
+
+  function recentSessions(mocks) {
+    const recorded = S.sessions.slice(0, 3).map((s) => {
+      const a = C.agentForSession(s);
+      return {
+        title: (a && C.agentRole(a)) || C.sessionTitle(s), company: a && C.agentCompany(a),
+        date: C.sessionDate(s), questions: Number(s.questionsCount) || 0,
+        score: s.jevScore, mode: s.mode === 'demo' ? 'Practice' : 'Live', id: s.id
+      };
+    });
+    const rehearsals = mocks.slice(0, 3).map((s) => ({
+      title: s.role || s.company || C.t('Mock interview'), company: s.company,
+      date: new Date(s.startedAt), questions: s.evaluation?.items?.length ?? null,
+      score: s.evaluation?.score, mode: 'Simulation', id: s.id, mock: true
+    }));
+    return [...recorded, ...rehearsals].sort((a, b) => (Number(b.date) || 0) - (Number(a.date) || 0)).slice(0, 3);
+  }
+
   C.views.home = function home() {
     const name = firstName(fixText(S.profile.name || (S.auth && S.auth.account && S.auth.account.name) || ''));
     const agents = S.agents.filter((a) => !a.archived);
     const up = C.upcomingAgents();
-    const week = up.filter(({ iv }) => iv.days <= 7).length;
     const cfg = S.config || {};
-    // One latency number everywhere on the page: the average the chart shows.
     const latPts = latencyPoints();
     const lat = latPts.length ? Math.round(latPts.reduce((acc, p) => acc + p.v, 0) / latPts.length) : null;
     const running = S.overlayStatus.running;
-    const u = C.usage();
-    const stealthOn = Boolean(S.stealthState && S.stealthState.active);
     const ready = C.engineReady();
-    const gconn = S.gcal.status && S.gcal.status.connected;
-    const cats = categoryBars();
-    const prep = agents
-      .map((a) => ({ a, r: C.readiness(a), iv: C.agentInterview(a) }))
-      .sort((x, y) => (x.iv && x.iv.days >= 0 ? x.iv.at : Infinity) - (y.iv && y.iv.days >= 0 ? y.iv.at : Infinity) || x.r.pct - y.r.pct)
-      .slice(0, 3);
+    const next = up[0];
+    const mocks = C.mockRecords();
+    const prep = next ? homePrep(next.a, mocks) : [];
+    const pendingN = prep.filter(([, done]) => !done).length;
+    const liveAgent = C.agentById(S.overlayStatus.agentId) || C.activeAgent();
+    const ivDocs = (liveAgent?.documents || []).length;
+    const detected = S.meeting?.active?.[0]?.name;
+    const audioEnabled = cfg.mic_enabled !== false && cfg.loopback_enabled !== false;
+    const shortcut = cfg.hotkeys?.responder_alt2 ?? 'Ctrl+Space';
+    const shortcutLabel = shortcut === 'Ctrl+Space' ? C.t('Ctrl Space') : shortcut.replaceAll('+', ' ').replace(/Space\b/, C.t('Space'));
+
+    const relative = next ? esc(C.relDays(next.iv.days).toLowerCase()) : '';
+    const lede = next
+      ? `${esc(C.t('Your next interview is {x}.', { x: C.relDays(next.iv.days).toLowerCase() })).replace(relative, `<strong>${relative}</strong>`)} ${esc(C.t(pendingN === 0 ? 'You are all set.' : pendingN === 1 ? '1 prep step left.' : '{n} prep steps left.', { n: pendingN }))}`
+      : esc(C.t('No interview scheduled. Set a date in a session to see the countdown.'));
 
     const setupBanner = !ready.ok
       ? `<div class="banner warn">${icon('key')}<span class="grow">${!ready.stt ? 'Add your transcription key (Deepgram) so the copilot can hear the interview.' : 'Add an AI key (OpenRouter, Cerebras, OpenAI…) so the copilot can suggest answers.'}</span><button type="button" class="btn sm" data-action="go" data-to="settings/ai">Set up</button></div>`
       : '';
-
     const liveBanner = running
       ? `<div class="banner">${icon('broadcast')}<span class="grow">Copilot live${C.agentById(S.overlayStatus.agentId) ? ` · ${esc(C.agentTitle(C.agentById(S.overlayStatus.agentId)))}` : ''}</span><button type="button" class="btn sm" data-action="go" data-to="live">Open live panel</button><button type="button" class="btn sm danger" data-action="stop-copilot">${icon('stop')}Stop</button></div>`
       : '';
 
-    return `<div class="page">
-      ${C.mockAd ? C.mockAd() : ''}
-      ${head(
-        `<div class="title-row"><h1 class="h1">${esc(greeting())}${name ? `, ${esc(name)}` : ''}</h1>${agents.length ? `<span class="pill ok"><span class="dot"></span>${plural(agents.length, 'active session', 'active sessions')}</span>` : ''}</div>`,
-        'Overview of your preparation and the copilot performance.',
-        `<button type="button" class="status-chip" data-action="go" data-to="settings/ai"><span class="dot ${ready.ok ? '' : 'warn'}"></span>${esc(C.modelLabel(cfg.model))}<span class="vsep">|</span><span class="num">${lat ? `${lat} ms` : 'no measurements'}</span></button>
-         <button type="button" class="status-chip" data-action="go" data-to="settings/privacy">${icon('shield-check')}${cfg.save_sessions === false ? 'Not recording' : 'Local recording'}<span class="vsep">|</span><span class="sub">${stealthOn ? 'Hidden' : 'Visible'} in captures</span></button>`,
-        true
-      )}
+    const nextCard = next
+      ? `<section class="card aurora home-next" data-tour="home-upcoming">
+          <div class="row between top">
+            <div class="row home-next-title">
+              <div class="date-tile"><span class="d">${C.pad2(next.iv.at.getDate())}</span><span class="m">${esc(C.t(C.MONTHS[next.iv.at.getMonth()]))}</span></div>
+              <div class="stack home-next-copy"><span class="next-co truncate">${esc(C.agentCompany(next.a) || C.t('No company set'))}${next.iv.hasTime ? ` · ${esc(next.iv.time)}` : ''}</span><span class="next-role truncate" title="${esc(C.agentRole(next.a) || next.a.name || '—')}">${esc(C.agentRole(next.a) || next.a.name || '—')}</span></div>
+            </div>
+            <span class="pill glass">${esc(C.relDays(next.iv.days))}</span>
+          </div>
+          <ul class="prep-list">${prep.map((item) => prepRow(next.a, item)).join('')}</ul>
+          <div class="row wrap" style="gap:10px">
+            ${next.iv.days === 0 ? `<button type="button" class="btn primary" data-action="start-copilot" data-agent="${esc(next.a.id)}">${icon('video')}Join the room</button>` : `<button type="button" class="btn primary" data-action="mock-for-agent" data-agent="${esc(next.a.id)}">Train with Orby</button>`}
+            <button type="button" class="btn glass" data-action="go" data-to="session/${esc(next.a.id)}">Open context</button>
+          </div>
+        </section>`
+      : `<section class="card aurora home-next" data-tour="home-upcoming">
+          <span class="eyebrow on-aurora">Up next</span>
+          <span class="next-role">No interviews scheduled</span>
+          <span class="next-co">Set a session date to see the countdown and get reminders.</span>
+          <div class="row wrap" style="gap:10px;margin-top:auto"><button type="button" class="btn primary" data-action="new-session">${icon('plus')}New session</button><button type="button" class="btn glass" data-action="open-scheduler">${icon('calendar')}Schedule interview</button></div>
+        </section>`;
+
+    const liveCard = `<button type="button" class="card home-live" data-action="go" data-to="live">
+        <span class="row between"><span class="cue-bars ${running ? 'on' : ''}" aria-hidden="true"><i></i><i></i><i></i><i></i></span>${running ? '<span class="pill danger"><span class="dot danger live"></span>Live</span>' : shortcut && shortcut.toLowerCase() !== 'nenhum' ? `<span class="kbd" title="Answer now (alternative)">${esc(shortcutLabel)}</span>` : ''}</span>
+        <span class="stack home-live-copy"><span class="home-live-t">${running ? 'Open live panel' : 'Go live'}</span><span class="home-live-d">${audioEnabled && ready.ok ? 'Open your call and LipCue starts listening. Microphone and system audio are enabled.' : 'Open your call and LipCue starts listening to the microphone and system audio.'}</span></span>
+        <span class="row wrap home-live-chips">${detected ? `<span class="soft-chip" data-no-i18n>${esc(C.t('{app} detected', { app: detected }))}</span>` : ''}<span class="soft-chip" data-no-i18n>${esc(plural(ivDocs, 'file in context', 'files in context'))}</span></span>
+      </button>`;
+
+    const refCard = C.referralCard ? C.referralCard() : '';
+
+    const evald = S.sessions.filter((s) => Number.isFinite(s.jevScore));
+    const jevAvg = evald.length ? evald.reduce((a, s) => a + s.jevScore, 0) / evald.length : null;
+    const weekAgo = Date.now() - 7 * 864e5;
+    const thisWeek = S.sessions.filter((s) => { const d = C.sessionDate(s); return d && d.getTime() >= weekAgo; }).length;
+    const totalQ = S.sessions.reduce((acc, s) => acc + (Number(s.questionsCount) || 0), 0);
+    const totalA = S.sessions.reduce((acc, s) => acc + (Number(s.suggestions) || Number(s.answersCount) || 0), 0);
+    const stats = [
+      ['Sessions', String(S.sessions.length), thisWeek ? C.t('+{n} this week', { n: thisWeek }) : C.t('None this week'), thisWeek ? 'up' : ''],
+      ['Questions answered', String(totalQ), plural(totalA, 'copilot answer', 'copilot answers'), ''],
+      ['Average latency', lat ? `${lat}ms` : '—', latPts.length ? C.t(latPts.length === 1 ? 'Last measured session' : 'Last {n} sessions', { n: latPts.length }) : C.t('No measurements'), ''],
+      ['Average JEV score', jevAvg == null ? '—' : (jevAvg / 10).toFixed(1), evald.length ? plural(evald.length, 'session evaluated', 'sessions evaluated') : C.t('No evaluations yet'), jevAvg != null && jevAvg < 80 ? 'warn' : '']
+    ];
+
+    const recent = recentSessions(mocks);
+
+    return `<div class="page design-page home-page">
+      <section class="page-head">
+        <div class="title-col"><h1 class="h1 xl" data-no-i18n>${esc(C.t(greeting()))}${name ? `, ${esc(name)}` : ''}</h1><p class="lede" data-no-i18n>${lede}</p></div>
+        <button type="button" class="status-chip" data-action="go" data-to="settings/ai"><span class="dot ${ready.ok ? '' : 'warn'}"></span>${esc(C.modelLabel(cfg.model))}${lat ? `<span class="num">${lat} ms</span>` : ''}</button>
+      </section>
       ${liveBanner}${setupBanner}${C.proAd('card', 'Get more with lipcue.com PRO')}
-
-      <section class="card aurora" data-tour="home-upcoming" style="gap:16px">
-        <div class="row top" style="gap:12px">
-          <span class="icon-tile">${icon('calendar')}</span>
-          <div class="stack gap-4 grow" style="gap:0"><span class="h2">Upcoming interviews</span><span class="small faint">${gconn ? `Synced with Google Calendar${S.gcal.status.email ? ` · ${esc(S.gcal.status.email)}` : ''}` : 'Dates set in your sessions'}</span></div>
-          <span class="pill lg">${week ? `${week} in 7 days` : `${up.length} scheduled`}</span>
-          <button type="button" class="btn primary" data-action="open-scheduler">${icon('plus')}Schedule</button>
-        </div>
-        ${up.length
-          ? `<div class="cal-grid">${up.slice(0, 4).map(({ a, iv }) => calCard(a, iv)).join('')}</div>`
-          : `<div class="empty boxed">${icon('calendar')}<span class="t">No interviews scheduled</span><span>Set a session date to see the countdown and get reminders.</span><div class="row"><button type="button" class="btn" data-action="open-scheduler">${icon('calendar')}Schedule interview</button><button type="button" class="btn primary" data-action="new-session">${icon('plus')}New session</button></div></div>`}
-        <div class="reminder-bar"><span class="dot sm"></span><span style="color:var(--text)" class="nowrap">Smart reminder</span><span class="grow">${gconn ? `Google Calendar reminds you ${S.gcal.status.reminderMin ?? 60} min before; Windows notification 1 hour before.` : 'Windows notification 1 hour before each interview.'}</span><a class="nowrap" data-action="go" data-to="settings/calendar">Set up</a></div>
+      <section class="home-grid">
+        ${nextCard}
+        <div class="home-side">${liveCard}${refCard}</div>
       </section>
-
-      <section class="grid-2">
-        <div class="card">
-          <div class="row between"><span class="eyebrow">Active model</span><span class="pill ${running ? 'danger' : ready.ok ? 'ok' : 'warn'}">${running ? 'In use' : ready.ok ? 'Streaming' : 'No key'}</span></div>
-          <div class="stack gap-4">
-            <div class="row between" style="align-items:baseline"><span style="font-size:15px;font-weight:500">${esc(C.modelLabel(cfg.model))}</span><span class="num">${lat ? `~${lat}ms` : '—'}</span></div>
-            <span class="muted" style="font-size:13px">via ${esc(C.providerFor(cfg.model))} · ${cfg.auto_suggest === false ? 'on-demand' : 'automatic'} answers in ${esc(cfg.ai_response_language && cfg.ai_response_language !== 'auto' ? cfg.ai_response_language : 'the conversation language')}.</span>
-          </div>
-          <div class="toggle-row boxed">
-            <span class="txt"><span class="t">Hide from screen</span><span class="s">Panel invisible in recordings and screen sharing</span></span>
-            ${C.sw('data-change="stealth-switch" aria-label="Hide from screen"', stealthOn)}
-          </div>
-          <a class="small muted" style="margin-top:auto" data-action="go" data-to="settings/ai">Change the model in settings →</a>
-        </div>
-        <div class="card">
-          <div class="row between"><span class="eyebrow">Usage and quota</span><span class="pill">${esc(u.planLabel)} plan</span></div>
-          <div class="stack gap-4"><span class="metric">${u.usedMin}<span class="unit"> ${u.limit ? `/ ${u.limit} min` : 'min'}</span></span><span class="muted" style="font-size:13px">Transcribed in ${esc(u.monthLabel)}</span></div>
-          ${u.limit ? pctBar(u.pct) : ''}
-          <div class="kv"><div><span class="k">Sessions</span><span class="v">${u.sessions}</span></div><div><span class="k">Questions</span><span class="v">${u.questions}</span></div></div>
-          <div class="card-foot"><span>${u.limit ? (u.renewLabel ? `Renews on ${esc(u.renewLabel)}` : 'Does not renew') : `${esc(u.monthLabel)} cycle`}</span><span style="color:var(--text-secondary)">${u.limit ? `${u.left} min left` : `${u.answers} answers`}</span></div>
-        </div>
+      <section class="stat-strip">${stats.map(([l, val, d, tone]) => `<div class="stat"><span class="stat-l">${esc(l)}</span><span class="stat-v">${esc(val)}</span><span class="stat-d ${tone}">${esc(d)}</span></div>`).join('')}</section>
+      <section class="card flush" data-tour="home-sessions">
+        <div class="card-bar"><h2 class="card-bar-t">Recent sessions</h2><a href="#/sessions/past" class="small muted nowrap" data-action="go" data-to="sessions/past">View history</a></div>
+        ${recent.length
+          ? recent.map((s) => {
+              const hasDate = s.date && !Number.isNaN(s.date.getTime());
+              const score = Number.isFinite(s.score) ? s.score : null;
+              const color = score >= 70 && score < 80 ? 'var(--warning)' : C.scoreTone(score).color;
+              return `<button type="button" class="session-row" ${s.mock ? `data-action="mock-open" data-id="${esc(s.id)}"` : `data-action="go" data-to="review/${esc(s.id)}"`}>
+                ${companyTile(s.company, s.company || s.title)}
+                <span class="session-row-title"><span class="truncate" title="${esc(s.title)}" data-no-i18n>${esc(s.title)}</span><span class="small faint truncate" data-no-i18n>${s.company ? `${esc(s.company)} · ` : ''}${esc(C.t(s.mode))}</span></span>
+                <span class="num mid session-row-date" data-no-i18n>${hasDate ? `${esc(C.fmtCompactDate(s.date))} · ${esc(C.fmtTime(s.date))}` : '—'}</span>
+                <span class="num mid session-row-questions" data-no-i18n>${s.questions == null ? '—' : esc(plural(s.questions, 'question', 'questions'))}</span>
+                <span class="score-num" style="color:${color}">${score == null ? '—' : (score / 10).toFixed(1)}</span>
+              </button>`;
+            }).join('')
+          : `<div class="empty">${icon('history')}<span class="t">No recorded sessions</span><span>When you stop the copilot, the transcript and answers show up here.</span></div>`}
       </section>
-
-      <section class="stack gap-16">
-        <div class="card tight" data-tour="home-sessions">
-          <div class="card-head"><div class="stack gap-4" style="gap:0"><span class="t">Sessions in preparation</span><span class="s">Context the copilot uses live</span></div><a class="small muted nowrap" data-action="go" data-to="sessions">View all (${agents.length})</a></div>
-          ${prep.length
-            ? prep
-                .map(({ a, r }) => `<button type="button" class="list-row" data-action="go" data-to="session/${esc(a.id)}">
-                  ${monoTile(C.agentCompany(a) || a.name, companyLogo(C.agentCompany(a)))}
-                  <span class="stack grow" style="gap:0"><span class="truncate" style="font-size:13.5px;font-weight:500">${esc(C.agentTitle(a))}</span><span class="small faint">${plural((a.documents || []).length, 'linked document', 'linked documents')}</span></span>
-                  ${pctBar(r.pct, 'w96')}
-                  <span class="num" style="color:var(--text-secondary);width:34px;text-align:right">${r.pct}%</span>
-                  ${icon('caret-right', 'faint')}
-                </button>`)
-                .join('')
-            : `<div class="empty">${icon('stack')}<span class="t">No sessions yet</span><span>Each session brings together the job, your files and the instructions the AI uses live.</span><button type="button" class="btn primary" data-action="new-session">${icon('plus')}Create session</button></div>`}
-        </div>
-
-        <div class="card" style="gap:22px">
-          <div class="card-head"><div class="stack gap-4" style="gap:0"><span class="t">Performance</span><span class="s">Copilot latency and detected questions</span></div><span class="pill ok"><span class="dot"></span>Real data</span></div>
-          <div class="grid-2" style="gap:20px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
-            <div class="stack gap-8" style="gap:10px">
-              <div class="row between top"><div class="stack" style="gap:0"><span style="font-size:13px">First token per session</span><span class="xs faint">Average of the last ${latPts.length || 0} sessions, in ms</span></div><span class="num" style="color:var(--accent);font-size:13px">${lat ? `${lat} ms` : '—'}</span></div>
-              ${latencyChart(latPts)}
-            </div>
-            <div class="stack gap-8" style="gap:10px">
-              <div class="row between" style="align-items:baseline"><span style="font-size:13px">Questions by category</span><span class="num">${cats.total} in the bank</span></div>
-              <div class="inset" style="flex:1;justify-content:center;gap:12px">${cats.html}</div>
-            </div>
-          </div>
-        </div>
-      </section>
+      ${agents.length ? '' : `<div class="empty boxed">${icon('stack')}<span class="t">No sessions yet</span><span>Each session brings together the job, your files and the instructions the AI uses live.</span><button type="button" class="btn primary" data-action="new-session">${icon('plus')}Create session</button></div>`}
     </div>`;
   };
+  C.afterRender.home = () => C.loadMockRecords();
 
   function firstName(n) {
     return String(n || '').trim().split(/\s+/)[0] || '';
@@ -309,25 +367,28 @@
     if (!list.length) {
       return `<div class="empty boxed">${icon('history')}<span class="t">No recorded sessions</span><span>When you stop the copilot, the transcript and answers show up here.</span><button type="button" class="btn primary" data-action="go" data-to="live">${icon('broadcast')}Go to Live</button></div>`;
     }
-    const cols = 'grid-template-columns:minmax(0,1fr) 140px 100px 100px auto';
+    const cols = 'grid-template-columns:36px minmax(0,1fr) 140px 90px 110px 90px 24px';
     return `<div class="card flush">
-      <div class="table-head" style="${cols}"><span>Session</span><span>JEV score</span><span>Answers</span><span>Latency</span><span></span></div>
+      <div class="table-head" style="${cols}"><span></span><span>Session</span><span>Date</span><span>Duration</span><span>Questions</span><span>JEV</span><span></span></div>
       ${list
         .map((s) => {
           const d = C.sessionDate(s);
           const a = C.agentForSession(s);
           const title = C.sessionTitle(s);
           const mode = s.mode === 'demo' ? 'Practice' : s.mode === 'live' ? 'Live' : 'Session';
+          const q = Number(s.questionsCount) || 0;
           const answers = Number(s.suggestions || s.answersCount || 0);
           const lat = C.sessionLatency(s);
           return `<div class="table-row clickable" style="${cols}" data-action="go" data-to="review/${esc(s.id)}">
-            <div class="row" style="gap:12px;min-width:0">${monoTile(a ? C.agentCompany(a) : title, a ? companyLogo(C.agentCompany(a)) : '')}<div class="stack" style="gap:0;min-width:0"><span class="truncate strong">${esc(title)}</span><span class="truncate faint" style="font-size:12.5px">${esc(mode)} · <span class="mono" style="font-size:11.5px">${d ? `${esc(C.fmtDateShort(d))} · ${esc(C.fmtTime(d))}` : '—'} · ${esc(C.fmtDuration(s.durationSeconds))}</span></span></div></div>
+            ${monoTile(a ? C.agentCompany(a) : title, a ? companyLogo(C.agentCompany(a)) : '')}
+            <div class="stack" style="gap:2px;min-width:0"><span class="truncate">${esc(title)}</span><span class="truncate small faint">${esc(mode)} · ${plural(answers, 'answer', 'answers')}${lat ? ` · ${Math.round(lat)} ms` : ''}</span></div>
+            <span class="num mid">${d ? `${esc(C.fmtDateShort(d))} · ${esc(C.fmtTime(d))}` : '—'}</span>
+            <span class="num mid">${esc(C.fmtDuration(s.durationSeconds))}</span>
+            <span class="num mid">${plural(q, 'question', 'questions')}</span>
             ${Number.isFinite(s.jevScore)
-              ? `<div class="row"><span class="mono" style="font-size:14px;font-weight:500;width:26px;color:${C.scoreTone(s.jevScore).color}">${s.jevScore}</span>${pctBar(s.jevScore, `grow ${C.scoreTone(s.jevScore).cls === 'ok' ? '' : C.scoreTone(s.jevScore).cls}`)}</div>`
+              ? `<span class="score-num" style="color:${C.scoreTone(s.jevScore).color}">${(s.jevScore / 10).toFixed(1)}</span>`
               : `<span class="small faint">${s.hasEvents ? 'Not evaluated' : '—'}</span>`}
-            <span class="mono" style="font-size:13px">${answers}</span>
-            <span class="mono" style="font-size:12px;color:var(--text-secondary)">${lat ? `${Math.round(lat)} ms` : '—'}</span>
-            <button type="button" class="btn" data-action="go" data-to="review/${esc(s.id)}" data-stop="1">View review${icon('arrow-right')}</button>
+            ${icon('caret-right', 'faint')}
           </div>`;
         })
         .join('')}
@@ -346,27 +407,38 @@
         const ay = y.iv && y.iv.days >= 0 ? y.iv.at.getTime() : Infinity;
         return ax - ay || C.agentTitle(x.a).localeCompare(C.agentTitle(y.a));
       });
-    const cols = 'grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) 130px 190px';
-    return `<div class="card flush">
-      <div class="table-head" style="${cols}"><span>Role</span><span>Format</span><span>Date</span><span>Prep</span><span></span></div>
+    return `<div class="session-grid">
       ${sorted
-        .map(({ a, iv, r }) => `<div class="table-row clickable" style="${cols}" data-action="go" data-to="session/${esc(a.id)}">
-          <div class="row" style="gap:12px;min-width:0">${monoTile(C.agentCompany(a) || a.name, companyLogo(C.agentCompany(a)))}<div class="stack" style="gap:1px;min-width:0"><span class="strong truncate">${esc(C.agentRole(a) || a.name)}${a.archived ? ' <span class="tag">Archived</span>' : ''}</span><span class="truncate faint" style="font-size:12.5px">${esc(C.agentCompany(a) || '—')} · ${plural((a.documents || []).length, 'file', 'files')}</span></div></div>
-          <span class="muted" style="font-size:13px">${esc(formatOf(a))}</span>
-          <span class="mono" style="font-size:12px;color:var(--text-secondary)">${iv ? `${esc(C.fmtDateShort(iv.at))}${iv.hasTime ? ` · ${esc(iv.time)}` : ''}${iv.days < 0 ? ' <span class="faint">(passou)</span>' : ''}` : '—'}</span>
-          <div class="row">${pctBar(r.pct, 'neutral grow')}<span class="num" style="color:var(--text-secondary);width:32px;text-align:right">${r.pct}%</span></div>
-          <div class="row" style="justify-content:flex-end">
-            <button type="button" class="btn sm" data-action="start-copilot" data-agent="${esc(a.id)}" data-stop="1">${icon('play')}Start</button>
+        .map(({ a, iv, r }, n) => {
+          const future = iv && iv.days >= 0;
+          const soon = future && n === 0;
+          return `<div class="session-card">
+          <button type="button" class="session-card-top" data-action="go" data-to="session/${esc(a.id)}">
+            ${monoTile(C.agentCompany(a) || a.name, companyLogo(C.agentCompany(a)), 'md')}
+            <span class="stack grow" style="gap:2px;min-width:0"><span class="session-card-t truncate">${esc(C.agentRole(a) || a.name)}${a.archived ? ' <span class="tag">Archived</span>' : ''}</span><span class="small muted truncate">${esc(C.agentCompany(a) || '—')} · ${plural((a.documents || []).length, 'file', 'files')}</span></span>
+            <span class="pill ${soon ? 'ok' : ''}">${future ? esc(C.relDays(iv.days)) : iv ? 'Past' : 'No date'}</span>
+          </button>
+          <div class="row" style="gap:12px">
+            <span class="num mid" style="min-width:120px">${iv ? `${esc(C.fmtDateShort(iv.at))}${iv.hasTime ? ` · ${esc(iv.time)}` : ''}` : 'No date'}</span>
+            ${pctBar(r.pct, 'grow')}
+            <span class="num" style="color:var(--text)">${r.pct}%</span>
           </div>
-        </div>`)
+          <div class="row" style="gap:8px">
+            <button type="button" class="btn sm primary" data-action="start-copilot" data-agent="${esc(a.id)}">${icon('play')}Start</button>
+            <button type="button" class="btn sm" data-action="go" data-to="mock">Train</button>
+            <button type="button" class="btn sm ghost" data-action="go" data-to="session/${esc(a.id)}">Files</button>
+          </div>
+        </div>`;
+        })
         .join('')}
+      <button type="button" class="session-new" data-action="new-session">${icon('plus')}New job</button>
     </div>`;
   }
 
   C.views.sessions = function sessions() {
     const past = S.ui.sessTab === 'past';
     const nArchived = S.agents.filter((a) => a.archived).length;
-    return `<div class="page tight">
+    return `<div class="page tight design-page">
       ${head(past ? 'History' : 'Sessions', past ? 'Sessions recorded by the copilot, with transcript, answers and review.' : 'Each session brings together the job, your files and the instructions the AI uses live.',
         `${past ? `<button type="button" class="btn" data-action="open-path">${icon('folder')}Open folder</button>` : ''}<button type="button" class="btn primary lg" data-action="new-session">${icon('plus')}New session</button>`)}
       <div class="row between wrap">
@@ -774,7 +846,7 @@
     const tone = scoreTone(score);
     const circ = 2 * Math.PI * 52;
     const dash = score == null ? `0 ${circ}` : `${(circ * score) / 100} ${circ}`;
-    return `<div class="score-ring" style="width:${size}px;height:${size}px"><svg viewBox="0 0 120 120" style="width:${size}px;height:${size}px"><circle cx="60" cy="60" r="52" fill="none" stroke="var(--track)" stroke-width="7"/><circle cx="60" cy="60" r="52" fill="none" stroke="${tone.color}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${dash}" transform="rotate(-90 60 60)"/></svg><div class="center"><span class="v">${score == null ? '—' : score}</span><span class="num">/ 100</span></div></div>`;
+    return `<div class="score-ring" style="width:${size}px;height:${size}px"><svg viewBox="0 0 120 120" style="width:${size}px;height:${size}px"><circle cx="60" cy="60" r="52" fill="none" stroke="var(--track)" stroke-width="7"/><circle cx="60" cy="60" r="52" fill="none" stroke="${tone.color}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${dash}" transform="rotate(-90 60 60)"/></svg><div class="center"><span class="v">${score == null ? '—' : (score / 10).toFixed(1)}</span><span class="num">/ 10</span></div></div>`;
   }
 
   function jevSection(s, cache, agent) {
@@ -790,19 +862,19 @@
         ${/OpenRouter/i.test(cache.jevError || '') ? '<button type="button" class="btn" data-action="go" data-to="settings/ai">Set up key</button>' : ''}
         <button type="button" class="btn primary" data-action="jev-run" data-session="${esc(s.id)}">${icon('sparkle')}Evaluate with JEV</button></div></div>`;
     }
-    const tone = scoreTone(J.score);
     const when = J.evaluatedAt ? new Date(J.evaluatedAt) : null;
-    return `<div class="card" style="gap:16px">
-      <div class="row between"><span class="eyebrow">JEV evaluation</span><span class="pill ${tone.cls}"><span class="dot"></span>${tone.label}</span></div>
-      <div class="row wrap" style="gap:20px 28px">
-        ${ring(J.score, 112)}
-        <div class="stack gap-8" style="flex:1 1 280px;max-width:640px">
-          <span style="font-size:14px;line-height:1.6;color:var(--text-body)">${esc(J.resumo || `${plural(J.items.length, 'question evaluated', 'questions evaluated')} with the same rubric.`)}</span>
-          <span class="num">${plural(J.items.length, 'question', 'questions')} · reference culture: ${esc(fixText(J.company || company || 'not set'))}${when ? ` · ${esc(C.fmtDateShort(when))} ${esc(C.fmtTime(when))}` : ''}${J.partial ? ' · partial' : ''}</span>
-        </div>
-        <button type="button" class="btn sm ml-auto" data-action="jev-run" data-session="${esc(s.id)}" title="Evaluate again">${icon('refresh')}Re-evaluate</button>
+    return `<section class="card aurora review-hero">
+      ${ring(J.score, 92)}
+      <div class="stack" style="gap:6px;min-width:0">
+        <span class="eyebrow on-aurora">JEV evaluation</span>
+        <span class="review-summary">${esc(J.resumo || `${plural(J.items.length, 'question evaluated', 'questions evaluated')} with the same rubric.`)}</span>
+        <span class="small on-aurora-soft">${plural(J.items.length, 'question', 'questions')} · reference culture: ${esc(fixText(J.company || company || 'not set'))}${when ? ` · ${esc(C.fmtDateShort(when))} ${esc(C.fmtTime(when))}` : ''}${J.partial ? ' · partial' : ''}</span>
       </div>
-    </div>`;
+      <div class="stack" style="gap:8px">
+        <button type="button" class="btn primary lg" data-action="go" data-to="mock">Train the weak spots</button>
+        <button type="button" class="btn sm glass" data-action="jev-run" data-session="${esc(s.id)}" title="Evaluate again">${icon('refresh')}Re-evaluate</button>
+      </div>
+    </section>`;
   }
 
   function criteriaCard(J) {
@@ -1006,12 +1078,14 @@
     return `<div class="page tight">
       ${head('Files', 'Resume, job description and portfolio give the answers context.', `<button type="button" class="btn" data-action="paste-doc" data-agent="${esc(target ? target.id : '')}">${icon('note')}Paste text</button>`)}
       ${agents.length
-        ? `<div class="row wrap"><span class="small muted">Link new files to</span><select class="select sm" style="width:auto;min-width:260px" data-change="files-target">${C.opts(agents.map((a) => [a.id, C.agentTitle(a)]), target ? target.id : '')}</select></div>
-           <button type="button" class="dropzone" id="filesDrop" data-tour="files-drop" data-action="files-pick">
-             ${icon('upload')}
-             <span style="font-size:14px">Drag files or <u>choose from your computer</u></span>
-             <span class="num">PDF · DOCX · TXT · MD · code</span>
-           </button>`
+        ? `<section class="files-top">
+             <button type="button" class="dropzone" id="filesDrop" data-tour="files-drop" data-action="files-pick">
+               ${icon('upload')}
+               <span style="font-size:15px;font-weight:500">Drag files or <u>choose from your computer</u></span>
+               <span class="num">PDF · DOCX · TXT · MD · code</span>
+             </button>
+             <div class="card" style="gap:10px;padding:18px"><span class="strong">Link new files to</span><select class="select" data-change="files-target">${C.opts(agents.map((a) => [a.id, C.agentTitle(a)]), target ? target.id : '')}</select><span class="small muted" style="line-height:1.5">Indexed locally for hybrid search (BM25 + embeddings).</span></div>
+           </section>`
         : `<div class="empty boxed">${icon('folder')}<span class="t">Create a session to attach files</span><button type="button" class="btn primary" data-action="new-session">${icon('plus')}New session</button></div>`}
       <div class="row between wrap">
         <div class="search-box">${icon('magnifying-glass')}<input type="text" placeholder="Search file or session" value="${esc(S.ui.filesQuery)}" data-input="files-query"/></div>

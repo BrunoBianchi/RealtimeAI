@@ -381,37 +381,22 @@
       ['notices', 'Notices']
     ];
 
-    return `<div class="page wide" style="padding:20px 24px 24px;gap:12px">
-      <div class="live-grid">
-        <div class="live-col">
-          <div class="live-bar">
-            <span class="dot ${running ? 'danger live' : 'off'}"></span>
-            <span class="mono" style="font-size:12px" id="liveClock">${since}</span>
-            <span class="small faint truncate">${running ? 'Live' : L.ended ? 'Session ended' : 'Stopped'}</span>
-            ${running
-              ? `<button type="button" class="btn sm danger ml-auto" data-action="stop-copilot">${icon('stop')}Stop</button>`
-              : `<button type="button" class="btn sm primary ml-auto" data-action="start-copilot" data-agent="${esc(a ? a.id : '')}" ${a ? '' : 'disabled'}>${icon('play')}Start listening</button>`}
-          </div>
-          <div class="row wrap" style="padding:10px 16px 0;gap:6px">${src('outros', 'Interviewer', 'speaker')}${src('voce', 'You', 'microphone')}</div>
-          <div class="row between" style="padding:12px 16px 4px"><span class="eyebrow">Live transcript</span><span class="eyebrow">${plural(L.transcript.length, 'turn', 'turns')}</span></div>
-          <div class="live-scroll" id="liveTranscript" data-tour="live-transcript">${transcriptHtml()}</div>
-          <div class="live-ctx">
-            <div class="row between"><span class="eyebrow">Context</span>${a ? `<a class="small muted" data-action="go" data-to="session/${esc(a.id)}">Edit</a>` : ''}</div>
-            ${a
-              ? `<div class="kv" style="font-size:12px;gap:10px"><div><span class="k">Role</span><span class="strong truncate" style="font-family:var(--font-sans);font-size:12.5px">${esc(C.agentRole(a) || '—')}</span></div><div><span class="k">Company</span><span class="strong truncate" style="font-family:var(--font-sans);font-size:12.5px">${esc(C.agentCompany(a) || '—')}</span></div></div>
-                 <div class="row wrap" style="gap:6px">${docs.length ? docs.slice(0, 6).map((d) => `<span class="chip">${icon(C.docIcon(d))}<span class="truncate">${esc(fixText(d.title || d.name))}</span></span>`).join('') : '<span class="xs faint">No files: the copilot answers from the job description only.</span>'}${docs.length > 6 ? `<span class="xs faint">+${docs.length - 6}</span>` : ''}</div>`
-              : '<span class="small faint">No session selected.</span>'}
-          </div>
+    const u = C.usage();
+    const sessionMin = running && S.overlayStatus.startedAt ? Math.round((Date.now() - S.overlayStatus.startedAt) / 60000) : 0;
+    return `<div class="live-room">
+      <div class="live-main">
+        <div class="live-head">
+          <span class="pill ${running ? 'danger' : ''}"><span class="dot ${running ? 'danger live' : 'off'}"></span>${running ? 'Live' : L.ended ? 'Session ended' : 'Stopped'} · <span class="mono" id="liveClock">${since}</span></span>
+          <span class="strong truncate">${esc(a ? C.agentTitle(a) : 'No session selected.')}</span>
+          <span class="grow"></span>
+          <label class="row small muted" style="cursor:pointer" title="Transcription-only mode">${C.sw(`data-change="live-mode" ${running ? '' : 'disabled'}`, L.transcriptionOnly, !running)}Transcription only</label>
         </div>
-
-        <div class="live-col">
+        <div class="live-answer-card">
           <div class="live-bar">
             <div class="segmented sm">${tabs.map(([id, label]) => `<button type="button" class="${S.ui.liveTab === id ? 'active' : ''}" data-action="live-tab" data-tab="${id}">${esc(label)}</button>`).join('')}</div>
-            <label class="row small muted ml-auto" style="cursor:pointer" title="Transcription-only mode">${C.sw(`data-change="live-mode" ${running ? '' : 'disabled'}`, L.transcriptionOnly, !running)}Transcription only</label>
-            <span class="row" style="gap:2px" id="liveAnswerNav">${answerNavHtml()}</span>
+            <span class="row ml-auto" style="gap:2px" id="liveAnswerNav">${answerNavHtml()}</span>
           </div>
           <div class="answer-pane" id="liveAnswer" data-tour="live-answer">${answerHtml()}</div>
-          ${S.ui.liveTab === 'answer' ? '' : ''}
           <div class="live-foot" id="liveFoot">${footHtml()}</div>
           <div class="chat-row">
             <input class="input" id="liveChat" placeholder="${running ? 'Ask the copilot (e.g. how do I explain this project?)' : 'Start the copilot to chat'}" ${running ? '' : 'disabled'} data-input="noop"/>
@@ -419,7 +404,24 @@
           </div>
           <div id="liveNotices" hidden></div>
         </div>
+        <div class="live-controls">
+          ${src('outros', 'Interviewer', 'speaker')}${src('voce', 'You', 'microphone')}
+          ${running
+            ? `<button type="button" class="btn end-btn" data-action="stop-copilot"><span class="stop-square"></span>End session</button>`
+            : `<button type="button" class="btn primary lg" data-action="start-copilot" data-agent="${esc(a ? a.id : '')}" ${a ? '' : 'disabled'}>${icon('play')}Start listening</button>`}
+        </div>
       </div>
+      <aside class="live-side">
+        <div class="row between live-side-head"><span class="strong">Transcript</span><span class="num">${plural(L.transcript.length, 'turn', 'turns')}</span></div>
+        <div class="live-scroll" id="liveTranscript" data-tour="live-transcript">${transcriptHtml()}</div>
+        <div class="live-ctx">
+          <div class="row between"><span class="eyebrow">Context</span>${a ? `<a class="small muted" data-action="go" data-to="session/${esc(a.id)}">Edit</a>` : ''}</div>
+          ${a
+            ? `<div class="row wrap" style="gap:6px">${docs.length ? docs.slice(0, 4).map((d) => `<span class="chip">${icon(C.docIcon(d))}<span class="truncate">${esc(fixText(d.title || d.name))}</span></span>`).join('') : '<span class="xs faint">No files: the copilot answers from the job description only.</span>'}${docs.length > 4 ? `<span class="xs faint">+${docs.length - 4}</span>` : ''}</div>`
+            : '<span class="small faint">No session selected.</span>'}
+        </div>
+        ${u.limit ? `<div class="live-minutes"><div class="row between small muted"><span>Minutes in this session</span><span class="mono" style="color:var(--text)">${sessionMin} / ${sessionMin + (u.left || 0)}</span></div>${C.pctBar(sessionMin + (u.left || 0) ? (sessionMin / (sessionMin + (u.left || 0))) * 100 : 0)}</div>` : ''}
+      </aside>
     </div>`;
   };
 

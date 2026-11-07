@@ -183,6 +183,30 @@ TEST(CloudSession, LlmIsOptionalButABrokenFallbackIsDropped) {
     EXPECT_FALSE(s->llm_fallback.valid());
 }
 
+// The exact shape backend/internal/server/session.go sends (docs/server-api.md).
+TEST(CloudSession, ReadsTheFallbackTheServerSends) {
+    std::string err;
+    auto s = cloud::parse_session(R"({"session_id":"sess_1","stt":{"url":"wss://api.deepgram.com/v1/listen","token":"t"},
+        "llm":{"url":"https://api.example.com/v1/llm/chat/completions","token":"llm_a","model":"main","background_model":"main",
+               "fallback":{"url":"https://api.example.com/v1/llm/chat/completions","token":"llm_a","model":"alt"}}})", err);
+    ASSERT_TRUE(s) << err;
+    ASSERT_TRUE(s->llm_fallback.valid());
+    EXPECT_EQ(s->llm_fallback.url, "https://api.example.com/v1/llm/chat/completions");
+    EXPECT_EQ(s->llm_fallback.token, "llm_a");
+    EXPECT_EQ(s->llm_fallback.model, "alt");
+    EXPECT_EQ(s->llm.model, "main");
+}
+
+TEST(CloudSession, AnHttpFallbackFromTheServerDoesNotFailTheSession) {
+    std::string err;
+    auto s = cloud::parse_session(R"({"session_id":"sess_1","stt":{"url":"wss://api.deepgram.com/v1/listen","token":"t"},
+        "llm":{"url":"http://203.0.113.5/v1/llm/chat/completions","token":"llm_a","model":"main",
+               "fallback":{"url":"http://203.0.113.5/v1/llm/chat/completions","token":"llm_a","model":"alt"}}})", err);
+    ASSERT_TRUE(s) << err;
+    EXPECT_TRUE(s->llm.valid());
+    EXPECT_FALSE(s->llm_fallback.valid());
+}
+
 TEST(CloudSession, SttTargetFeedsTheListenPath) {
     std::string err;
     auto s = cloud::parse_session(

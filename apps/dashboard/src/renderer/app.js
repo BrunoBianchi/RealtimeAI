@@ -166,6 +166,11 @@ function fmtDateShort(d) {
 }
 Cue.fmtDateShort = fmtDateShort;
 
+function fmtCompactDate(d) {
+  return `${pad2(d.getDate())} ${t(MONTHS[d.getMonth()]).toLowerCase()}`;
+}
+Cue.fmtCompactDate = fmtCompactDate;
+
 function fmtTime(d) {
   if (!d || Number.isNaN(d.getTime())) return '';
   return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
@@ -705,6 +710,8 @@ Cue.stopCopilot = stopCopilot;
 const CRUMBS = {
   home: 'Home',
   mock: 'Mock interview',
+  pair: 'Pair programming',
+  profile: 'Profile',
   sessions: 'Sessions',
   history: 'History',
   session: 'Session',
@@ -805,12 +812,14 @@ const NAV = [
   ['files', 'Files', 'folder'],
   ['questions', 'Question bank', 'question'],
   ['mock', 'Mock interview', 'microphone'],
+  ['pair', 'Pair programming', 'code'],
   ['live', 'Live', 'broadcast'],
   ['settings', 'Settings', 'gear']
 ];
 
 function navActive(id) {
   const v = S.route.view;
+  if (id === 'settings') return v === 'settings';
   if (id === 'history') return v === 'review' || (v === 'sessions' && S.ui.sessTab === 'past');
   if (id === 'sessions') return v === 'session' || (v === 'sessions' && S.ui.sessTab !== 'past');
   return v === id;
@@ -835,6 +844,7 @@ function renderShell() {
     return;
   }
   const running = Boolean(S.overlayStatus && S.overlayStatus.running);
+  const ready = engineReady();
   const activeAgents = S.agents.filter((a) => !a.archived);
   const qCount = S.questionBank
     ? (S.questionBank.companies || []).reduce((acc, c) => acc + ((c.questions && c.questions.length) || 0), 0)
@@ -848,11 +858,13 @@ function renderShell() {
   const nav = document.getElementById('sideNav');
   if (nav) {
     setHtml(nav, NAV.map(([id, label, ic]) => {
+      const active = navActive(id);
       const right =
-        id === 'live' && running
-          ? '<span class="nav-live-dot" title="Copilot running"></span>'
-          : `<span class="nav-count">${counts[id] === undefined || counts[id] === '' ? '' : counts[id]}</span>`;
-      return `<button type="button" class="nav-item ${navActive(id) ? 'active' : ''}" data-action="go" data-to="${id}" title="${esc(label)}">${icon(ic)}<span class="nav-label">${esc(label)}</span>${right}</button>`;
+        id === 'live' && (running || ready.ok)
+          ? `<span class="nav-live-dot${running ? ' running' : ''}" title="${running ? 'Copilot running' : 'Ready'}"></span>`
+          : id === 'pair' ? '<span class="nav-count">new</span>'
+            : counts[id] === undefined || counts[id] === '' ? '' : `<span class="nav-count">${counts[id]}</span>`;
+      return `<button type="button" class="nav-item ${active ? 'active' : ''}" data-action="go" data-to="${id}" title="${esc(label)}"${active ? ' aria-current="page"' : ''}>${icon(ic)}<span class="nav-label">${esc(label)}</span>${right}</button>`;
     }).join(''));
   }
 
@@ -868,7 +880,6 @@ function renderShell() {
   }
 
   // Engine status pill
-  const ready = engineReady();
   const pill = document.getElementById('engineStatusPill');
   const pillLabel = document.getElementById('engineStatusLabel');
   if (pill && pillLabel) {
@@ -892,8 +903,14 @@ function renderShell() {
   if (next) {
     const upcoming = upcomingAgents().slice(0, 2);
     setHtml(next, upcoming.length
-      ? `<span class="eyebrow" style="padding:0 10px">Up next</span>${upcoming
-          .map(({ a, iv }) => `<button type="button" class="next-item" data-action="go" data-to="session/${esc(a.id)}"><span class="t">${esc(agentTitle(a))}</span><span class="s">${esc(fmtDateShort(iv.at))}${iv.hasTime ? ` · ${esc(iv.time)}` : ''} · ${esc(relDays(iv.days).toLowerCase())}</span></button>`)
+      ? `<span class="eyebrow">Up next</span>${upcoming
+          .map(({ a, iv }) => {
+            const role = agentRole(a) || agentTitle(a);
+            const when = iv.days > 1 ? t('in {n}d', { n: iv.days }) : relDays(iv.days).toLowerCase();
+            const schedule = `${fmtCompactDate(iv.at)}${iv.hasTime ? ` · ${iv.time}` : ''} · ${when}`;
+            const label = esc(`${agentTitle(a)} · ${schedule}`);
+            return `<button type="button" class="next-item" data-action="go" data-to="session/${esc(a.id)}" title="${label}" aria-label="${label}">${Cue.companyTile(agentCompany(a), agentCompany(a) || a.name)}<span class="next-copy"><span class="t" data-no-i18n>${esc(role)}</span><span class="s" data-no-i18n>${esc(schedule)}</span></span></button>`;
+          })
           .join('')}`
       : '');
   }
@@ -913,16 +930,12 @@ function renderShell() {
   } else if (card) {
     card.dataset.action = 'go';
     card.dataset.to = 'settings/plan';
-    const ticks = Array.from({ length: 12 }, (_, i) => {
-      if (u.pct == null) return '<span></span>';
-      const filled = (u.pct / 100) * 12;
-      return `<span class="${i < Math.floor(filled) ? 'on' : i < filled ? 'half' : ''}"></span>`;
-    }).join('');
+    const ticks = usageMeter(u.pct);
     setHtml(card, `
-      <div class="row between"><span class="eyebrow">Usage this month</span><span class="pill">${esc(u.planLabel)}</span></div>
-      <div class="row" style="align-items:baseline;gap:6px"><span style="font-size:22px;font-weight:600;letter-spacing:-.03em;line-height:1">${u.usedMin}</span><span class="num">${u.limit ? `/ ${u.limit} min` : 'min transcribed'}</span></div>
-      ${u.limit ? `<div class="usage-ticks">${ticks}</div>` : ''}
-      <div class="row between faint" style="font-size:11.5px"><span>${u.limit ? `${u.left} min left` : plural(u.sessions, 'session', 'sessions')}</span><span class="nowrap">${u.limit ? (u.renewLabel ? `Renews on ${esc(u.renewLabel)}` : 'Does not renew') : esc(u.monthLabel)}</span></div>`);
+      <div class="row between"><span class="eyebrow">This month</span><span class="plan-badge${u.planLabel === 'Free' ? ' free' : ''}">${esc(u.planLabel)}</span></div>
+      <div class="usage-num"><strong>${u.usedMin}</strong> <span class="of">${u.limit ? `/ ${u.limit} min` : 'min transcribed'}</span></div>
+      ${u.limit ? ticks : ''}
+      <span class="usage-note" data-no-i18n>${esc(u.limit ? t('{n} min left in plan', { n: u.left }) : plural(u.sessions, 'session', 'sessions'))} · ${esc(u.limit ? (u.renewLabel ? t('renews {date}', { date: u.renewLabel }) : t('Does not renew')) : u.monthLabel)}</span>`);
   }
 
   // Profile
@@ -942,6 +955,7 @@ function renderShell() {
   const live = document.getElementById('btnGoLive');
   if (live) {
     if (running) {
+      live.hidden = false;
       live.className = 'btn live';
       // The clock span is ticked in place (tickLiveClock) so the pulse
       // animation is not restarted every second.
@@ -950,13 +964,14 @@ function renderShell() {
     } else {
       live.className = 'btn raised';
       setHtml(live, '<span class="dot"></span>Go live');
+      live.hidden = true;
     }
   }
   const stealth = document.getElementById('btnStealthChip');
   if (stealth) {
     const on = Boolean(S.stealthState && S.stealthState.active);
-    setHtml(stealth, `${icon(on ? 'eye-slash' : 'eye')}${on ? 'Hidden' : 'Visible'}`);
-    stealth.style.color = on ? 'var(--accent)' : '';
+    setHtml(stealth, `${icon(on ? 'eye-slash' : 'eye')}${on ? 'Hidden from captures' : 'Visible in captures'}`);
+    stealth.classList.toggle('on', on);
   }
   const upd = document.getElementById('btnUpdateChip');
   if (upd) {
@@ -970,6 +985,14 @@ function renderShell() {
   }
 }
 Cue.renderShell = renderShell;
+
+// The 40-bar usage meter of the design system: filled bars follow the real share used.
+function usageMeter(pct) {
+  const heights = [45, 90, 60, 100];
+  const filled = pct == null ? 0 : Math.round((Math.min(100, Math.max(0, pct)) / 100) * 40);
+  return `<div class="usage-meter" aria-hidden="true">${Array.from({ length: 40 }, (_, i) => `<span class="${i < filled ? 'on' : ''}" style="height:${heights[i % 4]}%"></span>`).join('')}</div>`;
+}
+Cue.usageMeter = usageMeter;
 
 // Writes markup only when it changed: the shell is refreshed often, and an
 // identical rewrite still costs a reflow and restarts CSS animations.
@@ -1067,6 +1090,11 @@ function bindDelegation() {
       Cue.openModal('palette');
       return;
     }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') {
+      e.preventDefault();
+      if (!isLocked() && Cue.actions['new-session']) Cue.actions['new-session'](document.getElementById('btnNewSession'), e);
+      return;
+    }
     if (e.key === 'Escape' && Cue.closeTopModal) Cue.closeTopModal();
   });
   // Dropping files anywhere outside a dropzone must not navigate the window.
@@ -1159,8 +1187,9 @@ function subscribe() {
     if (S.route.view === 'settings') refresh();
   });
   api.onMeetingDetection((st) => {
+    const previous = S.meeting?.active?.[0]?.name;
     S.meeting = st;
-    if (S.route.view === 'settings') refresh();
+    if (S.route.view === 'settings' || (S.route.view === 'home' && previous !== st?.active?.[0]?.name)) refresh();
   });
   api.onQuestionBankUpdated(async (payload) => {
     // The one-time rebuild after an update reclassifies the bank: reload it quietly.

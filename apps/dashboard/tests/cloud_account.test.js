@@ -7,7 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const Module = require('node:module');
 
-const { createCloudAccount, effectiveServerUrl } = require('../src/main/cloud_account');
+const { createCloudAccount, effectiveServerUrl, describeError } = require('../src/main/cloud_account');
 
 function fakeServer(script) {
   const calls = [];
@@ -178,6 +178,24 @@ test('e-mail + password: sign in, wrong password, sign-up and verification', asy
 
   assert.strictEqual((await acc.resetPassword('ana@x.com')).ok, true);
   assert.strictEqual(server.calls.pop().url, 'https://api.test.local/v1/auth/password/reset');
+});
+
+test('a busy server says what to do, in both languages', async () => {
+  const text = 'The server is busy right now. Try again in a few seconds.';
+  assert.strictEqual(describeError('busy', 503), text);
+
+  // Same wording whether the server sends its message or only the code.
+  for (const error of [{ code: 'busy', message: text }, 'busy']) {
+    const server = fakeServer(() => ({ status: 503, body: { error } }));
+    const { acc, store } = account(server);
+    const r = await acc.loginWithPassword('ana@x.com', 'certa123');
+    assert.strictEqual(r.ok, false);
+    assert.strictEqual(r.error, text);
+    assert.strictEqual(store.token, '');
+  }
+
+  const catalog = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'locales', 'pt-BR.js'), 'utf8');
+  assert.ok(catalog.includes(`'${text}':`), 'the Portuguese entry must exist');
 });
 
 test('billing opens the hosted checkout or portal (https only)', async () => {

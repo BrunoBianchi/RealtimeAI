@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cctype>
 #include "rtai/session_transcript.hpp"
+#include "rtai/speech_timing.hpp"
 #include "rtai/subject_fusion.hpp"
 
 #include <atomic>
@@ -315,6 +316,9 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
     std::optional<Active> active;
     std::unordered_map<std::uint64_t, Meta> meta;
     std::string last_live[2];
+    // Recent speech ends of the trigger source (see speech_end_to_visible).
+    static constexpr std::size_t kMaxSpeechEnds = 16;
+    std::deque<std::int64_t> speech_ends_;
 
     // Speculative shadow: runs in parallel, can be promoted on hit.
     struct Shadow {
@@ -627,6 +631,10 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
     // Req 3.1/3.3: 120 ms of absolute local silence closes the commit race.
     // Commit only when a shadow is Speculating for the same source.
     void handle(InVadCommitSilence& in) {
+        if (in.source == cfg.decision.trigger_source) {
+            speech_ends_.push_back(in.t - kVadCommitSilenceMs);
+            if (speech_ends_.size() > kMaxSpeechEnds) speech_ends_.pop_front();
+        }
         if (shadow && shadow->state == ShadowState::Speculating && shadow->source == in.source)
             maybe_commit(CommitCause::LocalSilence, in.t);
     }
@@ -889,6 +897,9 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
                 e.visible_ms = std::max<std::int64_t>(0, in.first_visible_ms - it->second.shown_ms);
             }
             const TriggerReason rr = it->second.reason;
+            if (rr == TriggerReason::Question || rr == TriggerReason::Keyword || rr == TriggerReason::LongTurn) {
+                e.speech_end_to_visible_ms = speech_end_to_visible(speech_ends_, in.first_visible_ms);
+            }
             const bool answer_like = rr == TriggerReason::Question || rr == TriggerReason::Keyword ||
                                      rr == TriggerReason::LongTurn || rr == TriggerReason::Manual ||
                                      rr == TriggerReason::Chat;

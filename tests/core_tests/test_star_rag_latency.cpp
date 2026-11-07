@@ -23,6 +23,7 @@
 #include "rtai/mini_agent.hpp"
 #include "rtai/scripted_llm.hpp"
 #include "rtai/settings.hpp"
+#include "rtai/speech_timing.hpp"
 #include "rtai/suggestion_format.hpp"
 
 using namespace rtai;
@@ -255,6 +256,85 @@ std::shared_ptr<ScriptedLlmClient> llm_with(std::string reply, std::chrono::mill
 }
 
 } // namespace
+
+TEST(SpeechEndToVisible, UsesTheLastSpeechEndBeforeTheText) {
+    EXPECT_EQ(speech_end_to_visible({1000, 2000}, 2350), 350);
+}
+
+TEST(SpeechEndToVisible, NoDataIsMinusOne) {
+    EXPECT_EQ(speech_end_to_visible({}, 2000), -1);
+    EXPECT_EQ(speech_end_to_visible({1000}, -1), -1) << "no text was shown";
+}
+
+TEST(SpeechEndToVisible, TextBeforeTheSpeechEndIsNegative) {
+    EXPECT_EQ(speech_end_to_visible({1000, 2200}, 2000), -200);
+    EXPECT_EQ(speech_end_to_visible({2200}, 2000), -200);
+}
+
+TEST(SpeechEndToVisible, LaterSpeechIsNotThisQuestion) {
+    // The interviewer spoke again 3 s after the answer appeared.
+    EXPECT_EQ(speech_end_to_visible({1000, 5000}, 2000), 1000);
+    EXPECT_EQ(speech_end_to_visible({5000}, 2000), -1);
+}
+
+TEST(SpeechEndToVisible, ARealMinusOneIsNotConfusedWithNoData) {
+    EXPECT_EQ(speech_end_to_visible({2001}, 2000), 0);
+}
+
+TEST(EngineSpeechTiming, MeasuresFromTheVadSilenceToTheFirstText) {
+    CopilotConfig c = cfg_fast();
+    c.allow_speculative = false;
+    auto llm = llm_with("**Situação:** ok", 2ms, 1ms);
+    CopilotEngine engine{c, llm};
+    auto sink = std::make_shared<Sink>();
+    engine.add_sink([sink](const EngineEvent& e) { (*sink)(e); });
+    engine.start();
+
+    engine.on_vad_commit_silence(AudioSource::Loopback);
+    engine.on_transcript(final_t(AudioSource::Loopback, "Qual é o prazo de implantação?"));
+    ASSERT_TRUE(eventually([&] { return !sink->all<SuggestionDoneEvent>().empty(); }));
+    engine.stop();
+    llm->shutdown(1s);
+
+    const auto done = sink->all<SuggestionDoneEvent>().front();
+    EXPECT_EQ(done.status, LlmStatus::Completed);
+    EXPECT_GE(done.speech_end_to_visible_ms, kVadCommitSilenceMs) << "the speech ended 120 ms before the edge";
+    EXPECT_LT(done.speech_end_to_visible_ms, 5000);
+}
+
+TEST(EngineSpeechTiming, IgnoresTheCandidatesOwnMicrophone) {
+    CopilotConfig c = cfg_fast();
+    c.allow_speculative = false;
+    auto llm = llm_with("**Situação:** ok", 2ms, 1ms);
+    CopilotEngine engine{c, llm};
+    auto sink = std::make_shared<Sink>();
+    engine.add_sink([sink](const EngineEvent& e) { (*sink)(e); });
+    engine.start();
+
+    engine.on_vad_commit_silence(AudioSource::Microphone);
+    engine.on_transcript(final_t(AudioSource::Loopback, "Qual é o prazo de implantação?"));
+    ASSERT_TRUE(eventually([&] { return !sink->all<SuggestionDoneEvent>().empty(); }));
+    engine.stop();
+    llm->shutdown(1s);
+    EXPECT_EQ(sink->all<SuggestionDoneEvent>().front().speech_end_to_visible_ms, -1);
+}
+
+TEST(EngineSpeechTiming, AnswersNotStartedBySpeechHaveNoValue) {
+    auto llm = llm_with("ok", 2ms, 1ms);
+    CopilotEngine engine{cfg_fast(), llm};
+    auto sink = std::make_shared<Sink>();
+    engine.add_sink([sink](const EngineEvent& e) { (*sink)(e); });
+    engine.start();
+
+    engine.on_vad_commit_silence(AudioSource::Loopback);
+    engine.request_action(TriggerReason::Chat, "Me ajuda com esta resposta");
+    ASSERT_TRUE(eventually([&] { return !sink->all<SuggestionDoneEvent>().empty(); }));
+    engine.stop();
+    llm->shutdown(1s);
+    const auto done = sink->all<SuggestionDoneEvent>().front();
+    EXPECT_EQ(done.reason, TriggerReason::Chat);
+    EXPECT_EQ(done.speech_end_to_visible_ms, -1);
+}
 
 TEST(EngineSplitQuestion, SecondHalfReanswersTheWholeQuestion) {
     CopilotConfig c = cfg_fast();

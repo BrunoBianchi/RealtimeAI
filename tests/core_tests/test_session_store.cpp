@@ -99,6 +99,66 @@ TEST(SessionStore, WritesJsonlAndMarkdownOnClose) {
     fs::remove_all(dir);
 }
 
+TEST(SessionStore, RecordsTheRouteAndTheSpeechEndTiming) {
+    const fs::path dir = fresh_dir("timing");
+    SessionStoreConfig cfg;
+    cfg.dir = dir;
+    cfg.export_markdown = false;
+    SessionStore store{cfg};
+    SessionMeta m = meta("s-timing");
+    m.route = "relay";
+    ASSERT_TRUE(store.open(m));
+    SuggestionDoneEvent done;
+    done.id = 1;
+    done.speech_end_to_visible_ms = 345;
+    store.on_event(done);
+    SuggestionDoneEvent unknown;
+    unknown.id = 2;
+    store.on_event(unknown);
+    store.close();
+
+    const auto records = SessionStore::load(store.jsonl_path(), nullptr);
+    ASSERT_EQ(records.size(), 4u); // start, suggestion, suggestion, end
+    EXPECT_EQ(records[0]["route"].as_string(), "relay");
+    EXPECT_EQ(records[1]["speech_end_to_visible_ms"].as_number(0), 345);
+    EXPECT_EQ(records[2]["speech_end_to_visible_ms"].as_number(0), -1) << "no data";
+    fs::remove_all(dir);
+}
+
+TEST(SessionStore, SessionWithoutAnLlmHasNoRoute) {
+    const fs::path dir = fresh_dir("noroute");
+    SessionStoreConfig cfg;
+    cfg.dir = dir;
+    cfg.export_markdown = false;
+    SessionStore store{cfg};
+    ASSERT_TRUE(store.open(meta("s-noroute")));
+    store.close();
+    const auto records = SessionStore::load(store.jsonl_path(), nullptr);
+    ASSERT_FALSE(records.empty());
+    EXPECT_EQ(records[0]["route"].as_string(), "");
+    EXPECT_EQ(records[0]["llm_model"].as_string(), "google/gemini-3.1-flash-lite");
+    fs::remove_all(dir);
+}
+
+TEST(SessionStore, OlderFilesWithoutTheNewFieldsStillLoad) {
+    const fs::path dir = fresh_dir("older");
+    fs::create_directories(dir);
+    const fs::path file = dir / "older.jsonl";
+    {
+        std::ofstream out(file, std::ios::binary);
+        out << R"({"type":"session_start","t":0,"id":"old","mode":"live","llm_model":"m","version":"2.0.0"})" << '\n'
+            << R"({"type":"suggestion","t":10,"id":1,"status":"completed","ttft_ms":300,"total_ms":900,"visible_ms":0})" << '\n';
+    }
+    std::size_t bad = 0;
+    const auto records = SessionStore::load(file, &bad);
+    EXPECT_EQ(bad, 0u);
+    ASSERT_EQ(records.size(), 2u);
+    EXPECT_EQ(records[0]["route"].as_string(), "");
+    EXPECT_EQ(records[1]["speech_end_to_visible_ms"].as_number(-1), -1);
+    EXPECT_EQ(records[1]["ttft_ms"].as_number(0), 300);
+    fs::remove_all(dir);
+}
+
 TEST(SessionStore, ConcurrentWritersLoseNothing) {
     const fs::path dir = fresh_dir("concurrent");
     SessionStoreConfig cfg;
