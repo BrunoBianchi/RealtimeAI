@@ -15,6 +15,7 @@
     "backend": "docker compose -f ../backend/docker-compose.yml up --build",
     "backend:docker": "docker compose -f ../backend/docker-compose.yml up -d --build",
     "backend:docker:down": "docker compose -f ../backend/docker-compose.yml down",
+    "test:edge": "bash ../backend/deploy/test-nginx.sh",
     "build:native": "cmake --preset windows-release && cmake --build --preset windows-release",
     "package": "scripts\\windows\\package.bat",
     "build:css": "npm --prefix apps/dashboard run build:css",

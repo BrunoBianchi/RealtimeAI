@@ -18,7 +18,7 @@ passa a ser a conta lipcue.com (sem chaves de API), sem perder latência (meta <
 | Planos: Free (uma sessão de até 15 min, uma vez) e PRO (200 min/mês); checkout e portal | pronto |
 | Engine encerra a sessão no limite do plano (aviso 1 min antes) | pronto |
 | `hello` com `backend` (`nuvem`/`proprio`) e `plan`; `needs: "login" \| "upgrade" \| "server"` | pronto |
-| Servidor padrão no build (`-DRTAI_SERVER_URL`, `BUILTIN_SERVER_URL`) | **vazio: preencher** |
+| Servidor padrão no build (`-DRTAI_SERVER_URL`, `BUILTIN_SERVER_URL`) | `https://api.lipcue.com` |
 
 Sem servidor configurado, a tela de login pede o endereço: não há mais uso sem conta.
 

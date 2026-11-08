@@ -11,8 +11,8 @@
 const { entitlement } = require('./plans');
 
 // Official builds set this (keep it in sync with CMake -DRTAI_SERVER_URL).
-// For now the Droplet by address, over plain HTTP: move to https://<domain> as soon as there is one.
-const BUILTIN_SERVER_URL = 'http://167.172.147.53';
+// Older installs still reach http://167.172.147.53, which keeps answering without a redirect.
+const BUILTIN_SERVER_URL = 'https://api.lipcue.com';
 
 const STATUS_TTL_MS = 60 * 1000;
 const REQUEST_TIMEOUT_MS = 8000;

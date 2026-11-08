@@ -65,8 +65,8 @@ test('logout revokes on the server and clears the token', async () => {
 test('without a configured address the built-in server is used', async () => {
   const saved = process.env.RTAI_SERVER_URL;
   delete process.env.RTAI_SERVER_URL;
-  assert.strictEqual(effectiveServerUrl(''), 'http://167.172.147.53');
-  assert.strictEqual(effectiveServerUrl('ftp://x'), 'http://167.172.147.53');
+  assert.strictEqual(effectiveServerUrl(''), 'https://api.lipcue.com');
+  assert.strictEqual(effectiveServerUrl('ftp://x'), 'https://api.lipcue.com');
   assert.strictEqual(effectiveServerUrl('https://api.x.com/'), 'https://api.x.com');
   if (saved !== undefined) process.env.RTAI_SERVER_URL = saved;
 });

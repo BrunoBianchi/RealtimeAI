@@ -88,6 +88,16 @@ Três formas de entrar, todas terminam no mesmo token do dispositivo:
   exclusão de senha) e para corpos acima de 1 MB em `POST /v1/ai/chat/completions`,
   `POST /v1/files` e `PUT /v1/sync/{kind}/{id}`. Depois de até 2 s de espera, o servidor
   recusa em vez de enfileirar. O relay ao vivo (`/v1/llm/`) nunca recebe esse erro.
+- **Erros da borda (nginx)**: alguns erros vêm do proxy na frente da API, no mesmo formato
+  JSON. São eles: `429 rate_limited` com `Retry-After` (limite de taxa ou de conexões por IP),
+  `413 too_large` (corpo acima de 2 MB, ou 33 MB em `/v1/files`, `/v1/sync/` e `/v1/ai/`),
+  `405 method_not_allowed` (método fora de `GET HEAD POST PUT DELETE OPTIONS`) e `503 busy` com
+  `Retry-After` (API reiniciando ou fora do ar). Os erros da própria API passam sem mudança.
+- **Site lipcue.com** (`/app`, `/login`): usa o mesmo token Bearer, obtido por `POST /v1/auth/login`
+  ou `/signup` com `client_id: "lipcue-web"`, guardado no `localStorage` do navegador. Não envia
+  `X-RTAI-Version` (a checagem de versão só vale para quem envia o cabeçalho). Origens de navegador
+  só são aceitas na mesma origem da API ou na lista `WEB_ORIGINS` (CORS em `/v1/`, fora `/v1/llm/`,
+  sem cookies); qualquer outra origem continua com escrita cross-site recusada (`403`).
 
 ## Endpoints
 
@@ -381,6 +391,10 @@ O servidor padrão é definido no build: `cmake --preset windows-release -DRTAI_
 (engine) e `BUILTIN_SERVER_URL` em `apps/dashboard/src/main/cloud_account.js` (dashboard).
 Um build open-source sem esses valores pede o endereço do servidor na própria tela de login.
 
+Produção: `https://api.lipcue.com` (TLS 1.2/1.3, HTTP/2). `http://167.172.147.53` continua
+atendendo, sem redirecionar, para instalações antigas. `http://api.lipcue.com` redireciona com
+`308` para HTTPS.
+
 ## Sincronização
 
 Cópia na nuvem dos dados do usuário. O app define o formato; o servidor guarda bytes e aplica o plano. `kind`: `session`, `history` ou `bank` (`id` = `main`).
@@ -391,6 +405,13 @@ Cópia na nuvem dos dados do usuário. O app define o formato; o servidor guarda
 - `DELETE /v1/sync/{kind}/{id}` → `{ ok: true }`.
 
 Free: 3 sessões e 5 itens de histórico. PRO: sem limite de quantidade. A cota de bytes é compartilhada com `/v1/files`.
+
+**Dois escritores de `session`.** O site lipcue.com também cria vagas (`PUT /v1/sync/session/{id}`), com o formato de `saveAgentToDisk` (`apps/dashboard/src/main/main.js`). Mudar esse formato exige atualizar junto `Browser/Home/src/lib/agentItem.js` e `specs/002-web-app-real-backend/contracts/agent-item.md`.
+
+- Id: `sanitizeId("<empresa>-<cargo>")` (minúsculas → NFD → sem acentos → `[^a-z0-9_-]+` vira `-` → apara `-`), espelhado em `Browser/Home/src/lib/agentId.js`; se já existe no índice, recebe `-2`, `-3`…
+- Corpo JSON UTF-8: `id`, `name` (`"<empresa> — <cargo>"`), `session_type: "interview"`, `company`, `role`, `job_description`, `company_research`, `company_dossier`, `stage: "Active"`, `next_interview {date, time}`, `next_interview_date`, `next_interview_time`, `documents: []`, `created_at` (ISO). Campos vazios vão como `""`.
+- `updated_at` da query = relógio do navegador. O site nunca reescreve uma vaga existente (a edição é do app); só cria e exclui.
+- O site lê `history` (até os 20 mais recentes) e `bank/main` sem alterá-los.
 
 Os endpoints `/v1/auth/device*` (login por dispositivo) foram removidos: o login é por e-mail e senha. `/v1/billing/*` responde `503 billing_unavailable` até haver um provedor de pagamento.
 
