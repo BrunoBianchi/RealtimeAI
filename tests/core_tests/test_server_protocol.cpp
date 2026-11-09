@@ -97,6 +97,19 @@ TEST(ServerProtocol, HelloLevelsAndBye) {
 
     const auto b = parse(server::encode_bye("a.jsonl", "a.md"));
     EXPECT_EQ(b["summary"].as_string(), "a.md");
+    // No cloud session and no duration: the fields are left out (older shape).
+    EXPECT_EQ(server::encode_bye("a.jsonl", "a.md").find("cloud_session"), std::string::npos);
+    EXPECT_EQ(server::encode_bye("a.jsonl", "a.md").find("duration_s"), std::string::npos);
+    EXPECT_EQ(server::encode_bye("a.jsonl", "a.md", "", 30).find("cloud_session"), std::string::npos);
+}
+
+// specs/004-session-feedback-popup/contracts/engine-bye.md
+TEST(ServerProtocol, ByeCarriesTheCloudSessionAndDuration) {
+    const auto b = parse(server::encode_bye("a.jsonl", "a.md", "sess_1", 742));
+    EXPECT_EQ(b["type"].as_string(), "bye");
+    EXPECT_EQ(b["session"].as_string(), "a.jsonl");
+    EXPECT_EQ(b["cloud_session"].as_string(), "sess_1");
+    EXPECT_EQ(b["duration_s"].as_number(), 742);
 }
 
 TEST(ServerProtocol, ParsesCommands) {

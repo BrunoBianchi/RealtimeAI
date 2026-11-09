@@ -1,0 +1,367 @@
+[
+  {
+    "name": "interviewer question closed by speech_final",
+    "messages": [
+      {
+        "type": "Results",
+        "channel_index": [
+          1,
+          2
+        ],
+        "is_final": true,
+        "speech_final": false,
+        "start": 1,
+        "duration": 1.4,
+        "channel": {
+          "alternatives": [
+            {
+              "transcript": "Me conta sobre um projeto"
+            }
+          ]
+        }
+      },
+      {
+        "type": "Results",
+        "channel_index": [
+          1,
+          2
+        ],
+        "is_final": true,
+        "speech_final": true,
+        "start": 2.4,
+        "duration": 1.6,
+        "channel": {
+          "alternatives": [
+            {
+              "transcript": "em que você teve um prazo apertado?"
+            }
+          ]
+        }
+      }
+    ],
+    "turns": [
+      {
+        "speaker": "Outros",
+        "text": "Me conta sobre um projeto em que você teve um prazo apertado?",
+        "startMs": 1000,
+        "endMs": 4000
+      }
+    ]
+  },
+  {
+    "name": "interim results never make a turn",
+    "messages": [
+      {
+        "type": "Results",
+        "channel_index": [
+          1,
+          2
+        ],
+        "is_final": false,
+        "speech_final": false,
+        "start": 0,
+        "duration": 0.5,
+        "channel": {
+          "alternatives": [
+            {
+              "transcript": "Qual foi"
+            }
+          ]
+        }
+      },
+      {
+        "type": "Results",
+        "channel_index": [
+          1,
+          2
+        ],
+        "is_final": false,
+        "speech_final": false,
+        "start": 0,
+        "duration": 1.2,
+        "channel": {
+          "alternatives": [
+            {
+              "transcript": "Qual foi o maior desafio"
+            }
+          ]
+        }
+      }
+    ],
+    "turns": []
+  },
+  {
+    "name": "UtteranceEnd closes only its channel",
+    "messages": [
+      {
+        "type": "Results",
+        "channel_index": [
+          0,
+          2
+        ],
+        "is_final": true,
+        "speech_final": false,
+        "start": 3,
+        "duration": 1,
+        "channel": {
+          "alternatives": [
+            {
+              "transcript": "Então, no projeto de dados"
+            }
+          ]
+        }
+      },
+      {
+        "type": "Results",
+        "channel_index": [
+          1,
+          2
+        ],
+        "is_final": true,
+        "speech_final": false,
+        "start": 3.2,
+        "duration": 0.3,
+        "channel": {
+          "alternatives": [
+            {
+              "transcript": "Hum"
+            }
+          ]
+        }
+      },
+      {
+        "type": "UtteranceEnd",
+        "channel": [
+          0,
+          2
+        ],
+        "last_word_end": 4
+      },
+      {
+        "type": "Results",
+        "channel_index": [
+          1,
+          2
+        ],
+        "is_final": true,
+        "speech_final": true,
+        "start": 4.1,
+        "duration": 0.5,
+        "channel": {
+          "alternatives": [
+            {
+              "transcript": "entendi."
+            }
+          ]
+        }
+      }
+    ],
+    "turns": [
+      {
+        "speaker": "Você",
+        "text": "Então, no projeto de dados",
+        "startMs": 3000,
+        "endMs": 4000
+      },
+      {
+        "speaker": "Outros",
+        "text": "Hum entendi.",
+        "startMs": 3200,
+        "endMs": 4600
+      }
+    ]
+  },
+  {
+    "name": "both speakers interleaved",
+    "messages": [
+      {
+        "type": "Results",
+        "channel_index": [
+          1,
+          2
+        ],
+        "is_final": true,
+        "speech_final": true,
+        "start": 0,
+        "duration": 1.8,
+        "channel": {
+          "alternatives": [
+            {
+              "transcript": "Você já trabalhou com Kafka?"
+            }
+          ]
+        }
+      },
+      {
+        "type": "Results",
+        "channel_index": [
+          0,
+          2
+        ],
+        "is_final": true,
+        "speech_final": false,
+        "start": 2.2,
+        "duration": 1.5,
+        "channel": {
+          "alternatives": [
+            {
+              "transcript": "Sim, trabalhei com Kafka"
+            }
+          ]
+        }
+      },
+      {
+        "type": "Results",
+        "channel_index": [
+          0,
+          2
+        ],
+        "is_final": true,
+        "speech_final": true,
+        "start": 3.7,
+        "duration": 0.9,
+        "channel": {
+          "alternatives": [
+            {
+              "transcript": "por dois anos."
+            }
+          ]
+        }
+      }
+    ],
+    "turns": [
+      {
+        "speaker": "Outros",
+        "text": "Você já trabalhou com Kafka?",
+        "startMs": 0,
+        "endMs": 1800
+      },
+      {
+        "speaker": "Você",
+        "text": "Sim, trabalhei com Kafka por dois anos.",
+        "startMs": 2200,
+        "endMs": 4600
+      }
+    ]
+  },
+  {
+    "name": "empty finals and metadata are ignored",
+    "messages": [
+      {
+        "type": "Metadata",
+        "request_id": "x"
+      },
+      {
+        "type": "Results",
+        "channel_index": [
+          1,
+          2
+        ],
+        "is_final": true,
+        "speech_final": true,
+        "start": 0,
+        "duration": 0.2,
+        "channel": {
+          "alternatives": [
+            {
+              "transcript": ""
+            }
+          ]
+        }
+      },
+      {
+        "type": "SpeechStarted",
+        "channel": [
+          1,
+          2
+        ],
+        "timestamp": 0.3
+      },
+      {
+        "type": "Results",
+        "channel_index": [
+          1,
+          2
+        ],
+        "is_final": true,
+        "speech_final": true,
+        "start": 0.4,
+        "duration": 0.6,
+        "channel": {
+          "alternatives": [
+            {
+              "transcript": "Tudo bem?"
+            }
+          ]
+        }
+      }
+    ],
+    "turns": [
+      {
+        "speaker": "Outros",
+        "text": "Tudo bem?",
+        "startMs": 400,
+        "endMs": 1000
+      }
+    ]
+  },
+  {
+    "name": "UtteranceEnd without a channel closes both",
+    "messages": [
+      {
+        "type": "Results",
+        "channel_index": [
+          0,
+          2
+        ],
+        "is_final": true,
+        "speech_final": false,
+        "start": 0,
+        "duration": 0.4,
+        "channel": {
+          "alternatives": [
+            {
+              "transcript": "Certo"
+            }
+          ]
+        }
+      },
+      {
+        "type": "Results",
+        "channel_index": [
+          1,
+          2
+        ],
+        "is_final": true,
+        "speech_final": false,
+        "start": 0.5,
+        "duration": 0.8,
+        "channel": {
+          "alternatives": [
+            {
+              "transcript": "E o resultado?"
+            }
+          ]
+        }
+      },
+      {
+        "type": "UtteranceEnd",
+        "last_word_end": 1.3
+      }
+    ],
+    "turns": [
+      {
+        "speaker": "Você",
+        "text": "Certo",
+        "startMs": 0,
+        "endMs": 400
+      },
+      {
+        "speaker": "Outros",
+        "text": "E o resultado?",
+        "startMs": 500,
+        "endMs": 1300
+      }
+    ]
+  }
+]

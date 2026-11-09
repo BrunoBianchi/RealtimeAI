@@ -34,24 +34,21 @@
   let sttRetries = 0;
 
   const entitlement = () => (S.auth && S.auth.entitlement) || null;
-  const tokenCost = (wallet, mode) => mode === 'basic' ? wallet.basicCost : wallet.advancedCost;
-  const remaining = (mode) => {
-    const e = entitlement();
-    if (e?.mockTokens) return Math.floor(e.mockTokens.balance / tokenCost(e.mockTokens, mode));
-    return mode === 'basic'
-      ? (e?.mockBasicLeft || 0) + (e?.mockBasicCredits || 0)
-      : (e?.mocksLeft || 0) + (e?.mockAdvancedCredits || 0);
+  // Both modes are charged by the time used, from the same minutes as a live
+  // session (main/plans.js entitlement().minutesLeft). Under 1 minute: no start.
+  const minutesLeft = () => Math.max(0, Number(entitlement()?.minutesLeft) || 0);
+  const canRunMode = (mode) => entitlement()?.canMock === true || M.resumeMode === mode;
+  const maxMinutes = () => {
+    const t = entitlement()?.training;
+    return t && t.maxMinutes > 0 ? t.maxMinutes : Math.min(30, Math.floor(minutesLeft()));
   };
-  const canRunMode = (mode) => remaining(mode) > 0 || M.resumeMode === mode;
-  const planLink = '<button type="button" class="btn sm" data-action="go" data-to="settings/plan/interviews">View plan and credits</button>';
+  const minutesText = (n) => (Math.round(n * 10) / 10).toLocaleString(S.lang.locale);
+  const planLink = '<button type="button" class="btn sm" data-action="go" data-to="settings/plan/interviews">View plan and minutes</button>';
 
   function availability(mode) {
     if (M.resumeMode === mode) return C.t('In progress');
     if (!entitlement()) return C.t('Balance unavailable');
-    const wallet = entitlement().mockTokens;
-    if (wallet) return C.t('{n} tokens per interview', { n: tokenCost(wallet, mode) });
-    const n = remaining(mode);
-    return C.t(n === 1 ? '1 available' : '{n} available', { n });
+    return C.t('Charged per minute used');
   }
 
   function clock(seconds) {
@@ -107,7 +104,7 @@
       return `${intro()}<div class="empty boxed">${icon('stack')}<span class="t">Create a session first</span><span>The interview is based on the job and files of a session.</span><a class="btn sm primary" href="#/sessions">Go to sessions</a></div>${historyView()}`;
     }
     const { items, done, prep } = readiness(a);
-    const wallet = entitlement()?.mockTokens;
+    const ent = entitlement();
     const canStartMode = canRunMode(M.mode);
     const modes = [
       ['basic', 'chat', 'Basic mode', 'Text chat with Orby'],
@@ -125,7 +122,7 @@
                 <span class="mock-availability" data-no-i18n>${esc(availability(mode))}</span>
               </button>`).join('')}
             </div>
-            ${wallet ? `<span class="small muted" data-no-i18n>${esc(C.t('Shared balance: {n} tokens', { n: wallet.balance.toLocaleString(S.lang.locale) }))}</span>` : ''}
+            ${ent ? `<span class="small muted" data-tour="mock-balance" data-no-i18n>${esc(C.t('Balance: {n} min, shared with live sessions', { n: minutesText(minutesLeft()) }))}</span>` : ''}
           </div>
           <label class="field">Interview language<select class="select" data-change="mock-lang" data-no-i18n>${C.opts(LANGUAGES, lang)}</select></label>
           ${M.mode === 'advanced' ? `<div class="stack" style="gap:8px"><div class="row" style="gap:8px"><button type="button" class="btn sm" data-action="mock-mic-test">${icon('microphone')}Test microphone</button><div class="mock-meter grow"><span id="mockMeter"></span></div></div>
@@ -134,8 +131,8 @@
           <details class="mock-details small muted"><summary>How camera analysis works</summary><p>About once a minute, a camera still is sent to AI; when available, it is compared with the previous still for framing, eye direction, posture, clothing, background organization and visible movement. The app does not record video or save camera images.</p></details>` : ''}
           ${M.error ? `<div class="banner warn" role="alert">${icon('alert')}<span class="grow">${esc(M.error)}</span></div>` : ''}
           <div class="mock-actions">
-            ${canStartMode ? `<button type="button" class="btn primary lg" data-action="mock-start" ${M.mode === 'advanced' && !M.consent ? 'disabled' : ''}>${icon(M.mode === 'basic' ? 'chat' : 'camera')}${M.resumeMode === M.mode ? 'Resume interview' : M.mode === 'basic' ? 'Start Basic interview' : 'Start Advanced interview'}</button><span class="small muted">Up to 30 minutes</span>`
-              : `<span class="small muted">${wallet ? 'Not enough tokens for this mode.' : entitlement() ? 'No interviews of this type are available.' : 'Could not read your interview balance.'}</span>${planLink}`}
+            ${canStartMode ? `<button type="button" class="btn primary lg" data-action="mock-start" ${M.mode === 'advanced' && !M.consent ? 'disabled' : ''}>${icon(M.mode === 'basic' ? 'chat' : 'camera')}${M.resumeMode === M.mode ? 'Resume interview' : M.mode === 'basic' ? 'Start Basic interview' : 'Start Advanced interview'}</button><span class="small muted" data-no-i18n>${esc(C.t('Up to {n} minutes', { n: maxMinutes() }))}</span>`
+              : `<span class="small muted">${ent ? 'You have no minutes left for a mock interview.' : 'Could not read your balance.'}</span>${planLink}`}
           </div>
         </div>
         <div class="stack" style="gap:16px;min-width:0">
@@ -212,7 +209,7 @@
           </div>
           <div class="mock-room-center">
             ${C.orb(M.state || 'idle', 360, 'room')}
-            <span class="state-pill ${M.state || ''}" id="mockStatePill"><span class="dot sm"></span><span id="mockState">${esc(STATE_LABEL[M.state] || '')}</span></span>
+            <span class="state-pill ${M.state || ''}" id="mockStatePill" role="status"><span class="dot sm" aria-hidden="true"></span><span id="mockState">${esc(STATE_LABEL[M.state] || '')}</span></span>
             <p class="mock-caption" id="mockCaption" data-no-i18n>${esc(lastOrbyLine())}</p>
           </div>
           <div class="mock-room-controls">
@@ -278,6 +275,7 @@
       ${M.phase === 'finishing' ? `<section class="card"><div class="row" style="gap:8px">${icon('sparkle')}<span>Writing your feedback…</span></div></section>` : ''}
       ${r ? evaluationHtml(r) + visualFeedbackHtml(r) + coachHtml(r) + transcriptHtml(r) : ''}
       ${M.phase === 'done' && !r ? `<section class="card"><div class="muted">${esc(M.refunded ? 'The interview ended before any answer and was not counted.' : 'The interview ended before any answer.')}</div></section>` : ''}
+      ${M.phase === 'done' && M.chargedMinutes != null ? `<div class="small muted" data-no-i18n>${esc(M.chargedMinutes > 0 ? C.t('{n} min used from your balance', { n: minutesText(M.chargedMinutes) }) : C.t('Nothing was charged: interviews under a minute are free.'))}</div>` : ''}
       ${M.phase === 'done' ? '<div class="row"><button type="button" class="btn primary" data-action="mock-reset">Back</button></div>' : ''}`;
   }
 
@@ -571,10 +569,14 @@
     const r = await C.guard(() => api.mockEnd(), 'Could not end the interview.');
     M.record = (r && r.record) || null;
     M.refunded = Boolean(r && r.refunded);
+    M.chargedMinutes = r && Number.isFinite(r.chargedMinutes) ? r.chargedMinutes : null;
     M.history = null;
     M.phase = 'done';
     if (C.authRefresh) await C.authRefresh(true);
     C.renderView();
+    // The record exists only when the user answered (mock_interview.js end()).
+    const id = M.record && M.record.id;
+    if (id && C.openFeedback && (await api.feedbackShouldAskMock({ id, userTurns: 1 }).catch(() => false))) C.openFeedback({ kind: 'mock', id });
   }
 
   C.actions['mock-start'] = async () => {

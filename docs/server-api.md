@@ -175,12 +175,51 @@ Bearer. Resposta `200`:
     "minutes_used": 115,
     "sessions_used": 31,
     "max_session_minutes": 200,
-    "period_end": "2026-12-01"
-  }
+    "period_end": "2026-12-01",
+    "credit_minutes": 0,
+    "minutes_left": 85,
+    "training": { "rate": 1, "max_minutes": 30, "free_under_s": 60 },
+    "mocks_limit": 0, "mocks_used": 0, "mock_credits": 0,
+    "mock_tokens": { "included_limit": 0, "included_left": 0, "purchased": 85, "basic_cost": 1, "advanced_cost": 1 }
+  },
+  "preferences": { "feedback_prompt": true }
 }
 ```
 
-`401` = login expirado (o app volta para a tela de login).
+`plan.minutes_left` é o saldo que a conta pode gastar agora, ao vivo ou treinando, já com a regra da sessão única do Free (depois dela, só os minutos comprados). Use esse número em vez de calcular no cliente. `plan.training` diz como a entrevista simulada é cobrada (veja "Entrevista simulada"). `mock_tokens`, `mocks_limit`, `mocks_used` e `mock_credits` existem só para apps antigos: o "saldo de tokens" é o saldo inteiro em minutos e cada modo custa 1, para que esses apps liberem o treino.
+
+`401` = login expirado (o app volta para a tela de login). `preferences.feedback_prompt` (padrão `true`) diz se o app e o site podem pedir avaliação ao fim das sessões; veja "Avaliações e preferências".
+
+## Avaliações e preferências
+
+Contrato completo: `specs/004-session-feedback-popup/contracts/feedback-api.md`. As duas rotas abaixo são escritas e têm um limite **por conta** de 20 por minuto, somadas: acima disso, `429 rate_limited` com `Retry-After: 60`. Elas não estão no caminho ao vivo.
+
+### `PUT /v1/feedback/{kind}/{session_id}` — avaliar uma sessão
+
+Bearer. `kind` é `live` (id de `POST /v1/session`) ou `mock` (id de `POST /v1/mock/start`). É um upsert: cada sessão tem no máximo uma avaliação e reenviar a substitui (`created_at` fica, `updated_at` muda). A sessão não precisa ter terminado.
+
+```json
+{ "rating": 4, "comment": "Rápido e fácil de usar", "surface": "web", "client_version": "web-5d42e94" }
+```
+
+| Campo | Regra |
+|---|---|
+| `rating` | obrigatório, inteiro de 1 a 5 |
+| `comment` | opcional; aparado; até 1.000 caracteres (não bytes); vazio = sem comentário |
+| `surface` | obrigatório, `app` ou `web` |
+| `client_version` | opcional, até 40 caracteres imprimíveis |
+
+Corpo até 4 KiB; campos desconhecidos são recusados. Resposta `200`:
+
+```json
+{ "feedback": { "kind": "mock", "session_id": "mock_…", "rating": 4, "comment": "…", "surface": "web", "created_at": 1762610000000, "updated_at": 1762610000000 } }
+```
+
+Erros: `400 invalid_request` (JSON inválido, `kind`, `rating`, `surface` ou `client_version` fora da regra), `400 comment_too_long`, `401 invalid_token`, `404 not_found` (a sessão não existe **ou** é de outra conta: as duas respostas são iguais), `413 too_large`, `429 rate_limited`. O servidor nunca registra o comentário em log.
+
+### `PUT /v1/me/preferences` — mudar preferências
+
+Bearer. Corpo `{ "feedback_prompt": false }` (obrigatório, booleano; campos desconhecidos são recusados). Resposta `200 { "preferences": { "feedback_prompt": false } }`. Repetir o mesmo valor é aceito e não muda nada. Erros: `400 invalid_request`, `401 invalid_token`, `429 rate_limited`. `PATCH` não é usado: a borda só libera `GET HEAD POST PUT DELETE OPTIONS`.
 
 ## Arquivos
 
@@ -201,11 +240,15 @@ Arquivo de outra conta responde `404`.
 | Plano | Limite | Sessões | Renova |
 |---|---|---|---|
 | `free` | 15 min | **uma única**, de até 15 min | nunca (é um teste) |
-| `pro` | US$ 19/mês, 200 min (tokens) e 1 entrevista simulada por mês | quantas quiser | todo mês (`period_end`) |
+| `pro` | US$ 19/mês, 200 min | quantas quiser | todo mês (`period_end`) |
+
+Um saldo só: os minutos pagam a ajuda ao vivo e a entrevista simulada (desde a especificação 005). Não há mais tokens de simulado nem franquia mensal de simulado.
 
 Tokens avulsos: 1 token = 1 minuto, nunca expiram e são gastos depois dos minutos do plano.
 Pacotes: `tokens_60` (US$ 7), `tokens_150` (US$ 16), `tokens_400` (US$ 40). O saldo vem em
 `plan.credit_minutes` de `GET /v1/me`, e `minutes_left`/`max_session_s` da sessão já o incluem.
+
+Migração: na primeira leitura da conta, os tokens de simulado comprados viram minutos comprados, 1 token = 1 minuto (`mock_tokens` + 24 × créditos Básicos antigos + 48 × créditos Avançados antigos), uma única vez (`training_minutes` no banco). A franquia mensal de simulado do PRO não é convertida.
 
 - O servidor é a autoridade: recusa `POST /v1/session` com `402` quando o plano não tem
   minutos (ou a sessão gratuita já foi usada) e informa em `account` quanto a sessão pode
@@ -238,14 +281,15 @@ Bearer. Devolve o código da conta (criado no primeiro uso) e o andamento:
 
 ### Entrevista simulada (`/v1/mock`)
 
-Até 30 min por simulado. O Básico custa 24 tokens de simulado e o Avançado, 48. O Pro inclui 72 tokens de simulado por mês, em saldo separado dos minutos ao vivo. Os dois modos usam primeiro a franquia mensal e depois os tokens comprados, que não expiram. Créditos antigos são convertidos pelo custo do modo original. O saldo em `GET /v1/me` fica em `plan.mock_tokens`, com `included_limit`, `included_left`, `purchased`, `basic_cost` e `advanced_cost`.
+Básico e Avançado descontam o tempo usado do mesmo saldo da ajuda ao vivo (`plan.minutes_left`): 1 minuto do saldo por minuto de entrevista, arredondado para cima em 0,1 min, no fim. Até 60 s não desconta nada. Para começar é preciso ter pelo menos 1 minuto, e a entrevista dura no máximo `min(30 min, saldo)`. Primeiro saem os minutos do plano, depois os comprados. No Free, o treino usa os mesmos 15 minutos e **não** conta como a sessão única ao vivo; depois que essa sessão é usada, os minutos do plano acabam para tudo.
 
-- `POST /v1/mock/start` `{agent_id, mode: "basic" | "advanced"}` → `{id, source, mode, max_s, tokens_spent?, vision_enabled, stt?}`. Básico conversa com Orby por texto. Avançado inclui voz e pede consentimento para analisar imagens ocasionais da câmera. Uma entrevista em andamento é retomada sem nova cobrança. Saldo insuficiente retorna `402 mock_not_included`.
+- `POST /v1/mock/start` `{agent_id, mode: "basic" | "advanced"}` → `{id, source, billing: "minutes", mode, max_s, minutes_left, vision_enabled, stt?}`. `max_s` = `min(1800, floor(minutes_left) × 60)`; `minutes_left` é o saldo antes desta entrevista. Básico conversa com Orby por texto. Avançado inclui voz e pede consentimento para analisar imagens ocasionais da câmera. Uma entrevista em andamento é retomada sem nova cobrança. Menos de 1 minuto: `402 mock_not_included` ("You don't have minutes left for a mock interview."), código mantido para apps antigos. `ai_unavailable`, `stt_unavailable`, `vision_unavailable` e `invalid_mode` vêm antes e não custam nada.
 - `POST /v1/mock/{id}/chat`: corpo chat/completions; o servidor impõe o modelo de conversa e `max_tokens`. Aceito até 3 min depois do limite (feedback final).
 - `POST /v1/mock/{id}/tts` `{text}` (até 500 caracteres; 15 mil por entrevista Avançada) → áudio mp3 (`TTS_MODEL`, padrão `elevenlabs/eleven-turbo-v2.5`; `TTS_VOICE`, padrão `sarah`; o modelo detecta o idioma do texto). Indisponível no Básico.
 - `POST /v1/mock/{id}/stt` → nova credencial de transcrição. Indisponível no Básico.
 - `POST /v1/mock/{id}/vision` `{image, previous_image?, language}` analisa até dois JPEGs pequenos, com limite de 30 chamadas por entrevista e intervalo mínimo de 55 s. Usa `MOCK_VISION_MODEL` (padrão `openai/gpt-5.4-mini` via OpenRouter) para observações de enquadramento, direção do olhar, postura, vestimenta, organização do fundo e movimentos visíveis. As imagens são retransmitidas para o modelo e não são armazenadas pelo servidor.
-- `POST /v1/mock/{id}/end` → `{refunded}`. Encerrar em menos de 1 min estorna a cobrança para os saldos de origem, desde que a franquia mensal ainda esteja no mesmo ciclo.
+- `POST /v1/mock/{id}/end` → `{refunded, charged_minutes, minutes_left}`. Cobra `min(tempo decorrido, max_s + 30 s)`; `refunded: true` quando nada foi cobrado (até 60 s). Repetir devolve o mesmo resultado sem cobrar de novo. Entrevistas iniciadas antes da troca para minutos (com `token_debit`) seguem a regra antiga: até 1 min, o débito volta como minutos comprados.
+- Entrevista abandonada (sem `/end`): é encerrada depois de `expires_at` + 3 min e cobrada até a última chamada (`chat`, `tts`, `stt`, `vision`), na próxima leitura de `GET /v1/me` ou em `POST /v1/mock/start`.
 - Depois do limite: `410 mock_over`.
 
 ### `POST /v1/session` — credenciais da sessão (engine)
@@ -270,6 +314,11 @@ Requisição:
   "credentials": true
 }
 ```
+
+`client` diz quem abriu a sessão: `engine` (app do Windows), `web` (página "Ao vivo" de
+lipcue.com/app) ou `app`. Outro valor é ignorado. O servidor grava o campo na sessão só para
+medir uso; ele não muda a cobrança nem os limites. A página web manda
+`{"credentials": true, "agent_id": "...", "client": "web"}`.
 
 `credentials: false` quando o usuário usa as próprias chaves (`[servidor] modo = proprio`):
 o servidor só concede a sessão e o tempo (a cota vale nos dois modos) e pode omitir
@@ -319,6 +368,9 @@ Validação no app (`cloud::parse_session`):
 - **Relay em HTTPS**: `llm.url` segue `PUBLIC_URL`. Em HTTPS, o nginx fala HTTP/2 com o cliente
   e mantém a conexão por 300 s. A porta 80 continua respondendo, sem redirecionar, para as
   instalações antigas, porque um redirecionamento quebraria os POSTs delas.
+- **CORS do relay**: com `WEB_ORIGINS`, só `POST /v1/llm/chat/completions` (e o preflight dele)
+  responde às origens listadas, para a página "Ao vivo" do site. Só Bearer, sem
+  `Allow-Credentials`. O resto de `/v1/llm/` continua sem CORS.
 - `HEAD /v1/llm/models` responde `200` sem token e sem tocar no banco. O app usa essa rota
   para manter a conexão com o relay aquecida (`keep_alive_relay`).
 - O servidor pode acrescentar `provider` ao corpo no relay ao vivo (`LLM_PROVIDER_ROUTING`). Um
@@ -361,8 +413,13 @@ para eles; no modo **chaves próprias** com chave do OpenRouter, a IA vai direto
 Bearer. Enviada ao encerrar (sem bloquear: espera no máximo 1,2 s).
 
 ```json
-{"duration_s": 1800, "stt_audio_s": 1500, "answers": 12, "avg_ttft_ms": 180}
+{"duration_s": 1800, "stt_audio_s": 1500, "answers": 12, "avg_ttft_ms": 180, "client_proc_ms": 4.2}
 ```
+
+`client_proc_ms` (opcional, enviado pela página web) é a média, em ms, do fim de um turno até o
+envio ao relay, medida no navegador. A meta é ficar abaixo de 10 ms. Vai para `stats` da sessão
+e nunca muda a cobrança. A página web envia esta chamada com `fetch(..., {keepalive: true})`,
+inclusive no `pagehide`.
 
 Resposta `204`. Use para conciliar uso; a fonte de verdade de cobrança deve ser o
 servidor (uso do Deepgram por `tag`, tokens do LLM no relay).
@@ -417,4 +474,4 @@ Os endpoints `/v1/auth/device*` (login por dispositivo) foram removidos: o login
 
 ## Excluir conta
 
-`DELETE /v1/me` com `{ "password": "..." }` → `{ ok: true }`. Apaga a conta, tokens, sessões, arquivos e dados sincronizados. Senha errada: `401 invalid_credentials`. As perguntas anônimas do banco da comunidade ficam, sem o vínculo com a conta.
+`DELETE /v1/me` com `{ "password": "..." }` → `{ ok: true }`. Apaga a conta, tokens, sessões, avaliações, preferências, arquivos e dados sincronizados. Senha errada: `401 invalid_credentials`. As perguntas anônimas do banco da comunidade ficam, sem o vínculo com a conta.

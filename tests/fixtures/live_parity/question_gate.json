@@ -1,0 +1,2578 @@
+[
+  {
+    "text": "Qual foi o maior desafio do TechFinance?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Qual foi o maior desafio do TechFinance?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Qual foi o maior desafio do TechFinance?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Qual foi o maior desafio do TechFinance?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Você já trabalhou com Kafka?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Você já trabalhou com Kafka?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Você já trabalhou com Kafka?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Você já trabalhou com Kafka?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "What was your biggest challenge?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "What was your biggest challenge?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "What was your biggest challenge?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "What was your biggest challenge?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Por que você quer trabalhar no Nubank?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Por que você quer trabalhar no Nubank?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Por que você quer trabalhar no Nubank?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Por que você quer trabalhar no Nubank?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Como você lidaria com um conflito no time?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Como você lidaria com um conflito no time?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Como você lidaria com um conflito no time?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Como você lidaria com um conflito no time?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Me conta sobre um projeto em que você teve um prazo apertado",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Me conta sobre um projeto em que você teve um prazo apertado",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Me conta sobre um projeto em que você teve um prazo apertado",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Me conta sobre um projeto em que você teve um prazo apertado",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Fale um pouco sobre você.",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Fale um pouco sobre você.",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Fale um pouco sobre você.",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Fale um pouco sobre você.",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Tell me about a time you failed.",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Tell me about a time you failed.",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Tell me about a time you failed.",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Tell me about a time you failed.",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Me fala do seu projeto",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Me fala do seu projeto",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Me fala do seu projeto",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Me fala do seu projeto",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Você já trabalhou com Kafka",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Você já trabalhou com Kafka",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Você já trabalhou com Kafka",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Você já trabalhou com Kafka",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Legal. E qual tecnologia você usou nesse projeto",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Legal. E qual tecnologia você usou nesse projeto",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Legal. E qual tecnologia você usou nesse projeto",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Legal. E qual tecnologia você usou nesse projeto",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Sabe me dizer quanto tempo levou a migração",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Sabe me dizer quanto tempo levou a migração",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Sabe me dizer quanto tempo levou a migração",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Sabe me dizer quanto tempo levou a migração",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Walk me through your resume",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Walk me through your resume",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Walk me through your resume",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Walk me through your resume",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Conte uma situação em que você errou.",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Conte uma situação em que você errou.",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Conte uma situação em que você errou.",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Conte uma situação em que você errou.",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Qual sua experiência com Kafka? Porque aqui a gente usa muito.",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Qual sua experiência com Kafka? Porque aqui a gente usa muito.",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Qual sua experiência com Kafka? Porque aqui a gente usa muito.",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Qual sua experiência com Kafka? Porque aqui a gente usa muito.",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "E por quê?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "E por quê?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "E por quê?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "E por quê?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Como assim?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Como assim?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Como assim?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Como assim?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "E por quê",
+    "has_context": false,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "E por quê",
+    "has_context": true,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "E por quê",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "E por quê",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Me fala disso",
+    "has_context": false,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Me fala disso",
+    "has_context": true,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Me fala disso",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Me fala disso",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Me conta sobre um projeto em que você",
+    "has_context": false,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Me conta sobre um projeto em que você",
+    "has_context": true,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Me conta sobre um projeto em que você",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Me conta sobre um projeto em que você",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Qual foi o maior",
+    "has_context": false,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Qual foi o maior",
+    "has_context": true,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Qual foi o maior",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Qual foi o maior",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Qual é a sua experiência com",
+    "has_context": false,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Qual é a sua experiência com",
+    "has_context": true,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Qual é a sua experiência com",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Qual é a sua experiência com",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Qual é a sua experiência com?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Qual é a sua experiência com?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Qual é a sua experiência com?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Qual é a sua experiência com?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Me conta do seu projeto, tipo",
+    "has_context": false,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Me conta do seu projeto, tipo",
+    "has_context": true,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Me conta do seu projeto, tipo",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Me conta do seu projeto, tipo",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Me fala,",
+    "has_context": false,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Me fala,",
+    "has_context": true,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Me fala,",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Me fala,",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Me conta",
+    "has_context": false,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Me conta",
+    "has_context": true,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Me conta",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Me conta",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "E qual foi o resultado que a gente",
+    "has_context": false,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "E qual foi o resultado que a gente",
+    "has_context": true,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "E qual foi o resultado que a gente",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "E qual foi o resultado que a gente",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Tell me about the",
+    "has_context": false,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Tell me about the",
+    "has_context": true,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Tell me about the",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Tell me about the",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Qual é o nome do seu",
+    "has_context": false,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Qual é o nome do seu",
+    "has_context": true,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Qual é o nome do seu",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Qual é o nome do seu",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Como você resolveu o problema de...",
+    "has_context": false,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Como você resolveu o problema de...",
+    "has_context": true,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Como você resolveu o problema de...",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Como você resolveu o problema de...",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Como você escalou o pipeline de dados do Kubernetes com",
+    "has_context": false,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Como você escalou o pipeline de dados do Kubernetes com",
+    "has_context": true,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Como você escalou o pipeline de dados do Kubernetes com",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Como você escalou o pipeline de dados do Kubernetes com",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Como eu disse, aqui a gente usa Kafka e Clojure.",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Como eu disse, aqui a gente usa Kafka e Clojure.",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Como eu disse, aqui a gente usa Kafka e Clojure.",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Como eu disse, aqui a gente usa Kafka e Clojure.",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Quando a gente contrata estagiários, eles passam por um onboarding.",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Quando a gente contrata estagiários, eles passam por um onboarding.",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Quando a gente contrata estagiários, eles passam por um onboarding.",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Quando a gente contrata estagiários, eles passam por um onboarding.",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "O que a gente espera de você é proatividade.",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "O que a gente espera de você é proatividade.",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "O que a gente espera de você é proatividade.",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "O que a gente espera de você é proatividade.",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "What we do here is build payment systems.",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "What we do here is build payment systems.",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "What we do here is build payment systems.",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "What we do here is build payment systems.",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Como você sabe, o Nubank é uma empresa grande.",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Como você sabe, o Nubank é uma empresa grande.",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Como você sabe, o Nubank é uma empresa grande.",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Como você sabe, o Nubank é uma empresa grande.",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Você vai ver que aqui o ritmo é bem rápido.",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Você vai ver que aqui o ritmo é bem rápido.",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Você vai ver que aqui o ritmo é bem rápido.",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Você vai ver que aqui o ritmo é bem rápido.",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Bom, a nossa empresa trabalha com pagamentos e tem muitos clientes no Brasil e no México.",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Bom, a nossa empresa trabalha com pagamentos e tem muitos clientes no Brasil e no México.",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Bom, a nossa empresa trabalha com pagamentos e tem muitos clientes no Brasil e no México.",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Bom, a nossa empresa trabalha com pagamentos e tem muitos clientes no Brasil e no México.",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Por que eu deveria te contratar",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Por que eu deveria te contratar",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Por que eu deveria te contratar",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Por que eu deveria te contratar",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Por que eu pagaria trinta por cento a mais",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Por que eu pagaria trinta por cento a mais",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Por que eu pagaria trinta por cento a mais",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Por que eu pagaria trinta por cento a mais",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Por que a gente escolheria você e não outro candidato",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Por que a gente escolheria você e não outro candidato",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Por que a gente escolheria você e não outro candidato",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Por que a gente escolheria você e não outro candidato",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Why should we hire you",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Why should we hire you",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Why should we hire you",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Why should we hire you",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Porque aqui a gente usa muito Kafka.",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Porque aqui a gente usa muito Kafka.",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Porque aqui a gente usa muito Kafka.",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Porque aqui a gente usa muito Kafka.",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Quando eu entrei aqui, o time era pequeno.",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Quando eu entrei aqui, o time era pequeno.",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Quando eu entrei aqui, o time era pequeno.",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Quando eu entrei aqui, o time era pequeno.",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "O que eu quero dizer é que o prazo é curto.",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "O que eu quero dizer é que o prazo é curto.",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "O que eu quero dizer é que o prazo é curto.",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "O que eu quero dizer é que o prazo é curto.",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Como já falei, a vaga é remota.",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Como já falei, a vaga é remota.",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Como já falei, a vaga é remota.",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Como já falei, a vaga é remota.",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Como vocês viram, o produto é grande.",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Como vocês viram, o produto é grande.",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Como vocês viram, o produto é grande.",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Como vocês viram, o produto é grande.",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Hum, é, então, tipo",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Hum, é, então, tipo",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Hum, é, então, tipo",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Hum, é, então, tipo",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Legal, bacana, entendi.",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Legal, bacana, entendi.",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Legal, bacana, entendi.",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Legal, bacana, entendi.",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Tudo bem? Está me ouvindo?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Tudo bem? Está me ouvindo?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Tudo bem? Está me ouvindo?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Tudo bem? Está me ouvindo?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Can you hear me?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Can you hear me?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Can you hear me?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Can you hear me?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "O quê?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "O quê?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "O quê?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "O quê?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Opa, testando, tudo bem?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Opa, testando, tudo bem?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Opa, testando, tudo bem?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Opa, testando, tudo bem?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "ok ok ok ok",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "ok ok ok ok",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "ok ok ok ok",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "ok ok ok ok",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Ahn.",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Ahn.",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Ahn.",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Ahn.",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Bom dia, tudo bem com você?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Bom dia, tudo bem com você?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Bom dia, tudo bem com você?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Bom dia, tudo bem com você?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Como você chegou a US$ 5.000 de receita com o bot em Node.js?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Como você chegou a US$ 5.000 de receita com o bot em Node.js?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Como você chegou a US$ 5.000 de receita com o bot em Node.js?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Como você chegou a US$ 5.000 de receita com o bot em Node.js?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Me conta sobre",
+    "has_context": false,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Me conta sobre",
+    "has_context": true,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Me conta sobre",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Me conta sobre",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Me conta sobre o projeto de Kubernetes",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Me conta sobre o projeto de Kubernetes",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Me conta sobre o projeto de Kubernetes",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Me conta sobre o projeto de Kubernetes",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Qual foi o maior desafio?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Qual foi o maior desafio?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Qual foi o maior desafio?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Qual foi o maior desafio?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Tell me about",
+    "has_context": false,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Tell me about",
+    "has_context": true,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Tell me about",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Tell me about",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Qual é a sua experiência",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Qual é a sua experiência",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Qual é a sua experiência",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Qual é a sua experiência",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Experiência com Kafka?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Experiência com Kafka?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Experiência com Kafka?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Experiência com Kafka?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Qual é a sua experiência com Kafka?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Qual é a sua experiência com Kafka?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Qual é a sua experiência com Kafka?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Qual é a sua experiência com Kafka?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Me fala do projeto",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Me fala do projeto",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Me fala do projeto",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Me fala do projeto",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Por quê?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Por quê?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Por quê?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Por quê?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Por que você saiu?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Por que você saiu?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Por que você saiu?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Por que você saiu?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Por quê? Por que você saiu?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Por quê? Por que você saiu?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Por quê? Por que você saiu?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Por quê? Por que você saiu?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Fala, tudo bem?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Fala, tudo bem?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Fala, tudo bem?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Fala, tudo bem?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Oi, tudo bem com você?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Oi, tudo bem com você?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Oi, tudo bem com você?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Oi, tudo bem com você?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Está me ouvindo bem?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Está me ouvindo bem?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Está me ouvindo bem?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Está me ouvindo bem?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Can you hear me okay?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Can you hear me okay?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Can you hear me okay?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Can you hear me okay?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Consegue ver minha tela?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Consegue ver minha tela?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Consegue ver minha tela?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Consegue ver minha tela?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Opa, boa tarde, tudo certo por aí?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Opa, boa tarde, tudo certo por aí?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Opa, boa tarde, tudo certo por aí?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Opa, boa tarde, tudo certo por aí?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Como vai o projeto de dados?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Como vai o projeto de dados?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Como vai o projeto de dados?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Como vai o projeto de dados?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Bom, me fala do seu projeto de Kubernetes.",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Bom, me fala do seu projeto de Kubernetes.",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Bom, me fala do seu projeto de Kubernetes.",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Bom, me fala do seu projeto de Kubernetes.",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "tá, tá bom",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "tá, tá bom",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "tá, tá bom",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "tá, tá bom",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Aqui a gente usa muito Kafka e Clojure.",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Aqui a gente usa muito Kafka e Clojure.",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Aqui a gente usa muito Kafka e Clojure.",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Aqui a gente usa muito Kafka e Clojure.",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Você já trabalhou com isso?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Você já trabalhou com isso?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Você já trabalhou com isso?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Você já trabalhou com isso?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Então, o projeto de Kubernetes foi assim",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Então, o projeto de Kubernetes foi assim",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Então, o projeto de Kubernetes foi assim",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Então, o projeto de Kubernetes foi assim",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Qual foi o maior desafio do projeto?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Qual foi o maior desafio do projeto?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Qual foi o maior desafio do projeto?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Qual foi o maior desafio do projeto?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Qual foi o maior desafio do projeto",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Qual foi o maior desafio do projeto",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Qual foi o maior desafio do projeto",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Qual foi o maior desafio do projeto",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Me conta sobre um projeto",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Me conta sobre um projeto",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Me conta sobre um projeto",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Me conta sobre um projeto",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "e quais foram os resultados?",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "e quais foram os resultados?",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "e quais foram os resultados?",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "e quais foram os resultados?",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": true
+  },
+  {
+    "text": "Como você resolveu o problema de…",
+    "has_context": false,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Como você resolveu o problema de…",
+    "has_context": true,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Como você resolveu o problema de…",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Como você resolveu o problema de…",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "   ",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "   ",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "   ",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "   ",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "uhum",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "uhum",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "uhum",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "uhum",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Kubernetes",
+    "has_context": false,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Kubernetes",
+    "has_context": true,
+    "final": false,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Kubernetes",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Kubernetes",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Fale sobre você",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Fale sobre você",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Fale sobre você",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Fale sobre você",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Tell me about yourself",
+    "has_context": false,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Tell me about yourself",
+    "has_context": true,
+    "final": false,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Tell me about yourself",
+    "has_context": false,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Tell me about yourself",
+    "has_context": true,
+    "final": true,
+    "verdict": "Ready",
+    "explicit": false
+  },
+  {
+    "text": "Qual o",
+    "has_context": false,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Qual o",
+    "has_context": true,
+    "final": false,
+    "verdict": "Wait",
+    "explicit": false
+  },
+  {
+    "text": "Qual o",
+    "has_context": false,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  },
+  {
+    "text": "Qual o",
+    "has_context": true,
+    "final": true,
+    "verdict": "Drop",
+    "explicit": false
+  }
+]

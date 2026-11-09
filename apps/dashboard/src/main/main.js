@@ -18,7 +18,8 @@ const { createMeetingPopup } = require('./meeting_popup');
 const { createFlagStore } = require('./feature_flags');
 const { createUpdater } = require('./updater');
 const { createCloudSync } = require('./cloud_sync');
-const { createCloudAccount, effectiveServerUrl } = require('./cloud_account');
+const { createCloudAccount, effectiveServerUrl, describeError } = require('./cloud_account');
+const { createFeedback } = require('./feedback');
 const { normalizeUiLanguage, resolveUiLocale, systemLanguages, SUPPORTED: UI_LOCALES } = require('./ui_locale');
 const I18n = require('../renderer/i18n.js');
 require('../renderer/locales/pt-BR.js');
@@ -673,8 +674,25 @@ const cloudAccount = createCloudAccount({
     if (e.type === 'signed_in') scheduleCloudSync();
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('rtai:cloud-event', payload);
   },
+  appVersion: typeof app.getVersion === 'function' ? app.getVersion() : '',
+  // The rating preference rides on every GET /v1/me.
+  onAccount: (me) => {
+    feedback.syncFromMe(me).catch(() => {});
+  }
+});
+
+// Rating dialog at the end of sessions (specs/004-session-feedback-popup).
+const feedback = createFeedback({
+  api: (method, p, body) => cloudAccount.api(method, p, body),
+  describeError,
+  dataDir: () => getAppDataDir(),
+  isLocalMode: () => isLocalMode(readConfigIni()),
   appVersion: typeof app.getVersion === 'function' ? app.getVersion() : ''
 });
+
+function closeFeedbackDialog() {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('rtai:feedback-close');
+}
 
 // Sessions, history and the question bank follow the account (cloud_sync.js).
 const cloudSync = createCloudSync({
@@ -2832,6 +2850,15 @@ function launchOverlay({ agent, configOverrides = {} }) {
             if (msg.mode !== undefined) {
               mainWindow.webContents.send('rtai:mode', Boolean(msg.mode));
             }
+          } else if (msg.type === 'bye') {
+            // End of a live session: ask for a rating in the dashboard, never
+            // in the HUD. A window in the background only flashes in the
+            // taskbar; the user's other programs keep the focus.
+            const ask = feedback.onBye(msg);
+            if (ask && mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send('rtai:feedback-prompt', ask);
+              if (!mainWindow.isFocused()) mainWindow.flashFrame(true);
+            }
           } else if (msg.type === 'open_settings') {
             // The HUD's Config button: one settings screen, the dashboard's.
             showSettingsWindow(msg.section || 'general');
@@ -3757,7 +3784,13 @@ app.whenReady().then(() => {
   ipcMain.handle('rtai:mock-list', async () => mockInterviews.list());
   ipcMain.handle('rtai:mock-stt-token', async () => mockInterviews.sttToken());
   ipcMain.handle('rtai:cloud-billing', async (_ev, kind, pack) => cloudAccount.billing(kind === 'portal' ? 'portal' : 'checkout', pack));
+  ipcMain.handle('rtai:feedback-submit', async (_ev, p) => feedback.submit(p || {}));
+  ipcMain.handle('rtai:feedback-should-ask-mock', async (_ev, p) => feedback.shouldAskMock(p || {}));
+  ipcMain.handle('rtai:feedback-set-prompt', async (_ev, v) => feedback.setPrompt(Boolean(v)));
+  ipcMain.handle('rtai:feedback-save-prompt', async (_ev, v) => feedback.savePrompt(Boolean(v)));
+  ipcMain.handle('rtai:feedback-get-prompt', async () => feedback.getPrompt());
   ipcMain.handle('rtai:cloud-logout', async () => {
+    closeFeedbackDialog();
     if (isOverlayRunning()) stopRunningOverlay();
     const res = await cloudAccount.logout();
     return { ...res, config: readConfigIni() };
@@ -3850,6 +3883,7 @@ app.whenReady().then(() => {
     const { agent, configOverrides } = options || {};
     const allowed = await checkCanStartLive();
     if (!allowed.ok) return allowed;
+    closeFeedbackDialog(); // a new session closes an open rating, unsaved
     return launchOverlay({ agent, configOverrides });
   });
 

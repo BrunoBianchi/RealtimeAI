@@ -46,6 +46,7 @@
     setup: {
       steps: (m) => [
         { route: 'settings/general', element: card('appearance'), title: 'Theme and language', text: 'Dark, light or the Windows theme. The interface language follows Windows by default; change it here.' },
+        { route: 'settings/general', element: card('session-ratings'), title: 'Session ratings', text: 'Ask for a rating after sessions: one short, optional rating after an interview or a mock interview. Turn it off here or with “Don’t show again” in the dialog.' },
         m.local
           ? { route: 'settings/account', element: card('local-mode'), title: 'Local mode', text: 'No account and no server: transcription and answers use your own keys, with a 500 ms wait before each answer.' }
           : { route: 'settings/account', element: card('where-the-ai-runs'), title: 'Where the AI runs', text: 'lipcue.com servers need no keys. “My keys” uses your own provider keys instead.' },
@@ -100,6 +101,12 @@
         { element: tour('pair-list'), optional: true, title: 'Your progress', text: 'A problem counts as solved once every test passes.' }
       ]
     },
+    mock: {
+      steps: () => [
+        { element: tour('mock-setup'), title: 'Mock interview', text: 'Practice for a real role with Orby, by text (Basic) or with voice and camera (Advanced).' },
+        { element: tour('mock-balance'), optional: true, title: 'One balance in minutes', text: 'Both modes are charged per minute used, from the same minutes as live sessions. Interviews under a minute are free.' }
+      ]
+    },
     profile: {
       steps: () => [
         { route: 'profile', element: tour('profile-badges'), title: 'Your record', text: 'Everything here comes from your real activity on this computer: sessions, mock interviews and problems.' }
@@ -114,7 +121,7 @@
   };
 
   // Which tour a page starts with the first time it is opened.
-  const PAGE_TOUR = { home: 'welcome', session: 'session', live: 'live', files: 'files', questions: 'questions', settings: 'setup', pair: 'pair', profile: 'profile' };
+  const PAGE_TOUR = { home: 'welcome', session: 'session', live: 'live', files: 'files', questions: 'questions', settings: 'setup', pair: 'pair', mock: 'mock', profile: 'profile' };
 
   // ----------------------------------------------------------- runtime --
   const lib = () => (window.driver && window.driver.js && window.driver.js.driver) || null;

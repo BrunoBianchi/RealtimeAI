@@ -111,9 +111,16 @@ inline std::string encode_levels(const Levels& l) {
     return std::move(w).str();
 }
 
-inline std::string encode_bye(const std::string& jsonl, const std::string& markdown) {
+// End of a session. cloud_session (the POST /v1/session id) and duration_s
+// let the dashboard ask for a rating (specs/004-session-feedback-popup,
+// contracts/engine-bye.md); both are left out when unknown.
+inline std::string encode_bye(const std::string& jsonl, const std::string& markdown,
+                              std::string_view cloud_session = {}, std::int64_t duration_s = -1) {
     json::Writer w;
-    w.begin_object().field("type", "bye").field("session", jsonl).field("summary", markdown).end_object();
+    w.begin_object().field("type", "bye").field("session", jsonl).field("summary", markdown);
+    if (!cloud_session.empty()) w.field("cloud_session", cloud_session);
+    if (duration_s >= 0) w.field_int("duration_s", duration_s);
+    w.end_object();
     return std::move(w).str();
 }
 

@@ -44,9 +44,13 @@ add_executable(core_tests
     test_hybrid_rag.cpp
     test_repair_mojibake.cpp
     test_engine_deadlines.cpp
+    test_live_parity.cpp
 )
 
 target_include_directories(core_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+
+# Shared with the lipcue.com live page (Browser/Home/tests/live-parity.test.js).
+target_compile_definitions(core_tests PRIVATE RTAI_LIVE_PARITY_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../fixtures/live_parity")
 
 target_link_libraries(core_tests PRIVATE
     rtai::options

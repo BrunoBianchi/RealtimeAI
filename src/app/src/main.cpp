@@ -1569,8 +1569,12 @@ int run_app(AppConfig cfg) {
     }
     overlay.reset();
     if (out) {
-        out->send(store ? server::encode_bye(path_utf8(store->jsonl_path()), path_utf8(store->markdown_path()))
-                        : server::encode_bye("", ""));
+        const std::string cloud_id = cfg.cloud_session ? cfg.cloud_session->session_id : std::string();
+        const std::int64_t duration_s =
+            std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - session_start).count();
+        out->send(store ? server::encode_bye(path_utf8(store->jsonl_path()), path_utf8(store->markdown_path()), cloud_id,
+                                             duration_s)
+                        : server::encode_bye("", "", cloud_id, duration_s));
     }
 
     for (auto& lane : lanes) {

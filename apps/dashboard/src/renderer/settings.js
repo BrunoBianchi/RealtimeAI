@@ -91,6 +91,30 @@
       <div class="ctl" data-no-i18n><select class="select sm" data-change="cfg" data-key="ui_language" data-type="text" data-label="${esc(C.t('Language'))}">${C.opts(list, value)}</select></div>`;
   }
 
+  // "Ask for a rating after sessions" (specs/004-session-feedback-popup, US4):
+  // the account preference, shown as the server saved it.
+  let feedbackPref = null; // null = not read yet; { value: true|false|null, local }
+  let feedbackPrefError = '';
+  function loadFeedbackPref() {
+    if (feedbackPref || !api || typeof api.feedbackGetPrompt !== 'function') return;
+    feedbackPref = { value: null, local: false };
+    Promise.resolve(api.feedbackGetPrompt())
+      .then((r) => {
+        feedbackPref = r || feedbackPref;
+        C.refresh();
+      })
+      .catch(() => {});
+  }
+
+  function feedbackCard() {
+    loadFeedbackPref();
+    const f = feedbackPref || { value: null, local: false };
+    const sub = f.local ? 'Needs a lipcue.com account.' : 'A short optional rating after each interview or mock interview, in the app and on the site.';
+    return card('Session ratings', '',
+      `${row('Ask for a rating after sessions', sub, C.sw('data-change="feedback-prompt" aria-label="Ask for a rating after sessions"', f.value === true, f.value === null))}
+       ${feedbackPrefError ? `<div class="small" role="alert" style="color:var(--danger)">${esc(feedbackPrefError)}</div>` : ''}`);
+  }
+
   function general() {
     const p = S.profile || {};
     const pref = (S.themeState && S.themeState.preference) || 'dark';
@@ -121,6 +145,7 @@
       ${card('Local data', 'Everything stays on this machine: sessions, files and settings',
         `${row('Record sessions', 'Saves the transcript and answers as Markdown and JSONL when stopping.', cfgSwitch('save_sessions', 'Record sessions', cfg.save_sessions !== false))}
          ${row('Data folder', `<span class="mono" style="font-size:11px">${esc((cfg.configPath || '').replace(/[\\/][^\\/]+$/, '') || '%LOCALAPPDATA%\\RealTimeAI')}</span>`, '<button type="button" class="btn sm" data-action="open-path">Open folder</button>')}`)}
+      ${feedbackCard()}
       ${card('Guided tour', 'Step-by-step popups that show how to set up and use each part of the app',
         `${row('Set up the copilot', 'Keys, audio, privacy and the floating panel, one screen at a time.', `<button type="button" class="btn sm" data-action="start-setup-tour">${icon('play')}Start</button>`)}
          ${row('Show every tour again', 'Each screen shows its tour again the next time it opens. The ? button in the top bar replays the current one.', '<button type="button" class="btn sm" data-action="tour-reset">Restart tours</button>')}`)}`;
@@ -612,40 +637,31 @@
     { id: 'tokens_150', minutes: 150, price: 16 },
     { id: 'tokens_400', minutes: 400, price: 40 }
   ];
-  const MOCK_PACKS = [
-    ['mock_tokens_24', 24, 2.99],
-    ['mock_tokens_72', 72, 7.99],
-    ['mock_tokens_144', 144, 14.99]
-  ];
   const perMinute = (price, minutes) => `$${(price / minutes).toFixed(3).replace(/0$/, '')}`;
 
   function tokenPacks() {
-    return card('Buy tokens', 'One token is one live minute. No subscription, and they never expire.',
+    return card('Buy minutes', 'For live sessions and mock interviews. No subscription, and they never expire.',
       `<div class="option-cards" style="grid-template-columns:repeat(3,minmax(0,1fr))">${TOKEN_PACKS.map((p) => `
-        <div class="option-card"><span class="t">${p.minutes} tokens</span>
+        <div class="option-card"><span class="t">${p.minutes} minutes</span>
           <span class="metric">$${p.price}</span>
           <span class="s">${perMinute(p.price, p.minutes)} per minute</span>
           <button type="button" class="btn sm" style="margin-top:10px" data-action="cloud-billing" data-kind="checkout" data-pack="${p.id}">Buy</button></div>`).join('')}
       </div>
-      <div class="small muted" style="margin-top:12px">PRO includes ${PRO_MINUTES} tokens every month for $${PRO_PRICE}: ${perMinute(PRO_PRICE, PRO_MINUTES)} per minute, the lowest price. Purchased tokens are used after the plan's minutes.</div>`);
+      <div class="small muted" style="margin-top:12px">PRO includes ${PRO_MINUTES} minutes every month for $${PRO_PRICE}: ${perMinute(PRO_PRICE, PRO_MINUTES)} per minute, the lowest price. Purchased minutes are used after the plan's minutes.</div>`);
   }
 
-  function interviewCredits() {
-    const wallet = S.auth?.entitlement?.mockTokens;
-    if (!wallet) return card('Interview credits', '', '<span class="small muted">The shared mock token balance is unavailable on this server.</span>');
-    const currency = new Intl.NumberFormat(S.lang.locale, { style: 'currency', currency: 'USD' });
-    const count = (n) => n.toLocaleString(S.lang.locale);
-    const balance = `<div class="row wrap small muted plan-interview-balance" data-no-i18n>
-      <span>${esc(C.t('Shared balance: {n} tokens', { n: count(wallet.balance) }))}</span>
-      <span>${esc(C.t('{left} of {limit} monthly tokens left', { left: count(wallet.includedLeft), limit: count(wallet.includedLimit) }))}</span>
-      <span>${esc(C.t('{n} purchased tokens', { n: count(wallet.purchased) }))}</span>
-      <span>${esc(C.t('Basic: {basic} tokens · Advanced: {advanced} tokens', { basic: wallet.basicCost, advanced: wallet.advancedCost }))}</span>
-    </div>`;
-    return card('Interview credits', 'Basic and Advanced share a token balance. Purchased mock tokens never expire.',
-      `${balance}<div class="option-cards plan-interview-packs">${MOCK_PACKS.map(([id, tokens, price]) => `
-        <div class="option-card"><span class="t" data-no-i18n>${esc(C.t('{n} mock tokens', { n: count(tokens) }))}</span>
-          <span class="metric" data-no-i18n>${esc(currency.format(price))}</span>
-          <button type="button" class="btn sm" data-action="cloud-billing" data-kind="checkout" data-pack="${id}">Buy</button></div>`).join('')}</div>`);
+  // Mock interviews use the same minutes as live sessions, charged by the time
+  // used (the server's minutes_left; main/plans.js entitlement()).
+  function trainingMinutes() {
+    const ent = S.auth?.entitlement;
+    if (!ent) return card('Mock interview minutes', '', '<span class="small muted">Could not read your balance.</span>');
+    const n = (v) => (Math.round(v * 10) / 10).toLocaleString(S.lang.locale);
+    const max = ent.training && ent.training.maxMinutes > 0 ? ent.training.maxMinutes : Math.min(30, Math.floor(ent.minutesLeft));
+    return card('Mock interview minutes', 'Basic and Advanced are charged per minute used, from the same balance as live sessions. Interviews under a minute are free.',
+      `<div class="row wrap small muted plan-interview-balance" data-no-i18n>
+        <span>${esc(C.t('{n} min available', { n: n(ent.minutesLeft) }))}</span>
+        ${ent.canMock ? `<span>${esc(C.t('Up to {n} minutes', { n: max }))}</span>` : `<span>${esc(C.t('You have no minutes left for a mock interview.'))}</span>`}
+      </div>`);
   }
 
   // The big meter at the top of Plan and usage. Forecasts only from real usage.
@@ -676,7 +692,7 @@
     return card('Current plan', 'From your lipcue.com account',
       `<div class="row" style="gap:16px"><span class="metric">${esc(ent.planLabel)}</span><span class="muted grow">${sub}</span>${action}</div>
        <div class="meter-row" style="margin-top:14px"><div class="lbl"><span>${u.usedMin} of ${u.limit} min ${ent.isPro ? `in ${esc(u.monthLabel)}` : 'used'}</span><span class="num">${u.left} min left</span></div>${C.pctBar(u.pct, tone)}</div>
-       ${ent.creditMinutes > 0 ? `<div class="small muted" style="margin-top:10px"><span class="num">${Math.round(ent.creditMinutes)}</span> <span>purchased tokens, they never expire</span></div>` : ''}
+       ${ent.creditMinutes > 0 ? `<div class="small muted" style="margin-top:10px"><span class="num">${Math.round(ent.creditMinutes)}</span> <span>purchased minutes, they never expire</span></div>` : ''}
        ${ent.canStart ? '' : `<div class="small" role="alert" style="color:var(--danger);margin-top:12px">${esc(ent.reason)}</div>`}`,
       `<button type="button" class="btn sm ghost" data-action="plan-refresh">${icon('refresh')}Refresh</button>`);
   }
@@ -689,9 +705,9 @@
       ['API keys', 'Your own', 'Not needed', 'Not needed'],
       ['Price', 'Free', 'Free', `$${PRO_PRICE} / month`],
       ['Live minutes', 'Pay your providers', '15 min, once', '200 min / month'],
-      ['Extra tokens', '—', 'From $0.10 per minute', 'From $0.10 per minute'],
+      ['Extra minutes', '—', 'From $0.10 per minute', 'From $0.10 per minute'],
       ['Answer speed', `+${d} ms per answer`, 'Instant', 'Instant'],
-      ['AI mock interviews', '—', 'Shared mock token packs', '72 mock tokens per month'],
+      ['AI mock interviews', '—', 'Charged per minute used', 'Charged per minute used'],
       ['Cloud backup of files', '—', '25 MB', '500 MB'],
       ['Sessions saved in the cloud', '—', '3', 'Unlimited'],
       ['History saved in the cloud', '—', '5', 'Unlimited'],
@@ -725,11 +741,11 @@
       ${usageHero(u)}
       ${C.referralInvite ? C.referralInvite() : ''}
       ${planCard(u)}
-      ${interviewCredits()}
-      ${card('Plans', 'One token is one live minute. The server checks the limit on every session; when it runs out, the session ends.',
+      ${trainingMinutes()}
+      ${card('Plans', 'Live sessions and mock interviews use the same minutes. The server checks the limit on every session; when it runs out, the session ends.',
         `<div class="option-cards">
           <div class="option-card ${u.isPro ? '' : 'active'}"><span class="t">${u.isPro ? '' : '<span class="dot"></span>'}Free</span><span class="s">A single session of up to 15 minutes to try it out. Does not renew.</span></div>
-          <div class="option-card ${u.isPro ? 'active' : ''}"><span class="t">${u.isPro ? '<span class="dot"></span>' : ''}PRO</span><span class="metric">$${PRO_PRICE}</span><span class="s">Per month. Includes ${PRO_MINUTES} tokens a month, across as many sessions as you like.</span></div>
+          <div class="option-card ${u.isPro ? 'active' : ''}"><span class="t">${u.isPro ? '<span class="dot"></span>' : ''}PRO</span><span class="metric">$${PRO_PRICE}</span><span class="s">Per month. Includes ${PRO_MINUTES} minutes a month, across as many sessions as you like.</span></div>
         </div>`)}
       ${tokenPacks()}
       ${card('Usage by month', 'Calculated from recorded sessions',
@@ -802,7 +818,7 @@
     const tab = parts[0] || 'general';
     if (tab === 'plan' && parts[1] === 'interviews' && planJump !== parts) {
       planJump = parts;
-      document.querySelector('[data-card="interview-credits"]')?.scrollIntoView({ block: 'start' });
+      document.querySelector('[data-card="mock-interview-minutes"]')?.scrollIntoView({ block: 'start' });
     }
     if (tab === 'audio') {
       enumerateDevices();
@@ -1036,6 +1052,17 @@
     C.refresh();
   };
 
+  C.changes['feedback-prompt'] = async (el) => {
+    const want = Boolean(el.checked);
+    feedbackPrefError = '';
+    const r = await Promise.resolve(api.feedbackSavePrompt(want)).catch(() => null);
+    if (r && r.ok) feedbackPref = { value: r.value, local: false };
+    else {
+      el.checked = !want; // back to what is saved
+      feedbackPrefError = (r && r.error) || 'Could not save. Try again.';
+    }
+    C.refresh();
+  };
   C.changes.meeting = async (el) => {
     const res = await C.guard(() => api.setMeetingDetection({ [el.dataset.field]: el.checked }), 'Could not change detection.');
     if (res) S.meeting = res;

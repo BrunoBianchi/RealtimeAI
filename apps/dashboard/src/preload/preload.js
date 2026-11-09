@@ -67,6 +67,21 @@ contextBridge.exposeInMainWorld('rtai', {
   },
   cloudBilling: (kind, pack) => ipcRenderer.invoke('rtai:cloud-billing', kind, pack),
   cloudLogout: () => ipcRenderer.invoke('rtai:cloud-logout'),
+  feedbackSubmit: (p) => ipcRenderer.invoke('rtai:feedback-submit', p),
+  feedbackShouldAskMock: (p) => ipcRenderer.invoke('rtai:feedback-should-ask-mock', p),
+  feedbackSetPrompt: (v) => ipcRenderer.invoke('rtai:feedback-set-prompt', v),
+  feedbackSavePrompt: (v) => ipcRenderer.invoke('rtai:feedback-save-prompt', v),
+  feedbackGetPrompt: () => ipcRenderer.invoke('rtai:feedback-get-prompt'),
+  onFeedbackPrompt: (cb) => {
+    const handler = (_ev, p) => cb(p);
+    ipcRenderer.on('rtai:feedback-prompt', handler);
+    return () => ipcRenderer.removeListener('rtai:feedback-prompt', handler);
+  },
+  onFeedbackClose: (cb) => {
+    const handler = () => cb();
+    ipcRenderer.on('rtai:feedback-close', handler);
+    return () => ipcRenderer.removeListener('rtai:feedback-close', handler);
+  },
   onCloudEvent: (cb) => {
     const handler = (_event, msg) => cb(msg);
     ipcRenderer.on('rtai:cloud-event', handler);

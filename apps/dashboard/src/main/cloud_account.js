@@ -66,6 +66,7 @@ function describeError(code, status) {
  * @param {(url: string) => void} deps.openBrowser
  * @param {(event: object) => void} [deps.emit]     progress events for the renderer
  * @param {string} deps.appVersion
+ * @param {(me: object) => void} [deps.onAccount]  every fresh GET /v1/me body
  * @param {typeof fetch} [deps.fetchImpl]
  */
 function createCloudAccount(deps) {
@@ -144,6 +145,11 @@ function createCloudAccount(deps) {
     let value;
     if (r.ok && r.data) {
       value = { ...info, signedIn: true, account: r.data, entitlement: entitlement(r.data) };
+      if (deps.onAccount) {
+        try {
+          deps.onAccount(r.data);
+        } catch (_e) { /* a listener never breaks the status */ }
+      }
     } else if (r.status === 401) {
       value = { ...info, signedIn: false, expired: true, detail: describeError('invalid_token', 401) };
     } else {
@@ -305,6 +311,15 @@ function createCloudAccount(deps) {
     return r.ok ? { ok: true } : { ok: false, error: describeError(r.error, r.status) };
   }
 
+  // Session ratings and account preferences (specs/004-session-feedback-popup).
+  function feedback(kind, id, body) {
+    return api('PUT', `/v1/feedback/${encodeURIComponent(String(kind))}/${encodeURIComponent(String(id))}`, body);
+  }
+
+  function setPreferences(prefs) {
+    return api('PUT', '/v1/me/preferences', prefs);
+  }
+
   async function logout() {
     const token = deps.readToken();
     if (token) await request('POST', '/v1/auth/logout', { token }); // best effort revoke
@@ -313,7 +328,7 @@ function createCloudAccount(deps) {
     return { ok: true };
   }
 
-  return { deleteAccount, syncClient, status, loginWithPassword, signup, referral, resetPassword, billing, logout, serverInfo, api, aiEndpoint, uploadFile, listFiles, deleteFile };
+  return { feedback, setPreferences, deleteAccount, syncClient, status, loginWithPassword, signup, referral, resetPassword, billing, logout, serverInfo, api, aiEndpoint, uploadFile, listFiles, deleteFile };
 }
 
 module.exports = { createCloudAccount, effectiveServerUrl, normalizeBaseUrl, describeError, BUILTIN_SERVER_URL };

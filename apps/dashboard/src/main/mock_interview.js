@@ -229,7 +229,7 @@ function createMockInterviews(deps) {
     if (!r.ok) {
       const code = r.error || (r.data && r.data.error && r.data.error.code) || '';
       if (r.status === 404) return { ok: false, code: 'server_outdated', error: 'The lipcue.com server has not been updated for mock interviews yet. Nothing was charged.' };
-      const error = code === 'mock_not_included' ? 'No interviews of this type are available on your account. Check your plan and credits.'
+      const error = code === 'mock_not_included' ? 'You have no minutes left for a mock interview. Buy minutes or upgrade to PRO to continue.'
         : code === 'vision_unavailable' ? 'Camera analysis is unavailable right now. Nothing was charged.'
           : 'Mock interviews are unavailable right now. Nothing was charged.';
       return { ok: false, code, error };
@@ -370,7 +370,10 @@ function createMockInterviews(deps) {
     const text = answered && !evaluation ? await feedback(me) : '';
     const ended = await deps.api('POST', `/v1/mock/${me.id}/end`, {});
     const refunded = Boolean(ended.ok && ended.data && ended.data.refunded);
-    if (!answered) return { ok: true, refunded, record: null };
+    // Charged by the time used, from the same minutes as a live session.
+    const charge = ended.ok && ended.data ? Number(ended.data.charged_minutes) : NaN;
+    const chargedMinutes = Number.isFinite(charge) ? charge : null;
+    if (!answered) return { ok: true, refunded, chargedMinutes, record: null };
     const record = {
       id: me.id, agentId: me.agent.id, company: me.agent.company || '', role: me.agent.role || '', lang: me.lang, mode: me.mode,
       startedAt: me.startedAt, durationS: Math.round((deps.now() - me.startedAt) / 1000), messages: me.messages, feedback: text, evaluation, coach: [],
@@ -378,7 +381,7 @@ function createMockInterviews(deps) {
       bankUsed: [...me.bankUsed], bankLeft: me.bank.filter((q) => !me.bankUsed.has(q.text)).map((q) => q.text)
     };
     save(record);
-    return { ok: true, refunded, record };
+    return { ok: true, refunded, chargedMinutes, record };
   }
 
   function save(record) {

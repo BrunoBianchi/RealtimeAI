@@ -691,6 +691,135 @@
     });
     paint();
   };
+
+  // ------------------------------------------------------ session rating --
+  // Optional rating at the end of a live session or a mock interview
+  // (specs/004-session-feedback-popup/contracts/feedback-dialog-ui.md).
+  // Every way out but Submit saves nothing; "Don't show again" turns it off
+  // for the account.
+  const STAR = '<svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path d="M12 2.8l2.84 5.76 6.36.92-4.6 4.49 1.09 6.33L12 17.31l-5.69 2.99 1.09-6.33-4.6-4.49 6.36-.92z"/></svg>';
+  let feedbackEntry = null;
+
+  function feedbackDialog(ask) {
+    if (!ask || !ask.id || (ask.kind !== 'live' && ask.kind !== 'mock')) return;
+    if (feedbackEntry) close(feedbackEntry);
+    const st = { rating: 0, hover: 0, phase: 'open', error: '' }; // open | sending | thanks | gone
+    const entry = mount(
+      `<div class="modal feedback-dialog" role="dialog" aria-modal="true" aria-labelledby="fbTitle" aria-describedby="fbLead">
+        <div class="modal-head"><div class="stack grow" style="gap:2px"><span class="t" id="fbTitle">Rate your session</span></div><button type="button" class="icon-btn" id="fbClose" title="Close" aria-label="Close">${icon('x')}</button></div>
+        <div class="modal-body" id="fbBody"></div>
+      </div>`,
+      { onClose: () => { if (feedbackEntry === entry) feedbackEntry = null; } }
+    );
+    feedbackEntry = entry;
+    const L = entry.layer;
+    const body = L.querySelector('#fbBody');
+    const shut = () => { if (st.phase !== 'sending') close(entry); };
+    L.querySelector('#fbClose').addEventListener('click', shut);
+
+    function paintStars() {
+      const shown = st.hover || st.rating;
+      L.querySelectorAll('[data-fb-star]').forEach((b) => {
+        const n = Number(b.dataset.fbStar);
+        b.classList.toggle('on', n <= shown);
+        b.setAttribute('aria-checked', String(n === st.rating));
+        b.tabIndex = n === (st.rating || 1) ? 0 : -1;
+      });
+      const send = L.querySelector('#fbSend');
+      if (send) send.disabled = !st.rating || st.phase !== 'open';
+    }
+
+    function paint() {
+      if (st.phase === 'thanks') {
+        body.innerHTML = '<p class="feedback-thanks" role="status">Thanks for your feedback!</p>';
+        setTimeout(() => close(entry), 1500);
+        return;
+      }
+      const keep = L.querySelector('#fbComment');
+      const comment = keep ? keep.value : '';
+      body.innerHTML = `
+        <p class="muted feedback-lead" id="fbLead">Your rating helps us make LipCue.com better for your next interview.</p>
+        <div class="stars" role="radiogroup" aria-label="Your rating">
+          ${[1, 2, 3, 4, 5].map((n) => `<button type="button" class="star" role="radio" aria-checked="false" data-fb-star="${n}" aria-label="${n} of 5 stars" title="${n} of 5 stars">${STAR}</button>`).join('')}
+        </div>
+        <label class="field">Can you tell us more?<textarea class="textarea" id="fbComment" rows="4" maxlength="1000" placeholder="Add feedback (optional)">${esc(comment)}</textarea><span class="hint" id="fbCount" hidden></span></label>
+        ${st.error ? `<div class="small feedback-error" role="alert">${esc(st.error)}</div>` : ''}
+        <div class="feedback-actions">
+          <button type="button" class="btn lg" id="fbCancel">Cancel</button>
+          <button type="button" class="btn primary lg" id="fbSend">${st.phase === 'sending' ? '<span class="spinner"></span>Sending…' : 'Submit'}</button>
+        </div>
+        <div class="feedback-foot"><button type="button" class="link-btn" id="fbNever">Don't show again</button></div>`;
+      window.CueIcons.hydrateIcons(body);
+      const stars = [...L.querySelectorAll('[data-fb-star]')];
+      const pick = (n) => {
+        st.rating = Math.min(5, Math.max(1, n));
+        paintStars();
+        const el = stars[st.rating - 1];
+        if (el && el.focus) el.focus();
+      };
+      stars.forEach((b) => {
+        const n = Number(b.dataset.fbStar);
+        b.addEventListener('click', () => pick(n));
+        b.addEventListener('mouseenter', () => { st.hover = n; paintStars(); });
+        b.addEventListener('mouseleave', () => { st.hover = 0; paintStars(); });
+        b.addEventListener('keydown', (e) => {
+          const next = { ArrowRight: st.rating + 1, ArrowUp: st.rating + 1, ArrowLeft: st.rating - 1, ArrowDown: st.rating - 1, Home: 1, End: 5 }[e.key];
+          if (next === undefined) return;
+          e.preventDefault();
+          pick(next || 1);
+        });
+      });
+      const ta = L.querySelector('#fbComment');
+      const count = L.querySelector('#fbCount');
+      const counter = () => {
+        const n = [...ta.value].length;
+        count.hidden = n < 900;
+        count.textContent = `${n}/1000`;
+      };
+      ta.addEventListener('input', counter);
+      counter();
+      L.querySelector('#fbCancel').addEventListener('click', shut);
+      L.querySelector('#fbSend').addEventListener('click', submit);
+      L.querySelector('#fbNever').addEventListener('click', () => {
+        if (st.phase === 'sending') return;
+        close(entry);
+        api.feedbackSetPrompt(false); // a failure stays pending: nothing to show
+      });
+      paintStars();
+      if (stars[0] && stars[0].focus) setTimeout(() => stars[(st.rating || 1) - 1].focus(), 40);
+    }
+
+    async function submit() {
+      if (!st.rating || st.phase !== 'open') return;
+      const comment = L.querySelector('#fbComment').value;
+      st.phase = 'sending';
+      st.error = '';
+      paint();
+      const r = await api.feedbackSubmit({ kind: ask.kind, id: ask.id, rating: st.rating, comment }).catch(() => ({ ok: false, error: 'Could not send. Check your connection and try again.' }));
+      if (r && r.ok) {
+        st.phase = 'thanks';
+      } else {
+        st.phase = r && r.gone ? 'gone' : 'open';
+        st.error = (r && r.error) || 'Could not send. Check your connection and try again.';
+      }
+      paint();
+      if (st.phase === 'gone') {
+        const send = L.querySelector('#fbSend');
+        if (send) send.disabled = true;
+      }
+    }
+
+    paint();
+  }
+
+  MODALS.feedback = feedbackDialog;
+  C.openFeedback = feedbackDialog;
+  C.closeFeedback = () => {
+    if (feedbackEntry) close(feedbackEntry);
+  };
+  if (api && api.onFeedbackPrompt) api.onFeedbackPrompt((ask) => feedbackDialog(ask));
+  if (api && api.onFeedbackClose) api.onFeedbackClose(() => C.closeFeedback());
+
   C.actions['open-palette'] = () => MODALS.palette();
   void plural;
 })();

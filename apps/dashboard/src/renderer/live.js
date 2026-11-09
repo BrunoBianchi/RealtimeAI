@@ -300,11 +300,11 @@
     const a = cur.a;
     const statusPill =
       a.status === 'streaming'
-        ? '<span class="pill warn"><span class="dot"></span>Generating</span>'
+        ? '<span class="pill warn"><span class="activity-dots" aria-hidden="true"><i></i><i></i><i></i></span>Generating</span>'
         : a.status === 'completed'
           ? '<span class="pill ok"><span class="dot"></span>Ready</span>'
           : `<span class="pill danger"><span class="dot"></span>${esc(a.status === 'interrupted' ? 'Interrupted' : 'Failed')}</span>`;
-    return `<div class="stack gap-8">
+    return `<div class="stack gap-8 answer-context">
         <div class="row"><span class="eyebrow">Question</span><span class="tag">${esc(REASON[a.reason] || a.reason || 'Auto')}</span>${a.image ? `<span class="tag">${icon('camera')} screen</span>` : ''}</div>
         <span class="answer-q">${esc(a.trigger || a.understood || '—')}</span>
         ${a.understood && a.understood !== a.trigger ? `<span class="small faint">Understood as: ${esc(a.understood)}</span>` : ''}
@@ -393,7 +393,7 @@
         </div>
         <div class="live-answer-card">
           <div class="live-bar">
-            <div class="segmented sm">${tabs.map(([id, label]) => `<button type="button" class="${S.ui.liveTab === id ? 'active' : ''}" data-action="live-tab" data-tab="${id}">${esc(label)}</button>`).join('')}</div>
+            <div class="segmented sm">${tabs.map(([id, label]) => `<button type="button" class="${S.ui.liveTab === id ? 'active' : ''}" aria-pressed="${S.ui.liveTab === id}" data-action="live-tab" data-tab="${id}">${esc(label)}</button>`).join('')}</div>
             <span class="row ml-auto" style="gap:2px" id="liveAnswerNav">${answerNavHtml()}</span>
           </div>
           <div class="answer-pane" id="liveAnswer" data-tour="live-answer">${answerHtml()}</div>

@@ -201,7 +201,7 @@ html[data-theme='light'] ::-webkit-scrollbar-thumb {
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent-border);
+  outline: 2px solid var(--accent-bright);
   outline-offset: 2px;
 }
 
@@ -1191,7 +1191,7 @@ html[data-theme='light'] .mock-hero::before {
   background: var(--btn-primary-bg);
   color: var(--btn-primary-text);
   font-weight: 600;
-  box-shadow: 0 0 20px -3px rgba(34, 197, 94, 0.4);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 14%);
   transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
 }
 
@@ -1588,7 +1588,7 @@ button.status-chip:hover {
   border-radius: var(--radius-sm);
   border: 0;
   background: transparent;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   font-size: 12.5px;
   font-weight: 500;
   white-space: nowrap;
@@ -1601,6 +1601,7 @@ button.status-chip:hover {
 .segmented button.active {
   background: var(--surface-active);
   color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--border-muted);
 }
 
 .segmented .num {
@@ -1694,7 +1695,7 @@ button.status-chip:hover {
 .empty {
   padding: 40px 20px;
   text-align: center;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   font-size: 13px;
   display: flex;
   flex-direction: column;
@@ -1758,7 +1759,16 @@ button.status-chip:hover {
 .select:focus,
 .textarea:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent-border), 0 0 12px -2px color-mix(in srgb, var(--accent) 25%, transparent);
+  box-shadow: 0 0 0 3px var(--accent-border);
+}
+
+:is(.input, .select, .textarea)[aria-invalid="true"] {
+  border-color: var(--danger-bright);
+}
+
+:is(.btn, .input, .select, .textarea):disabled {
+  cursor: not-allowed;
+  opacity: .55;
 }
 
 .input.sm,
@@ -4321,4 +4331,69 @@ button.prep-mark:hover { border-color: var(--accent-bright); }
 @media (max-width: 860px) {
   .live-room { grid-template-columns: minmax(0, 1fr); padding: 20px; }
   .live-side { border: 1px solid var(--border-subtle); }
+}
+
+/* Session rating dialog (specs/004-session-feedback-popup). Theme tokens only. */
+.feedback-dialog { width: min(460px, calc(100vw - 32px)); }
+.feedback-dialog .modal-body { display: flex; flex-direction: column; gap: 14px; }
+.feedback-lead { margin: 0; font-size: 13px; }
+.stars { display: flex; justify-content: space-between; gap: 6px; padding: 2px 6px; }
+.star {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.12s ease, transform 0.12s ease;
+}
+.star svg { fill: transparent; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; }
+.star.on { color: var(--accent); }
+.star.on svg { fill: currentColor; }
+.star:hover { transform: scale(1.06); }
+.star:focus-visible { outline: 2px solid var(--accent-border); outline-offset: 2px; }
+.feedback-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.feedback-actions .btn { justify-content: center; }
+.feedback-foot { display: flex; justify-content: center; }
+.feedback-foot .link-btn { text-decoration: underline; text-underline-offset: 3px; }
+.feedback-foot .link-btn:focus-visible { color: var(--text); outline: 2px solid var(--accent-border); outline-offset: 2px; }
+.feedback-error { color: var(--danger); }
+.feedback-thanks { margin: 10px 0; text-align: center; font-size: 15px; font-weight: 500; color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .star { transition: none; } .star:hover { transform: none; } }
+
+/* Live context and response progress share the dashboard's surface tokens. */
+.answer-context {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.activity-dots {
+  display: inline-flex;
+  gap: 3px;
+  color: var(--warning);
+}
+
+.activity-dots i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: activity-fade 1.4s ease-in-out infinite;
+}
+
+.activity-dots i:nth-child(2) { animation-delay: .18s; }
+.activity-dots i:nth-child(3) { animation-delay: .36s; }
+
+@keyframes activity-fade {
+  50% { opacity: .35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .activity-dots i, .answer-body.streaming::after, .modal-layer { animation: none; }
 }

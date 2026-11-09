@@ -106,7 +106,7 @@ test('tour library: driver.js is vendored at the version in package.json', () =>
 
 test('tours: every step points at something the screen really renders', () => {
   const modes = [false, true].flatMap((local) => [false, true].map((running) => ({ local, running })));
-  const pageRoute = { session: 'session/a1', live: 'live', files: 'files', questions: 'questions' };
+  const pageRoute = { session: 'session/a1', live: 'live', files: 'files', questions: 'questions', mock: 'mock' };
   for (const m of modes) {
     const r = loadRenderer({
       state: {
