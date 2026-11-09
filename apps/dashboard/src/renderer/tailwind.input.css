@@ -4397,3 +4397,58 @@ button.prep-mark:hover { border-color: var(--accent-bright); }
 @media (prefers-reduced-motion: reduce) {
   .activity-dots i, .answer-body.streaming::after, .modal-layer { animation: none; }
 }
+
+/* ==========================================================================
+   Refinement pass: type roles follow docs/design.md.
+   Geist Mono is for keys, code and raw timings only. Metrics use Geist
+   (metric-display) with tabular figures; captions and card labels use Geist
+   (caption). Labels read in sentence case instead of tracked capitals.
+   ========================================================================== */
+.eyebrow {
+  font: 600 12px/1.35 var(--font-sans);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-secondary);
+}
+.eyebrow.on-aurora { color: var(--accent-bright); }
+.palette-group.eyebrow { color: var(--text-tertiary); font-weight: 500; }
+
+.num,
+.nav-count,
+.next-item .s,
+.metric .unit,
+.card-foot,
+.table-head,
+.stat-d,
+.usage-num .of,
+.plan-badge,
+.prof-level,
+.err-legend b,
+.share-stats,
+.date-tile .m,
+.mock-availability {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.table-head { font-size: 11px; letter-spacing: 0.04em; }
+
+.stat-v,
+.usage-num,
+.usage-big,
+.score-num,
+.score-disc .v {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+}
+
+/* Active navigation: a surface and an accent icon, no coloured edge. */
+.nav-item.active { box-shadow: none; }
+.ref-card-bonus { font-family: var(--font-sans); font-weight: 600; font-variant-numeric: tabular-nums; }
+/* Profile counts are metrics, not code. */
+.prof-page .mono,
+.badge-r {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
