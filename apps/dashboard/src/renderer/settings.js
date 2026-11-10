@@ -684,7 +684,8 @@
     const tone = u.pct > 90 ? 'danger' : u.pct > 70 ? 'warn' : '';
     const sub = ent.isPro
       ? `${ent.limitMinutes} minutes per month · renews on ${esc(u.renewLabel)}`
-      : ent.sessionsUsed >= 1 ? 'Free session already used' : 'One free session of up to 15 minutes';
+      : ent.signupCredits ? '15 signup minutes across interviews'
+        : ent.sessionsUsed >= 1 ? 'Free session already used' : 'One free session of up to 15 minutes';
     const action = ent.isPro
       ? `<button type="button" class="btn" data-action="cloud-billing" data-kind="portal">${icon('external')}Manage subscription</button>`
       : `<button type="button" class="btn primary" data-action="cloud-billing" data-kind="checkout">Upgrade to PRO</button>`;
@@ -743,7 +744,7 @@
       ${trainingMinutes()}
       ${card('Plans', 'Live sessions and mock interviews use the same minutes. The server checks the limit on every session; when it runs out, the session ends.',
         `<div class="option-cards">
-          <div class="option-card ${u.isPro ? '' : 'active'}"><span class="t">${u.isPro ? '' : '<span class="dot"></span>'}Free</span><span class="s">A single session of up to 15 minutes to try it out. Does not renew.</span></div>
+          <div class="option-card ${u.isPro ? '' : 'active'}"><span class="t">${u.isPro ? '' : '<span class="dot"></span>'}Free</span><span class="s">15 free minutes on signup. Does not renew.</span></div>
           <div class="option-card ${u.isPro ? 'active' : ''}"><span class="t">${u.isPro ? '<span class="dot"></span>' : ''}PRO</span><span class="metric">$${PRO_PRICE}</span><span class="s">Per month. Includes ${PRO_MINUTES} minutes a month, across as many sessions as you like.</span></div>
         </div>`)}
       ${tokenPacks()}
