@@ -110,6 +110,26 @@ inline std::string query_key(std::string_view q) {
     return out;
 }
 
+// What two wordings of the same question share: ASCII lower case, no ASCII
+// punctuation, single spaces. The live interim ("qual foi o maior desafio")
+// and the final the STT sends for it ("Qual foi o maior desafio?") get the
+// same key, so the embedding started while the question was being spoken
+// serves the search made when it ends.
+inline std::string match_key(std::string_view q) {
+    std::string out;
+    out.reserve(q.size());
+    bool space = false;
+    for (char ch : q) {
+        const auto c = static_cast<unsigned char>(ch);
+        const bool keep = c >= 0x80 || (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+        if (!keep) { space = !out.empty(); continue; }
+        if (space) out.push_back(' ');
+        space = false;
+        out.push_back(c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : ch);
+    }
+    return out;
+}
+
 } // namespace dense
 
 // Lets the app attach the dense side before it exists: the model and the
@@ -355,11 +375,19 @@ private:
     // ---- cache (mu_ held) ----
     std::shared_ptr<const std::vector<float>> cache_find(const std::string& key) {
         auto it = cache_.find(key);
-        if (it == cache_.end()) return nullptr;
+        if (it == cache_.end()) {
+            // Another wording of the same question (dense::match_key).
+            const auto al = alias_.find(dense::match_key(key));
+            if (al == alias_.end()) return nullptr;
+            it = cache_.find(al->second);
+            if (it == cache_.end()) return nullptr;
+        }
         lru_.splice(lru_.begin(), lru_, it->second.second);
         return it->second.first;
     }
     void cache_put(const std::string& key, std::shared_ptr<const std::vector<float>> v) {
+        if (alias_.size() > 256) alias_.clear();
+        alias_[dense::match_key(key)] = key;
         auto it = cache_.find(key);
         if (it != cache_.end()) {
             it->second.first = std::move(v);
@@ -470,6 +498,7 @@ private:
     std::shared_ptr<BuildJob> build_;
     std::shared_ptr<const DenseIndex> index_;
     std::list<std::string> lru_;
+    std::unordered_map<std::string, std::string> alias_; // match_key -> cached key
     std::unordered_map<std::string, std::pair<std::shared_ptr<const std::vector<float>>, std::list<std::string>::iterator>> cache_;
     Stats stats_;
     std::thread worker_;

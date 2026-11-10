@@ -135,7 +135,8 @@ inline std::optional<Turn> collect_loopback_context(
     const Container& turns,
     std::size_t end_index,
     std::int64_t curr_start_ms,
-    const FusionConfig& cfg = {}) noexcept {
+    const FusionConfig& cfg = {},
+    std::int64_t answered_until_ms = -1) noexcept {
     if (turns.empty() || end_index == 0) return std::nullopt;
 
     std::vector<Turn> context_turns;
@@ -147,6 +148,15 @@ inline std::optional<Turn> collect_loopback_context(
 
         const std::int64_t gap = (next_start_ms >= 0 && t.end_ms >= 0) ? (next_start_ms - t.end_ms) : 0;
         if (gap < 0 || gap >= cfg.fusion_window_ms) break; // outside fusion window
+
+        // A complete question that already got its answer is not the subject
+        // of the next one: gluing it on made the model answer the old question
+        // again ("Qual foi o maior desafio do sistema?" + "E qual tecnologia
+        // você usou?"). The prompt still carries it as conversation.
+        if (answered_until_ms >= 0 && t.end_ms >= 0 && t.end_ms <= answered_until_ms) {
+            const std::string said = text::trim(t.text);
+            if (!said.empty() && said.back() == '?') break;
+        }
 
         context_turns.push_back(t);
         next_start_ms = t.start_ms;

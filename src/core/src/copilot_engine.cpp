@@ -65,10 +65,13 @@ struct InFinalize { std::int64_t t; };
 struct InFinalizeDone { bool ok; JevReport report; std::int64_t t; };
 // A background summary of the answer memory's thread (rtai/answer_memory.hpp).
 struct InCompactionDone { std::uint64_t thread; std::size_t covered; bool ok; std::string text; };
+// A background summary of the story ledger's older entries (rtai/story_ledger.hpp).
+struct InLedgerDone { std::size_t covered; bool ok; std::string text; };
 using Input = std::variant<InTranscript, InStatus, InManual, InPause, InNotice, InLlmDone, InAction,
                            InFeedback, InClearChat, InAutoToggle, InModeToggle, InMicRms, InPtt,
                            InVadSpeculate, InVadCommitSilence, InSpeechFinal, InShadowDelta,
-                           InShadowDone, InFinalize, InFinalizeDone, InHoldDecided, InCompactionDone>;
+                           InShadowDone, InFinalize, InFinalizeDone, InHoldDecided, InCompactionDone,
+                           InLedgerDone>;
 
 // Shadow Streaming state (Req 2.1). Formalizes the implicit shadow lifecycle
 // (speculate -> commit -> abort) that today lives in shadow/promote/cancel.
@@ -86,6 +89,10 @@ constexpr std::size_t kMaxChatAnswerChars = 1500;
 // first piece already triggered an answer and the second piece follows within
 // this window (nobody else spoke), the answer is redone for the whole question.
 constexpr std::int64_t kContinuationWindowMs = 2500;
+// The same question fired again within this window is not answered twice.
+constexpr std::int64_t kRepeatWindowMs = 15000;
+// A correction of the question counts when said this soon after its answer started.
+constexpr std::int64_t kCorrectionWindowMs = 12000;
 // A speculation still counts as "the same question" when the final text only
 // adds up to this many words and no new question word.
 constexpr std::size_t kMaxExtraWordsSameQuestion = 6;
@@ -308,6 +315,15 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
     AnswerMemory memory_{cfg.answer_memory};
     std::shared_ptr<ILlmCall> compaction_call_;
     bool compaction_in_flight_{false};
+    StoryLedger ledger_{make_ledger(cfg)};
+    std::shared_ptr<ILlmCall> ledger_call_;
+    bool ledger_in_flight_{false};
+
+    static StoryLedger make_ledger(const CopilotConfig& c) {
+        StoryLedger l{c.story_ledger};
+        l.set_prior(c.story_prior);
+        return l;
+    }
     struct Active {
         std::uint64_t id{0};
         std::shared_ptr<ILlmCall> call;
@@ -354,6 +370,34 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
         std::string trigger;
     };
     LastAuto last_auto_;
+    // The last question that got an automatic answer (words only) and when:
+    // the same question again right away is not answered twice, and a
+    // correction said right after it ("não é isso, quero dizer...") is.
+    std::string last_fired_norm_;
+    std::int64_t last_fired_ms_{-1};
+
+    void note_fired(const std::string& trigger, std::int64_t now) {
+        last_fired_norm_ = norm_words(trigger);
+        last_fired_ms_ = now;
+    }
+
+    // "Pode repetir?", "de novo": the interviewer wants it again.
+    static bool asks_to_repeat(const std::string& norm) {
+        for (const char* cue : {"repet", "de novo", "outra vez", "again", "repeat", "once more"}) {
+            if (norm.find(cue) != std::string::npos) return true;
+        }
+        return false;
+    }
+
+    // End of the interviewer turn the last automatic answer was for (-1: none).
+    std::int64_t answered_until_ms() const {
+        if (last_auto_.turn_seq == 0) return -1;
+        const auto& all = convo.all();
+        for (auto it = all.rbegin(); it != all.rend(); ++it) {
+            if (it->seq == last_auto_.turn_seq) return it->end_ms;
+        }
+        return -1;
+    }
 
     // Question gate (rtai/question_gate.hpp): the interviewer's closed turns
     // that are not answered yet. An unfinished phrase waits for the rest; a
@@ -568,6 +612,51 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
         maybe_compact(); // answers that arrived meanwhile may need another pass
     }
 
+    // The story ledger after a finished answer: stored for the next session
+    // and, past its budget, folded by the background model (never on the
+    // path of the next answer; until it lands the newest entries go as-is).
+    void ledger_added() {
+        if (cfg.on_story_changed) cfg.on_story_changed(ledger_.persistable());
+        maybe_compact_ledger();
+    }
+
+    void maybe_compact_ledger() {
+        if (ledger_in_flight_ || !ledger_.needs_compaction()) return;
+        const std::shared_ptr<ILlmClient> client = cfg.compaction_llm ? cfg.compaction_llm : llm;
+        if (!client) return;
+        StoryLedger::CompactionJob job = ledger_.compaction_job(convo.render_source(AudioSource::Microphone, 900));
+        LlmRequest req;
+        req.model = cfg.compaction_model.empty() ? cfg.model : cfg.compaction_model;
+        req.messages = std::move(job.messages);
+        req.max_tokens = 400;
+        req.temperature = 0.0;
+        req.reasoning_effort = "none";
+        auto buf = std::make_shared<std::string>();
+        std::weak_ptr<Impl> weak = shared_from_this();
+        LlmCallbacks cb;
+        cb.on_delta = [buf](std::string_view d) { buf->append(d); };
+        cb.on_done = [weak, buf, covered = job.covered](const LlmResult& r) {
+            if (auto self = weak.lock())
+                self->post(InLedgerDone{covered, r.status == LlmStatus::Completed, std::move(*buf)});
+        };
+        ledger_in_flight_ = true;
+        try {
+            ledger_call_ = client->start(std::move(req), std::move(cb));
+        } catch (...) {
+            ledger_in_flight_ = false;
+        }
+    }
+
+    void handle(InLedgerDone& in) {
+        ledger_in_flight_ = false;
+        ledger_call_.reset();
+        if (in.ok) {
+            ledger_.set_summary(in.covered, in.text);
+            if (cfg.on_story_changed) cfg.on_story_changed(ledger_.persistable());
+        }
+        maybe_compact_ledger();
+    }
+
     // The answer memory to send with a new question: empty unless it follows
     // up on the subject of the current thread. Only the question decides: the
     // interviewer's recent lines still hold the previous question, which
@@ -756,7 +845,7 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
         std::vector<ChatTurn> thread(chat.begin(), chat.end());
         // Requests about the conversation itself see the whole memory.
         std::string history = render_history(true, true);
-        auto messages = build_action_messages(cfg.prompt, history, ai, thread);
+        auto messages = build_action_messages(cfg.prompt, history, ai, thread, ledger_.render());
         std::string question;
         if (in.reason == TriggerReason::Chat) question = ai.text;
         else if (in.reason == TriggerReason::Screenshot) question = "[screenshot] " + ai.text;
@@ -921,8 +1010,10 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
                     const std::string q_label = !e.interpreted_question.empty() ? e.interpreted_question
                                                 : !it->second.question.empty() ? it->second.question
                                                                                : it->second.trigger;
-                    memory_.add(q_label, split_interpreted_answer(e.text, true).body);
+                    const std::string said = split_interpreted_answer(e.text, true).body;
+                    memory_.add(q_label, said);
                     maybe_compact();
+                    if (ledger_.add(q_label, said)) ledger_added();
                 }
             }
             meta.erase(it);
@@ -986,6 +1077,12 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
         std::string& last = last_live[lane_index(s)];
         if (live == last) return;
         last = live;
+        // The interviewer is still talking: warm the retrieval for what was
+        // said so far (the same text the closed turn will ask about).
+        if (cfg.prompt.rag_prefetch && s == cfg.decision.trigger_source && !transcription_only_.load() &&
+            text::word_count(live) >= 4) {
+            cfg.prompt.rag_prefetch(live_utterance(live, s, t).trigger);
+        }
         publish(TranscriptUpdateEvent{s, std::move(live), false, t});
     }
 
@@ -1023,7 +1120,8 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
         std::optional<Turn> prev_loopback;
         const auto& all_turns = convo.all();
         if (all_turns.size() >= 2) {
-            prev_loopback = collect_loopback_context(all_turns, all_turns.size() - 1, turn.start_ms);
+            prev_loopback = collect_loopback_context(all_turns, all_turns.size() - 1, turn.start_ms, {},
+                                                     answered_until_ms());
         }
         const std::int64_t gap = prev_loopback ? (turn.start_ms - prev_loopback->end_ms) : -1;
         const std::string enriched_trigger = enrich_trigger_with_subject(prev_loopback, turn.text, gap);
@@ -1178,7 +1276,7 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
 
     // Same for the live text of the open turn on `src` at time `t`.
     Utterance live_utterance(const std::string& live, AudioSource src, std::int64_t t) const {
-        auto prev_lb = collect_loopback_context(convo.all(), convo.size(), t);
+        auto prev_lb = collect_loopback_context(convo.all(), convo.size(), t, {}, answered_until_ms());
         const std::int64_t g = prev_lb ? (t - prev_lb->end_ms) : -1;
         const std::string enriched = enrich_trigger_with_subject(prev_lb, live, g);
         const std::int64_t start = turns.open_turn_start_ms(src);
@@ -1239,9 +1337,20 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
         t.start_ms = now;
         t.end_ms = now;
         t.seq = seq;
+        // The same question again within a few seconds (the STT repeating a
+        // final, the interviewer saying it twice): its answer is on screen.
+        const std::string norm = norm_words(trigger);
+        if (!norm.empty() && norm == last_fired_norm_ && last_fired_ms_ >= 0 && now - last_fired_ms_ <= kRepeatWindowMs &&
+            !asks_to_repeat(norm)) {
+            last_auto_ = LastAuto{seq, trigger};
+            return;
+        }
         const TriggerReason r = policy.evaluate(t, now, true);
         if (r != TriggerReason::None) {
-            if (route_suggestion(trigger, src, r, policy.last_keyword(), now)) last_auto_ = LastAuto{seq, trigger};
+            if (route_suggestion(trigger, src, r, policy.last_keyword(), now)) {
+                last_auto_ = LastAuto{seq, trigger};
+                note_fired(trigger, now);
+            }
         } else if (policy.config().enqueue_on_cooldown &&
                    policy.would_trigger(trigger, -1, true) != TriggerReason::None) {
             enqueue_suggestion(trigger, src, TriggerReason::Question, {}, now);
@@ -1298,6 +1407,21 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
         }
         if (qa.verdict == QuestionVerdict::Wait) {
             hold_utterance(u, turn, false, has_context, fusion_prefix);
+            return;
+        }
+        // A correction right after an answer ("Não é isso, quero dizer o lado
+        // técnico."): not a question by itself, but it changes the one that
+        // was just answered. Answer the corrected question (latest wins).
+        if (!u.chained && last_fired_ms_ >= 0 && !last_auto_.trigger.empty() && all_turns.size() >= 2 &&
+            all_turns[all_turns.size() - 2].source == turn.source &&
+            turn.end_ms - last_fired_ms_ <= kCorrectionWindowMs && !gate.should_pin() &&
+            is_correction(u.assess) && content_word_count(u.assess) >= 2) {
+            const std::string merged = text::join_space(last_auto_.trigger, u.assess);
+            held_q_.reset();
+            policy.record_trigger(TriggerReason::Question, turn.end_ms);
+            start_suggestion(merged, turn.source, TriggerReason::Question, {});
+            last_auto_ = LastAuto{turn.seq, merged};
+            note_fired(merged, turn.end_ms);
             return;
         }
         // Not a question: it stays as context for what comes next, and the
@@ -1521,7 +1645,7 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
 
         std::string enriched = std::move(trigger);
         if (enriched.empty()) {
-            auto prev_lb = collect_loopback_context(convo.all(), convo.size(), c.t_ms);
+            auto prev_lb = collect_loopback_context(convo.all(), convo.size(), c.t_ms, {}, answered_until_ms());
             const std::int64_t gap = prev_lb ? (c.t_ms - prev_lb->end_ms) : -1;
             enriched = enrich_trigger_with_subject(prev_lb, c.text, gap);
         }
@@ -1529,7 +1653,7 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
 
         const std::string history = render_history();
         auto messages = build_copilot_messages(cfg.prompt, history, enriched, reason, keyword, may_skip(reason),
-                                               memory_for(enriched));
+                                               memory_for(enriched), ledger_.render());
         const std::uint64_t sid = ++next_id;
         meta[sid] = Meta{enriched, reason, c.source, {}, grounding_of(messages), -1};
 
@@ -1769,7 +1893,7 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
             research = cfg.web_search(trigger);
         const std::string history = render_history();
         auto messages = build_copilot_messages(cfg.prompt, history, trigger, reason, keyword, may_skip(reason),
-                                               memory_for(trigger));
+                                               memory_for(trigger), ledger_.render());
         if (!research.empty()) {
             messages.back().content += "\n\nPesquisa recente na internet:\n" + research +
                                        "\nUse somente como contexto auxiliar.";

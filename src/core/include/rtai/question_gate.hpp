@@ -502,6 +502,33 @@ inline QuestionAssessment assess_question(std::string_view utterance, bool has_c
     return out;
 }
 
+// "Não é isso", "quero dizer", "fora isso": the interviewer is correcting or
+// narrowing the question that was just asked. Said right after an answer, it
+// asks for a new one even though it is not a question by itself. Whole
+// phrases only, so a plain statement ("Na verdade aqui usamos Kafka") is not
+// one. The JS port is isCorrection in Browser/Home/src/lib/live/questionGate.js.
+inline bool is_correction(std::string_view utterance) {
+    std::string f = " ";
+    for (char c : text::fold(utterance)) {
+        const auto u = static_cast<unsigned char>(c);
+        const bool word = (u >= 'a' && u <= 'z') || (u >= '0' && u <= '9') || u >= 0x80 || c == '\'';
+        if (word) f.push_back(c);
+        else if (f.back() != ' ') f.push_back(' ');
+    }
+    if (f.back() != ' ') f.push_back(' ');
+    static constexpr std::string_view kCues[] = {
+        " nao e isso ", " nao foi isso ", " nao e bem isso ", " nao era isso ", " nao e a questao ",
+        " nao e so ", " nao so ", " quero dizer ", " quis dizer ", " fora isso ", " alem disso ",
+        " tirando isso ", " sem ser ", " nao estou falando ", " nao to falando ",
+        " not that ", " that's not ", " thats not ", " i mean ", " i meant ", " besides that ",
+        " other than that ", " apart from that ", " aside from that ", " not just ", " i'm not asking ",
+        " im not asking "};
+    for (std::string_view cue : kCues) {
+        if (f.find(cue) != std::string::npos) return true;
+    }
+    return false;
+}
+
 // Words that carry a subject ("projeto", "Kafka", "5G") in raw text.
 inline std::size_t content_word_count(std::string_view raw) {
     std::size_t n = 0;

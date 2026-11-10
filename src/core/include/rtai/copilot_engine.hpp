@@ -34,6 +34,7 @@
 #include "rtai/copilot_prompt.hpp"
 #include "rtai/decision_policy.hpp"
 #include "rtai/llm.hpp"
+#include "rtai/story_ledger.hpp"
 #include "rtai/turn_assembler.hpp"
 
 namespace rtai {
@@ -69,6 +70,14 @@ struct CopilotConfig {
     AnswerMemoryConfig answer_memory{};
     std::shared_ptr<ILlmClient> compaction_llm;
     std::string compaction_model;
+    // Everything already claimed in the interview goes with every answer, on
+    // any subject (rtai/story_ledger.hpp), so the persona never drifts.
+    // `story_prior`: what earlier sessions of the same goal left.
+    // `on_story_changed`: called on the orchestrator thread after each answer
+    // with the text to store for the next session; keep it cheap.
+    StoryLedgerConfig story_ledger{};
+    std::string story_prior;
+    std::function<void(const std::string&)> on_story_changed;
     std::chrono::steady_clock::time_point session_start{std::chrono::steady_clock::now()};
     std::chrono::milliseconds tick{20};
 };

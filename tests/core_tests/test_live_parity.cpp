@@ -12,6 +12,7 @@
 #include "rtai/copilot_prompt.hpp"
 #include "rtai/json_min.hpp"
 #include "rtai/question_gate.hpp"
+#include "rtai/story_ledger.hpp"
 
 #ifndef RTAI_LIVE_PARITY_DIR
 #error "RTAI_LIVE_PARITY_DIR must point to tests/fixtures/live_parity"
@@ -86,13 +87,51 @@ TEST(LiveParity, PromptMatchesTheWebPort) {
         PromptConfig cfg;
         const std::string profile = c["profile"].as_string();
         cfg.session_profile = [profile] { return profile; };
+        const std::string retrieved = c["retrieved"].as_string();
+        if (!retrieved.empty()) cfg.rag_retrieve = [retrieved](std::string_view, std::string_view) { return retrieved; };
         const auto msgs = build_copilot_messages(cfg, history, c["trigger"].as_string(),
-                                                 reason_of(c["reason"].as_string()), {}, c["allow_skip"].as_bool());
+                                                 reason_of(c["reason"].as_string()), {}, c["allow_skip"].as_bool(),
+                                                 {}, c["story_ledger"].as_string());
         const auto& want = c["messages"];
         ASSERT_EQ(msgs.size(), want.size()) << name;
         for (std::size_t m = 0; m < msgs.size(); ++m) {
             EXPECT_EQ(msgs[m].role, want.at(m)["role"].as_string()) << name;
             EXPECT_EQ(msgs[m].content, want.at(m)["content"].as_string()) << name << ": message " << m;
         }
+    }
+}
+
+TEST(LiveParity, StoryLedgerMatchesTheWebPort) {
+    const auto cases = load("ledger.json");
+    ASSERT_GE(cases.size(), 5u);
+    for (std::size_t i = 0; i < cases.size(); ++i) {
+        const auto& c = cases.at(i);
+        const std::string name = c["name"].as_string();
+        StoryLedgerConfig cfg;
+        cfg.prompt_chars = static_cast<std::size_t>(c["prompt_chars"].as_number());
+        StoryLedger l{cfg};
+        const auto& ops = c["ops"];
+        std::size_t adds = 0;
+        for (std::size_t k = 0; k < ops.size(); ++k) {
+            const auto& op = ops.at(k);
+            if (op.has("add")) {
+                const bool kept = l.add(op["add"].at(0).as_string(), op["add"].at(1).as_string());
+                EXPECT_EQ(kept, c["added"].at(adds).as_bool()) << name << ": add " << adds;
+                ++adds;
+            } else if (op.has("prior")) {
+                l.set_prior(op["prior"].as_string());
+            } else if (op.has("summary")) {
+                l.set_summary(static_cast<std::size_t>(op["summary"].at(0).as_number()), op["summary"].at(1).as_string());
+            }
+        }
+        EXPECT_EQ(l.size(), static_cast<std::size_t>(c["size"].as_number())) << name;
+        EXPECT_EQ(l.render(), c["render"].as_string()) << name << ": render";
+        EXPECT_EQ(l.persistable(), c["persistable"].as_string()) << name << ": persistable";
+        EXPECT_EQ(l.needs_compaction(), c["needs_compaction"].as_bool()) << name;
+        const auto job = l.compaction_job(c["spoken"].as_string());
+        EXPECT_EQ(job.covered, static_cast<std::size_t>(c["job_covered"].as_number())) << name;
+        ASSERT_EQ(job.messages.size(), 2u);
+        EXPECT_EQ(job.messages[0].content, c["job_system"].as_string()) << name;
+        EXPECT_EQ(job.messages[1].content, c["job_user"].as_string()) << name << ": compaction request";
     }
 }

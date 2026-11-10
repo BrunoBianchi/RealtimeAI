@@ -14,6 +14,7 @@ add_executable(core_tests
     test_deepgram_stream.cpp
     test_source_pipeline.cpp
     test_answer_memory.cpp
+    test_story_ledger.cpp
     test_copilot.cpp
     test_llm_protocol.cpp
     test_session_store.cpp

@@ -31,6 +31,13 @@ struct Settings {
     int turn_boundary_grace_ms{-1};
     int turn_stale_ms{-1};
     int turn_speculative_pause_ms{-1};
+    // [turn] optional tuning of the question gate (-1 = engine default): how
+    // long a request without '?' waits for more speech, how long a phrase cut
+    // mid-way waits for the rest, and how far apart two fragments still are
+    // one utterance.
+    int question_settle_ms{-1};
+    int question_hold_ms{-1};
+    int fragment_gap_ms{-1};
     // [llm]
     std::string llm_key;
     std::string llm_url{"https://openrouter.ai/api/v1/chat/completions"};
@@ -207,6 +214,9 @@ inline Settings load_settings(const ini::File& f, const EnvLookup& env, const Se
     integer("turn", "speculative_pause_ms", 0, 3000, s.turn_speculative_pause_ms);
     integer("turn", "boundary_grace_ms", 0, 3000, s.turn_boundary_grace_ms);
     integer("turn", "stale_ms", 200, 10000, s.turn_stale_ms);
+    integer("turn", "question_settle_ms", 0, 3000, s.question_settle_ms);
+    integer("turn", "question_hold_ms", 200, 8000, s.question_hold_ms);
+    integer("turn", "fragment_gap_ms", 200, 8000, s.fragment_gap_ms);
 
     secret("llm", "OPENROUTER_API_KEY", s.llm_key, s.llm_key_source);
     {

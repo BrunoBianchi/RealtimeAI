@@ -1,0 +1,274 @@
+[
+  {
+    "name": "empty",
+    "prompt_chars": 1400,
+    "ops": [],
+    "added": [],
+    "size": 0,
+    "render": "",
+    "persistable": "",
+    "needs_compaction": false,
+    "spoken": "[Você] Na verdade foram três meses, não dois.\n",
+    "job_covered": 0,
+    "job_system": "Você mantém o registro do que um candidato já afirmou numa entrevista, para ele nunca se contradizer nas próximas respostas. Escreva em primeira pessoa, em até 8 linhas curtas, uma afirmação por linha: qual projeto ou história eu usei para cada tema, meu papel, as tecnologias, os números e as opiniões que eu defendi. Junte o que já estava registrado com as novas respostas, sem repetir. Use só o que está escrito, sem inventar nem opinar. Mantenha nomes e números exatamente como estão. Sem títulos.",
+    "job_user": "Novas respostas:\n\nO que eu falei de fato no microfone (vale mais que a resposta sugerida quando forem diferentes):\n[Você] Na verdade foram três meses, não dois.\n"
+  },
+  {
+    "name": "two subjects stay",
+    "prompt_chars": 1400,
+    "ops": [
+      {
+        "add": [
+          "Conte sobre um projeto onde você trabalhou em equipe.",
+          "Trabalho bem em equipe quando o objetivo está claro. Um exemplo foi o hackathon da Ninja Startup, onde eu liderei o alinhamento técnico com **WebSocket** e Docker e ganhamos o primeiro lugar."
+        ]
+      },
+      {
+        "add": [
+          "Por que você quer trabalhar no iFood?",
+          "Porque o iFood resolve logística em escala,\nque é o que eu mais gosto de fazer."
+        ]
+      }
+    ],
+    "added": [
+      true,
+      true
+    ],
+    "size": 2,
+    "render": "- Perguntaram: Conte sobre um projeto onde você trabalhou em equipe.\n  Eu disse: Trabalho bem em equipe quando o objetivo está claro. Um exemplo foi o hackathon da Ninja Startup, onde eu liderei o alinhamento técnico com WebSocket e Docker e ganhamos o primeiro lugar.\n- Perguntaram: Por que você quer trabalhar no iFood?\n  Eu disse: Porque o iFood resolve logística em escala, que é o que eu mais gosto de fazer.\n",
+    "persistable": "- Perguntaram: Conte sobre um projeto onde você trabalhou em equipe.\n  Eu disse: Trabalho bem em equipe quando o objetivo está claro. Um exemplo foi o hackathon da Ninja Startup, onde eu liderei o alinhamento técnico com WebSocket e Docker e ganhamos o primeiro lugar.\n- Perguntaram: Por que você quer trabalhar no iFood?\n  Eu disse: Porque o iFood resolve logística em escala, que é o que eu mais gosto de fazer.",
+    "needs_compaction": false,
+    "spoken": "[Você] Na verdade foram três meses, não dois.\n",
+    "job_covered": 0,
+    "job_system": "Você mantém o registro do que um candidato já afirmou numa entrevista, para ele nunca se contradizer nas próximas respostas. Escreva em primeira pessoa, em até 8 linhas curtas, uma afirmação por linha: qual projeto ou história eu usei para cada tema, meu papel, as tecnologias, os números e as opiniões que eu defendi. Junte o que já estava registrado com as novas respostas, sem repetir. Use só o que está escrito, sem inventar nem opinar. Mantenha nomes e números exatamente como estão. Sem títulos.",
+    "job_user": "Novas respostas:\n\nO que eu falei de fato no microfone (vale mais que a resposta sugerida quando forem diferentes):\n[Você] Na verdade foram três meses, não dois.\n"
+  },
+  {
+    "name": "repeated question keeps the newest wording",
+    "prompt_chars": 1400,
+    "ops": [
+      {
+        "add": [
+          "Conte sobre um projeto onde você trabalhou em equipe.",
+          "Primeira versão."
+        ]
+      },
+      {
+        "add": [
+          "Conte sobre um projeto onde você trabalhou em equipe.",
+          "Segunda versão."
+        ]
+      },
+      {
+        "add": [
+          "",
+          "sem pergunta"
+        ]
+      },
+      {
+        "add": [
+          "Sem resposta?",
+          "  "
+        ]
+      }
+    ],
+    "added": [
+      true,
+      true,
+      false,
+      false
+    ],
+    "size": 1,
+    "render": "- Perguntaram: Conte sobre um projeto onde você trabalhou em equipe.\n  Eu disse: Segunda versão.\n",
+    "persistable": "- Perguntaram: Conte sobre um projeto onde você trabalhou em equipe.\n  Eu disse: Segunda versão.",
+    "needs_compaction": false,
+    "spoken": "[Você] Na verdade foram três meses, não dois.\n",
+    "job_covered": 0,
+    "job_system": "Você mantém o registro do que um candidato já afirmou numa entrevista, para ele nunca se contradizer nas próximas respostas. Escreva em primeira pessoa, em até 8 linhas curtas, uma afirmação por linha: qual projeto ou história eu usei para cada tema, meu papel, as tecnologias, os números e as opiniões que eu defendi. Junte o que já estava registrado com as novas respostas, sem repetir. Use só o que está escrito, sem inventar nem opinar. Mantenha nomes e números exatamente como estão. Sem títulos.",
+    "job_user": "Novas respostas:\n\nO que eu falei de fato no microfone (vale mais que a resposta sugerida quando forem diferentes):\n[Você] Na verdade foram três meses, não dois.\n"
+  },
+  {
+    "name": "long answers are cut at a sentence end or with an ellipsis",
+    "prompt_chars": 1400,
+    "ops": [
+      {
+        "add": [
+          "Você já usou Kafka?",
+          "Sim, usei Kafka por dois anos. No TechFinance eu desenhei o pipeline de eventos que processava os pagamentos e reduzi a latência com particionamento por conta do cliente, o que deixou a conciliação muito mais rápida para a operação inteira do banco digital, sem perder a ordem das mensagens em nenhum momento do processamento."
+        ]
+      },
+      {
+        "add": [
+          "Qual foi a decisão técnica mais difícil?",
+          "Ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação"
+        ]
+      }
+    ],
+    "added": [
+      true,
+      true
+    ],
+    "size": 2,
+    "render": "- Perguntaram: Você já usou Kafka?\n  Eu disse: Sim, usei Kafka por dois anos. No TechFinance eu desenhei o pipeline de eventos que processava os pagamentos e reduzi a latência com particionamento por conta do cliente, o que deixou a conciliação muito mais rápida para a operação inteira do banco digit...\n- Perguntaram: Qual foi a decisão técnica mais difícil?\n  Eu disse: Ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação a...\n",
+    "persistable": "pagamentos e reduzi a latência com particionamento por conta do cliente, o que deixou a conciliação muito mais rápida para a operação inteira do banco digit...\n- Perguntaram: Qual foi a decisão técnica mais difícil?\n  Eu disse: Ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação a...",
+    "needs_compaction": false,
+    "spoken": "[Você] Na verdade foram três meses, não dois.\n",
+    "job_covered": 0,
+    "job_system": "Você mantém o registro do que um candidato já afirmou numa entrevista, para ele nunca se contradizer nas próximas respostas. Escreva em primeira pessoa, em até 8 linhas curtas, uma afirmação por linha: qual projeto ou história eu usei para cada tema, meu papel, as tecnologias, os números e as opiniões que eu defendi. Junte o que já estava registrado com as novas respostas, sem repetir. Use só o que está escrito, sem inventar nem opinar. Mantenha nomes e números exatamente como estão. Sem títulos.",
+    "job_user": "Novas respostas:\n\nO que eu falei de fato no microfone (vale mais que a resposta sugerida quando forem diferentes):\n[Você] Na verdade foram três meses, não dois.\n"
+  },
+  {
+    "name": "small budget drops old entries from the prompt",
+    "prompt_chars": 420,
+    "ops": [
+      {
+        "add": [
+          "Conte sobre um projeto onde você trabalhou em equipe.",
+          "Trabalho bem em equipe quando o objetivo está claro. Um exemplo foi o hackathon da Ninja Startup, onde eu liderei o alinhamento técnico com **WebSocket** e Docker e ganhamos o primeiro lugar."
+        ]
+      },
+      {
+        "add": [
+          "Por que você quer trabalhar no iFood?",
+          "Porque o iFood resolve logística em escala,\nque é o que eu mais gosto de fazer."
+        ]
+      },
+      {
+        "add": [
+          "Você já usou Kafka?",
+          "Sim, usei Kafka por dois anos. No TechFinance eu desenhei o pipeline de eventos que processava os pagamentos e reduzi a latência com particionamento por conta do cliente, o que deixou a conciliação muito mais rápida para a operação inteira do banco digital, sem perder a ordem das mensagens em nenhum momento do processamento."
+        ]
+      },
+      {
+        "add": [
+          "Qual foi a decisão técnica mais difícil?",
+          "Ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação"
+        ]
+      },
+      {
+        "add": [
+          "Como você lida com prazo apertado?",
+          "Eu corto escopo antes de cortar qualidade. No TechFinance negociei a entrega em duas fases."
+        ]
+      },
+      {
+        "add": [
+          "E conflito no time?",
+          "Eu converso em particular primeiro. Foi assim com o time de dados na Vértice."
+        ]
+      }
+    ],
+    "added": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "size": 6,
+    "render": "- Perguntaram: Como você lida com prazo apertado?\n  Eu disse: Eu corto escopo antes de cortar qualidade. No TechFinance negociei a entrega em duas fases.\n- Perguntaram: E conflito no time?\n  Eu disse: Eu converso em particular primeiro. Foi assim com o time de dados na Vértice.\n",
+    "persistable": "ão ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação a...\n- Perguntaram: Como você lida com prazo apertado?\n  Eu disse: Eu corto escopo antes de cortar qualidade. No TechFinance negociei a entrega em duas fases.\n- Perguntaram: E conflito no time?\n  Eu disse: Eu converso em particular primeiro. Foi assim com o time de dados na Vértice.",
+    "needs_compaction": true,
+    "spoken": "[Você] Na verdade foram três meses, não dois.\n",
+    "job_covered": 4,
+    "job_system": "Você mantém o registro do que um candidato já afirmou numa entrevista, para ele nunca se contradizer nas próximas respostas. Escreva em primeira pessoa, em até 8 linhas curtas, uma afirmação por linha: qual projeto ou história eu usei para cada tema, meu papel, as tecnologias, os números e as opiniões que eu defendi. Junte o que já estava registrado com as novas respostas, sem repetir. Use só o que está escrito, sem inventar nem opinar. Mantenha nomes e números exatamente como estão. Sem títulos.",
+    "job_user": "Novas respostas:\n- Perguntaram: Conte sobre um projeto onde você trabalhou em equipe.\n  Eu disse: Trabalho bem em equipe quando o objetivo está claro. Um exemplo foi o hackathon da Ninja Startup, onde eu liderei o alinhamento técnico com WebSocket e Docker e ganhamos o primeiro lugar.\n- Perguntaram: Por que você quer trabalhar no iFood?\n  Eu disse: Porque o iFood resolve logística em escala, que é o que eu mais gosto de fazer.\n- Perguntaram: Você já usou Kafka?\n  Eu disse: Sim, usei Kafka por dois anos. No TechFinance eu desenhei o pipeline de eventos que processava os pagamentos e reduzi a latência com particionamento por conta do cliente, o que deixou a conciliação muito mais rápida para a operação inteira do banco digit...\n- Perguntaram: Qual foi a decisão técnica mais difícil?\n  Eu disse: Ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação a...\n\nO que eu falei de fato no microfone (vale mais que a resposta sugerida quando forem diferentes):\n[Você] Na verdade foram três meses, não dois.\n"
+  },
+  {
+    "name": "summary of the older entries",
+    "prompt_chars": 420,
+    "ops": [
+      {
+        "add": [
+          "Conte sobre um projeto onde você trabalhou em equipe.",
+          "Trabalho bem em equipe quando o objetivo está claro. Um exemplo foi o hackathon da Ninja Startup, onde eu liderei o alinhamento técnico com **WebSocket** e Docker e ganhamos o primeiro lugar."
+        ]
+      },
+      {
+        "add": [
+          "Por que você quer trabalhar no iFood?",
+          "Porque o iFood resolve logística em escala,\nque é o que eu mais gosto de fazer."
+        ]
+      },
+      {
+        "add": [
+          "Você já usou Kafka?",
+          "Sim, usei Kafka por dois anos. No TechFinance eu desenhei o pipeline de eventos que processava os pagamentos e reduzi a latência com particionamento por conta do cliente, o que deixou a conciliação muito mais rápida para a operação inteira do banco digital, sem perder a ordem das mensagens em nenhum momento do processamento."
+        ]
+      },
+      {
+        "add": [
+          "Qual foi a decisão técnica mais difícil?",
+          "Ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação"
+        ]
+      },
+      {
+        "add": [
+          "Como você lida com prazo apertado?",
+          "Eu corto escopo antes de cortar qualidade. No TechFinance negociei a entrega em duas fases."
+        ]
+      },
+      {
+        "add": [
+          "E conflito no time?",
+          "Eu converso em particular primeiro. Foi assim com o time de dados na Vértice."
+        ]
+      },
+      {
+        "summary": [
+          4,
+          "Usei o hackathon da Ninja Startup para equipe e o TechFinance para Kafka."
+        ]
+      },
+      {
+        "summary": [
+          2,
+          "resumo antigo"
+        ]
+      }
+    ],
+    "added": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "size": 6,
+    "render": "Nesta entrevista, até aqui:\nUsei o hackathon da Ninja Startup para equipe e o TechFinance para Kafka.\nDepois disso:\n- Perguntaram: Como você lida com prazo apertado?\n  Eu disse: Eu corto escopo antes de cortar qualidade. No TechFinance negociei a entrega em duas fases.\n- Perguntaram: E conflito no time?\n  Eu disse: Eu converso em particular primeiro. Foi assim com o time de dados na Vértice.\n",
+    "persistable": "Usei o hackathon da Ninja Startup para equipe e o TechFinance para Kafka.\n- Perguntaram: Como você lida com prazo apertado?\n  Eu disse: Eu corto escopo antes de cortar qualidade. No TechFinance negociei a entrega em duas fases.\n- Perguntaram: E conflito no time?\n  Eu disse: Eu converso em particular primeiro. Foi assim com o time de dados na Vértice.",
+    "needs_compaction": false,
+    "spoken": "[Você] Na verdade foram três meses, não dois.\n",
+    "job_covered": 4,
+    "job_system": "Você mantém o registro do que um candidato já afirmou numa entrevista, para ele nunca se contradizer nas próximas respostas. Escreva em primeira pessoa, em até 8 linhas curtas, uma afirmação por linha: qual projeto ou história eu usei para cada tema, meu papel, as tecnologias, os números e as opiniões que eu defendi. Junte o que já estava registrado com as novas respostas, sem repetir. Use só o que está escrito, sem inventar nem opinar. Mantenha nomes e números exatamente como estão. Sem títulos.",
+    "job_user": "Fatos já registrados:\nUsei o hackathon da Ninja Startup para equipe e o TechFinance para Kafka.\n\nNovas respostas:\n\nO que eu falei de fato no microfone (vale mais que a resposta sugerida quando forem diferentes):\n[Você] Na verdade foram três meses, não dois.\n"
+  },
+  {
+    "name": "prior sessions come first",
+    "prompt_chars": 1400,
+    "ops": [
+      {
+        "prior": "Na primeira entrevista falei do TechFinance e de Kafka.\n"
+      },
+      {
+        "add": [
+          "Como você lida com prazo apertado?",
+          "Eu corto escopo antes de cortar qualidade. No TechFinance negociei a entrega em duas fases."
+        ]
+      }
+    ],
+    "added": [
+      true
+    ],
+    "size": 1,
+    "render": "Em entrevistas anteriores para esta vaga:\nNa primeira entrevista falei do TechFinance e de Kafka.\nDepois disso:\n- Perguntaram: Como você lida com prazo apertado?\n  Eu disse: Eu corto escopo antes de cortar qualidade. No TechFinance negociei a entrega em duas fases.\n",
+    "persistable": "Na primeira entrevista falei do TechFinance e de Kafka.\n- Perguntaram: Como você lida com prazo apertado?\n  Eu disse: Eu corto escopo antes de cortar qualidade. No TechFinance negociei a entrega em duas fases.",
+    "needs_compaction": false,
+    "spoken": "[Você] Na verdade foram três meses, não dois.\n",
+    "job_covered": 0,
+    "job_system": "Você mantém o registro do que um candidato já afirmou numa entrevista, para ele nunca se contradizer nas próximas respostas. Escreva em primeira pessoa, em até 8 linhas curtas, uma afirmação por linha: qual projeto ou história eu usei para cada tema, meu papel, as tecnologias, os números e as opiniões que eu defendi. Junte o que já estava registrado com as novas respostas, sem repetir. Use só o que está escrito, sem inventar nem opinar. Mantenha nomes e números exatamente como estão. Sem títulos.",
+    "job_user": "Novas respostas:\n\nO que eu falei de fato no microfone (vale mais que a resposta sugerida quando forem diferentes):\n[Você] Na verdade foram três meses, não dois.\n"
+  }
+]

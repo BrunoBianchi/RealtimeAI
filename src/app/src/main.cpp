@@ -30,6 +30,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <future>
 #include <string>
 #include <string_view>
@@ -140,6 +141,20 @@ std::string read_text_file(const fs::path& p, std::size_t max_bytes) {
         s.erase(0, 3); // UTF-8 BOM
     }
     return text::sanitize_utf8(text::truncate_utf8(s, max_bytes));
+}
+
+// Sets top-level fields of a goal's agents/<id>.json (values are serialized
+// JSON) and keeps everything else in the file byte for byte: the dashboard
+// owns the file and writes fields the engine does not know. A file that is
+// not valid JSON is left alone.
+void patch_agent_file(const fs::path& path, const std::shared_ptr<std::mutex>& mu,
+                      const std::vector<std::pair<std::string, std::string>>& fields) {
+    std::lock_guard<std::mutex> lk(*mu);
+    std::ifstream f(path, std::ios::binary);
+    if (!f) return;
+    const std::string raw((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    f.close();
+    if (auto patched = json::patch_top_level(raw, fields)) wincfg::write_file_atomic(path, *patched);
 }
 
 // ---------------------------------------------------------------------------
@@ -751,7 +766,23 @@ int run_app(AppConfig cfg) {
                     }
                     if (!inherited_docs.empty()) {
                         prof->documents = std::move(inherited_docs);
-                        wincfg::write_file_atomic(agent_path, prof->to_json());
+                        // Only the documents change: the dashboard's other
+                        // fields in the file stay as they are.
+                        json::Writer dw;
+                        dw.begin_array();
+                        for (const auto& d : prof->documents) {
+                            dw.begin_object()
+                                .field("name", d.name)
+                                .field("title", d.name)
+                                .field("path", d.path)
+                                .field("tag", !d.tag.empty() ? d.tag : (d.path.empty() ? "doc" : d.path))
+                                .field("content", d.content)
+                                .end_object();
+                        }
+                        dw.end_array();
+                        if (auto patched = json::patch_top_level(raw, {{"documents", dw.str()}})) {
+                            wincfg::write_file_atomic(agent_path, *patched);
+                        }
                     }
                 }
                 agent_rag = std::make_shared<MiniAgentRag>(*prof);
@@ -973,6 +1004,22 @@ int run_app(AppConfig cfg) {
         cc.compaction_model = cfg.cloud_session->background_model;
     }
     cc.prompt.user_context = cfg.context_text;
+    // The agent file is patched by the story ledger (after each answer) and by
+    // the deep-reading pass, from different threads.
+    auto agent_file_mu = std::make_shared<std::mutex>();
+    if (agent_rag) {
+        // The story told in earlier sessions of this goal comes back, and this
+        // session's is stored for the next one. The write runs off the
+        // orchestrator thread: the file holds every document of the goal.
+        cc.story_prior = agent_rag->profile().story_ledger;
+        if (!loaded_agent_path.empty()) {
+            cc.on_story_changed = [loaded_agent_path, agent_file_mu](const std::string& story) {
+                std::thread([loaded_agent_path, agent_file_mu, story] {
+                    patch_agent_file(loaded_agent_path, agent_file_mu, {{"story_ledger", json::quote(story)}});
+                }).detach();
+            };
+        }
+    }
     if (agent_rag) {
         // Stable profile -> system message (cacheable prefix); per-question
         // retrieval -> user message. Both are in-memory and take well under
@@ -980,6 +1027,7 @@ int run_app(AppConfig cfg) {
         cc.prompt.session_profile = [agent_rag, base_ctx = cfg.context_text]() {
             return agent_rag->session_profile_block(base_ctx);
         };
+        cc.prompt.rag_prefetch = [agent_rag](std::string_view q) { agent_rag->prefetch(q); };
         cc.prompt.rag_retrieve = [agent_rag, &log](std::string_view q, std::string_view recent) {
             MiniAgentRag::RetrievalTrace tr;
             std::string block = agent_rag->retrieve_block(q, recent, 3200, &tr);
@@ -995,6 +1043,9 @@ int run_app(AppConfig cfg) {
     if (cfg.st.turn_boundary_grace_ms >= 0) cc.turns.boundary_grace_ms = cfg.st.turn_boundary_grace_ms;
     if (cfg.st.turn_stale_ms >= 0) cc.turns.stale_ms = cfg.st.turn_stale_ms;
     if (cfg.st.turn_speculative_pause_ms >= 0) cc.turns.speculative_pause_ms = cfg.st.turn_speculative_pause_ms;
+    if (cfg.st.question_settle_ms >= 0) cc.question_settle_ms = cfg.st.question_settle_ms;
+    if (cfg.st.question_hold_ms >= 0) cc.question_hold_ms = cfg.st.question_hold_ms;
+    if (cfg.st.fragment_gap_ms >= 0) cc.fragment_gap_ms = cfg.st.fragment_gap_ms;
     cc.decision.auto_enabled = cfg.st.auto_suggest;
     cc.decision.cooldown_ms = static_cast<std::int64_t>(cfg.st.cooldown_s) * 1000;
     if (!cfg.st.keywords.empty()) {
@@ -1037,7 +1088,7 @@ int run_app(AppConfig cfg) {
         dcb.on_delta = [deep_compact_buf](std::string_view d) {
             deep_compact_buf->append(d);
         };
-        dcb.on_done = [agent_rag, deep_compact_buf, weak_eng, loaded_agent_path](const LlmResult& r) {
+        dcb.on_done = [agent_rag, deep_compact_buf, weak_eng, loaded_agent_path, agent_file_mu](const LlmResult& r) {
             const std::string trimmed_buf = text::trim(*deep_compact_buf);
             if (r.status == LlmStatus::Completed && !trimmed_buf.empty()) {
                 // The model's compact replaces the local one (the playbook and
@@ -1045,10 +1096,9 @@ int run_app(AppConfig cfg) {
                 const std::string final_compact = text::truncate_utf8(trimmed_buf, 3600);
                 agent_rag->set_mini_compact(final_compact);
                 if (!loaded_agent_path.empty()) {
-                    MiniAgentProfile updated_prof = agent_rag->profile();
-                    updated_prof.mini_compact = final_compact;
-                    updated_prof.mini_compact_fingerprint = agent_rag->source_fingerprint();
-                    wincfg::write_file_atomic(loaded_agent_path, updated_prof.to_json());
+                    patch_agent_file(loaded_agent_path, agent_file_mu,
+                                     {{"mini_compact", json::quote(final_compact)},
+                                      {"mini_compact_fingerprint", json::quote(agent_rag->source_fingerprint())}});
                 }
                 if (auto eng = weak_eng.lock()) {
                     eng->notify(NoticeLevel::Info,

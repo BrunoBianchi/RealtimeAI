@@ -12,6 +12,7 @@ const live = path.resolve(here, '../../../../Browser/Home/src/lib/live');
 const { assessQuestion } = await import(pathToFileURL(path.join(live, 'questionGate.js')));
 const { buildCopilotMessages, renderHistory } = await import(pathToFileURL(path.join(live, 'prompt.js')));
 const { createTurnAssembler } = await import(pathToFileURL(path.join(live, 'turns.js')));
+const { createStoryLedger } = await import(pathToFileURL(path.join(live, 'storyLedger.js')));
 
 const write = (name, data) => writeFileSync(path.join(here, name), `${JSON.stringify(data, null, 2)}\n`);
 
@@ -117,8 +118,50 @@ const prompts = [
   { name: 'long turn', profile: '  ', turns: turnsA, max_history_chars: 3500, trigger: 'Aqui a gente usa muito Kafka e Clojure.', reason: 'long_turn', allow_skip: false },
   { name: 'manual request', profile: PROFILE, turns: turnsA.slice(0, 2), max_history_chars: 3500, trigger: 'Tudo ótimo, obrigada.', reason: 'manual', allow_skip: false },
 ];
+const LEDGER_TEXT = '- Perguntaram: Conte sobre um projeto em equipe.\n  Eu disse: No hackathon da Ninja Startup eu liderei o alinhamento técnico.\n';
+const RETRIEVED = '=== DECISÃO AUTÔNOMA DO RAG ===\nTipo de pergunta: comportamental.\n[SOBRE MIM: meus arquivos, fatos que posso afirmar]\n• (cv.md) Cinco anos com pipelines em Kafka e Spark.';
+prompts.push(
+  { name: 'story ledger and retrieved excerpts', profile: PROFILE, turns: turnsA, max_history_chars: 3500, trigger: 'E qual foi o resultado?', reason: 'question', allow_skip: true, story_ledger: LEDGER_TEXT, retrieved: RETRIEVED },
+  { name: 'story ledger on a manual request', profile: '', turns: turnsA.slice(0, 2), max_history_chars: 3500, trigger: 'Tudo ótimo, obrigada.', reason: 'manual', allow_skip: false, story_ledger: 'Usei o TechFinance para falar de prazo.', retrieved: '' },
+);
 write('prompt.json', prompts.map((c) => {
   const history = renderHistory(c.turns, c.max_history_chars);
-  return { ...c, history, messages: buildCopilotMessages({ profile: c.profile, history, trigger: c.trigger, reason: c.reason, allowSkip: c.allow_skip }) };
+  const story_ledger = c.story_ledger || '';
+  const retrieved = c.retrieved || '';
+  return { ...c, story_ledger, retrieved, history, messages: buildCopilotMessages({ profile: c.profile, history, trigger: c.trigger, reason: c.reason, allowSkip: c.allow_skip, storyLedger: story_ledger, retrieved }) };
 }));
-console.log(`question_gate ${gate.length}, turns ${sequences.length}, prompt ${prompts.length}`);
+
+// Story ledger: a list of operations and what the ledger says after them.
+const QA = [
+  ['Conte sobre um projeto onde você trabalhou em equipe.', 'Trabalho bem em equipe quando o objetivo está claro. Um exemplo foi o hackathon da Ninja Startup, onde eu liderei o alinhamento técnico com **WebSocket** e Docker e ganhamos o primeiro lugar.'],
+  ['Por que você quer trabalhar no iFood?', 'Porque o iFood resolve logística em escala,\nque é o que eu mais gosto de fazer.'],
+  ['Você já usou Kafka?', 'Sim, usei Kafka por dois anos. No TechFinance eu desenhei o pipeline de eventos que processava os pagamentos e reduzi a latência com particionamento por conta do cliente, o que deixou a conciliação muito mais rápida para a operação inteira do banco digital, sem perder a ordem das mensagens em nenhum momento do processamento.'],
+  ['Qual foi a decisão técnica mais difícil?', 'Ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação ação'],
+  ['Como você lida com prazo apertado?', 'Eu corto escopo antes de cortar qualidade. No TechFinance negociei a entrega em duas fases.'],
+  ['E conflito no time?', 'Eu converso em particular primeiro. Foi assim com o time de dados na Vértice.'],
+];
+const ledgers = [
+  { name: 'empty', options: {}, ops: [] },
+  { name: 'two subjects stay', options: {}, ops: QA.slice(0, 2).map((x) => ({ add: x })) },
+  { name: 'repeated question keeps the newest wording', options: {}, ops: [{ add: [QA[0][0], 'Primeira versão.'] }, { add: [QA[0][0], 'Segunda versão.'] }, { add: ['', 'sem pergunta'] }, { add: ['Sem resposta?', '  '] }] },
+  { name: 'long answers are cut at a sentence end or with an ellipsis', options: {}, ops: [{ add: QA[2] }, { add: QA[3] }] },
+  { name: 'small budget drops old entries from the prompt', options: { promptChars: 420 }, ops: QA.map((x) => ({ add: x })) },
+  { name: 'summary of the older entries', options: { promptChars: 420 }, ops: [...QA.map((x) => ({ add: x })), { summary: [4, 'Usei o hackathon da Ninja Startup para equipe e o TechFinance para Kafka.'] }, { summary: [2, 'resumo antigo'] }] },
+  { name: 'prior sessions come first', options: {}, ops: [{ prior: 'Na primeira entrevista falei do TechFinance e de Kafka.\n' }, { add: QA[4] }] },
+];
+write('ledger.json', ledgers.map(({ name, options, ops }) => {
+  const l = createStoryLedger(options);
+  const added = [];
+  for (const op of ops) {
+    if (op.add) added.push(l.add(op.add[0], op.add[1]));
+    else if (op.prior !== undefined) l.setPrior(op.prior);
+    else if (op.summary) l.setSummary(op.summary[0], op.summary[1]);
+  }
+  const spoken = '[Você] Na verdade foram três meses, não dois.\n';
+  const job = l.compactionJob(spoken);
+  return {
+    name, prompt_chars: options.promptChars || 1400, ops, added, size: l.size(), render: l.render(), persistable: l.persistable(),
+    needs_compaction: l.needsCompaction(), spoken, job_covered: job.covered, job_system: job.messages[0].content, job_user: job.messages[1].content,
+  };
+}));
+console.log(`question_gate ${gate.length}, turns ${sequences.length}, prompt ${prompts.length}, ledger ${ledgers.length}`);

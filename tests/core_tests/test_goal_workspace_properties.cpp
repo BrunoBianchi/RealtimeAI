@@ -102,7 +102,7 @@ TEST(GoalWorkspaceProperties, PlaybookAndNextFocusInjectedInMiniCompact) {
     EXPECT_NE(compact.find("[6. Next Focus — Foco Específico para esta Sessão]"), std::string::npos);
     EXPECT_NE(compact.find("Enfatizar liderança"), std::string::npos);
     EXPECT_NE(compact.find("[7. Diretrizes do Playbook de Resposta (Direto & Assertivo)]"), std::string::npos);
-    EXPECT_NE(compact.find("Estrutura comportamental obrigatória: STAR"), std::string::npos);
+    EXPECT_NE(compact.find("Estrutura: a ordem STAR"), std::string::npos);
     EXPECT_NE(compact.find("Veredito primeiro"), std::string::npos);
     EXPECT_NE(compact.find("Trade-offs"), std::string::npos);
     EXPECT_NE(compact.find("Linguagem para exemplos de código: Go"), std::string::npos);

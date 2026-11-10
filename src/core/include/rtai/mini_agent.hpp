@@ -70,6 +70,9 @@ struct MiniAgentProfile {
     std::string next_interview_date;
     std::string next_interview_time;
     std::string next_focus;
+    // What earlier sessions of this goal already claimed (rtai/story_ledger.hpp),
+    // so the next interview for the same job tells the same story.
+    std::string story_ledger;
     std::string playbook_name{"Standard STAR"};
     std::string playbook_answer_length{"Balanced"}; // "Concise", "Balanced", "Thorough"
     std::string playbook_behavioral_structure{"Auto"}; // "Auto", "STAR", "CAR", "PAR", "Direct"
@@ -130,6 +133,7 @@ struct MiniAgentProfile {
             .field("next_interview_date", next_interview_date)
             .field("next_interview_time", next_interview_time)
             .field("next_focus", next_focus)
+            .field("story_ledger", story_ledger)
             .field("playbook_name", playbook_name)
             .field("playbook_answer_length", playbook_answer_length)
             .field("playbook_behavioral_structure", playbook_behavioral_structure)
@@ -217,6 +221,7 @@ struct MiniAgentProfile {
         }
 
         p.next_focus = root["next_focus"].as_string();
+        p.story_ledger = root["story_ledger"].as_string();
 
         p.playbook_name = root["playbook_name"].as_string();
         p.playbook_answer_length = root["playbook_answer_length"].as_string();
@@ -560,6 +565,7 @@ public:
         mix(kCompactPromptVersion);
         mix(profile_.company); mix(profile_.role); mix(profile_.job_description);
         mix(profile_.company_dossier); mix(profile_.custom_instructions);
+        mix(profile_.answer_language);
         for (const auto& d : profile_.documents) { mix(d.name); mix(d.tag); mix(d.content); }
         static const char* hex = "0123456789abcdef";
         std::string out(16, '0');
@@ -580,7 +586,13 @@ public:
         const std::string company = company_label_.empty() ? std::string("(não informada)") : company_label_;
         const std::string role = profile_.role.empty() ? std::string("(não informado)") : profile_.role;
         std::string p;
-        p += "Write the MINI-COMPACT in English.\n";
+        // The answers quote the compact, so it is written in the language of
+        // the answers: a fact translated twice is a fact that drifts.
+        const std::string lang = text::fold(profile_.answer_language);
+        if (lang.rfind("en", 0) == 0) p += "Escreva o MINI-COMPACT em inglês.\n";
+        else if (lang.rfind("pt", 0) == 0) p += "Escreva o MINI-COMPACT em português.\n";
+        else if (lang.rfind("es", 0) == 0) p += "Escreva o MINI-COMPACT em espanhol.\n";
+        else p += "Escreva o MINI-COMPACT no idioma dos arquivos do candidato.\n";
         p += "Leia TODOS os materiais abaixo e gere um MINI-COMPACT fiel para o candidato consultar durante uma "
              "entrevista ao vivo para " + role + " na " + company + ".\n"
              "REGRAS DE FIDELIDADE (ZERO ALUCINAÇÃO):\n"
@@ -693,29 +705,29 @@ public:
     [[nodiscard]] std::string playbook_block() const {
         std::string out = "[7. Diretrizes do Playbook de Resposta (" +
                           (profile_.playbook_name.empty() ? std::string("Standard STAR") : profile_.playbook_name) + ")]\n";
-        // STAR is mandatory for every answer (CAR/PAR/Direct playbooks are
-        // mapped to STAR): the HUD and the system prompt are built around it.
-        out += "• Estrutura comportamental obrigatória: STAR (Situação, Tarefa, Ação, Resultado) em todas as respostas de entrevista.\n";
-        // The playbook's style, kept inside the four STAR labels.
+        // Every answer follows the STAR order (CAR/PAR/Direct playbooks are
+        // mapped to it), told as speech: the system prompt forbids the labels,
+        // so nothing here may ask for them.
+        out += "• Estrutura: a ordem STAR contada como fala natural (o contexto e o desafio, o que eu fiz, o resultado), "
+               "sem escrever os rótulos.\n";
         const std::string style = text::fold(profile_.playbook_behavioral_structure + " " + profile_.playbook_name);
         if (has_keyword(style, "executive") || has_keyword(style, "impact")) {
-            out += "• Estilo executivo: a primeira frase da Situação já traz o impacto/resultado principal; "
-                   "Ação foca em decisões e trade-offs, não em detalhes de implementação.\n";
+            out += "• Estilo executivo: a primeira frase já traz o impacto ou o resultado principal; "
+                   "o meio foca em decisões e trade-offs, não em detalhes de implementação.\n";
         } else if (has_keyword(style, "direct") || has_keyword(style, "direto")) {
-            out += "• Estilo direto: cada linha STAR com uma única frase curta, sem contexto acessório.\n";
+            out += "• Estilo direto: uma frase curta para cada parte da história, sem contexto acessório.\n";
         } else if (count_word(style, "car") > 0 || count_word(style, "par") > 0) {
-            out += "• Ênfase no desafio/problema (estilo CAR/PAR): Situação e Tarefa deixam claro o problema; "
-                   "mantenha os 4 rótulos STAR.\n";
+            out += "• Ênfase no desafio (estilo CAR/PAR): deixe claro o problema antes de contar o que eu fiz.\n";
         }
         if (profile_.playbook_lead_with_answer) {
-            out += "• Veredito primeiro: a primeira frase da Situação já deixa clara a resposta direta à pergunta.\n";
+            out += "• Veredito primeiro: a primeira frase já deixa clara a resposta direta à pergunta.\n";
         }
         const std::string& len = profile_.playbook_answer_length;
         out += "• Extensão de resposta: " + len + " (" +
                (len == "Concise" ? std::string("60 a 100 palavras, só o essencial") :
                 len == "Thorough" ? std::string("150 a 230 palavras, com arquitetura, métricas e trade-offs") :
                 std::string("90 a 170 palavras, equilibrando contexto, ações e resultados")) +
-               "; isto prevalece sobre o padrão).\n";
+               ").\n";
         if (profile_.playbook_name_tradeoffs) {
             out += "• Trade-offs: mencione ativamente os prós e contras das escolhas técnicas tomadas.\n";
         }
@@ -1138,6 +1150,25 @@ public:
         if (pb_pos != std::string::npos) compact = text::trim(compact.substr(0, pb_pos));
 
         out += "=== PLAYBOOK DESTA ENTREVISTA ===\n" + playbook_block() + "\n";
+        // What the debriefs of earlier sessions of this goal asked for. Kept
+        // short: it shapes how I answer, it is not a fact about me.
+        {
+            std::string focus;
+            const std::string nf = text::trim(profile_.next_focus);
+            if (!nf.empty()) focus += "• " + text::truncate_utf8(collapse_ws(nf), 240) + "\n";
+            if (!profile_.goal_memory_improve.empty()) {
+                focus += "• Melhorar nas respostas: " +
+                         text::truncate_utf8(collapse_ws(profile_.goal_memory_improve.front()), 200) + "\n";
+            }
+            if (!profile_.goal_memory_strengths.empty()) {
+                focus += "• Manter: " +
+                         text::truncate_utf8(collapse_ws(profile_.goal_memory_strengths.front()), 200) + "\n";
+            }
+            if (!focus.empty()) {
+                out += "=== FOCO DESTA SESSÃO (vem do feedback das sessões anteriores; é sobre o jeito de responder, "
+                       "não é fato sobre mim) ===\n" + focus + "\n";
+            }
+        }
         if (!compact.empty()) {
             out += "=== MINI-COMPACT SEMPRE PRESENTE (PERSONA, PROJETOS, FIT CULTURAL & MAPA DE ASSUNTOS) ===\n";
             out += text::truncate_utf8(compact, 3600) + "\n";
@@ -1487,7 +1518,7 @@ private:
         return stops.count(w) > 0;
     }
 
-    static constexpr const char* kCompactPromptVersion = "compact-v2";
+    static constexpr const char* kCompactPromptVersion = "compact-v3";
 
     // Does the chunk mention a project term? "tech finance" (as the
     // interviewer says it) also matches "TechFinance" (as the file writes it).

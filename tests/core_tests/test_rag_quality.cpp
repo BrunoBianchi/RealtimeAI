@@ -519,7 +519,7 @@ TEST(RagQuality, SystemPromptExplainsLabelsSmallTalkAndUnknownTech) {
     EXPECT_NE(p.find("[SOBRE A EMPRESA/VAGA]"), std::string::npos);
     EXPECT_NE(p.find("Cumprimento, teste de áudio ou logística"), std::string::npos);
     EXPECT_NE(p.find("ainda não usei X em projeto"), std::string::npos);
-    EXPECT_NE(p.find("salvo se o PLAYBOOK definir outra extensão"), std::string::npos);
+    EXPECT_NE(p.find("siga a do PLAYBOOK DESTA ENTREVISTA"), std::string::npos);
 }
 
 TEST(RagQuality, FullPromptCarriesProfileRetrievalAndLiteralQuestion) {

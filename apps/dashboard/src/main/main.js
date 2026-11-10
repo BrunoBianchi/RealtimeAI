@@ -1949,9 +1949,19 @@ function saveAgentToDisk(agent) {
     debrief_read: false
   };
 
+  // The overlay writes the story ledger into the goal file after each answer
+  // (what was already said, for the next session of the same goal). The
+  // renderer's copy of the goal may predate it, so the file wins.
+  let storyLedger = typeof agent.story_ledger === 'string' ? agent.story_ledger : '';
+  try {
+    const onDisk = JSON.parse(fs.readFileSync(path.join(getAppDataDir(), 'agents', `${id}.json`), 'utf8'));
+    if (typeof onDisk.story_ledger === 'string' && onDisk.story_ledger) storyLedger = onDisk.story_ledger;
+  } catch { /* new goal, or a file being rewritten */ }
+
   const normalized = {
     id,
     name: (agent.name || `${agent.company || 'Session'} — ${agent.role || 'Interview'}`).trim(),
+    story_ledger: storyLedger,
     session_type: agent.session_type || 'interview',
     company: (agent.company || '').trim(),
     role: (agent.role || '').trim(),

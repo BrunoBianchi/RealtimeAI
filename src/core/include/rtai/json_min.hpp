@@ -406,4 +406,91 @@ private:
     bool after_key_{false};
 };
 
+// ---------------------------------------------------------------------------
+// Patching
+// ---------------------------------------------------------------------------
+
+// Sets top-level fields of the JSON object `raw` to pre-serialized values and
+// leaves every other byte as it was: fields this build does not know (written
+// by the dashboard or a newer version) survive. A key that is absent is added
+// at the end. Returns std::nullopt when `raw` is not a JSON object.
+inline std::optional<std::string> patch_top_level(
+    std::string_view raw, const std::vector<std::pair<std::string, std::string>>& fields) {
+    if (!Parser::parse(raw).has_value()) return std::nullopt;
+    struct Span { std::string key; std::size_t begin; std::size_t end; };
+    std::vector<Span> spans;
+    std::size_t i = 0;
+    auto skip_ws = [&] { while (i < raw.size() && (raw[i] == ' ' || raw[i] == '\n' || raw[i] == '\r' || raw[i] == '\t')) ++i; };
+    // Past a string that starts at raw[i] == '"'.
+    auto skip_string = [&] {
+        ++i;
+        while (i < raw.size() && raw[i] != '"') i += raw[i] == '\\' ? 2 : 1;
+        ++i;
+    };
+    skip_ws();
+    if (i >= raw.size() || raw[i] != '{') return std::nullopt;
+    ++i;
+    std::size_t close = std::string_view::npos;
+    while (i < raw.size()) {
+        skip_ws();
+        if (i < raw.size() && raw[i] == '}') { close = i; break; }
+        if (i >= raw.size() || raw[i] != '"') return std::nullopt;
+        const std::size_t key_begin = i;
+        skip_string();
+        auto key = Parser::parse(raw.substr(key_begin, i - key_begin));
+        if (!key || !key->is_string()) return std::nullopt;
+        skip_ws();
+        if (i >= raw.size() || raw[i] != ':') return std::nullopt;
+        ++i;
+        skip_ws();
+        const std::size_t value_begin = i;
+        int depth = 0;
+        while (i < raw.size()) {
+            const char c = raw[i];
+            if (c == '"') { skip_string(); continue; }
+            if (c == '{' || c == '[') ++depth;
+            else if (c == '}' || c == ']') { if (depth == 0) break; --depth; }
+            else if (c == ',' && depth == 0) break;
+            ++i;
+        }
+        std::size_t value_end = i;
+        while (value_end > value_begin && (raw[value_end - 1] == ' ' || raw[value_end - 1] == '\n' ||
+                                           raw[value_end - 1] == '\r' || raw[value_end - 1] == '\t')) --value_end;
+        spans.push_back(Span{key->as_string(), value_begin, value_end});
+        if (i < raw.size() && raw[i] == ',') ++i;
+    }
+    if (close == std::string_view::npos) return std::nullopt;
+
+    std::string out;
+    out.reserve(raw.size() + 256);
+    std::size_t pos = 0;
+    std::vector<bool> done(fields.size(), false);
+    for (const Span& s : spans) {
+        for (std::size_t f = 0; f < fields.size(); ++f) {
+            if (done[f] || fields[f].first != s.key) continue;
+            out.append(raw.substr(pos, s.begin - pos));
+            out += fields[f].second;
+            pos = s.end;
+            done[f] = true;
+            break;
+        }
+    }
+    out.append(raw.substr(pos, close - pos));
+    bool any = !spans.empty();
+    for (std::size_t f = 0; f < fields.size(); ++f) {
+        if (done[f]) continue;
+        // Trailing whitespace before '}' stays after the new field.
+        std::size_t tail = out.size();
+        while (tail > 0 && (out[tail - 1] == ' ' || out[tail - 1] == '\n' || out[tail - 1] == '\r' || out[tail - 1] == '\t')) --tail;
+        std::string add = any ? "," : "";
+        append_quoted(add, fields[f].first);
+        add.push_back(':');
+        add += fields[f].second;
+        out.insert(tail, add);
+        any = true;
+    }
+    out.append(raw.substr(close));
+    return out;
+}
+
 } // namespace rtai::json

@@ -99,6 +99,26 @@
     el.dataset.rev = String(L.transcriptRev);
   }
 
+  // The engine's split_interpreted_answer for a stream still in progress:
+  // nothing is shown while the header line is being written.
+  function splitUnderstood(raw) {
+    const text = String(raw || '');
+    const lead = text.replace(/^[\s*_#>]+/, '');
+    const m = /^(pergunta entendida|pergunta|question)[*_ ]*:/i.exec(lead);
+    if (!m) {
+      const head = lead.toLowerCase().replace(/[*_ ]+$/, '');
+      const maybe = ['pergunta entendida', 'pergunta', 'question'].some((t) => t.startsWith(head) || head === t);
+      return maybe && lead.length <= 24 ? { question: '', body: '' } : { question: '', body: text };
+    }
+    const rest = lead.slice(m[0].length);
+    const nl = rest.indexOf('\n');
+    if (nl < 0) return { question: '', body: '' };
+    return {
+      question: rest.slice(0, nl).trim().replace(/^[*_]+|[*_]+$/g, '').trim(),
+      body: rest.slice(nl + 1).replace(/^[\n\r ]+/, '')
+    };
+  }
+
   C.liveOnEvent = (msg) => {
     const L = S.live;
     switch (msg.type) {
@@ -162,7 +182,12 @@
       case 'answer_delta': {
         const a = L.answers.find((x) => x.id === msg.id);
         if (a) {
-          a.text += msg.text || '';
+          // The answer starts with a "PERGUNTA: ..." line (what the copilot
+          // understood): it is the card's title, never part of what to say.
+          a.raw = (a.raw || '') + (msg.text || '');
+          const split = splitUnderstood(a.raw);
+          a.text = split.body;
+          if (split.question) a.understood = fixText(split.question);
           mark('answer');
         }
         break;

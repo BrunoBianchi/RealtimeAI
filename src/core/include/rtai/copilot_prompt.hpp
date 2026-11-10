@@ -111,6 +111,10 @@ struct PromptConfig {
     // Per-question retrieval: (literal question, recent interviewer lines) ->
     // retrieved chunks. Goes into the USER message.
     std::function<std::string(std::string_view, std::string_view)> rag_retrieve;
+    // Called with the question while it is still being spoken, so the
+    // retrieval for it is warm when it ends (e.g. the question embedding of
+    // the dense search). Must return at once.
+    std::function<void(std::string_view)> rag_prefetch;
     std::size_t max_context_chars{6000};
     // Smaller history = fewer prompt tokens = faster first token. 3500 chars
     // is ~10 turns, enough for follow-ups and persona coherence.
@@ -157,10 +161,13 @@ inline std::string copilot_system_prompt() {
         "COMO RESPONDER (STAR natural, sem rótulos):\n"
         "- Texto corrido para falar, em primeira pessoa, em 1 ou 2 parágrafos curtos. NÃO escreva os rótulos "
         "Situação, Tarefa, Ação, Resultado (nem Situation, Task, Action, Result), nem listas.\n"
-        "- A primeira frase responde direto à pergunta: é a tese. Depois vem a história real que prova a tese, "
+        "- A primeira frase responde direto à pergunta da linha PERGUNTA: é a tese. Quem ouvir só essa frase já "
+        "tem a resposta. Depois vem a história real que prova a tese, "
         "seguindo a ordem STAR de forma fluida: o contexto e o desafio, o que EU fiz e por quê (decisões e "
         "trade-offs), e o resultado com o aprendizado. A última frase amarra de volta na pergunta, e na empresa "
         "quando a pergunta for sobre ela.\n"
+        "- Pergunta com duas partes (\"o que você fez e o que aprendeu?\", \"qual foi o problema e como resolveu?\"): "
+        "responda às duas, na ordem em que foram feitas. Pergunta de sim ou não: comece por sim ou não.\n"
         "- Use conectores de fala: \"Um exemplo foi quando...\", \"O desafio era...\", \"O que eu fiz foi...\", "
         "\"No fim...\", \"Por isso...\".\n"
         "- A história tem que servir à pergunta. Pergunta de motivação (\"por que essa empresa\", \"por que essa vaga\"): "
@@ -172,14 +179,14 @@ inline std::string copilot_system_prompt() {
         "tudo hipotético, sem afirmar experiência.\n"
         "- \"Você já usou X?\" com X fora dos meus arquivos: diga com honestidade que ainda não usei X em projeto e "
         "conecte com a experiência real mais próxima que está nos trechos.\n"
-        "- De 80 a 150 palavras, salvo se o PLAYBOOK definir outra extensão. Frases curtas, fáceis de falar. "
-        "No máximo 2 termos-chave em **negrito**.\n"
+        "- Extensão: siga a do PLAYBOOK DESTA ENTREVISTA; sem playbook, de 80 a 150 palavras. Frases curtas, "
+        "fáceis de falar. No máximo 2 termos-chave em **negrito**.\n"
         "- Cumprimento, teste de áudio ou logística (\"tudo bem?\", \"está me ouvindo?\", \"podemos começar?\"): "
         "depois da linha PERGUNTA, 1 frase curta e natural.\n"
         "\n"
         "FOCO NA PERGUNTA (antes de tudo):\n"
         "- Responda exatamente ao que foi pedido, cobrindo todas as partes. Os trechos e o perfil são apoio, não o assunto.\n"
-        "- Siga a linha \"Tipo de pergunta\" dos trechos recuperados.\n"
+        "- Siga a linha \"Tipo de pergunta\" dos trechos recuperados, quando ela vier.\n"
         "- Só use uma história ou projeto se ela responde diretamente à pergunta. Nunca traga um projeto só porque "
         "ele aparece nos trechos ou no perfil; trecho sem relação com a pergunta deve ser ignorado.\n"
         "\n"
@@ -192,7 +199,17 @@ inline std::string copilot_system_prompt() {
         "- Sem métrica no contexto, o resultado é qualitativo e sem número.\n"
         "- A empresa-alvo é onde estou sendo entrevistado: nunca diga que construí produtos dela.\n"
         "- No máximo uma história por resposta; não misture fatos de projetos diferentes.\n"
-        "- Mantenha a mesma persona e não contradiga o que [Você] já falou nem a MEMÓRIA DESTE ASSUNTO.\n"
+        "\n"
+        "MESMA PERSONA DO INÍCIO AO FIM:\n"
+        "- O LIVRO DA HISTÓRIA é o que eu já afirmei nesta entrevista (e em entrevistas anteriores para esta vaga). "
+        "Ele vale como fato: mesmo projeto, mesmo papel, mesmas tecnologias, mesmos números, mesma opinião.\n"
+        "- Mesmo tema de novo: continue a história que eu já contei e avance nela (um detalhe novo, uma decisão, "
+        "o resultado), sem recontar do zero e sem trocar por outra.\n"
+        "- Tema novo: prefira uma história que eu ainda não contei, se os trechos tiverem uma que responda à "
+        "pergunta. Se a única que responde já foi contada, use-a por outro ângulo e diga que é o mesmo projeto.\n"
+        "- Se o que [Você] falou no microfone for diferente do que foi sugerido, vale o que [Você] falou.\n"
+        "- Nunca contradiga o LIVRO DA HISTÓRIA, a MEMÓRIA DESTE ASSUNTO nem o que [Você] já falou. Mantenha o "
+        "mesmo jeito de falar em todas as respostas.\n"
         "\n"
         "IDIOMA E ESTILO:\n"
         "- Responda no idioma em que [Outros] perguntou.\n"
@@ -289,10 +306,19 @@ inline std::vector<ChatMessage> build_copilot_messages(const PromptConfig& cfg,
                                                        TriggerReason reason,
                                                        const std::string& keyword = {},
                                                        bool allow_skip = false,
-                                                       std::string_view answer_memory = {}) {
+                                                       std::string_view answer_memory = {},
+                                                       std::string_view story_ledger = {}) {
     std::string system = detail::with_profile(copilot_system_prompt_static(), cfg);
 
     std::string user;
+    // The ledger only grows at its end during a session, so it goes first:
+    // the provider's prompt cache covers the system message and this block.
+    if (!story_ledger.empty()) {
+        user += "LIVRO DA HISTÓRIA (o que eu já afirmei; vale como fato, não contradiga e não reconte do zero):\n";
+        user += story_ledger;
+        if (user.back() != '\n') user.push_back('\n');
+        user.push_back('\n');
+    }
     const std::string ctx = detail::retrieved_context(cfg, trigger_text, history);
     user += "TRECHOS RECUPERADOS PARA ESTA PERGUNTA:\n";
     user += ctx.empty() ? std::string("(nenhum trecho específico; use só o perfil da sessão e a conversa)") : ctx;
@@ -334,7 +360,7 @@ inline std::vector<ChatMessage> build_copilot_messages(const PromptConfig& cfg,
     } else {
         user += "Primeiro a linha PERGUNTA (a pergunta inteira, reconstruída a partir das falas recentes do entrevistador), "
                 "depois a resposta em STAR natural, sem rótulos, no idioma da pergunta, só com fatos do perfil, "
-                "dos trechos relevantes e da conversa.";
+                "dos trechos relevantes e da conversa. A primeira frase da resposta responde à linha PERGUNTA.";
         if (allow_skip) {
             // Automatic trigger: nobody asked for this card, so a non-question
             // must not become an answer.
@@ -495,7 +521,8 @@ inline std::string action_system_prompt(TriggerReason r) {
             break;
     }
     p += "\nRegras:\n"
-         "- Mantenha a mesma persona do candidato, reutilizando a conversa e o [Histórico de Respostas já Sugeridas pelo Copiloto] para total consistência.\n"
+         "- Mantenha a mesma persona do candidato: o LIVRO DA HISTÓRIA e a memória das respostas já sugeridas "
+         "valem como fato. Mesmo projeto, mesmo papel, mesmos números; nunca contradiga o que já foi dito.\n"
          "- Use apenas fatos da transcrição, do PERFIL DA SESSÃO, dos TRECHOS RECUPERADOS e da imagem (se houver). "
          "Se a informação não estiver lá, diga isso em uma linha e não invente.\n"
          "- Nunca invente números, nomes, clientes ou experiências do usuário.\n"
@@ -506,11 +533,18 @@ inline std::string action_system_prompt(TriggerReason r) {
 
 inline std::vector<ChatMessage> build_action_messages(const PromptConfig& cfg, const std::string& history,
                                                       const ActionInput& in,
-                                                      const std::vector<ChatTurn>& chat = {}) {
+                                                      const std::vector<ChatTurn>& chat = {},
+                                                      std::string_view story_ledger = {}) {
     std::vector<ChatMessage> msgs;
     msgs.push_back(ChatMessage{"system", detail::with_profile(action_system_prompt(in.reason), cfg), {}});
 
     std::string ctx_block;
+    if (!story_ledger.empty()) {
+        ctx_block += "LIVRO DA HISTÓRIA (o que eu já afirmei; vale como fato):\n";
+        ctx_block += story_ledger;
+        if (ctx_block.back() != '\n') ctx_block.push_back('\n');
+        ctx_block.push_back('\n');
+    }
     const bool wants_retrieval = in.reason == TriggerReason::Chat || in.reason == TriggerReason::Screenshot;
     if (wants_retrieval) {
         const std::string ctx = detail::retrieved_context(cfg, in.text, history);

@@ -17,6 +17,7 @@
 #include "rtai/copilot_events.hpp"
 #include "rtai/copilot_prompt.hpp"
 #include "rtai/decision_policy.hpp"
+#include "rtai/question_gate.hpp"
 #include "rtai/scripted_llm.hpp"
 
 using namespace rtai;
@@ -300,4 +301,100 @@ TEST(SkipSentinel, OnlyOfferedWhenAsked) {
     EXPECT_NE(with.back().content.find("[SKIP]"), npos);
     EXPECT_EQ(without.back().content.find("[SKIP]"), npos);
     EXPECT_EQ(with.front().content, without.front().content) << "the cached system prefix does not change";
+}
+
+// ------------------------------------------------------------------
+// One question, one answer: an answered question is not glued to the next
+// one, is not answered twice, and a correction of it gets a new answer.
+
+TEST(QuestionFlow, AnAnsweredQuestionIsNotGluedToTheNextOne) {
+    Rig r(cfg_gate());
+    r.say("Qual foi o maior desafio do sistema?");
+    ASSERT_TRUE(eventually([&] { return r.cards().size() == 1; }));
+    std::this_thread::sleep_for(80ms);
+    r.say("E qual tecnologia você usou?");
+    ASSERT_TRUE(eventually([&] { return r.cards().size() == 2; }));
+    const std::string t = r.cards()[1].trigger_text;
+    EXPECT_EQ(t.find("maior desafio"), npos) << "the answered question came back: " << t;
+    EXPECT_NE(t.find("qual tecnologia"), npos) << t;
+    // The model still sees the earlier question as conversation.
+    EXPECT_NE(r.llm->last_request().messages.back().content.find("maior desafio do sistema"), npos);
+}
+
+TEST(QuestionFlow, AnUnansweredPremiseStillGoesWithTheQuestion) {
+    Rig r(cfg_gate());
+    r.say("Sobre o projeto de pagamentos que você citou.");
+    std::this_thread::sleep_for(60ms);
+    r.say("Qual foi o resultado?");
+    ASSERT_TRUE(eventually([&] { return r.cards().size() == 1; }));
+    EXPECT_NE(r.cards()[0].trigger_text.find("projeto de pagamentos"), npos) << r.cards()[0].trigger_text;
+}
+
+TEST(QuestionFlow, TheSameQuestionAgainIsNotAnsweredTwice) {
+    Rig r(cfg_gate());
+    r.say("Qual foi o maior desafio do sistema?");
+    ASSERT_TRUE(eventually([&] { return r.cards().size() == 1; }));
+    std::this_thread::sleep_for(80ms);
+    r.say("qual foi o maior desafio do sistema?"); // other bytes, same question
+    std::this_thread::sleep_for(400ms);
+    EXPECT_EQ(r.cards().size(), 1u) << "the question on screen was answered again";
+    // Asking for it again in words is a new request.
+    r.say("Pode repetir, qual foi o maior desafio do sistema?");
+    ASSERT_TRUE(eventually([&] { return r.cards().size() == 2; }));
+}
+
+TEST(QuestionFlow, ACorrectionRightAfterTheAnswerGetsANewAnswer) {
+    Rig r(cfg_gate());
+    r.say("Por que você quer trabalhar no Nubank?");
+    ASSERT_TRUE(eventually([&] { return r.cards().size() == 1; }));
+    std::this_thread::sleep_for(80ms);
+    r.say("Não é isso, quero dizer o lado técnico da vaga.");
+    ASSERT_TRUE(eventually([&] { return r.cards().size() == 2; }));
+    const std::string t = r.cards()[1].trigger_text;
+    EXPECT_NE(t.find("Nubank"), npos) << t;
+    EXPECT_NE(t.find("lado técnico"), npos) << t;
+}
+
+TEST(QuestionFlow, APlainStatementAfterAnAnswerIsNotACorrection) {
+    Rig r(cfg_gate());
+    r.say("Por que você quer trabalhar no Nubank?");
+    ASSERT_TRUE(eventually([&] { return r.cards().size() == 1; }));
+    std::this_thread::sleep_for(80ms);
+    r.say("Na verdade aqui a gente usa muito Kafka e Clojure.");
+    std::this_thread::sleep_for(400ms);
+    EXPECT_EQ(r.cards().size(), 1u);
+}
+
+TEST(CorrectionCue, WholePhrasesOnly) {
+    EXPECT_TRUE(is_correction("Não é isso, quero dizer o lado técnico."));
+    EXPECT_TRUE(is_correction("Fora isso, o que mais te atrai?"));
+    EXPECT_TRUE(is_correction("Não é a questão da cultura da Nubank."));
+    EXPECT_TRUE(is_correction("I mean the technical side of it."));
+    EXPECT_TRUE(is_correction("That's not what I asked"));
+    EXPECT_FALSE(is_correction("Na verdade aqui a gente usa Kafka."));
+    EXPECT_FALSE(is_correction("Isso é ótimo."));
+    EXPECT_FALSE(is_correction("We use Kafka a lot here."));
+    EXPECT_FALSE(is_correction(""));
+}
+
+// The retrieval is warmed with the question while it is still being spoken.
+TEST(QuestionFlow, RetrievalIsPrefetchedWhileTheInterviewerTalks) {
+    CopilotConfig c = cfg_gate();
+    auto seen = std::make_shared<std::vector<std::string>>();
+    auto mu = std::make_shared<std::mutex>();
+    c.prompt.rag_prefetch = [seen, mu](std::string_view q) {
+        std::lock_guard<std::mutex> lk(*mu);
+        seen->push_back(std::string(q));
+    };
+    Rig r(c);
+    r.engine->on_transcript(interim(AudioSource::Microphone, "eu estou falando agora mesmo aqui"));
+    r.engine->on_transcript(interim(AudioSource::Loopback, "qual foi"));
+    r.engine->on_transcript(interim(AudioSource::Loopback, "qual foi o maior desafio do sistema"));
+    ASSERT_TRUE(eventually([&] {
+        std::lock_guard<std::mutex> lk(*mu);
+        return !seen->empty();
+    }));
+    std::lock_guard<std::mutex> lk(*mu);
+    ASSERT_EQ(seen->size(), 1u) << "only the interviewer, only once there is something to look for";
+    EXPECT_EQ(seen->front(), "qual foi o maior desafio do sistema");
 }

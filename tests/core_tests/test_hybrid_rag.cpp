@@ -349,6 +349,26 @@ TEST(DenseSearch, ZeroBudgetUsesOnlyPrefetchedQueries) {
     EXPECT_TRUE(ds->search("uma pergunta nunca vista", 3).empty());
 }
 
+// The question embedded while it was still being spoken (the live interim)
+// serves the search made when the STT sends its final wording.
+TEST(DenseSearch, TheInterimWordingServesTheFinalOne) {
+    MiniAgentRag rag{nubank_goal()};
+    auto emb = std::make_shared<ToyEmbedder>();
+    EmbeddingDenseSearch::Options o;
+    o.budget = std::chrono::microseconds(0); // only what is already cached
+    auto ds = std::make_shared<EmbeddingDenseSearch>(emb, o);
+    ds->build_index(rag.dense_passages());
+    ASSERT_TRUE(ds->wait_ready(5s));
+    ds->prefetch("qual foi o maior desafio com o volume de dados");
+    for (int i = 0; i < 200 && ds->search("qual foi o maior desafio com o volume de dados", 3).empty(); ++i)
+        std::this_thread::sleep_for(2ms);
+    const int embedded = emb->query_calls.load();
+    EXPECT_FALSE(ds->search("Qual foi o maior desafio com o volume de dados?", 3).empty());
+    EXPECT_EQ(emb->query_calls.load(), embedded) << "the same question was embedded again";
+    EXPECT_TRUE(ds->search("Qual foi o maior desafio com o prazo?", 3).empty()) << "another question is not an alias";
+    EXPECT_EQ(dense::match_key("  Qual foi, o MAIOR desafio?  "), "qual foi o maior desafio");
+}
+
 TEST(DenseSearch, NotReadyMeansBm25Only) {
     MiniAgentRag plain{nubank_goal()};
     MiniAgentRag rag{nubank_goal()};
