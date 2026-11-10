@@ -30,6 +30,7 @@ public:
         std::string fail_message{"falha simulada"};
         // Optional: pick the reply per request (demo answers chat/recap/...).
         std::function<std::string(const LlmRequest&)> reply_for;
+        std::string finish_reason{"stop"};
     };
 
     ScriptedLlmClient() : ScriptedLlmClient(Options{}) {}
@@ -87,7 +88,7 @@ public:
                         break;
                     }
                 }
-                if (res.status == LlmStatus::Completed) res.finish_reason = "stop";
+                if (res.status == LlmStatus::Completed) res.finish_reason = opts.finish_reason;
             }
             res.total_ms = elapsed();
             if (cb.on_done) cb.on_done(res);

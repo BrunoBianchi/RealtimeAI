@@ -10,7 +10,7 @@ const HUD_KEYS = ['stealth_screen_capture', 'stealth_dock', 'stealth_activity_mo
 
 test('Privacy & Stealth: the HUD card has the 4 functional toggles', () => {
   // Capture/dock/task manager default to on; click-through defaults to off.
-  const { Cue } = loadRenderer({ state: { config: { stealth_click_through: false } } });
+  const { Cue } = loadRenderer({ state: { config: { stealth_click_through: false }, dashboardExecutable: 'lipcue.exe' } });
   const html = render(Cue, 'settings/privacy');
   const toggles = tags(html, { 'data-change': 'cfg', 'data-type': 'bool' }).filter((t) => HUD_KEYS.includes(t['data-key']));
   assert.deepStrictEqual(toggles.map((t) => t['data-key']), HUD_KEYS);
@@ -22,7 +22,7 @@ test('Privacy & Stealth: the HUD card has the 4 functional toggles', () => {
 
   // Brand integrity: no third-party names anywhere in the page.
   for (const src of [indexHtml, ...Object.values(sources)]) assert.ok(!src.includes('InterviewCoder'));
-  assert.ok(html.includes('lipcue.com'), 'the process-name option shows the real app name');
+  assert.ok(html.includes('lipcue.exe'), 'the process row shows the executable');
 });
 
 test('Privacy & Stealth: a toggle saves its key as a boolean and says so', async () => {

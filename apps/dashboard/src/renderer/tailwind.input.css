@@ -3818,7 +3818,7 @@ table.compare td.strong {
 .mock-step .n { flex: none; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; font-size: 12px; color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .mock-page { max-width: 1040px; gap: 18px; container-type: inline-size; }
 .mock-page .mock-intro { gap: 14px; padding: 14px 20px; }
-.mock-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.mock-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 .mock-config { gap: 18px; }
 .mock-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding-top: 14px; border-top: 1px solid var(--border-subtle); }
 .mock-details summary { cursor: pointer; }
@@ -4331,6 +4331,65 @@ button.prep-mark:hover { border-color: var(--accent-bright); }
 @media (max-width: 860px) {
   .live-room { grid-template-columns: minmax(0, 1fr); padding: 20px; }
   .live-side { border: 1px solid var(--border-subtle); }
+}
+
+.live-room.is-coding {
+  max-width: 1520px;
+  padding-inline: clamp(16px, 2vw, 32px);
+  grid-template-columns: minmax(0, 1fr) minmax(255px, 23%);
+}
+.live-room.is-coding .answer-pane { gap: 16px; }
+.live-room.is-coding .answer-body:has(.coding-answer) { max-width: none; }
+.coding-answer { container-type: inline-size; }
+.coding-columns { display: grid; gap: 12px; min-width: 0; }
+.coding-code-column, .coding-explanation { min-width: 0; }
+.coding-editor + .coding-editor { margin-top: 10px; }
+.coding-editor { background: #1e1e1e; color: #d4d4d4; border: 1px solid #3f3f46; border-radius: 10px; overflow: hidden; }
+.coding-editor-head, .coding-explanation-head {
+  display: flex; align-items: center; gap: 8px; padding: 10px 12px; font-size: 11px;
+  font-weight: 650; line-height: 1.4; letter-spacing: .065em; text-transform: uppercase;
+}
+.coding-editor-head { background: #2a2b30; color: #9cdcfe; border-bottom: 1px solid #3f3f46; }
+.coding-editor-head svg { width: 14px; height: 14px; flex: none; }
+.coding-language { margin-left: auto; color: #d4d4d4; text-transform: none; overflow-wrap: anywhere; }
+.coding-copy {
+  display: inline-flex; align-items: center; gap: 5px; flex: none; padding: 4px 7px;
+  border: 1px solid #54545a; border-radius: 5px; color: #eee;
+  background: transparent; font: 600 11px/1.25 var(--font-sans);
+}
+.coding-copy:hover { background: #393a40; }
+.coding-editor pre {
+  margin: 0; padding: 9px 0; border: 0; border-radius: 0; background: transparent;
+  overflow-x: auto; line-height: 1.65; tab-size: 4; color-scheme: dark;
+}
+.coding-editor pre code { display: block; width: max-content; min-width: 100%; font-size: 12.5px; }
+.coding-row { display: block; padding-right: 12px; }
+.coding-line-number {
+  display: inline-block; width: 3.25em; margin-right: 10px; padding-right: 8px;
+  color: #9c9ca1; text-align: right; border-right: 1px solid #414145; user-select: none;
+}
+.syntax-keyword { color: #c586c0; }
+.syntax-type { color: #4ec9b0; }
+.syntax-string { color: #ce9178; }
+.syntax-number { color: #b5cea8; }
+.syntax-comment { color: #89a378; }
+.syntax-function { color: #dcdcaa; }
+.coding-explanation {
+  padding: 0 12px 10px; border: 1px solid var(--border-subtle);
+  border-radius: 10px; background: var(--surface-sunken); overflow-wrap: anywhere;
+}
+.coding-explanation-head { margin-inline: -12px; color: var(--text-strong); border-bottom: 1px solid var(--border-subtle); }
+.coding-explanation h4 { margin: 14px 0 4px; color: var(--text-strong); font-size: 13px; }
+.coding-explanation li + li { margin-top: 5px; }
+.coding-explanation p:first-of-type { margin-top: 10px; }
+@container (min-width: 590px) {
+  .coding-columns:not(.code-only) { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); }
+  .coding-columns:not(.code-only) > .coding-column { max-height: min(52vh, 460px); overflow-y: auto; }
+}
+@media (max-width: 1170px) {
+  .live-room.is-coding { grid-template-columns: minmax(0, 1fr); height: auto; }
+  .live-room.is-coding .live-main { min-height: min(720px, 82vh); }
+  .live-room.is-coding .live-side .live-scroll { max-height: 260px; }
 }
 
 /* Session rating dialog (specs/004-session-feedback-popup). Theme tokens only. */

@@ -67,7 +67,7 @@
   const TITLES = { signin: 'Welcome to lipcue.com', signup: 'Create your account', reset: 'Reset your password' };
   const SUBS = {
     signin: 'Your real-time interview copilot. Sign in to continue.',
-    signup: 'Start on the Free plan: one session of up to 15 minutes.',
+    signup: 'Get 15 free minutes when you sign up.',
     reset: 'We will e-mail you a link to choose a new password.'
   };
 

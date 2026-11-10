@@ -41,6 +41,7 @@ const APP_ROOT = path.resolve(__dirname, '..', '..');
 const REPO_ROOT = path.resolve(APP_ROOT, '..', '..');
 const PRELOAD_DIR = path.join(__dirname, '..', 'preload');
 const RENDERER_DIR = path.join(__dirname, '..', 'renderer');
+const DASHBOARD_TITLE = 'lipcue.com — Interview Copilot';
 const APP_ICON = path.join(APP_ROOT, 'assets', 'icon.png');
 // The installed app must match the ID on the shortcuts made by electron-builder.
 const WINDOWS_APP_ID = app.isPackaged ? 'com.raiado.realtimeai' : 'com.raiado.realtimeai.dev';
@@ -48,6 +49,7 @@ const WINDOWS_APP_ID = app.isPackaged ? 'com.raiado.realtimeai' : 'com.raiado.re
 let mainWindow = null;
 let overlayProcess = null;
 let overlayMode = null;
+let overlayCodingInterview = false;
 let overlayAgentId = null;
 let overlayStartedAt = 0;
 let overlayVersion = ''; // reported by the overlay's hello (rtai_app --server)
@@ -329,7 +331,6 @@ function readConfigIni() {
     update_channel: (sistema.update_channel || sistema.canal || 'stable') === 'beta' ? 'beta' : 'stable',
     // Interface language: auto = follow Windows (see ui_locale.js), or a locale.
     ui_language: normalizeUiLanguage(sistema.idioma_interface || sistema.ui_language || 'auto'),
-    process_disguise: stealth.process_disguise || (stealth.electron_disguise === 'sim' ? 'settings' : 'none'),
     interface_opacity: parseFloat(stealth.interface_opacity || stealth.electron_opacity || '1.0'),
     share_anonymized_questions: (stealth.share_anonymized_questions ?? stealth.contribuir_perguntas ?? 'sim') !== 'nao' &&
                                 (stealth.share_anonymized_questions ?? stealth.contribuir_perguntas ?? 'sim') !== 'false',
@@ -465,7 +466,6 @@ function writeConfigIni(updates) {
   const autoUpdate = (updates.auto_update ?? current.auto_update) ? 'sim' : 'nao';
   const updateChannel = (updates.update_channel ?? current.update_channel) === 'beta' ? 'beta' : 'stable';
   const uiLanguage = normalizeUiLanguage(updates.ui_language ?? current.ui_language ?? 'auto');
-  const processDisguise = updates.process_disguise ?? current.process_disguise ?? 'none';
   const interfaceOpacity = String(updates.interface_opacity ?? current.interface_opacity ?? '1.0');
   const shareAnonymizedQuestions = (updates.share_anonymized_questions ?? current.share_anonymized_questions) ? 'sim' : 'nao';
   const calendarIcsUrl = updates.calendar_ics_url ?? current.calendar_ics_url;
@@ -559,7 +559,6 @@ function writeConfigIni(updates) {
     `electron_skip_taskbar = ${electronSkipTaskbar}`,
     `electron_disguise = ${electronDisguise}`,
     `electron_opacity = ${electronOpacity}`,
-    `process_disguise = ${processDisguise}`,
     `interface_opacity = ${interfaceOpacity}`,
     `share_anonymized_questions = ${shareAnonymizedQuestions}`,
     '',
@@ -2716,6 +2715,7 @@ function broadcastOverlayStatus() {
     mainWindow.webContents.send('rtai:overlay-status', {
       running,
       mode: overlayMode || 'idle',
+      codingInterview: running && overlayCodingInterview,
       agentId: overlayAgentId || '',
       startedAt: running ? overlayStartedAt : 0
     });
@@ -2777,7 +2777,7 @@ function sendOverlayCommand(command) {
   }
 }
 
-function launchOverlay({ agent, configOverrides = {} }) {
+function launchOverlay({ agent, configOverrides = {}, codingInterview = false }) {
   if (!canUseApp()) return LOGIN_REQUIRED; // also covers relaunches
   // 1. Save the active Mini-Agent (with its RAG documents, instructions, and mini_compact)
   let savedAgent = null;
@@ -2799,6 +2799,8 @@ function launchOverlay({ agent, configOverrides = {} }) {
   // 4. Spawn the native C++20 overlay (packaged resource or local CMake build).
   const exePath = getOverlayExecutablePath();
   const args = ['--no-launcher', '--server'];
+  overlayCodingInterview = codingInterview === true;
+  if (overlayCodingInterview) args.push('--coding-interview');
   if (savedAgent && savedAgent.id) {
     args.push('--agent', savedAgent.id);
   }
@@ -2806,11 +2808,12 @@ function launchOverlay({ agent, configOverrides = {} }) {
   overlayAgentId = savedAgent ? savedAgent.id : '';
 
   overlayStartedAt = Date.now();
-  overlayProcess = spawn(exePath, args, {
+  const child = spawn(exePath, args, {
     cwd: path.dirname(exePath),
     detached: false,
     windowsHide: false
   });
+  overlayProcess = child;
 
   if (overlayProcess.stderr) {
     overlayProcess.stderr.on('data', (chunk) => {
@@ -2824,6 +2827,7 @@ function launchOverlay({ agent, configOverrides = {} }) {
 
   overlayProcess.on('error', (err) => {
     console.error('[overlay-process-error]', err);
+    if (overlayProcess !== child) return;
     overlayProcess = null;
     overlayMode = null;
     broadcastOverlayStatus();
@@ -2834,6 +2838,7 @@ function launchOverlay({ agent, configOverrides = {} }) {
     // A multi-byte character can straddle two chunks; the decoder keeps it whole.
     overlayProcess.stdout.setEncoding('utf8');
     overlayProcess.stdout.on('data', (chunk) => {
+      if (overlayProcess !== child) return;
       lineBuffer += chunk;
       const lines = lineBuffer.split(/\r?\n/);
       lineBuffer = lines.pop();
@@ -2914,9 +2919,10 @@ function launchOverlay({ agent, configOverrides = {} }) {
     });
   }
 
-  overlayProcess.on('exit', () => {
-    overlayProcess = null;
+  overlayProcess.on('close', () => {
     scheduleCloudSync();
+    if (overlayProcess !== child) return;
+    overlayProcess = null;
     overlayMode = null;
     broadcastOverlayStatus();
   });
@@ -3086,13 +3092,7 @@ function applyElectronStealthMode(overrides = {}) {
       : Boolean(cfg.electron_skip_taskbar)
   );
 
-  const disguise = isStealthActive && (
-    overrides.electron_disguise !== undefined
-      ? Boolean(overrides.electron_disguise)
-      : Boolean(cfg.electron_disguise)
-  );
-
-  const activeDisguise = overrides.process_disguise || cfg.process_disguise || (disguise ? 'settings' : 'none');
+  const disguise = Boolean(overrides.electron_disguise ?? cfg.electron_disguise);
 
   const opacity = overrides.interface_opacity !== undefined
     ? parseFloat(overrides.interface_opacity)
@@ -3105,7 +3105,6 @@ function applyElectronStealthMode(overrides = {}) {
     screenProtection: protectScreen,
     skipTaskbar,
     disguise,
-    processDisguise: activeDisguise,
     opacity: Number.isFinite(opacity) && opacity >= 0.2 && opacity <= 1.0 ? opacity : 1.0
   };
 
@@ -3128,11 +3127,7 @@ function applyElectronStealthMode(overrides = {}) {
 
     try {
       if (typeof mainWindow.setTitle === 'function') {
-        let title = 'lipcue.com — Interview Copilot';
-        if (activeDisguise === 'settings') title = 'Settings';
-        else if (activeDisguise === 'cmd') title = 'Command Prompt';
-        else if (activeDisguise === 'taskmgr') title = 'Task Manager';
-        mainWindow.setTitle(title);
+        mainWindow.setTitle(disguise ? tm('Settings') : DASHBOARD_TITLE);
       }
     } catch (e) {
       console.warn('[stealth] Failed to set title on mainWindow:', e && e.message);
@@ -3387,7 +3382,7 @@ function createWindow() {
     minHeight: 720,
     frame: false,
     backgroundColor: initialTheme.resolved === 'dark' ? '#070908' : '#FFFFFF',
-    title: 'lipcue.com — Interview Copilot',
+    title: DASHBOARD_TITLE,
     icon: APP_ICON,
     webPreferences: {
       preload: path.join(PRELOAD_DIR, 'preload.js'),
@@ -3415,6 +3410,7 @@ function createWindow() {
     if (wc && wc.getZoomFactor() !== UI_ZOOM) wc.setZoomFactor(UI_ZOOM);
   };
   for (const ev of ['did-finish-load', 'did-navigate', 'did-navigate-in-page']) mainWindow.webContents.on(ev, keepZoom);
+  mainWindow.on('page-title-updated', (event) => event.preventDefault());
   const loadPromise = mainWindow.loadFile(path.join(RENDERER_DIR, 'index.html'));
   applyElectronStealthMode();
 
@@ -3490,6 +3486,7 @@ app.whenReady().then(() => {
     return {
       appDataDir: getAppDataDir(),
       overlayExePath: getOverlayExecutablePath(),
+      dashboardExecutable: path.basename(process.execPath),
       // Interface language: the setting resolved against the Windows languages.
       ui: { locale: resolveUiLocale(config.ui_language, systemLanguages(app)), systemLanguages: systemLanguages(app), supported: UI_LOCALES },
       config,
@@ -3512,6 +3509,7 @@ app.whenReady().then(() => {
       overlayStatus: {
         running: isOverlayRunning(),
         mode: overlayMode || 'idle',
+        codingInterview: overlayMode === 'live' && overlayCodingInterview,
         agentId: overlayAgentId || config.last_agent || (agents[0]?.id ?? ''),
         startedAt: overlayProcess && !overlayProcess.killed ? overlayStartedAt : 0
       }
@@ -3550,7 +3548,7 @@ app.whenReady().then(() => {
       'playbook_lead_with_answer', 'playbook_name_tradeoffs', 'answer_language', 'coding_language'];
     const changed = before && answerKeys.some((k) => String(before[k] ?? '') !== String(saved[k] ?? ''));
     if (changed && isOverlayRunning() && overlayAgentId === saved.id) {
-      launchOverlay({ agent: saved });
+      launchOverlay({ agent: saved, codingInterview: overlayCodingInterview });
       overlayRestarted = true;
     }
     return {
@@ -3844,6 +3842,7 @@ app.whenReady().then(() => {
       configUpdates.electron_screen_protection !== undefined ||
       configUpdates.electron_skip_taskbar !== undefined ||
       configUpdates.electron_disguise !== undefined ||
+      configUpdates.ui_language !== undefined ||
       configUpdates.electron_opacity !== undefined ||
       configUpdates.stealth_screen_capture !== undefined
     )) {
@@ -3871,6 +3870,7 @@ app.whenReady().then(() => {
       const currentAgent = agents.find((a) => a.id === (overlayAgentId || updated.last_agent)) || agents[0] || null;
       launchOverlay({
         agent: currentAgent,
+        codingInterview: overlayCodingInterview,
         configOverrides: { ...configUpdates }
       });
       overlayRestarted = true;
@@ -3890,11 +3890,11 @@ app.whenReady().then(() => {
 
   // Always a real session: there is no scripted demo.
   ipcMain.handle('rtai:start-overlay', async (_ev, options) => {
-    const { agent, configOverrides } = options || {};
+    const { agent, configOverrides, codingInterview } = options || {};
     const allowed = await checkCanStartLive();
     if (!allowed.ok) return allowed;
     closeFeedbackDialog(); // a new session closes an open rating, unsaved
-    return launchOverlay({ agent, configOverrides });
+    return launchOverlay({ agent, configOverrides, codingInterview });
   });
 
   ipcMain.handle('rtai:stop-overlay', async () => {
@@ -4186,19 +4186,6 @@ app.whenReady().then(() => {
     }
   });
   ipcMain.handle('rtai:flags-reset-overrides', async () => ({ ok: true, flags: flagStore.clearOverrides() }));
-
-  ipcMain.handle('rtai:set-process-disguise', async (_ev, disguise) => {
-    const valid = ['none', 'settings', 'cmd', 'taskmgr'].includes(disguise) ? disguise : 'none';
-    writeConfigIni({ process_disguise: valid });
-    let title = 'lipcue.com — Interview Copilot';
-    if (valid === 'settings') title = 'Settings';
-    else if (valid === 'cmd') title = 'Command Prompt';
-    else if (valid === 'taskmgr') title = 'Task Manager';
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      try { mainWindow.setTitle(title); } catch (_e) {}
-    }
-    return { ok: true, disguise: valid, title };
-  });
 
   ipcMain.handle('rtai:set-interface-opacity', async (_ev, opacityVal) => {
     const op = Math.max(0.2, Math.min(1.0, parseFloat(opacityVal) || 1.0));

@@ -81,7 +81,7 @@
             { element: '#liveChat', title: 'Chat', text: 'Ask the copilot anything during the call, for example how to explain a project.', side: 'top' }
           ]
         : [
-            { element: tour('live-start'), title: 'Go live', text: 'Pick the session and start. The floating panel opens over your meeting.' },
+            { element: tour('live-start'), title: 'Go live', text: 'Pick a session to open the overlay. Choose Coding interview for code and a walkthrough you can explain aloud.' },
             { element: tour('live-checks'), title: 'Before you start', text: 'Transcription, AI, microphone and system audio must all be ok. Click a missing item to fix it.' },
             { element: tour('live-shortcuts'), title: 'Panel shortcuts', text: 'Control the floating panel without leaving the call.' }
           ])

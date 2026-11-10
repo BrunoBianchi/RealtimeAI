@@ -382,7 +382,7 @@ inline bool open_clause_at_end(const std::vector<std::string>& all) {
 // follow-ups like "E por quê?" are complete then). `final`: no more speech
 // came after this utterance, so it will not grow any more.
 inline QuestionAssessment assess_question(std::string_view utterance, bool has_context = false,
-                                          bool final = false) {
+                                          bool final = false, bool coding_interview = false) {
     using namespace qgate;
     QuestionAssessment out;
     const std::string raw = text::trim(utterance);
@@ -413,13 +413,16 @@ inline QuestionAssessment assess_question(std::string_view utterance, bool has_c
     // opened by an interrogative/request (and not a declarative opener).
     int qi = -1;
     bool explicit_q = false;
+    static const std::set<std::string_view> coding_verbs = {
+        "implement", "write", "solve", "debug", "refactor", "optimize", "test",
+        "implemente", "escreva", "resolva", "depure", "refatore", "otimize", "teste"};
     for (std::size_t i = 0; i < sentences.size(); ++i) {
         const auto words = strip_leading(sentences[i].words);
         if (words.empty()) continue;
         if (sentences[i].asked) {
             qi = static_cast<int>(i);
             explicit_q = true;
-        } else if (is_implicit_question(words)) {
+        } else if (is_implicit_question(words) || (coding_interview && in(coding_verbs, words.front()))) {
             qi = static_cast<int>(i);
             explicit_q = false;
         }

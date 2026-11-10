@@ -78,7 +78,25 @@
     const el = document.getElementById(id);
     if (!el) return;
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    const previous = id === 'liveAnswer' && el.querySelector('.coding-answer');
+    const focused = previous && document.activeElement;
     el.innerHTML = html;
+    if (previous?.dataset.answerId) {
+      const next = el.querySelector('.coding-answer');
+      if (next?.dataset.answerId === previous.dataset.answerId) {
+        const selector = '.coding-column, .coding-editor pre';
+        const oldPanes = previous.querySelectorAll(selector);
+        next.querySelectorAll(selector).forEach((pane, i) => {
+          if (!oldPanes[i]) return;
+          if (focused === oldPanes[i]) pane.focus({ preventScroll: true });
+          pane.scrollTop = oldPanes[i].scrollTop;
+          pane.scrollLeft = oldPanes[i].scrollLeft;
+        });
+        const buttons = [...previous.querySelectorAll('.coding-copy')];
+        const focusedCopy = buttons.indexOf(focused);
+        if (focusedCopy >= 0) next.querySelectorAll('.coding-copy')[focusedCopy]?.focus({ preventScroll: true });
+      }
+    }
     if (stickBottom && atBottom) el.scrollTop = el.scrollHeight;
   }
 
@@ -168,6 +186,7 @@
           reason: msg.reason || '',
           model: msg.model || '',
           image: Boolean(msg.image),
+          codingInterview: Boolean(S.overlayStatus.codingInterview),
           text: '',
           status: 'streaming',
           ttft: null,
@@ -199,7 +218,7 @@
           if (msg.text) a.text = msg.text;
           a.ttft = Number(msg.ttft) || null;
           a.total = Number(msg.total) || null;
-          a.understood = fixText(msg.understood || '');
+          a.understood = fixText(msg.understood || a.understood);
           a.error = msg.error || '';
           mark('answer');
         }
@@ -323,20 +342,23 @@
       return `<div class="empty" style="padding:64px 20px">${icon('sparkle')}<span class="t">${L.transcriptionOnly ? 'Transcription-only mode' : 'Waiting for the next question'}</span><span>${L.transcriptionOnly ? 'The copilot transcribes without suggesting answers. Turn the mode off to get suggestions again.' : 'When the interviewer asks a question, the suggested answer shows up here. Use “Answer now” to ask for one right away.'}</span>${running && !L.transcriptionOnly ? `<button type="button" class="btn" data-action="live-cmd" data-cmd="answer">${icon('lightning')}Answer now</button>` : ''}</div>`;
     }
     const a = cur.a;
+    const renderedAnswer = a.text && (a.codingInterview ? C.codingMd(a.text, a.id, a.status === 'streaming') : C.md(a.text));
+    const codingQuestion = a.codingInterview && a.understood;
     const statusPill =
       a.status === 'streaming'
         ? '<span class="pill warn"><span class="activity-dots" aria-hidden="true"><i></i><i></i><i></i></span>Generating</span>'
         : a.status === 'completed'
           ? '<span class="pill ok"><span class="dot"></span>Ready</span>'
-          : `<span class="pill danger"><span class="dot"></span>${esc(a.status === 'interrupted' ? 'Interrupted' : 'Failed')}</span>`;
+          : `<span class="pill danger"><span class="dot"></span>${esc((a.status === 'interrupted' || a.status === 'cancelled') ? 'Interrupted' : a.codingInterview && a.text ? 'Incomplete' : 'Failed')}</span>`;
     return `<div class="stack gap-8 answer-context">
         <div class="row"><span class="eyebrow">Question</span><span class="tag">${esc(REASON[a.reason] || a.reason || 'Auto')}</span>${a.image ? `<span class="tag">${icon('camera')} screen</span>` : ''}</div>
-        <span class="answer-q">${esc(a.trigger || a.understood || '—')}</span>
-        ${a.understood && a.understood !== a.trigger ? `<span class="small faint">Understood as: ${esc(a.understood)}</span>` : ''}
+        <span class="answer-q">${esc(codingQuestion || a.trigger || a.understood || '—')}</span>
+        ${!codingQuestion && a.understood && a.understood !== a.trigger ? `<span class="small faint">Understood as: ${esc(a.understood)}</span>` : ''}
       </div>
       <div class="stack" style="gap:12px">
         <div class="row"><span class="eyebrow">Suggested answer</span>${statusPill}</div>
-        <div class="answer-body md ${a.status === 'streaming' ? 'streaming' : ''}">${a.text ? C.md(a.text) : a.status === 'streaming' ? '' : `<span class="faint">${esc(a.error || 'No text.')}</span>`}</div>
+        ${a.codingInterview && a.text && a.error ? `<div class="notice-line error" role="status">${icon('warning')}<span>${esc(a.error)}</span></div>` : ''}
+        <div class="answer-body md ${a.status === 'streaming' ? 'streaming' : ''}">${renderedAnswer || (a.status === 'streaming' ? '' : `<span class="faint">${esc(a.error || 'No text.')}</span>`)}</div>
       </div>`;
   }
 
@@ -408,11 +430,13 @@
 
     const u = C.usage();
     const sessionMin = running && S.overlayStatus.startedAt ? Math.round((Date.now() - S.overlayStatus.startedAt) / 60000) : 0;
-    return `<div class="live-room">
+    const coding = S.overlayStatus.codingInterview || currentAnswer()?.a.codingInterview;
+    return `<div class="live-room${coding ? ' is-coding' : ''}">
       <div class="live-main">
         <div class="live-head">
           <span class="pill ${running ? 'danger' : ''}"><span class="dot ${running ? 'danger live' : 'off'}"></span>${running ? 'Live' : L.ended ? 'Session ended' : 'Stopped'} · <span class="mono" id="liveClock">${since}</span></span>
           <span class="strong truncate">${esc(a ? C.agentTitle(a) : 'No session selected.')}</span>
+          ${running && S.overlayStatus.codingInterview ? '<span class="tag">Coding interview</span>' : ''}
           <span class="grow"></span>
           <label class="row small muted" style="cursor:pointer" title="Transcription-only mode">${C.sw(`data-change="live-mode" ${running ? '' : 'disabled'}`, L.transcriptionOnly, !running)}Transcription only</label>
         </div>
@@ -433,7 +457,8 @@
           ${src('outros', 'Interviewer', 'speaker')}${src('voce', 'You', 'microphone')}
           ${running
             ? `<button type="button" class="btn end-btn" data-action="stop-copilot"><span class="stop-square"></span>End session</button>`
-            : `<button type="button" class="btn primary lg" data-action="start-copilot" data-agent="${esc(a ? a.id : '')}" ${a ? '' : 'disabled'}>${icon('play')}Start listening</button>`}
+            : `<button type="button" class="btn lg" data-action="start-copilot" data-agent="${esc(a ? a.id : '')}" data-mode="coding-interview" title="Get code and a step-by-step explanation in the overlay." ${a ? '' : 'disabled'}>${icon('code')}Coding interview</button>
+               <button type="button" class="btn primary lg" data-action="start-copilot" data-agent="${esc(a ? a.id : '')}" ${a ? '' : 'disabled'}>${icon('play')}Start listening</button>`}
         </div>
       </div>
       <aside class="live-side">

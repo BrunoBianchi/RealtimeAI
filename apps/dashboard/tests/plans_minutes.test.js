@@ -38,3 +38,10 @@ test('the Plan page shows the same catalog as plans.js and no mock packs', () =>
   assert.strictEqual(PRICING.mockPacks, undefined);
   assert.doesNotMatch(src, /mock_tokens_\d+|MOCK_PACKS/);
 });
+
+test('signup credits still allow a live interview after the first session', () => {
+  const free = entitlement({ plan: { id: 'free', signup_credits: true, sessions_used: 1, minutes_used: 4, minutes_left: 11 } });
+  assert.strictEqual(free.canStart, true);
+  assert.strictEqual(free.minutesLeft, 11);
+  assert.strictEqual(free.maxSessions, null);
+});
