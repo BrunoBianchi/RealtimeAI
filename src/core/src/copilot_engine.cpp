@@ -85,6 +85,7 @@ enum class CommitCause : std::uint8_t { SpeechFinal, LocalSilence, Timeout, Turn
 
 constexpr std::size_t kMaxChatTurns = 8;
 constexpr std::size_t kMaxChatAnswerChars = 1500;
+constexpr std::size_t kMaxCodingAnswerChars = 10000;
 // A question split by a breath pause arrives as two closed turns. When the
 // first piece already triggered an answer and the second piece follows within
 // this window (nobody else spoke), the answer is redone for the whole question.
@@ -707,7 +708,7 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
             // interviewer said right before it).
             const Utterance u = live_utterance(interim, in.source, in.t);
             if (text::word_count(u.assess) <= 5) return;
-            if (assess_question(u.assess, convo.size() >= 1, false).verdict != QuestionVerdict::Ready) return;
+            if (assess_interviewer_question(u.assess, convo.size() >= 1).verdict != QuestionVerdict::Ready) return;
             if (policy.would_trigger(u.assess, in.t, true) == TriggerReason::None) return;
             enter_speculating(SpeculativeCandidate{in.source, std::move(interim), in.t}, TriggerReason::Question,
                               u.trigger);
@@ -844,7 +845,9 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
         }
         std::vector<ChatTurn> thread(chat.begin(), chat.end());
         // Requests about the conversation itself see the whole memory.
-        std::string history = render_history(true, true);
+        const bool coding_thread = cfg.prompt.coding_interview &&
+                                   (in.reason == TriggerReason::Chat || in.reason == TriggerReason::Screenshot);
+        std::string history = render_history(true, !coding_thread);
         auto messages = build_action_messages(cfg.prompt, history, ai, thread, ledger_.render());
         std::string question;
         if (in.reason == TriggerReason::Chat) question = ai.text;
@@ -974,6 +977,10 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
             }
         }
         e.error = in.res.error;
+        if (cfg.prompt.coding_interview && e.status == LlmStatus::Completed && in.res.finish_reason == "length") {
+            e.status = LlmStatus::Failed;
+            e.error = "The model reached its output limit. Ask for the missing part or try a shorter request.";
+        }
         e.model = cfg.model;
         e.ttft_ms = in.res.ttft_ms;
         e.total_ms = in.res.total_ms;
@@ -991,21 +998,26 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
             }
             const bool answer_like = rr == TriggerReason::Question || rr == TriggerReason::Keyword ||
                                      rr == TriggerReason::LongTurn || rr == TriggerReason::Manual ||
-                                     rr == TriggerReason::Chat;
-            if (answer_like && in.res.status == LlmStatus::Completed && !it->second.grounding.empty()) {
+                                     rr == TriggerReason::Chat ||
+                                     (cfg.prompt.coding_interview && rr == TriggerReason::Screenshot);
+            if (!cfg.prompt.coding_interview && answer_like && in.res.status == LlmStatus::Completed &&
+                !it->second.grounding.empty()) {
                 unsupported = ungrounded_numbers(e.text, it->second.grounding);
                 for (auto& term : ungrounded_terms(e.text, it->second.grounding)) {
                     if (std::find(unsupported.begin(), unsupported.end(), term) == unsupported.end())
                         unsupported.push_back(std::move(term));
                 }
             }
-            if (in.res.status == LlmStatus::Completed && !e.text.empty()) {
-                if (!it->second.question.empty()) {
-                    chat.push_back(ChatTurn{it->second.question, text::truncate_utf8(e.text, kMaxChatAnswerChars)});
+            if (e.status == LlmStatus::Completed && !e.text.empty()) {
+                if (!it->second.question.empty() || (cfg.prompt.coding_interview && answer_like)) {
+                    const auto answer_limit = cfg.prompt.coding_interview ? kMaxCodingAnswerChars : kMaxChatAnswerChars;
+                    const auto& question = cfg.prompt.coding_interview && !e.interpreted_question.empty()
+                        ? e.interpreted_question : it->second.question.empty() ? it->second.trigger : it->second.question;
+                    chat.push_back(ChatTurn{question, text::truncate_utf8(e.text, answer_limit)});
                     while (chat.size() > kMaxChatTurns) chat.pop_front();
                 }
                 // Answers the candidate may have said out loud go to the answer
-                // memory (not screenshots, recaps or follow-up lists).
+                // memory. Coding interviews also carry forward on-screen solutions.
                 if (answer_like) {
                     const std::string q_label = !e.interpreted_question.empty() ? e.interpreted_question
                                                 : !it->second.question.empty() ? it->second.question
@@ -1013,7 +1025,7 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
                     const std::string said = split_interpreted_answer(e.text, true).body;
                     memory_.add(q_label, said);
                     maybe_compact();
-                    if (ledger_.add(q_label, said)) ledger_added();
+                    if (!cfg.prompt.coding_interview && ledger_.add(q_label, said)) ledger_added();
                 }
             }
             meta.erase(it);
@@ -1133,7 +1145,7 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
         const bool has_context = all_turns.size() >= 2;
         const Utterance u = gated ? utterance_for(turn.text, turn.source, turn.start_ms, enriched_trigger)
                                   : Utterance{turn.text, enriched_trigger, {turn.text}, false};
-        const QuestionAssessment qa = gated ? assess_question(u.assess, has_context, false) : QuestionAssessment{};
+        const QuestionAssessment qa = gated ? assess_interviewer_question(u.assess, has_context) : QuestionAssessment{};
         const std::string& trigger_text = u.trigger;
 
         // Speculative match/divergence at turn close (Req 3.4).
@@ -1246,7 +1258,14 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
     // ------------------------------------------------------------------
     // Question gate: is what the interviewer said a complete question?
 
-    bool may_skip(TriggerReason r) const { return cfg.allow_skip && r == TriggerReason::Question; }
+    QuestionAssessment assess_interviewer_question(std::string_view text, bool has_context, bool final = false) const {
+        return assess_question(text, has_context, final, cfg.prompt.coding_interview);
+    }
+
+    bool may_skip(TriggerReason r) const {
+        return cfg.allow_skip && (r == TriggerReason::Question ||
+               (cfg.prompt.coding_interview && (r == TriggerReason::Keyword || r == TriggerReason::LongTurn)));
+    }
 
     // Interviewer fragments close together are one utterance.
     bool chains_with_held(AudioSource src, std::int64_t start_ms) const {
@@ -1452,7 +1471,7 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
         if (h.parts.empty()) return; // only context, nothing was asked
         const std::string asked = join_fragments(h.parts);
         const bool ready =
-            h.ready || assess_question(asked, h.has_context, true).verdict == QuestionVerdict::Ready;
+            h.ready || assess_interviewer_question(asked, h.has_context, true).verdict == QuestionVerdict::Ready;
         const bool shadow_here =
             shadow && shadow->state == ShadowState::Speculating && shadow->source == h.source;
         if (!ready) {
@@ -1696,7 +1715,9 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
         shadow = std::move(sh);
     }
 
-    int effective_max_tokens() const { return std::max(cfg.max_tokens, 1500); }
+    int effective_max_tokens() const {
+        return std::max(cfg.max_tokens, cfg.prompt.coding_interview ? 3200 : 1500);
+    }
     std::string effective_reasoning() const {
         return (cfg.reasoning_effort.empty() || cfg.reasoning_effort == "minimal") ? "none" : cfg.reasoning_effort;
     }
@@ -1752,7 +1773,7 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
             abort_shadow();
             // Speculate again on the longer text, if it is still a question.
             if (!cfg.question_gate || reason != TriggerReason::Question ||
-                assess_question(u.assess, convo.size() >= 1, false).verdict == QuestionVerdict::Ready) {
+                assess_interviewer_question(u.assess, convo.size() >= 1).verdict == QuestionVerdict::Ready) {
                 enter_speculating(SpeculativeCandidate{src, live_raw, now}, reason, live);
             }
             return;
@@ -1763,7 +1784,7 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
         }
         if (cfg.question_gate) {
             // Only a finished question ('?') is shown before the turn closes.
-            const QuestionAssessment qa = assess_question(u.assess, convo.size() >= 1, false);
+            const QuestionAssessment qa = assess_interviewer_question(u.assess, convo.size() >= 1);
             if (qa.verdict != QuestionVerdict::Ready || !qa.explicit_question) {
                 if (cause == CommitCause::Timeout) shadow->commit_deadline_ms = -1;
                 return;
@@ -1865,7 +1886,7 @@ struct CopilotEngine::Impl : std::enable_shared_from_this<Impl> {
             // The question gate decides what is a question (with the
             // fragments the interviewer said right before this one).
             const Utterance u = live_utterance(c.text, c.source, c.t_ms);
-            const QuestionAssessment qa = assess_question(u.assess, convo.size() >= 1, false);
+            const QuestionAssessment qa = assess_interviewer_question(u.assess, convo.size() >= 1);
             const TriggerReason r = policy.would_trigger(u.assess, c.t_ms, qa.verdict == QuestionVerdict::Ready);
             if (r == TriggerReason::None) return;
             enter_speculating(c, r, u.trigger);

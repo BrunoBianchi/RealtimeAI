@@ -366,7 +366,6 @@
   function privacy() {
     const cfg = S.config;
     const st = S.stealthState || {};
-    const disguise = cfg.process_disguise || 'none';
     const opacity = Math.round((cfg.interface_opacity ?? cfg.electron_opacity ?? 1) * 100);
     return `
       ${card('This window', 'How the lipcue.com window appears to other people',
@@ -375,10 +374,8 @@
          ${row('Hide from the taskbar and Alt+Tab', 'Open it from the tray or with Ctrl+Shift+H.', C.sw('data-change="stealth" data-field="skipTaskbar"', st.skipTaskbar ?? cfg.electron_skip_taskbar))}
          ${row('Discreet title', 'Changes the window title to "Settings".', C.sw('data-change="stealth" data-field="disguise"', st.disguise ?? cfg.electron_disguise))}
          <div class="set-row"><div class="txt"><span class="t">Window opacity</span><span class="s">Makes the panel translucent over other windows.</span></div><div class="ctl" style="gap:10px"><input type="range" min="40" max="100" step="5" value="${opacity}" data-input="opacity" data-change="opacity-save" style="width:180px;accent-color:var(--accent)"/><span class="num" id="opacityLabel" style="width:40px;text-align:right">${opacity}%</span></div></div>
-         <div class="set-row stacked"><div class="txt"><span class="t">Process name</span><span class="s">How lipcue.com appears in Task Manager.</span></div>
-           <div class="option-cards">${[['none', 'lipcue.com', 'Normal'], ['settings', 'Settings', 'Windows Settings'], ['cmd', 'Command Prompt', 'cmd.exe'], ['taskmgr', 'Task Manager', 'Task Manager']]
-             .map(([v, t, s]) => `<button type="button" class="option-card ${disguise === v ? 'active' : ''}" aria-pressed="${disguise === v}" data-action="set-disguise" data-mode="${v}" data-label="${esc(t)}"><span class="t">${esc(t)}</span><span class="s">${esc(s)}</span></button>`)
-             .join('')}</div></div>`)}
+         ${row('Process name', 'Executable shown in the Details tab of Windows Task Manager.',
+           S.dashboardExecutable ? `<code data-no-i18n>${esc(S.dashboardExecutable)}</code>` : '')}`)}
       ${card('Floating panel (HUD)', 'What the interviewer does not see during the call',
         `${row('Invisible in screen sharing and recording', 'You see the HUD on your screen; the capture does not.', cfgSwitch('stealth_screen_capture', 'Invisible in captures', cfg.stealth_screen_capture !== false))}
          ${row('Off the taskbar and Alt+Tab', '', cfgSwitch('stealth_dock', 'Off the taskbar', cfg.stealth_dock !== false))}
@@ -386,6 +383,8 @@
          ${row('Clicks pass through the HUD', 'Click the app underneath. Toggle live with Ctrl+Alt+T.', cfgSwitch('stealth_click_through', 'Clicks pass through', cfg.stealth_click_through))}`,
         '',
         'aurora')}
+      ${card('Appearance preview', '',
+        row('Simulated task', 'Preview a rotating name and icon inside lipcue.com.', '<button type="button" class="btn sm" data-action="open-task-preview">Open preview</button>'))}
       ${card('Sharing', '',
         `${row('Contribute anonymized questions', 'At the end of a session, only the interviewer questions (no names, none of your answers) feed the Question bank.', C.sw('data-change="share-questions"', cfg.share_anonymized_questions !== false))}`)}`;
   }
@@ -1043,13 +1042,6 @@
   };
   C.changes['opacity-save'] = async (el) => {
     await C.saveConfig({ interface_opacity: Number(el.value) / 100 }, `Opacidade: ${el.value}%.`);
-  };
-
-  C.actions['set-disguise'] = async (el) => {
-    const mode = el.dataset.mode;
-    if (api.setProcessDisguise) await C.guard(() => api.setProcessDisguise(mode));
-    await C.saveConfig({ process_disguise: mode }, `Process name: ${el.dataset.label}.`);
-    C.refresh();
   };
 
   C.changes['feedback-prompt'] = async (el) => {

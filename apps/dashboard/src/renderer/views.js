@@ -492,7 +492,8 @@
           <button type="button" class="btn" data-action="open-scheduler" data-agent="${esc(a.id)}">${icon('calendar')}${iv ? 'Reschedule' : 'Schedule'}</button>
           ${running
             ? `<button type="button" class="btn live" data-action="go" data-to="live">${icon('broadcast')}Live now</button>`
-            : `<button type="button" class="btn primary" data-action="start-copilot" data-agent="${esc(a.id)}">${icon('play')}Go live</button>`}
+            : `<button type="button" class="btn" data-action="start-copilot" data-agent="${esc(a.id)}" data-mode="coding-interview" title="Get code and a step-by-step explanation in the overlay.">${icon('code')}Coding interview</button>
+               <button type="button" class="btn primary" data-action="start-copilot" data-agent="${esc(a.id)}">${icon('play')}Go live</button>`}
         </div>
       </section>
 

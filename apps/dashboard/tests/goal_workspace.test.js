@@ -35,7 +35,9 @@ test('Task 5.1 / Property 1: header of a session (back, title, date, edit, sched
   assert.ok(html.includes('Jan 10 · 10:00'), 'interview date and time');
   for (const a of ['edit-session', 'open-scheduler', 'start-copilot']) assert.ok(actions(html).includes(a), a);
   const starts = tags(html, { 'data-action': 'start-copilot' });
-  assert.deepStrictEqual(starts.map((s) => s['data-demo'] || ''), [''], 'only a real session: no scripted practice');
+  assert.deepStrictEqual(starts.map((s) => s['data-mode'] || 'live'), ['coding-interview', 'live']);
+  assert.ok(starts.every((s) => !s['data-demo']), 'both modes start a real session');
+  assert.ok(starts.every((s) => s['data-agent'] === 'a1'), 'both modes use the selected session');
   assert.ok(html.includes('Reschedule'), 'scheduled: Reschedule');
 
   // While this session is live the button jumps to the live view instead.

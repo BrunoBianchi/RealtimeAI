@@ -180,7 +180,6 @@ contextBridge.exposeInMainWorld('rtai', {
   checkUpdate: () => ipcRenderer.invoke('rtai:check-update'),
   downloadUpdate: () => ipcRenderer.invoke('rtai:download-update'),
   installUpdate: () => ipcRenderer.invoke('rtai:install-update'),
-  setProcessDisguise: (disguise) => ipcRenderer.invoke('rtai:set-process-disguise', disguise),
   setInterfaceOpacity: (opacity) => ipcRenderer.invoke('rtai:set-interface-opacity', opacity),
   testSound: () => ipcRenderer.invoke('rtai:test-sound'),
   onUpdateProgress: (cb) => {
