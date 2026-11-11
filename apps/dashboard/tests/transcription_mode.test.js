@@ -60,14 +60,14 @@ test('Task 9.2: Main process IPC registration and stdout JSON forwarding', () =>
 });
 
 test('Task 9.3: UI presence for Transcription Only toggle and Session Summary modal', () => {
-  // The toggle lives in the live view, disabled until the copilot runs.
+  // The toggle lives in the live view, shown only while the copilot runs.
   const view = (running, on) => {
     const { Cue } = loadRenderer({ state: { overlayStatus: { running, mode: 'live', agentId: '' } } });
     Cue.state.live.transcriptionOnly = on;
     return tags(render(Cue, 'live'), { 'data-change': 'live-mode' })[0];
   };
   const stopped = view(false, false);
-  assert.ok(stopped && 'disabled' in stopped, 'disabled while the copilot is stopped');
+  assert.ok(!stopped, 'hidden while the copilot is stopped');
   const running = view(true, true);
   assert.ok(!('disabled' in running) && 'checked' in running, 'on while the engine reports transcription-only');
 
