@@ -17,7 +17,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const DEFAULT_QUESTIONS = path.join(here, '..', '..', 'specs', '001-backend-latency', 'bench-questions.json');
+const DEFAULT_QUESTIONS = path.join(here, 'fixtures', 'llm-bench-questions.json');
 const DEFAULT_OUT = path.join(here, '..', '..', 'specs', '001-backend-latency', 'benchmark-results.md');
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const MODEL = 'qwen/qwen3.6-flash';

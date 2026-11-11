@@ -2,7 +2,7 @@
 // session when the quota is gone); these rules mirror cloud::PlanRules in the
 // engine (src/core/include/rtai/cloud_session.hpp) and fill in what the
 // server did not send, so the dashboard can explain the limit before a start.
-//   Free: one single session of up to 15 minutes, once (a trial).
+//   Free: 15 signup minutes, with a one-session trial on older accounts.
 //   PRO:  up to 200 live minutes a month.
 // Live sessions and mock interviews use the same balance in minutes
 // (minutes_left from the server); a mock is charged for the time it ran.
@@ -38,13 +38,14 @@ function entitlement(account) {
   const used = Math.max(0, num(p.minutes_used) ?? 0);
   const sessionsUsed = Math.max(0, num(p.sessions_used) ?? 0);
   const credit = Math.max(0, num(p.credit_minutes) ?? 0);
-  const trialUsed = rules.id === 'free' && sessionsUsed >= rules.maxSessions;
+  const signupCredits = rules.id === 'free' && p.signup_credits === true;
+  const trialUsed = rules.id === 'free' && !signupCredits && sessionsUsed >= rules.maxSessions;
   const left = trialUsed && credit > 0 ? 0 : Math.max(0, limit - used);
   const minutesLeft = Math.max(0, num(p.minutes_left) ?? (trialUsed ? credit : left + credit));
   const t = p.training && typeof p.training === 'object' ? p.training : null;
   const training = t ? { maxMinutes: Math.max(0, num(t.max_minutes) ?? 0), freeUnderS: Math.max(0, num(t.free_under_s) ?? 60) } : null;
   const maxSession = Math.min(num(p.max_session_minutes) ?? rules.maxSessionMinutes, left + credit);
-  let canStart = left + credit > 0;
+  let canStart = signupCredits ? minutesLeft > 0 : left + credit > 0;
   let reason = '';
   if (trialUsed && credit <= 0) {
     canStart = false;
@@ -64,7 +65,8 @@ function entitlement(account) {
     leftMinutes: left,
     creditMinutes: credit,
     sessionsUsed,
-    maxSessions: rules.maxSessions,
+    signupCredits,
+    maxSessions: signupCredits ? null : rules.maxSessions,
     maxSessionMinutes: Math.max(0, maxSession),
     periodEnd: p.period_end || '',
     canStart,

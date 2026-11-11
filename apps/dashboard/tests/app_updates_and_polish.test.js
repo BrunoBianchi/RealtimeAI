@@ -7,6 +7,36 @@ const { loadRenderer, render, indexHtml, el, tags } = require('./helpers/rendere
 const preloadJsPath = path.resolve(__dirname, '../src/preload/preload.js');
 const mainJsPath = path.resolve(__dirname, '../src/main/main.js');
 
+test('Task preview rotates fictional names and icons locally and stops on close', () => {
+  const r = loadRenderer();
+  let tick;
+  let cleared = false;
+  r.window.setInterval = (fn, interval) => {
+    assert.strictEqual(interval, 30_000);
+    tick = fn;
+    return 7;
+  };
+  r.window.clearInterval = (id) => { assert.strictEqual(id, 7); cleared = true; };
+  assert.match(render(r.Cue, 'settings/privacy'), /data-action="open-task-preview"/);
+  const callsBefore = r.calls.length;
+  r.Cue.actions['open-task-preview']();
+  assert.match(r.modals.last, /Task Manager simulation/);
+  assert.match(r.modals.last, /<table[\s\S]*Process name[\s\S]*Status[\s\S]*Simulated task/);
+  assert.match(r.modals.last, /Sample Notebook/);
+  const preview = r.dialogs[0].querySelector('[data-task-preview]');
+  tick();
+  assert.match(preview.innerHTML, /Sample Calendar/);
+  assert.ok(preview.innerHTML.includes(r.Cue.icon('calendar')));
+  tick();
+  assert.match(preview.innerHTML, /Sample Gallery/);
+  assert.ok(preview.innerHTML.includes(r.Cue.icon('image')));
+  tick();
+  assert.match(preview.innerHTML, /Sample Notebook/);
+  r.Cue.closeTopModal();
+  assert.ok(cleared);
+  assert.strictEqual(r.calls.length, callsBefore);
+});
+
 test('App Updates & Polish: Settings > Updates shows the version and the right action for each status', () => {
   const { Cue, S } = loadRenderer({ state: { appVersion: { version: '2.4.0', packaged: true }, config: { auto_update: true } } });
 
@@ -58,8 +88,12 @@ test('App Updates & Polish: top bar hosts search, update chip, stealth chip and 
   assert.ok(page('btnUpdateChip').innerHTML.includes('Restart to update'));
 });
 
-test('App Updates & Polish: Privacy offers window opacity and the four process names', async () => {
-  const { Cue, called } = loadRenderer({ state: { config: { process_disguise: 'cmd', interface_opacity: 0.8 } } });
+test('Privacy shows the running executable and saves the window title independently', async () => {
+  const { Cue, called } = loadRenderer({ state: {
+    config: { process_disguise: 'cmd', interface_opacity: 0.8 },
+    dashboardExecutable: 'lipcue.exe',
+    stealthState: { active: false, disguise: true }
+  } });
   const html = render(Cue, 'settings/privacy');
 
   const slider = tags(html, { type: 'range', 'data-input': 'opacity' });
@@ -67,29 +101,29 @@ test('App Updates & Polish: Privacy offers window opacity and the four process n
   assert.strictEqual(slider[0].value, '80');
   assert.ok(html.includes('id="opacityLabel"') && html.includes('>80%<'));
 
-  const cards = tags(html, { 'data-action': 'set-disguise' });
-  assert.deepStrictEqual(cards.map((c) => c['data-mode']), ['none', 'settings', 'cmd', 'taskmgr']);
-  assert.deepStrictEqual(cards.filter((c) => c['aria-pressed'] === 'true').map((c) => c['data-mode']), ['cmd'], 'current name is the pressed card');
+  assert.match(html, /<code data-no-i18n>lipcue\.exe<\/code>/);
+  assert.strictEqual(tags(html, { 'data-action': 'set-disguise' }).length, 0);
+  const [title] = tags(html, { 'data-change': 'stealth', 'data-field': 'disguise' });
+  assert.ok('checked' in title);
 
-  await Cue.actions['set-disguise'](el({ mode: 'taskmgr', label: 'Task Manager' }));
-  assert.deepStrictEqual(called('setProcessDisguise'), [['taskmgr']]);
-  assert.deepStrictEqual(called('saveConfig'), [[{ process_disguise: 'taskmgr' }]]);
+  await Cue.changes.stealth(el({ field: 'disguise' }, { checked: false }));
+  assert.deepStrictEqual(called('setStealthMode'), [[{ disguise: false }]]);
 });
 
-test('App Updates & Polish: preload.js exposes update, disguise, and opacity APIs', () => {
+test('App Updates & Polish: preload.js exposes update, stealth, and opacity APIs', () => {
   const preload = fs.readFileSync(preloadJsPath, 'utf8');
 
   assert.ok(preload.includes('getAppVersion:'), 'preload must expose getAppVersion');
   assert.ok(preload.includes('checkUpdate:'), 'preload must expose checkUpdate');
   assert.ok(preload.includes('downloadUpdate:'), 'preload must expose downloadUpdate');
   assert.ok(preload.includes('installUpdate:'), 'preload must expose installUpdate');
-  assert.ok(preload.includes('setProcessDisguise:'), 'preload must expose setProcessDisguise');
+  assert.ok(preload.includes('setStealthMode:'), 'preload must expose setStealthMode');
   assert.ok(preload.includes('setInterfaceOpacity:'), 'preload must expose setInterfaceOpacity');
   assert.ok(preload.includes('onUpdateProgress:'), 'preload must expose onUpdateProgress');
   assert.ok(preload.includes('onUpdateDownloaded:'), 'preload must expose onUpdateDownloaded');
 });
 
-test('App Updates & Polish: main.js implements IPC channels and config persistence for updates & disguise', () => {
+test('App Updates & Polish: main.js implements IPC channels and config persistence for updates and the window title', () => {
   const main = fs.readFileSync(mainJsPath, 'utf8');
 
   // IPC handlers
@@ -97,12 +131,12 @@ test('App Updates & Polish: main.js implements IPC channels and config persisten
   assert.ok(main.includes("'rtai:check-update'"), 'main.js must handle rtai:check-update');
   assert.ok(main.includes("'rtai:download-update'"), 'main.js must handle rtai:download-update');
   assert.ok(main.includes("'rtai:install-update'"), 'main.js must handle rtai:install-update');
-  assert.ok(main.includes("'rtai:set-process-disguise'"), 'main.js must handle rtai:set-process-disguise');
   assert.ok(main.includes("'rtai:set-interface-opacity'"), 'main.js must handle rtai:set-interface-opacity');
 
   // Config INI schema handling
   assert.ok(main.includes('auto_update'), 'main.js must handle auto_update in config');
-  assert.ok(main.includes('process_disguise'), 'main.js must handle process_disguise in config');
+  assert.match(main, /mainWindow\.setTitle\(disguise \? tm\('Settings'\) : DASHBOARD_TITLE\)/);
+  assert.match(main, /mainWindow\.on\('page-title-updated', \(event\) => event\.preventDefault\(\)\)/);
   assert.ok(main.includes('interface_opacity'), 'main.js must handle interface_opacity in config');
 });
 

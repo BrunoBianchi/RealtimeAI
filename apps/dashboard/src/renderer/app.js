@@ -227,21 +227,61 @@ function firstName(name) {
 
 // Minimal, safe Markdown: input is escaped first, then a few constructs are
 // turned back into tags (bold, italics, code, lists, headings, quotes).
+function markdownParts(src, { coding = false, streaming = false } = {}) {
+  const blocks = [];
+  const source = (coding ? String(src ?? '') : fixText(src || '')).replace(/\r\n/g, '\n');
+  const lines = source.split('\n');
+  if (source.endsWith('\n')) lines.pop();
+  let prose = [];
+  let fence = '';
+  let language = '';
+  let code = [];
+  const flushCode = (closed) => {
+    blocks.push({ language, code: code.join('\n'), closed });
+    code = [];
+    fence = '';
+  };
+
+  for (const [i, line] of lines.entries()) {
+    const trimmed = line.trim();
+    if (fence) {
+      if (trimmed.length >= fence.length && [...trimmed].every((char) => char === fence[0])) {
+        flushCode(true);
+      } else if (!(streaming && i === lines.length - 1 && !source.endsWith('\n') &&
+                   trimmed && [...trimmed].every((char) => char === fence[0]))) {
+        code.push(line);
+      }
+      continue;
+    }
+    const candidate = coding ? trimmed.replace(/^\d+[.)]\s+/, '') : trimmed;
+    const opening = candidate.match(/^(`{3,}|~{3,})([^~`]*?)$/);
+    if (!opening) {
+      prose.push(line);
+      continue;
+    }
+    if (prose.length) blocks.push({ text: prose.join('\n') });
+    prose = [];
+    fence = opening[1];
+    language = opening[2].trim().split(/\s+/)[0];
+  }
+  if (fence) flushCode(false);
+  if (prose.length) blocks.push({ text: prose.join('\n') });
+  return blocks;
+}
+Cue.markdownParts = markdownParts;
+
 function md(src) {
-  const text = esc(fixText(src || '')).replace(/\r\n/g, '\n');
-  const blocks = text.split(/\n{2,}/);
   const inline = (s) =>
     s
       .replace(/`([^`]+)`/g, '<code>$1</code>')
       .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
       .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
   const out = [];
-  for (const block of blocks) {
-    if (/^```/.test(block)) {
-      out.push(`<pre><code>${block.replace(/^```[^\n]*\n?/, '').replace(/```\s*$/, '')}</code></pre>`);
+  for (const part of markdownParts(src)) {
+    if ('code' in part) {
+      out.push(`<pre><code>${esc(part.code)}</code></pre>`);
       continue;
     }
-    const lines = block.split('\n');
     let list = null;
     let para = [];
     const flushPara = () => {
@@ -252,7 +292,12 @@ function md(src) {
       if (list) out.push(`<${list.tag}>${list.items.map((i) => `<li>${inline(i)}</li>`).join('')}</${list.tag}>`);
       list = null;
     };
-    for (const raw of lines) {
+    for (const raw of esc(part.text).split('\n')) {
+      if (!raw.trim()) {
+        flushPara();
+        flushList();
+        continue;
+      }
       const line = raw.replace(/^&gt;\s?/, '');
       const ul = line.match(/^\s*[-*•]\s+(.*)$/);
       const ol = line.match(/^\s*\d+[.)]\s+(.*)$/);
@@ -621,6 +666,7 @@ Cue.applyAgents = applyAgents;
 async function refreshState() {
   const st = await api.getState();
   S.config = st.config || {};
+  S.dashboardExecutable = st.dashboardExecutable || '';
   S.agents = st.agents || [];
   S.sessions = st.sessions || [];
   S.profile = st.profile || {};
@@ -655,7 +701,7 @@ async function saveConfig(patch, message) {
 Cue.saveConfig = saveConfig;
 
 // Starts the native copilot (HUD) for a goal.
-async function startCopilot(agent) {
+async function startCopilot(agent, codingInterview = false) {
   const target = agent || activeAgent();
   if (!target) {
     toast('Create a session before starting the copilot.');
@@ -681,7 +727,7 @@ async function startCopilot(agent) {
   S.activeAgentId = target.id;
   toast(`Starting copilot: ${agentTitle(target)}`);
   const res = await guard(
-    () => api.startOverlay({ agent: target, configOverrides: {} }),
+    () => api.startOverlay({ agent: target, configOverrides: {}, codingInterview }),
     'Could not start the copilot.'
   );
   if (!res) return null;
@@ -1033,7 +1079,7 @@ Cue.actions['toggle-stealth'] = async () => {
   }
 };
 
-Cue.actions['start-copilot'] = (el) => startCopilot(agentById(el.dataset.agent) || activeAgent());
+Cue.actions['start-copilot'] = (el) => startCopilot(agentById(el.dataset.agent) || activeAgent(), el.dataset.mode === 'coding-interview');
 Cue.actions['stop-copilot'] = () => stopCopilot();
 
 // Local mode -> account: back to the sign-in screen, on "Create account".

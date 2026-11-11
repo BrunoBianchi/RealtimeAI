@@ -70,7 +70,7 @@ enum HitId : int {
     kNone = 0, kDragArea, kResize,
     kSrcOutros, kSrcVoce, kBtnAnswer, kBtnShot, kBtnChat, kBtnMove, kBtnCollapse, kBtnMenu, kBtnEnd,
     kMenuRecap, kMenuFollow, kMenuPause, kMenuClick, kMenuHide, kMenuConfig,
-    kStripClear, kPrev, kNext, kAnsClear, kAnsExpand, kCopy, kVoteUp, kVoteDown,
+    kStripClear, kPrev, kNext, kAnsClear, kAnsExpand, kCopy, kCopyCode, kVoteUp, kVoteDown,
     kChatField, kChatSend, kChatClose, kQuickRecap, kQuickFollow, kQuickShot, kQuickChat, kNotice, kBtnNextQuestion,
     kTabSuggested, kTabTranscript, kToggleAuto, kToggleTranscriptionOnly, kChipPickBase, kActionRecap = 600, kActionFollow, kActionAsk, kSuggestedAskBase = 700,
     kStyleConcise = 801, kStyleDetailed = 802, kStyleStar = 803, kFollowUpRowBase = 810,
@@ -285,8 +285,9 @@ struct OverlayWindow::Impl {
     ComPtr<IDWriteFactory> dwrite;
     ComPtr<ID2D1DCRenderTarget> rt;
     ComPtr<ID2D1SolidColorBrush> brush;
+    std::array<ComPtr<ID2D1SolidColorBrush>, static_cast<std::size_t>(CodeTone::Count)> code_brushes;
     ComPtr<ID2D1StrokeStyle> round_stroke;
-    ComPtr<IDWriteTextFormat> f_body, f_body_bold, f_ui, f_small, f_small_bold, f_kbd;
+    ComPtr<IDWriteTextFormat> f_body, f_body_bold, f_ui, f_small, f_small_bold, f_kbd, f_code;
     ComPtr<IDWriteInlineObject> ellipsis_small;
     std::map<std::string, std::vector<ComPtr<ID2D1PathGeometry>>> icon_cache;
 
@@ -374,6 +375,9 @@ struct OverlayWindow::Impl {
     bool follow_latest{true};
     float scroll{0.0f};          // answer body offset from the top (DIP)
     float ans_scroll_max{0.0f};
+    float code_scroll{0.0f};
+    float code_scroll_max{0.0f};
+    D2D1_RECT_F code_view_rect{};
     float tr_scroll{0.0f};       // transcript offset from the bottom (DIP)
     float tr_scroll_max{0.0f};
     D2D1_RECT_F ans_view_rect{}; // last drawn areas, for wheel routing
@@ -478,6 +482,7 @@ struct OverlayWindow::Impl {
     int resize_start_x{0};
     float resize_start_w{0.0f};
     std::chrono::steady_clock::time_point copied_at{};
+    int copied_action{kNone};
     float tooltip_bottom{0.0f};
 
     // ------------------------------------------------------------------
@@ -519,6 +524,7 @@ struct OverlayWindow::Impl {
     // the history, honoring follow-latest. Shared by the direct enqueue=false
     // path and by promoting a queued suggestion on [Tab] (Req 9.3, 9.6).
     void start_suggestion(SuggestionStartedEvent& e);
+    void quick_action(int action);
     void apply_interpreted(SuggestionView& v, const std::string& raw, bool final);
     // Pops the oldest queued suggestion (if any) into a visible card and clears
     // the pill when the queue drains (Req 9.3, 9.6).
@@ -567,6 +573,7 @@ struct OverlayWindow::Impl {
     void panel(const D2D1_RECT_F& r, const D2D1_COLOR_F& fill);
     void dot(float cx, float cy, float r, const D2D1_COLOR_F& c);
     void draw_text(IDWriteTextLayout* l, float x, float y, const D2D1_COLOR_F& c);
+    void draw_code(IDWriteTextLayout* l, const std::vector<TextSegment>& spans, float x, float y);
     void text_centered_v(IDWriteTextLayout* l, float x, float cy, const D2D1_COLOR_F& c);
     const std::vector<ComPtr<ID2D1PathGeometry>>& icon_geometry(const std::string& name);
     void icon(const char* name, float cx, float cy, float size, const D2D1_COLOR_F& c, float stroke = 2.0f);
@@ -651,8 +658,8 @@ static std::wstring pick_font_family(IDWriteFactory* dw) {
 
 bool OverlayWindow::Impl::create_text_formats() {
     const std::wstring family = pick_font_family(dwrite.get());
-    auto make = [&](ComPtr<IDWriteTextFormat>& f, DWRITE_FONT_WEIGHT w, float size) {
-        return SUCCEEDED(dwrite->CreateTextFormat(family.c_str(), nullptr, w, DWRITE_FONT_STYLE_NORMAL,
+    auto make = [&](ComPtr<IDWriteTextFormat>& f, DWRITE_FONT_WEIGHT w, float size, const wchar_t* face = nullptr) {
+        return SUCCEEDED(dwrite->CreateTextFormat(face ? face : family.c_str(), nullptr, w, DWRITE_FONT_STYLE_NORMAL,
                                                   DWRITE_FONT_STRETCH_NORMAL, size, L"pt-br", f.put()));
     };
     if (!make(f_body, DWRITE_FONT_WEIGHT_NORMAL, kBulletSize)) return false;
@@ -661,6 +668,8 @@ bool OverlayWindow::Impl::create_text_formats() {
     if (!make(f_small, DWRITE_FONT_WEIGHT_NORMAL, 12.5f)) return false;
     if (!make(f_small_bold, DWRITE_FONT_WEIGHT_SEMI_BOLD, 12.5f)) return false;
     if (!make(f_kbd, DWRITE_FONT_WEIGHT_NORMAL, 11.0f)) return false;
+    if (!make(f_code, DWRITE_FONT_WEIGHT_NORMAL, 13.5f, L"Consolas")) return false;
+    f_code->SetIncrementalTabStop(29.0f);
     for (auto* f : {f_ui.get(), f_kbd.get()}) {
         f->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
     }
@@ -971,6 +980,8 @@ bool OverlayWindow::Impl::ensure_device() {
 }
 
 void OverlayWindow::Impl::discard_device() {
+    layout_cache.clear(); // code layouts can hold drawing effects from this target
+    for (auto& code_brush : code_brushes) code_brush.reset();
     brush.reset();
     rt.reset();
 }
@@ -1204,6 +1215,20 @@ bool OverlayWindow::Impl::apply(EngineEvent& ev) {
 // Splits the "PERGUNTA:" header off the streamed answer: the understood
 // question becomes the card title (Trigger Lock keeps the raw transcript in
 // `trigger`), the rest is the body.
+void OverlayWindow::Impl::quick_action(int action) {
+    if (!cb.on_quick_action) return;
+    std::string context;
+    if (opts.coding_interview) {
+        if (history.empty()) return;
+        const auto& answer = history[std::min(cursor, history.size() - 1)];
+        if (!answer.done || answer.body.empty()) return;
+        context = (answer.understood.empty() ? answer.trigger : answer.understood) + "\n\n" +
+                  text::truncate_utf8(answer.body, 10000);
+        follow_latest = true;
+    }
+    cb.on_quick_action(action, std::move(context));
+}
+
 void OverlayWindow::Impl::apply_interpreted(SuggestionView& v, const std::string& raw, bool final) {
     InterpretedAnswer ia = split_interpreted_answer(raw, final);
     if (!ia.has_header) {
@@ -1248,7 +1273,7 @@ void OverlayWindow::Impl::start_suggestion(SuggestionStartedEvent& e) {
     if (follow_latest || history.size() == 1) {
         cursor = history.size() - 1;
         follow_latest = true;
-        scroll = 0.0f;
+        scroll = code_scroll = 0.0f;
         user_scrolled = false;
     }
     if (collapsed) unseen_answer = true;
@@ -1374,7 +1399,7 @@ void OverlayWindow::Impl::go_prev() {
     if (!history.empty() && cursor > 0) {
         --cursor;
         follow_latest = false;
-        scroll = 0.0f;
+        scroll = code_scroll = 0.0f;
         user_scrolled = false;
         invalidate();
     }
@@ -1384,7 +1409,7 @@ void OverlayWindow::Impl::go_next() {
     if (!history.empty() && cursor + 1 < history.size()) {
         ++cursor;
         follow_latest = (cursor + 1 == history.size());
-        scroll = 0.0f;
+        scroll = code_scroll = 0.0f;
         user_scrolled = false;
         invalidate();
     }
@@ -1394,7 +1419,7 @@ void OverlayWindow::Impl::clear_answers() {
     history.clear();
     cursor = 0;
     follow_latest = true;
-    scroll = 0.0f;
+    scroll = code_scroll = 0.0f;
     user_scrolled = false;
     // Drop any queued "nova pergunta" with the cleared answers so the pill does
     // not outlive the cards it referred to.
@@ -1665,9 +1690,9 @@ void OverlayWindow::Impl::on_hotkey(int id) {
             else set_notice(NoticeLevel::Info, "End of history.", false);
             break;
         // Ações rápidas sobre a resposta atual (Alt+1/2/3, Req 12.5-12.7).
-        case kHkQuick1: if (cb.on_quick_action) cb.on_quick_action(1); break;
-        case kHkQuick2: if (cb.on_quick_action) cb.on_quick_action(2); break;
-        case kHkQuick3: if (cb.on_quick_action) cb.on_quick_action(3); break;
+        case kHkQuick1: quick_action(1); break;
+        case kHkQuick2: quick_action(2); break;
+        case kHkQuick3: quick_action(3); break;
         // Modo_Panic (Alt+H, Req 12.8/12.9): colapsa o HUD para um ponto de
         // 8x8 DIP em <=50 ms e, ao reacionar, restaura tamanho/posição
         // anteriores em <=50 ms.
@@ -1733,25 +1758,40 @@ void OverlayWindow::Impl::on_click(int id) {
             answer_expanded = !answer_expanded;
             invalidate();
             break;
-        case kQuickShorter: if (cb.on_quick_action) cb.on_quick_action(1); follow_latest = true; break;
-        case kQuickExample: if (cb.on_quick_action) cb.on_quick_action(2); follow_latest = true; break;
-        case kQuickCode: if (cb.on_quick_action) cb.on_quick_action(3); follow_latest = true; break;
+        case kQuickShorter: quick_action(1); follow_latest = true; break;
+        case kQuickExample: quick_action(2); follow_latest = true; break;
+        case kQuickCode: quick_action(3); follow_latest = true; break;
         case kStripLatest: tr_scroll = 0.0f; break;
         case kTranscriptToggle:
             transcript_open = !transcript_open;
             tr_scroll = 0.0f;
             invalidate();
             break;
+        case kCopyCode:
         case kCopy: {
             if (history.empty()) break;
             const auto& sv = history[std::min(cursor, history.size() - 1)];
             std::string plain;
-            for (const auto& fl : format_suggestion(sv.body, false)) {
-                if (!plain.empty()) plain += "\r\n";
+            const bool code_only = id == kCopyCode;
+            const auto lines = format_suggestion(sv.body, false, opts.coding_interview);
+            bool started_code = false;
+            for (const auto& fl : lines) {
+                if (code_only) {
+                    if (fl.kind != FormattedLine::Kind::Code) {
+                        if (started_code) break;
+                        continue;
+                    }
+                    if (fl.code_line == 1 && started_code) break;
+                    started_code = true;
+                }
+                if (!plain.empty() || (code_only && fl.code_line > 1)) plain += "\r\n";
                 if (fl.kind == FormattedLine::Kind::Bullet) plain += "- ";
                 plain += fl.plain();
             }
-            if (plain.empty()) plain = sv.body;
+            if (plain.empty()) {
+                if (code_only) break;
+                plain = sv.body;
+            }
             std::wstring w = widen(plain);
             if (OpenClipboard(hwnd)) {
                 EmptyClipboard();
@@ -1759,13 +1799,17 @@ void OverlayWindow::Impl::on_click(int id) {
                     if (void* p = GlobalLock(g)) {
                         std::copy(w.c_str(), w.c_str() + w.size() + 1, static_cast<wchar_t*>(p));
                         GlobalUnlock(g);
-                        if (!SetClipboardData(CF_UNICODETEXT, g)) GlobalFree(g);
+                        if (SetClipboardData(CF_UNICODETEXT, g)) {
+                            copied_at = std::chrono::steady_clock::now();
+                            copied_action = id;
+                        } else {
+                            GlobalFree(g);
+                        }
                     } else {
                         GlobalFree(g);
                     }
                 }
                 CloseClipboard();
-                copied_at = std::chrono::steady_clock::now();
             }
             break;
         }
@@ -1950,6 +1994,25 @@ void OverlayWindow::Impl::draw_text(IDWriteTextLayout* l, float x, float y, cons
         static_cast<D2D1_DRAW_TEXT_OPTIONS>(D2D1_DRAW_TEXT_OPTIONS_CLIP | D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT);
     brush->SetColor(c);
     rt->DrawTextLayout(D2D1::Point2F(x, y), l, brush.get(), kTextOpts);
+}
+
+void OverlayWindow::Impl::draw_code(IDWriteTextLayout* l, const std::vector<TextSegment>& spans, float x, float y) {
+    if (!l) return;
+    const D2D1_COLOR_F colors[] = {rgba(212, 212, 212), rgba(197, 134, 192), rgba(78, 201, 176),
+                                  rgba(206, 145, 120), rgba(181, 206, 168), rgba(137, 163, 120), rgba(220, 220, 170)};
+    static_assert(std::size(colors) == static_cast<std::size_t>(CodeTone::Count));
+    UINT32 offset = 0;
+    for (const auto& span : spans) {
+        const auto length = static_cast<UINT32>(widen(span.text).size());
+        if (length == 0) continue;
+        const auto tone = static_cast<std::size_t>(span.tone);
+        auto& effect = code_brushes[tone];
+        if (tone != 0 && !effect) rt->CreateSolidColorBrush(colors[tone], effect.put());
+        // A cached layout can be shared by identical lines in different fences.
+        l->SetDrawingEffect(effect.get(), DWRITE_TEXT_RANGE{offset, length});
+        offset += length;
+    }
+    draw_text(l, x, y, colors[0]);
 }
 
 void OverlayWindow::Impl::text_centered_v(IDWriteTextLayout* l, float x, float cy, const D2D1_COLOR_F& c) {
@@ -2622,19 +2685,50 @@ float OverlayWindow::Impl::draw_answer_panel(float x, float y, float w, float mi
 
     struct BodyLine {
         ComPtr<IDWriteTextLayout> l;
+        ComPtr<IDWriteTextLayout> number;
+        const FormattedLine* code{};
+        bool code_header{};
         float indent;
         float gap;
         float h;
         D2D1_COLOR_F c;
         bool bullet;
     };
+    const auto fmt = has_body ? format_suggestion(sv->body, !sv->done, opts.coding_interview)
+                              : std::vector<FormattedLine>{};
+    const bool has_code = opts.coding_interview && std::any_of(fmt.begin(), fmt.end(), [](const auto& line) {
+        return line.kind == FormattedLine::Kind::Code;
+    });
+    const bool has_prose = std::any_of(fmt.begin(), fmt.end(), [](const auto& line) {
+        return line.kind != FormattedLine::Kind::Code;
+    });
+    const bool split = has_code && has_prose && inner >= 670.0f;
+    constexpr float column_gap = 14.0f;
+    const float code_width = split ? std::floor((inner - column_gap) * 0.57f) : inner;
+    const float prose_x = split ? X + code_width + column_gap : X;
+    const float prose_w = split ? inner - code_width - column_gap : inner;
+    const float prose_pad = split ? 12.0f : 0.0f;
+    const float prose_content_w = prose_w - 2.0f * prose_pad;
     std::vector<BodyLine> lines;
+    std::vector<BodyLine> code_lines;
     float body_h = 0.0f;
+    float code_h = 0.0f;
     if (has_body) {
-        const auto fmt = format_suggestion(sv->body, !sv->done);
-        for (std::size_t i = 0; i < fmt.size(); ++i) {
-            const auto& fl = fmt[i];
+        if (split) {
+            BodyLine heading{};
+            heading.l = layout(L"EXPLANATION", f_small_bold.get(), prose_content_w, 20.0f);
+            heading.gap = 10.0f;
+            heading.h = 23.0f;
+            heading.c = pal.accent_soft;
+            lines.push_back(std::move(heading));
+            body_h = 33.0f;
+        }
+        bool previous_code = false;
+        for (const auto& fl : fmt) {
             BodyLine b{};
+            const bool code = fl.kind == FormattedLine::Kind::Code;
+            auto& column = split && code ? code_lines : lines;
+            float& column_h = split && code ? code_h : body_h;
             b.bullet = fl.kind == FormattedLine::Kind::Bullet;
             b.indent = b.bullet ? 16.0f : 0.0f;
             IDWriteTextFormat* f = f_body.get();
@@ -2644,15 +2738,40 @@ float OverlayWindow::Impl::draw_answer_panel(float x, float y, float w, float mi
                 b.c = pal.text;
             } else if (fl.kind == FormattedLine::Kind::Label) {
                 f = f_small_bold.get();
-                b.c = pal.muted;
+                b.c = opts.coding_interview ? pal.accent_soft : pal.muted;
+            } else if (code) {
+                f = f_code.get();
+                b.indent = 8.0f;
+                b.c = pal.text;
             }
-            b.l = rich_layout(fl.segments, f, inner - b.indent - 6.0f);
+            if (has_code && code) {
+                b.code = &fl;
+                b.indent = 47.0f;
+                b.number = line_layout(widen(std::to_string(fl.code_line)), f_kbd.get(), 31.0f);
+                if (fl.code_line == 1) {
+                    BodyLine heading{};
+                    const auto label = fl.language.empty() ? std::wstring(L"CODE") : L"CODE  /  " + widen(fl.language);
+                    heading.l = line_layout(label, f_small_bold.get(), code_width - 24.0f);
+                    heading.indent = 12.0f;
+                    heading.gap = column.empty() ? 0.0f : 9.0f;
+                    heading.h = 28.0f;
+                    heading.c = rgba(156, 220, 254);
+                    heading.code_header = true;
+                    column_h += heading.gap + heading.h;
+                    column.push_back(std::move(heading));
+                }
+            }
+            const float line_w = code ? code_width : prose_content_w;
+            b.l = rich_layout(fl.segments, f, line_w - b.indent - (b.code ? 12.0f : 6.0f));
             b.h = std::max(18.0f, height_of(b.l.get()));
-            b.gap = i == 0 ? 0.0f : (fl.kind == FormattedLine::Kind::Label ? 12.0f : 7.0f);
-            body_h += b.gap + b.h;
-            lines.push_back(std::move(b));
+            b.gap = column.empty() ? 0.0f : (fl.kind == FormattedLine::Kind::Label ? 12.0f : 7.0f);
+            if (b.code || (code && previous_code)) b.gap = 0.0f;
+            column_h += b.gap + b.h;
+            column.push_back(std::move(b));
+            previous_code = code;
         }
     }
+    const float text_h = body_h;
     // Messages shown instead of (or after) the body.
     std::wstring state_msg;
     D2D1_COLOR_F state_c = pal.text_sub;
@@ -2698,7 +2817,7 @@ float OverlayWindow::Impl::draw_answer_panel(float x, float y, float w, float mi
     ComPtr<IDWriteTextLayout> state_l;
     if (!state_msg.empty()) {
         const float sx = state_dots ? 28.0f : 0.0f;
-        state_l = layout(state_msg, f_body.get(), inner - sx);
+        state_l = layout(state_msg, f_body.get(), prose_content_w - sx);
         body_h += (has_body ? 10.0f : 0.0f) + std::max(20.0f, height_of(state_l.get()));
     }
 
@@ -2723,10 +2842,12 @@ float OverlayWindow::Impl::draw_answer_panel(float x, float y, float w, float mi
     const float footer_h = (sv && sv->done && has_body) ? 38.0f : 0.0f;
 
     const float fixed = header_h + pill_h + q_h + 12.0f + 12.0f + fu_h + footer_h;
-    const float body_view = std::clamp(body_h, 20.0f, std::max(60.0f, max_h - fixed));
+    const float body_view = std::clamp(std::max(body_h, code_h), 20.0f, std::max(60.0f, max_h - fixed));
     const float panel_h = std::max(min_h, fixed + body_view);
     ans_scroll_max = std::max(0.0f, body_h - body_view);
     scroll = std::clamp(scroll, 0.0f, ans_scroll_max);
+    code_scroll_max = std::max(0.0f, code_h - body_view);
+    code_scroll = std::clamp(code_scroll, 0.0f, code_scroll_max);
 
     // ---------------- draw ----------------
     const D2D1_RECT_F pr = D2D1::RectF(x, y, x + w, y + panel_h);
@@ -2744,8 +2865,9 @@ float OverlayWindow::Impl::draw_answer_panel(float x, float y, float w, float mi
             lx += width_of(lt.get()) + 10.0f;
         }
         const bool failed = sv && sv->done && sv->status == LlmStatus::Failed;
-        const bool ready = sv && sv->done && has_body && !failed;
-        const wchar_t* st = generating ? L"Writing" : failed ? L"Error" : ready ? L"Ready" : L"Idle";
+        const bool interrupted = sv && sv->done && sv->status == LlmStatus::Cancelled;
+        const bool ready = sv && sv->done && has_body && !failed && !interrupted;
+        const wchar_t* st = generating ? L"Writing" : failed ? (has_body ? L"Incomplete" : L"Error") : interrupted ? L"Interrupted" : ready ? L"Ready" : L"Idle";
         const D2D1_COLOR_F sc = generating ? pal.amber : failed ? pal.red : ready ? pal.green : pal.muted;
         auto ls = layout(st, f_small.get(), 80.0f, 18.0f);
         const D2D1_RECT_F br = D2D1::RectF(lx, cy - 10.0f, lx + width_of(ls.get()) + 24.0f, cy + 10.0f);
@@ -2771,7 +2893,12 @@ float OverlayWindow::Impl::draw_answer_panel(float x, float y, float w, float mi
         }
         if (has_body) {
             const bool copied = std::chrono::steady_clock::now() - copied_at < std::chrono::milliseconds(1500);
-            ib(kCopy, copied ? "check" : "copy", copied ? L"Copied" : L"Copy the answer");
+            const bool copied_answer = copied && copied_action == kCopy;
+            ib(kCopy, copied_answer ? "check" : "copy", copied_answer ? L"Copied" : L"Copy the answer");
+            if (has_code && sv->done && sv->status == LlmStatus::Completed) {
+                const bool copied_code = copied && copied_action == kCopyCode;
+                ib(kCopyCode, copied_code ? "check" : "code", copied_code ? L"Code copied" : L"Copy code only");
+            }
         }
         if (history.size() > 1) {
             rx -= 4.0f;
@@ -2828,41 +2955,68 @@ float OverlayWindow::Impl::draw_answer_panel(float x, float y, float w, float mi
     cyy += 12.0f;
 
     // Body (scrollable).
-    const D2D1_RECT_F view = D2D1::RectF(X - 2.0f, cyy, X + inner + 2.0f, cyy + body_view);
-    rt->PushAxisAlignedClip(view, D2D1_ANTIALIAS_MODE_ALIASED);
-    {
-        float by = cyy - scroll;
-        for (const auto& b : lines) {
+    const auto code_bg = rgba(30, 30, 30);
+    const auto prose_bg = split ? rgba(25, 27, 33) : bg;
+    const auto paint_rows = [&](const auto& rows, const D2D1_RECT_F& clip, float left, float row_width, float offset) {
+        float by = cyy - offset;
+        for (const auto& b : rows) {
             by += b.gap;
-            if (by + b.h >= view.top - 2.0f && by <= view.bottom + 2.0f) {
-                if (b.bullet) dot(X + 5.0f, by + 9.5f, 2.5f, pal.accent_soft);
-                draw_text(b.l.get(), X + b.indent, by, b.c);
+            if (by + b.h >= clip.top && by < clip.bottom) {
+                if (b.code_header || b.code) {
+                    const auto row = D2D1::RectF(left, by, left + row_width, by + b.h);
+                    brush->SetColor(b.code_header ? rgba(42, 43, 48) : code_bg);
+                    rt->FillRectangle(row, brush.get());
+                }
+                if (b.code) {
+                    brush->SetColor(rgba(65, 65, 69));
+                    rt->DrawLine(D2D1::Point2F(left + 37.0f, by), D2D1::Point2F(left + 37.0f, by + b.h), brush.get());
+                    draw_text(b.number.get(), left + 25.0f - width_of(b.number.get()), by + 1.0f, rgba(156, 156, 161));
+                    draw_code(b.l.get(), b.code->segments, left + b.indent, by);
+                } else {
+                    if (b.bullet) dot(left + 5.0f, by + 9.5f, 2.5f, pal.accent_soft);
+                    draw_text(b.l.get(), left + b.indent, by + (b.code_header ? 6.0f : 0.0f), b.c);
+                }
             }
             by += b.h;
         }
-        if (state_l) {
-            if (has_body) by += 10.0f;
-            float sx = X;
-            if (state_dots) {
-                const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                                    std::chrono::steady_clock::now().time_since_epoch()).count();
-                for (int i = 0; i < 3; ++i) {
-                    const float phase = static_cast<float>((ms + i * 180) % 900) / 900.0f;
-                    const float al = 0.25f + 0.75f * 0.5f * (1.0f - std::cos(phase * 6.2831853f));
-                    dot(X + 4.0f + static_cast<float>(i) * 8.0f, by + 9.5f, 2.6f, with_alpha(pal.accent_soft, al));
-                }
-                sx += 28.0f;
-            } else if (state_err) {
-                icon("triangle-alert", X + 7.0f, by + 9.5f, 14.0f, pal.red);
-                sx += 22.0f;
+    };
+    if (split) {
+        code_view_rect = D2D1::RectF(X, cyy, X + code_width, cyy + body_view);
+        fill_round(code_view_rect, 7.0f, code_bg);
+        rt->PushAxisAlignedClip(code_view_rect, D2D1_ANTIALIAS_MODE_ALIASED);
+        paint_rows(code_lines, code_view_rect, X, code_width, code_scroll);
+        rt->PopAxisAlignedClip();
+        stroke_round(code_view_rect, 7.0f, rgba(63, 63, 70), 1.0f);
+        if (code_scroll_max > 0.0f) draw_scrollbar(code_view_rect.right - 5.0f, cyy, body_view, code_h, code_scroll);
+    }
+    const D2D1_RECT_F view = D2D1::RectF(prose_x, cyy, prose_x + prose_w, cyy + body_view);
+    if (split) fill_round(view, 7.0f, prose_bg);
+    rt->PushAxisAlignedClip(view, D2D1_ANTIALIAS_MODE_ALIASED);
+    const float prose_left = prose_x + prose_pad;
+    paint_rows(lines, view, prose_left, prose_content_w, scroll);
+    if (state_l) {
+        const float by = cyy - scroll + text_h + (has_body ? 10.0f : 0.0f);
+        float sx = prose_left;
+        if (state_dots) {
+            const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                std::chrono::steady_clock::now().time_since_epoch()).count();
+            for (int i = 0; i < 3; ++i) {
+                const float phase = static_cast<float>((ms + i * 180) % 900) / 900.0f;
+                const float al = 0.25f + 0.75f * 0.5f * (1.0f - std::cos(phase * 6.2831853f));
+                dot(prose_left + 4.0f + static_cast<float>(i) * 8.0f, by + 9.5f, 2.6f, with_alpha(pal.accent_soft, al));
             }
-            draw_text(state_l.get(), sx, by, state_c);
+            sx += 28.0f;
+        } else if (state_err) {
+            icon("triangle-alert", prose_left + 7.0f, by + 9.5f, 14.0f, pal.red);
+            sx += 22.0f;
         }
+        draw_text(state_l.get(), sx, by, state_c);
     }
     rt->PopAxisAlignedClip();
+    if (split) stroke_round(view, 7.0f, pal.border_soft, 1.0f);
     if (ans_scroll_max > 0.0f) {
-        if (scroll > 1.0f) draw_fade(D2D1::RectF(view.left, view.top, view.right, view.top + 20.0f), bg, false);
-        if (scroll < ans_scroll_max - 1.0f) {
+        if (!split && scroll > 1.0f) draw_fade(D2D1::RectF(view.left, view.top, view.right, view.top + 20.0f), bg, false);
+        if (!split && scroll < ans_scroll_max - 1.0f) {
             draw_fade(D2D1::RectF(view.left, view.bottom - 26.0f, view.right, view.bottom), bg, true);
             auto lm = layout(L"Scroll for more", f_small.get(), 120.0f, 18.0f);
             const float mw = width_of(lm.get()) + 30.0f;
@@ -2922,9 +3076,13 @@ float OverlayWindow::Impl::draw_answer_panel(float x, float y, float w, float mi
                 const wchar_t* label;
                 const wchar_t* tip;
             };
-            const Quick qs[] = {{kQuickShorter, L"Shorter", L"Rewrite it shorter  (Alt 1)"},
+            const Quick general[] = {{kQuickShorter, L"Shorter", L"Rewrite it shorter  (Alt 1)"},
                                 {kQuickExample, L"Example", L"Add an example from your resume  (Alt 2)"},
                                 {kQuickCode, L"Code", L"Show code with complexity  (Alt 3)"}};
+            const Quick coding[] = {{kQuickShorter, L"Explain", L"Explain why the selected solution works  (Alt 1)"},
+                                    {kQuickExample, L"Trace", L"Trace a concrete input through the selected code  (Alt 2)"},
+                                    {kQuickCode, L"Complexity", L"Explain time and extra space for the selected code  (Alt 3)"}};
+            const auto& qs = opts.coding_interview ? coding : general;
             const float limit = X + inner - (mxw > 0.0f ? mxw + 12.0f : 0.0f);
             for (const auto& q : qs) {
                 auto lq = layout(q.label, f_small.get(), 100.0f, 18.0f);
@@ -2964,9 +3122,7 @@ float OverlayWindow::Impl::draw_answer(float y) {
     cap = std::min(cap, space_below_dip() - top - 20.0f);
     cap = std::max(cap, 200.0f);
 
-    // One column at every width: the live transcript line, the optional full
-    // transcript drawer, then the answer card using the whole width. The eyes
-    // stay on a single reading line instead of jumping between two panels.
+    // The live transcript and its optional drawer stay above the answer card.
     float cy = draw_live_line(L, top, avail);
     if (transcript_open) {
         const float th = std::clamp(cap * 0.38f, 120.0f, 260.0f);
@@ -3489,6 +3645,7 @@ void OverlayWindow::Impl::render() {
     // ever-changing streaming body) and keep the cache bounded (Req 14.4).
     for (auto& kv : layout_cache) kv.second.used = false;
     hits.clear();
+    code_view_rect = {};
     tooltip_bottom = 0.0f;
     float y = kMargin;
     if (mode_ == OverlayMode::PostInterviewReport) {
@@ -3711,6 +3868,8 @@ LRESULT OverlayWindow::Impl::handle(UINT m, WPARAM w, LPARAM l) {
             auto inside = [&](const D2D1_RECT_F& r) { return px >= r.left && px < r.right && py >= r.top && py < r.bottom; };
             if (inside(tr_view_rect)) {
                 tr_scroll = std::clamp(tr_scroll + delta * 40.0f, 0.0f, tr_scroll_max); // up = older
+            } else if (inside(code_view_rect)) {
+                code_scroll = std::clamp(code_scroll - delta * 48.0f, 0.0f, code_scroll_max);
             } else {
                 scroll = std::clamp(scroll - delta * 48.0f, 0.0f, ans_scroll_max);
                 user_scrolled = true;

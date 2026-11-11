@@ -71,9 +71,10 @@ struct Rig {
     std::shared_ptr<Sink> sink = std::make_shared<Sink>();
     std::unique_ptr<CopilotEngine> engine;
 
-    explicit Rig(CopilotConfig c, std::string reply = "**Situação:** ok") {
+    explicit Rig(CopilotConfig c, std::string reply = "**Situação:** ok", std::string finish_reason = "stop") {
         ScriptedLlmClient::Options o;
         o.reply = std::move(reply);
+        o.finish_reason = std::move(finish_reason);
         o.first_token_delay = 2ms;
         o.token_delay = 1ms;
         llm = std::make_shared<ScriptedLlmClient>(o);
@@ -301,6 +302,69 @@ TEST(SkipSentinel, OnlyOfferedWhenAsked) {
     EXPECT_NE(with.back().content.find("[SKIP]"), npos);
     EXPECT_EQ(without.back().content.find("[SKIP]"), npos);
     EXPECT_EQ(with.front().content, without.front().content) << "the cached system prefix does not change";
+}
+
+TEST(QuestionFlow, CodingInterviewRespondsToSpokenImplementationRequest) {
+    constexpr auto request = "Implement a binary search over a sorted array.";
+    EXPECT_EQ(assess_question(request).verdict, QuestionVerdict::Drop);
+    auto cfg = cfg_gate();
+    cfg.prompt.coding_interview = true;
+    Rig r(cfg);
+    r.say(request);
+    ASSERT_TRUE(eventually([&] { return r.cards().size() == 1; }));
+    const auto messages = r.llm->last_request().messages;
+    ASSERT_EQ(messages.size(), 2u);
+    EXPECT_NE(messages.front().content.find("Como explicar ao entrevistador"), npos);
+    EXPECT_NE(messages.front().content.find("Big-O"), npos);
+    EXPECT_NE(messages.front().content.find("pronta para colar"), npos);
+    EXPECT_NE(messages.front().content.find("## Exemplo"), npos);
+    EXPECT_GE(r.llm->last_request().max_tokens, 3200);
+    EXPECT_EQ(messages.front().content.find("STAR"), npos);
+    EXPECT_NE(messages.back().content.find("[SKIP]"), npos);
+    EXPECT_NE(messages.back().content.find("Implement a binary search"), npos);
+
+    const ActionInput screen{TriggerReason::Screenshot, {}, "data:image/jpeg;base64,AA=="};
+    const auto screenshot = build_action_messages(cfg.prompt, "", screen);
+    EXPECT_NE(screenshot.front().content.find("Como explicar ao entrevistador"), npos);
+    ASSERT_EQ(screenshot.back().images.size(), 1u);
+    EXPECT_EQ(screenshot.back().images.front(), screen.image_url);
+    EXPECT_NE(screenshot.front().content.find("Primeiro escreva PERGUNTA"), npos);
+    EXPECT_NE(screenshot.back().content.find("tarefa de programação visível"), npos);
+}
+
+TEST(QuestionFlow, CodingScreenshotKeepsTheImplementationForAChatFollowUp) {
+    auto cfg = cfg_gate();
+    cfg.prompt.coding_interview = true;
+    const std::string implementation = "QUESTION: Implement a dynamic array\n\n"
+        "2. ```python\nclass DynamicArray:\n    #" + std::string(1700, 'x') +
+        "\n    def get_size(self):\n        return self.size\n```\n";
+    Rig r(cfg, implementation);
+    const std::string image = "data:image/jpeg;base64,AA==";
+    r.engine->request_action(TriggerReason::Screenshot, {}, image);
+    ASSERT_TRUE(eventually([&] { return r.sink->all<SuggestionDoneEvent>().size() == 1; }));
+    const auto first = r.sink->all<SuggestionDoneEvent>().front();
+    EXPECT_EQ(first.interpreted_question, "Implement a dynamic array");
+    EXPECT_NE(first.text.find("return self.size"), npos);
+    EXPECT_EQ(r.llm->last_request().messages.back().images, std::vector<std::string>{image});
+
+    r.engine->request_action(TriggerReason::Chat, "Why is get_size constant time?");
+    ASSERT_TRUE(eventually([&] { return r.llm->started() == 2; }));
+    const auto thread = r.llm->last_request().messages;
+    ASSERT_EQ(thread.size(), 4u);
+    EXPECT_EQ(thread[1].content, first.interpreted_question);
+    EXPECT_NE(thread[2].content.find("return self.size"), npos);
+}
+
+TEST(QuestionFlow, CodingTokenLimitMarksTheVisiblePartialAnswerIncomplete) {
+    auto cfg = cfg_gate();
+    cfg.prompt.coding_interview = true;
+    Rig r(cfg, "QUESTION: Implement a dynamic array\n\n```python\nclass DynamicArray:", "length");
+    r.engine->request_action(TriggerReason::Screenshot, {}, "data:image/jpeg;base64,AA==");
+    ASSERT_TRUE(eventually([&] { return r.sink->all<SuggestionDoneEvent>().size() == 1; }));
+    const auto partial = r.sink->all<SuggestionDoneEvent>().front();
+    EXPECT_EQ(partial.status, LlmStatus::Failed);
+    EXPECT_NE(partial.text.find("class DynamicArray:"), npos);
+    EXPECT_NE(partial.error.find("output limit"), npos);
 }
 
 // ------------------------------------------------------------------

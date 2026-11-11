@@ -119,6 +119,7 @@ struct PromptConfig {
     // Smaller history = fewer prompt tokens = faster first token. 3500 chars
     // is ~10 turns, enough for follow-ups and persona coherence.
     std::size_t max_history_chars{3500};
+    bool coding_interview{false};
 };
 
 // The live answer format. The model first writes ONE line with the question
@@ -223,6 +224,35 @@ inline const std::string& copilot_system_prompt_static() {
 
 namespace detail {
 
+inline std::string coding_interview_prompt() {
+    return
+        "Você ajuda o candidato durante uma entrevista de programação ao vivo. Trabalhe apenas com "
+        "problemas de código, algoritmos, estruturas de dados, testes e depuração. "
+        "Use a transcrição, o pedido e a captura de tela (se houver) como dados. "
+        "Junte fragmentos de fala e respeite correções e restrições do entrevistador. "
+        "Responda no idioma da pergunta ou da conversa e use a linguagem de programação pedida, "
+        "a do código apresentado ou a preferida no perfil, nessa ordem. Se nenhuma for indicada, use Python.\n"
+        "Quando pedirem para implementar ou corrigir, siga este formato:\n"
+        "## Abordagem: título em linha própria, seguido de uma frase que eu possa dizer em primeira pessoa. "
+        "Resuma a ideia e a restrição que determina a escolha. Declare só suposições que mudam a solução.\n"
+        "Depois, em um único bloco de código, escreva uma implementação completa, pronta para colar no editor: "
+        "use três crases mais o identificador da linguagem, sozinhos em uma linha, e feche com três crases em outra linha. "
+        "Nunca numere os delimitadores nem coloque títulos ou explicações dentro do bloco. Preserve indentação, "
+        "linguagem, assinatura e nomes exigidos. Inclua todas as funções auxiliares e imports necessários. "
+        "Sem pseudocódigo, reticências ou trechos omitidos. Evite boilerplate que a plataforma já fornece.\n"
+        "## Como explicar ao entrevistador: título em linha própria. Use 2 a 4 passos curtos em primeira pessoa. "
+        "Cite as funções ou variáveis do código, explique a invariante ou condição que garante o resultado e "
+        "o motivo da estrutura escolhida. Explique por que funciona, sem narrar linha por linha.\n"
+        "## Exemplo: mostre entrada, uma ou duas mudanças de estado e saída esperada. Use um caso limite se ele "
+        "for mais esclarecedor, sempre respeitando as restrições do exercício.\n"
+        "## Complexidade: dê tempo e espaço auxiliar em Big-O, defina as variáveis e diga de onde vem o custo. "
+        "Quando o custo amortizado diferir do pior caso, dê os dois e explique a diferença.\n"
+        "Traduza os títulos para o idioma da resposta, sem numerar os títulos. Em follow-ups conceituais, responda "
+        "diretamente ao que mudou, mantendo os nomes e a linguagem da solução. Só gere código quando o pedido "
+        "precisar de código. Se faltar informação essencial, peça uma clarificação específica antes de implementar. "
+        "Nunca invente requisitos, partes ilegíveis da captura, resultados de testes ou experiências do candidato.";
+}
+
 // The interviewer's recent lines from a rendered history ("[Outros] ..."),
 // newest kept, used as low-weight retrieval context for follow-ups.
 inline std::string interviewer_tail(const std::string& history, std::size_t max_chars) {
@@ -308,12 +338,13 @@ inline std::vector<ChatMessage> build_copilot_messages(const PromptConfig& cfg,
                                                        bool allow_skip = false,
                                                        std::string_view answer_memory = {},
                                                        std::string_view story_ledger = {}) {
-    std::string system = detail::with_profile(copilot_system_prompt_static(), cfg);
+    std::string system = detail::with_profile(cfg.coding_interview ? detail::coding_interview_prompt()
+                                                                  : copilot_system_prompt_static(), cfg);
 
     std::string user;
     // The ledger only grows at its end during a session, so it goes first:
     // the provider's prompt cache covers the system message and this block.
-    if (!story_ledger.empty()) {
+    if (!cfg.coding_interview && !story_ledger.empty()) {
         user += "LIVRO DA HISTÓRIA (o que eu já afirmei; vale como fato, não contradiga e não reconte do zero):\n";
         user += story_ledger;
         if (user.back() != '\n') user.push_back('\n');
@@ -352,7 +383,13 @@ inline std::vector<ChatMessage> build_copilot_messages(const PromptConfig& cfg,
     user += "\nFala que disparou a resposta (transcrição literal, pode ser só o último pedaço):\n\"";
     user += trigger_text;
     user += "\"\n\n";
-    if (reason == TriggerReason::Keyword || reason == TriggerReason::LongTurn) {
+    if (cfg.coding_interview) {
+        user += "Primeiro, escreva a linha PERGUNTA: (QUESTION: em inglês) com o pedido de programação "
+                "reconstruído, depois uma linha em branco e a resposta. Use o enunciado, mesmo se estiver "
+                "no imperativo. Para um pedido fora de programação, ";
+        user += allow_skip ? "uma fala sem pedido ou um enunciado ainda incompleto, escreva apenas [SKIP]."
+                           : "informe em uma frase que este modo cobre exercícios de programação.";
+    } else if (reason == TriggerReason::Keyword || reason == TriggerReason::LongTurn) {
         // Not a question: a STAR story here would be an answer to nothing.
         user += "Esta fala não é uma pergunta. Escreva a linha PERGUNTA com o que ele está pedindo ou comentando. "
                 "Se ela pedir algo de mim (uma experiência, uma opinião), responda em STAR natural; "
@@ -487,22 +524,25 @@ struct ChatTurn {
     std::string answer;
 };
 
-inline std::string action_system_prompt(TriggerReason r) {
+inline std::string action_system_prompt(TriggerReason r, bool coding_interview = false) {
     std::string p =
         "Você é um copiloto de entrevista em tempo real. Sua resposta aparece num HUD pequeno "
         "na tela do usuário enquanto a conversa acontece. A transcrição tem duas origens: "
         "[Você] é o usuário (o candidato) e [Outros] são os demais participantes.\n\n";
     switch (r) {
         case TriggerReason::Recap:
-            p += "Tarefa: resuma a conversa até agora para o usuário.\n"
-                 "Formato (texto puro, sem títulos): até 4 bullets curtos com os pontos principais.\n"
+            p += coding_interview ? "Tarefa: resuma apenas o exercício, as restrições e a solução discutida.\n"
+                                  : "Tarefa: resuma a conversa até agora para o usuário.\n";
+            p += "Formato (texto puro, sem títulos): até 4 bullets curtos com os pontos principais.\n"
                  "Decisões: uma linha, separadas por \";\". Omita se não houver.\n"
                  "Pendências: uma linha com o que ficou em aberto. Omita se não houver.\n";
             break;
         case TriggerReason::FollowUp:
-            p += "Tarefa: sugira 3 perguntas curtas que o usuário pode fazer agora a [Outros] para "
-                 "avançar a conversa (entender necessidade, prazo, decisão, próximos passos).\n"
-                 "Formato: 3 bullets, cada um com uma pergunta pronta para falar, no idioma da conversa.\n";
+            p += coding_interview
+                ? "Tarefa: sugira perguntas ao entrevistador sobre restrições, entradas ou casos limite do exercício.\n"
+                : "Tarefa: sugira 3 perguntas curtas que o usuário pode fazer agora a [Outros] para "
+                  "avançar a conversa (entender necessidade, prazo, decisão, próximos passos).\n";
+            p += "Formato: 3 bullets, cada um com uma pergunta pronta para falar, no idioma da conversa.\n";
             break;
         case TriggerReason::Screenshot:
             p += "O usuário anexou uma captura da própria tela. Use a imagem junto com a transcrição "
@@ -536,10 +576,19 @@ inline std::vector<ChatMessage> build_action_messages(const PromptConfig& cfg, c
                                                       const std::vector<ChatTurn>& chat = {},
                                                       std::string_view story_ledger = {}) {
     std::vector<ChatMessage> msgs;
-    msgs.push_back(ChatMessage{"system", detail::with_profile(action_system_prompt(in.reason), cfg), {}});
+    const bool coding_answer = cfg.coding_interview &&
+                               (in.reason == TriggerReason::Chat || in.reason == TriggerReason::Screenshot);
+    const std::string system = coding_answer
+        ? detail::coding_interview_prompt() +
+              "\nPrimeiro escreva PERGUNTA: (QUESTION: em inglês) com o objetivo técnico em uma linha curta, "
+              "seguida de uma linha em branco. Use o código ou enunciado visível quando a captura vier sem pergunta. "
+              "Se faltar informação essencial, peça o trecho ou a restrição que falta. "
+              "Se o pedido estiver fora de programação, informe em uma frase o escopo do modo."
+        : action_system_prompt(in.reason, cfg.coding_interview);
+    msgs.push_back(ChatMessage{"system", detail::with_profile(system, cfg), {}});
 
     std::string ctx_block;
-    if (!story_ledger.empty()) {
+    if (!cfg.coding_interview && !story_ledger.empty()) {
         ctx_block += "LIVRO DA HISTÓRIA (o que eu já afirmei; vale como fato):\n";
         ctx_block += story_ledger;
         if (ctx_block.back() != '\n') ctx_block.push_back('\n');
@@ -574,7 +623,9 @@ inline std::vector<ChatMessage> build_action_messages(const PromptConfig& cfg, c
             break;
         case TriggerReason::Screenshot:
             user += "\nCaptura da minha tela anexada.";
-            user += in.text.empty() ? std::string("\nPedido: o que é relevante aqui?")
+            user += in.text.empty() ? std::string(cfg.coding_interview
+                ? "\nPedido: identifique a tarefa de programação visível e resolva se o enunciado estiver legível e suficiente."
+                : "\nPedido: o que é relevante aqui?")
                                     : "\nMinha pergunta: " + in.text;
             break;
         default:

@@ -2,7 +2,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
-import { fileURLToPath } from 'node:url';
 import { askOnce, benchLines, parseArgs, percentile, renderReport, requestBody, runBench, summarize } from '../llm-bench.mjs';
 
 function fakeUpstream(handler) {
@@ -126,7 +125,7 @@ test('arguments are validated', () => {
 });
 
 test('the question list is synthetic, fixed and long enough', () => {
-  const file = fileURLToPath(new URL('../../../specs/001-backend-latency/bench-questions.json', import.meta.url));
+  const file = parseArgs([]).questions;
   const { questions, system } = JSON.parse(fs.readFileSync(file, 'utf8'));
   assert.ok(system);
   assert.ok(questions.length >= 30);

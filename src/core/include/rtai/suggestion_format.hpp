@@ -16,6 +16,7 @@
 #include <string_view>
 #include <vector>
 
+#include "rtai/code_highlight.hpp"
 #include "rtai/text_util.hpp"
 
 namespace rtai {
@@ -23,15 +24,18 @@ namespace rtai {
 struct TextSegment {
     std::string text;
     bool bold{false};
+    CodeTone tone{CodeTone::Plain};
 };
 
 struct FormattedLine {
     // Headline: a primeira linha não vazia da resposta (tese direta, Req 5.1),
     // renderizada na cor de destaque a 15.5 DIP. Paragraph permanece para
     // linhas de corpo que não são Headline, Bullet nem Label.
-    enum class Kind { Paragraph, Bullet, Label, Headline };
+    enum class Kind { Paragraph, Bullet, Label, Headline, Code };
     Kind kind{Kind::Paragraph};
     std::vector<TextSegment> segments;
+    std::string language;
+    std::size_t code_line{0};
 
     [[nodiscard]] std::string plain() const {
         std::string s;
@@ -94,6 +98,21 @@ inline bool starts_with(std::string_view s, std::string_view p) {
     return s.size() >= p.size() && s.compare(0, p.size(), p) == 0;
 }
 
+// Models sometimes wrap an otherwise valid fenced block in an ordered list.
+inline std::string_view code_fence_candidate(std::string_view line, bool coding) {
+    if (!coding) return line;
+    const auto end = line.find_first_not_of("0123456789");
+    if (end == 0 || end == std::string_view::npos || end + 2 >= line.size() ||
+        (line[end] != '.' && line[end] != ')') ||
+        (line[end + 1] != ' ' && line[end + 1] != '\t')) return line;
+    return line.substr(line.find_first_not_of(" \t", end + 1));
+}
+
+inline std::size_t fence_length(std::string_view line) {
+    if (line.empty() || (line.front() != '`' && line.front() != '~')) return 0;
+    return std::min(line.size(), line.find_first_not_of(line.front()));
+}
+
 inline bool is_label_line(std::string_view line) {
     // "**Situação:** ...", "**Situação**: ..." and "Situação: ..." are all the
     // same label: ignore the bold markers when matching.
@@ -115,14 +134,55 @@ inline bool is_label_line(std::string_view line) {
 
 } // namespace detail
 
-inline std::vector<FormattedLine> format_suggestion(std::string_view body, bool streaming = false) {
+inline std::vector<FormattedLine> format_suggestion(std::string_view body, bool streaming = false,
+                                                    bool highlight_code = false) {
     std::vector<FormattedLine> lines;
     std::size_t start = 0;
+    std::size_t fence_size = 0;
+    char fence_char = 0;
+    std::string language;
+    std::size_t code_line = 0;
+    CodeHighlighter highlighter;
     while (start <= body.size()) {
+        if (fence_size && start == body.size()) break;
         std::size_t end = body.find('\n', start);
         if (end == std::string_view::npos) end = body.size();
-        std::string raw = text::trim(body.substr(start, end - start));
+        auto line = body.substr(start, end - start);
         start = end + 1;
+        if (!line.empty() && line.back() == '\r') line.remove_suffix(1);
+        std::string raw = text::trim(line);
+        if (fence_size) {
+            const auto length = detail::fence_length(raw);
+            if (length != 0 && length == raw.size() && raw.front() == fence_char) {
+                if (length >= fence_size) {
+                    fence_size = 0;
+                    continue;
+                }
+                if (streaming && end == body.size()) continue;
+            }
+            FormattedLine code{FormattedLine::Kind::Code, {}, language, ++code_line};
+            if (highlight_code && !line.empty()) {
+                highlighter.line(line, [&](std::string_view span, CodeTone tone) {
+                    if (!code.segments.empty() && code.segments.back().tone == tone) code.segments.back().text += span;
+                    else code.segments.push_back({std::string(span), false, tone});
+                });
+            } else {
+                code.segments.push_back({std::string(line), false});
+            }
+            lines.push_back(std::move(code));
+            continue;
+        }
+        const auto candidate = detail::code_fence_candidate(raw, highlight_code);
+        const auto length = detail::fence_length(candidate);
+        if (length >= 3 && candidate.substr(length).find_first_of("`~") == std::string_view::npos) {
+            fence_size = length;
+            fence_char = candidate.front();
+            language = text::trim(candidate.substr(length));
+            language.erase(std::min(language.size(), language.find_first_of(" \t")));
+            highlighter = CodeHighlighter(text::fold(language));
+            code_line = 0;
+            continue;
+        }
         if (raw.empty()) continue;
 
         FormattedLine fl;

@@ -167,6 +167,7 @@ struct AppConfig {
     bool open_config_only{false};
     bool protect_only{false};       // --protect-keys: encrypt plaintext secrets and exit
     bool server{false};
+    bool coding_interview{false};
     std::string agent_id;
     fs::path config_path;
     Settings st;                    // everything from config.ini / env
@@ -207,6 +208,7 @@ AppConfig load_config(int argc, char** argv) {
         else if (a == "--config") c.open_config_only = true;
         else if (a == "--protect-keys") c.protect_only = true;
         else if (a == "--no-launcher") {}  // Older launchers still pass it.
+        else if (a == "--coding-interview") c.coding_interview = true;
         else if (a == "--agent" && i + 1 < argc) c.agent_id = argv[++i];
         else if (a == "--config-file" && i + 1 < argc) config_override = argv[++i];
     }
@@ -1004,10 +1006,11 @@ int run_app(AppConfig cfg) {
         cc.compaction_model = cfg.cloud_session->background_model;
     }
     cc.prompt.user_context = cfg.context_text;
+    cc.prompt.coding_interview = cfg.coding_interview;
     // The agent file is patched by the story ledger (after each answer) and by
     // the deep-reading pass, from different threads.
     auto agent_file_mu = std::make_shared<std::mutex>();
-    if (agent_rag) {
+    if (agent_rag && !cfg.coding_interview) {
         // The story told in earlier sessions of this goal comes back, and this
         // session's is stored for the next one. The write runs off the
         // orchestrator thread: the file holds every document of the goal.
@@ -1020,12 +1023,19 @@ int run_app(AppConfig cfg) {
             };
         }
     }
+    if (cfg.coding_interview) {
+        // Retain the implementation for a spoken follow-up instead of just its opening summary.
+        cc.answer_memory.answer_chars = 10000;
+        cc.answer_memory.verbatim_budget_chars = 12000;
+    }
     if (agent_rag) {
         // Stable profile -> system message (cacheable prefix); per-question
         // retrieval -> user message. Both are in-memory and take well under
         // a millisecond, so they never delay the request.
-        cc.prompt.session_profile = [agent_rag, base_ctx = cfg.context_text]() {
-            return agent_rag->session_profile_block(base_ctx);
+        cc.prompt.session_profile = [agent_rag, base_ctx = cfg.context_text, coding_interview = cfg.coding_interview]() {
+            if (!coding_interview) return agent_rag->session_profile_block(base_ctx);
+            const auto& language = agent_rag->profile().coding_language;
+            return language.empty() ? base_ctx : "Linguagem de programação preferida: " + language + "\n" + base_ctx;
         };
         cc.prompt.rag_prefetch = [agent_rag](std::string_view q) { agent_rag->prefetch(q); };
         cc.prompt.rag_retrieve = [agent_rag, &log](std::string_view q, std::string_view recent) {
@@ -1302,7 +1312,8 @@ int run_app(AppConfig cfg) {
         fs::create_directories(cfg.app_dir, ec);
         oo.settings_file = (cfg.app_dir / L"overlay.ini").wstring();
         oo.session_start = session_start;
-        oo.mode_label = "LIVE";
+        oo.mode_label = cfg.coding_interview ? "CODING INTERVIEW" : "LIVE";
+        oo.coding_interview = cfg.coding_interview;
         if (agent_rag && !agent_rag->profile().company.empty()) {
             oo.mode_label += " · " + agent_rag->profile().company;
         } else if (agent_rag && !agent_rag->profile().name.empty()) {
@@ -1349,15 +1360,26 @@ int run_app(AppConfig cfg) {
         // Req 12.5-12.7 quick actions over the current answer: reformulate as a
         // Chat turn with an explicit instruction (1 = shorter bullets, 2 =
         // CV-based example, 3 = code + complexity analysis).
-        ocb.on_quick_action = [engine](int action) {
+        ocb.on_quick_action = [engine, coding_interview = cfg.coding_interview](int action, std::string context) {
             const char* prompt = nullptr;
             switch (action) {
-                case 1: prompt = "Rewrite the previous answer as a shorter STAR (up to 70 words) without changing the facts. Keep the language of the conversation."; break;
-                case 2: prompt = "Give a practical example from my resume for the previous answer. Keep the language of the conversation."; break;
-                case 3: prompt = "Write code for the previous answer with a complexity analysis (time and space). Keep the language of the conversation."; break;
+                case 1: prompt = coding_interview
+                    ? "Explain why the selected solution works in two to four short steps. Tie each step to a function or variable in the code."
+                    : "Rewrite the previous answer as a shorter STAR (up to 70 words) without changing the facts. Keep the language of the conversation."; break;
+                case 2: prompt = coding_interview
+                    ? "Trace one small input through the selected code. Show how the relevant variables change and what the code returns."
+                    : "Give a practical example from my resume for the previous answer. Keep the language of the conversation."; break;
+                case 3: prompt = coding_interview
+                    ? "Explain the time and auxiliary space of the selected code. Define the variables and distinguish worst case from amortized cost when relevant."
+                    : "Write code for the previous answer with a complexity analysis (time and space). Keep the language of the conversation."; break;
                 default: return;
             }
-            engine->request_action(TriggerReason::Chat, prompt);
+            if (coding_interview) {
+                engine->request_action(TriggerReason::Chat, std::string(prompt) +
+                    " Answer in the language of the exercise. Use this selected answer as context:\n\n" + context);
+            } else {
+                engine->request_action(TriggerReason::Chat, prompt);
+            }
         };
         ocb.on_open_config = [path = cfg.config_path, o = out.get()] {
             // Launched by the dashboard: its Settings page is the one place to

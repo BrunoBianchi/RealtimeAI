@@ -60,6 +60,7 @@ struct OverlayOptions {
     bool system_audio_enabled{true};
     bool auto_answer_on{true};
     bool transcription_only_on{false};
+    bool coding_interview{false};
     float width_dip{960.0f};
     float max_height_fraction{0.6f}; // answer area cap, fraction of the monitor work area
     // Accent palette (Req 3.6): true -> key terms highlighted in rgb(10,132,255);
@@ -98,7 +99,7 @@ struct OverlayCallbacks {
     // Req 12.5-12.7 quick actions over the current answer, requested from the
     // engine: 1 = shorter bullets, 2 = resume/CV-based example, 3 = code with
     // complexity analysis. `action` is 1, 2 or 3.
-    std::function<void(int action)> on_quick_action;
+    std::function<void(int action, std::string context)> on_quick_action;
     // Req 12.2: immediate-answer (Alt+Espaço / Ctrl+Espaço) is ignored when the
     // turn-assembler buffer is empty. The engine exposes that state here so the
     // overlay can publish a NoticeEvent{Info} instead of firing an empty

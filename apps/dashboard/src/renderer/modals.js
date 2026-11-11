@@ -82,6 +82,40 @@
     if (fn) fn(data);
   };
 
+  C.actions['open-task-preview'] = () => {
+    const samples = [
+      ['Sample Notebook', 'pencil'],
+      ['Sample Calendar', 'calendar'],
+      ['Sample Gallery', 'image']
+    ];
+    let index = 0;
+    const sampleHtml = () => {
+      const [name, symbol] = samples[index];
+      return `<div class="row gap-8">${icon(symbol)}<span class="strong" data-no-i18n>${esc(name)}</span></div>`;
+    };
+    const entry = mount(`<div class="modal" role="dialog" aria-label="Task Manager simulation">
+      ${headHtml('Task Manager simulation', 'Simulation only. The preview changes every 30 seconds.')}
+      <div class="modal-body">
+        <div class="inset">
+          <table style="width:100%;text-align:left">
+            <thead><tr><th scope="col" class="muted" style="padding:4px 0 10px">Process name</th><th scope="col" class="muted" style="padding:4px 0 10px">Status</th></tr></thead>
+            <tbody><tr>
+              <td><div data-task-preview role="status">${sampleHtml()}</div></td>
+              <td><span class="tag">Simulated task</span></td>
+            </tr></tbody>
+          </table>
+        </div>
+        <p class="muted">Windows keeps the existing process name and icon.</p>
+      </div>
+      <div class="modal-foot"><button type="button" class="btn primary" data-action="modal-close" autofocus>Close</button></div>
+    </div>`, { onClose: () => clearInterval(timer) });
+    const preview = entry.layer.querySelector('[data-task-preview]');
+    const timer = setInterval(() => {
+      index = (index + 1) % samples.length;
+      preview.innerHTML = sampleHtml();
+    }, 30_000);
+  };
+
   // ------------------------------------------------------- new session --
   function newSession(prefill) {
     const st = {

@@ -86,6 +86,67 @@ TEST(SuggestionFormat, BlankBodyProducesEmptyList) {
     EXPECT_TRUE(format_suggestion("   \n\t  \n").empty());
 }
 
+TEST(SuggestionFormat, FencedCodeKeepsIndentationAndLiteralOperators) {
+    const std::string partial = "```python\r\ndef square(n):\r\n\r\n    # example\r\n    return n ** 2";
+    const auto streamed = format_suggestion(partial, true);
+    ASSERT_EQ(streamed.size(), 4u);
+    for (const auto& line : streamed) EXPECT_EQ(line.kind, FormattedLine::Kind::Code);
+    EXPECT_EQ(streamed[1].plain(), "");
+    EXPECT_EQ(streamed[2].plain(), "    # example");
+    EXPECT_EQ(streamed[3].plain(), "    return n ** 2");
+    EXPECT_FALSE(streamed[3].segments.front().bold);
+
+    const auto completed = format_suggestion(partial + "\n```\n## Complexity");
+    ASSERT_EQ(completed.size(), 5u);
+    EXPECT_EQ(completed.back().kind, FormattedLine::Kind::Label);
+    EXPECT_EQ(completed.back().plain(), "Complexity");
+}
+
+TEST(SuggestionFormat, HighlightsCodeWithLanguageAndNumberedFences) {
+    const auto lines = format_suggestion(
+        "```python\ndef square(n: int):\n    return n // 2 # halve\n```\n"
+        "```javascript\n/* two\nlines */ const name = \"Ada\";\n```\n"
+        "## Explanation\n1. Return the result.", true, true);
+    ASSERT_EQ(lines.size(), 6u);
+    EXPECT_EQ(lines[0].language, "python");
+    EXPECT_EQ(lines[1].code_line, 2u);
+    EXPECT_EQ(lines[1].plain(), "    return n // 2 # halve");
+    const auto tone_for = [](const FormattedLine& line, std::string_view text) {
+        for (const auto& segment : line.segments) {
+            if (segment.text == text) return segment.tone;
+        }
+        return CodeTone::Count;
+    };
+    EXPECT_EQ(tone_for(lines[0], "def"), CodeTone::Keyword);
+    EXPECT_EQ(tone_for(lines[0], "square"), CodeTone::Function);
+    EXPECT_EQ(tone_for(lines[0], "int"), CodeTone::Type);
+    EXPECT_EQ(tone_for(lines[1], "2"), CodeTone::Number);
+    EXPECT_EQ(tone_for(lines[1], "# halve"), CodeTone::Comment);
+    EXPECT_EQ(lines[2].language, "javascript");
+    EXPECT_EQ(lines[2].code_line, 1u);
+    EXPECT_EQ(tone_for(lines[3], "lines */"), CodeTone::Comment);
+    EXPECT_EQ(tone_for(lines[3], "\"Ada\""), CodeTone::String);
+    EXPECT_EQ(lines[4].kind, FormattedLine::Kind::Label);
+}
+
+TEST(SuggestionFormat, CodingOrderedFenceNeverSwapsCodeAndExplanation) {
+    const std::string partial = "1. Approach: double the capacity.\r\n"
+                                "2. ````python\r\nclass DynamicArray:\r\n"
+                                "    def size(self):\r\n        return self._size\r\n``";
+    const auto live = format_suggestion(partial, true, true);
+    ASSERT_EQ(live.size(), 4u);
+    EXPECT_EQ(live[0].kind, FormattedLine::Kind::Headline);
+    EXPECT_EQ(live[1].kind, FormattedLine::Kind::Code);
+    EXPECT_EQ(live[1].language, "python");
+    EXPECT_EQ(live[3].plain(), "        return self._size");
+    const auto complete = format_suggestion(partial + "``\r\n## Walkthrough\r\n"
+                                            "1. Return the current size.\r\n## Complexity", false, true);
+    ASSERT_EQ(complete.size(), 7u);
+    EXPECT_EQ(complete[4].kind, FormattedLine::Kind::Label);
+    EXPECT_EQ(complete[5].plain(), "1. Return the current size.");
+    EXPECT_NE(complete[5].kind, FormattedLine::Kind::Code);
+}
+
 // Property 7: a primeira linha não vazia é a Headline.
 // For ANY non-empty response text whose first non-empty line is a plain
 // paragraph (not a bullet "- "/"* "/"•", not a markdown heading "#", and not a
