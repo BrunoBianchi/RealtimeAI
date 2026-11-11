@@ -16,14 +16,26 @@
   const skipLabel = (topic) => C.t(topic === 'questions' ? 'I have no more questions' : 'Skip');
   const topicLabel = (topic) => C.t(TOPICS[topic] || '');
   const defaultSettings = { persona: 'recruiter', format: 'auto', depth: 1, goal: '', useBank: true };
-  // How much quiet ends an answer: less after a finished sentence, and more while
-  // words are still arriving, which the next message replaces anyway.
-  const SILENCE_MID_SPEECH_MS = 1500;
-  const SILENCE_AFTER_SENTENCE_MS = 900;
-  const SILENCE_AFTER_PAUSE_MS = 1300;
-  const silenceFor = (isFinal, text) => {
-    if (!isFinal) return SILENCE_MID_SPEECH_MS;
-    return /[.!?…。！？।]$/.test(text) ? SILENCE_AFTER_SENTENCE_MS : SILENCE_AFTER_PAUSE_MS;
+  // When a spoken answer is over. Two clocks run from the last word heard: the
+  // shorter one sends the answer, so Orby's question is prepared while we are
+  // still making sure the person stopped; the longer one is the earliest Orby
+  // may speak. Words in between take the answer back (resumeAnswer), so a pause
+  // to think costs nothing. Less quiet is needed after a finished sentence; while
+  // words are still arriving there is no head start. Same values as the site
+  // (Browser/Home/src/lib/mockTiming.js).
+  const SEND_AFTER_SENTENCE_MS = 350;
+  const SEND_AFTER_PAUSE_MS = 750;
+  const SEND_MID_SPEECH_MS = 1300;
+  const SPEAK_AFTER_SENTENCE_MS = 850;
+  const SPEAK_AFTER_PAUSE_MS = 1250;
+  const endsSentence = (text) => /[.!?…。！？।]$/.test(text);
+  const sendDelay = (isFinal, text) => {
+    if (!isFinal) return SEND_MID_SPEECH_MS;
+    return endsSentence(text) ? SEND_AFTER_SENTENCE_MS : SEND_AFTER_PAUSE_MS;
+  };
+  const speakDelay = (isFinal, text) => {
+    if (!isFinal) return SEND_MID_SPEECH_MS;
+    return endsSentence(text) ? SPEAK_AFTER_SENTENCE_MS : SPEAK_AFTER_PAUSE_MS;
   };
 
   const M = { phase: 'idle', agentId: '', lang: '', mode: 'basic', settings: { ...defaultSettings }, topic: '', modeTouched: false, consent: false, cameraStream: null, cameraTimer: null, cameraBusy: false, visualCount: 0, previousFrame: '', cameraJob: null, lines: [], partial: '', state: '', error: '', record: null, history: null, endsAt: 0, id: '' };
@@ -470,7 +482,12 @@
         M.partial = `${answer} ${text}`.trim();
       }
       paint();
-      if (answer) silence = setTimeout(submitAnswer, silenceFor(msg.is_final, answer));
+      if (answer) {
+        const final = Boolean(msg.is_final);
+        const wait = sendDelay(final, answer);
+        const hold = speakDelay(final, answer) - wait;
+        silence = setTimeout(() => submitAnswer('', hold), wait);
+      }
     };
     socket.onopen = () => { sttRetries = 0; };
     socket.onclose = async () => {
@@ -555,12 +572,12 @@
     paint();
   }
 
-  async function runTurn(text, action = '') {
+  async function runTurn(text, action = '', holdMs = 0) {
     const current = ++turnId;
     const lineStart = M.lines.length - (text ? 1 : 0);
     turnOpen = true;
     setState('thinking');
-    const r = await (action ? api.mockTurn(text, action) : api.mockTurn(text));
+    const r = await (holdMs > 0 ? api.mockTurn(text, action, holdMs) : action ? api.mockTurn(text, action) : api.mockTurn(text));
     if (current !== turnId || M.phase !== 'live') return;
     turnOpen = false;
     mayResume = false;
@@ -593,7 +610,8 @@
     setState('listening');
   }
 
-  function submitAnswer(typed) {
+  // holdMs: how long the main process keeps a spoken answer's reply to itself.
+  function submitAnswer(typed, holdMs = 0) {
     clearTimeout(silence);
     const text = String(typed || answer).trim();
     if (!text || M.phase !== 'live' || (M.mode === 'basic' ? M.state !== 'typing' : M.state !== 'listening')) return;
@@ -603,7 +621,7 @@
     answer = '';
     M.partial = '';
     M.error = '';
-    runTurn(text);
+    runTurn(text, '', typed ? 0 : holdMs);
   }
 
   async function finish() {

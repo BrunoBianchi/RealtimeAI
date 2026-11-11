@@ -3789,7 +3789,7 @@ app.whenReady().then(() => {
     return mockInterviews.start({ agentId, lang, mode, settings });
   });
   ipcMain.handle('rtai:mock-analyze', async (_ev, image, previousImage) => mockInterviews.analyzeFrame(image, previousImage));
-  ipcMain.handle('rtai:mock-turn', async (_ev, text, action) => mockInterviews.turn(text, action));
+  ipcMain.handle('rtai:mock-turn', async (_ev, text, action, holdMs) => mockInterviews.turn(text, action, holdMs));
   ipcMain.handle('rtai:mock-cancel-turn', async () => mockInterviews.cancelTurn());
   ipcMain.handle('rtai:mock-speak', async (_ev, text) => mockInterviews.speak(text));
   ipcMain.handle('rtai:mock-end', async () => mockInterviews.end());

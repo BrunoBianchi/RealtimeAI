@@ -52,7 +52,7 @@ contextBridge.exposeInMainWorld('rtai', {
   cloudFilesBackup: () => ipcRenderer.invoke('rtai:cloud-files-backup'),
   mockStart: (agentId, lang, mode, settings) => ipcRenderer.invoke('rtai:mock-start', agentId, lang, mode, settings),
   mockAnalyze: (image, previousImage) => ipcRenderer.invoke('rtai:mock-analyze', image, previousImage),
-  mockTurn: (text, action) => ipcRenderer.invoke('rtai:mock-turn', text, action),
+  mockTurn: (text, action, holdMs) => ipcRenderer.invoke('rtai:mock-turn', text, action, holdMs),
   mockCancelTurn: () => ipcRenderer.invoke('rtai:mock-cancel-turn'),
   mockSpeak: (text) => ipcRenderer.invoke('rtai:mock-speak', text),
   mockEnd: () => ipcRenderer.invoke('rtai:mock-end'),

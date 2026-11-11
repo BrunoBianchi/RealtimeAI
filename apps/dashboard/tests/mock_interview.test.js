@@ -380,3 +380,45 @@ test('an answer that goes on after a pause cancels the turn and gives its bank q
   await second;
   fs.rmSync(f.dir, { recursive: true });
 });
+
+test('a spoken answer sent early holds the reply: nothing is said or committed until the hold ends, and it can be taken back', async () => {
+  const f = fakeDeps({ ok: true, status: 200, data: { id: 'm2', max_s: 1800, stt: {} } });
+  const interviews = createMockInterviews(f.deps);
+  await interviews.start({ agentId: 'g1', lang: 'pt-BR', settings: { depth: 0 } });
+  await interviews.turn('');
+  const opening = f.said.length;
+
+  // The whole reply arrives at once, but the candidate goes on talking.
+  const early = interviews.turn('metade da resposta', '', 400);
+  await new Promise((resolve) => { setTimeout(resolve, 30); });
+  assert.strictEqual(f.said.length, opening, 'no sentence leaves during the hold');
+  assert.strictEqual(interviews.cancelTurn().ok, true);
+  assert.deepStrictEqual(await early, { ok: false, aborted: true });
+  assert.strictEqual(f.said.length, opening, 'a turn taken back says nothing');
+
+  // The full answer: said and committed once the hold is over.
+  const started = Date.now();
+  const whole = await interviews.turn('resposta inteira', '', 60);
+  assert.ok(Date.now() - started >= 50, 'the reply waited for the hold');
+  assert.strictEqual(whole.ok, true);
+  assert.deepStrictEqual(f.said.slice(opening), ['Bom dia.', 'Fale de você.']);
+  const { record } = await interviews.end();
+  assert.deepStrictEqual(record.messages.filter((m) => m.role === 'user').map((m) => m.content), ['resposta inteira']);
+  fs.rmSync(f.dir, { recursive: true });
+});
+
+test('the page sends a spoken answer before Orby may speak and asks the main process to hold the difference', () => {
+  const page = fs.readFileSync(path.join(__dirname, '../src/renderer/mock.js'), 'utf8');
+  const ms = (name) => Number(page.match(new RegExp(`const ${name} = ([0-9]+);`))[1]);
+  assert.ok(ms('SEND_AFTER_SENTENCE_MS') < ms('SPEAK_AFTER_SENTENCE_MS'));
+  assert.ok(ms('SEND_AFTER_PAUSE_MS') < ms('SPEAK_AFTER_PAUSE_MS'));
+  assert.ok(ms('SPEAK_AFTER_SENTENCE_MS') <= 900 && ms('SPEAK_AFTER_PAUSE_MS') <= 1300, 'never slower than the single wait it replaced');
+  assert.match(page, /api\.mockTurn\(text, action, holdMs\)/);
+  // The site keeps the same clocks, when it sits next to this repository.
+  const sitePath = path.join(__dirname, '../../../../Browser/Home/src/lib/mockTiming.js');
+  if (!fs.existsSync(sitePath)) return;
+  const site = fs.readFileSync(sitePath, 'utf8');
+  for (const name of ['SEND_AFTER_SENTENCE_MS', 'SEND_AFTER_PAUSE_MS', 'SEND_MID_SPEECH_MS', 'SPEAK_AFTER_SENTENCE_MS', 'SPEAK_AFTER_PAUSE_MS']) {
+    assert.strictEqual(ms(name), Number(site.match(new RegExp(`${name} = ([0-9]+);`))[1]), name);
+  }
+});

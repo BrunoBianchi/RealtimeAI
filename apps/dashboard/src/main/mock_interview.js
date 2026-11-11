@@ -14,6 +14,9 @@ const {
   feedbackPrompt, takeSentences, bankQuestionsFor
 } = prompt;
 
+// The longest a prepared reply waits for the candidate to be really done.
+const MAX_HOLD_MS = 2000;
+
 function createMockInterviews(deps) {
   let active = null;
   let starting = false;
@@ -65,24 +68,41 @@ function createMockInterviews(deps) {
 
   // A failed or interrupted generation leaves the plan and the transcript at
   // the last committed question, so retrying cannot advance the interview twice.
-  async function turn(text, action = '') {
+  //
+  // holdMs is for a spoken answer sent early: the interviewer's reply is
+  // prepared at once, but no sentence leaves and nothing is committed for that
+  // long, so cancelTurn() can still take the answer back if the candidate was
+  // only pausing.
+  async function turn(text, action = '', holdMs = 0) {
     const me = active;
     if (!me || me.abort) return { ok: false };
     if (me.messages.length && !String(text || '').trim() && !['repeat', 'hint', 'skip'].includes(action)) return { ok: false };
     const next = prepareTurn(me, text, action, secondsLeft());
-    const emit = (sentence) => deps.emit({ type: 'sentence', id: me.id, text: sentence });
-    const commit = (spoken, finished) => {
-      commitTurn(me, next, spoken);
-      return { ok: true, finished, secondsLeft: secondsLeft(), topic: me.topics[me.topicIndex] };
-    };
-    if (next.direct) {
-      takeSentences(next.direct, true).sentences.forEach(emit);
-      return commit(next.direct, next.finished);
-    }
-
     const ctrl = new AbortController();
     me.abort = ctrl;
     me.pendingTurn = next;
+    const send = (sentence) => deps.emit({ type: 'sentence', id: me.id, text: sentence });
+    const hold = Math.min(MAX_HOLD_MS, Math.max(0, Number(holdMs) || 0));
+    const held = [];
+    let released = hold === 0;
+    let open = () => {};
+    const gate = new Promise((resolve) => { open = resolve; });
+    const release = () => {
+      if (released) return;
+      released = true;
+      held.splice(0).forEach(send);
+      open();
+    };
+    if (released) open();
+    const timer = released ? null : setTimeout(release, hold);
+    ctrl.signal.addEventListener('abort', open, { once: true });
+    const emit = (sentence) => (released ? send(sentence) : held.push(sentence));
+    const commit = async (spoken, finished) => {
+      await gate;
+      if (ctrl.signal.aborted) return { ok: false, aborted: true };
+      commitTurn(me, next, spoken);
+      return { ok: true, finished, secondsLeft: secondsLeft(), topic: me.topics[me.topicIndex] };
+    };
     let spoken = '';
     let buffer = '';
     const add = (sentence) => {
@@ -92,6 +112,10 @@ function createMockInterviews(deps) {
       emit(clean);
     };
     try {
+      if (next.direct) {
+        takeSentences(next.direct, true).sentences.forEach(emit);
+        return await commit(next.direct, next.finished);
+      }
       const res = await deps.fetch(deps.url(`/v1/mock/${me.id}/chat`), {
         method: 'POST', headers: { ...deps.headers(), 'Content-Type': 'application/json' },
         signal: AbortSignal.any([ctrl.signal, AbortSignal.timeout(60000)]),
@@ -123,15 +147,16 @@ function createMockInterviews(deps) {
       if (next.sources) {
         const reply = resolveQAndA(me, next, buffer);
         takeSentences(reply, true).sentences.forEach(emit);
-        return commit(reply, false);
+        return await commit(reply, false);
       }
       takeSentences(buffer, true).sentences.forEach(add);
-      return spoken ? commit(spoken, false) : { ok: false };
+      return spoken ? await commit(spoken, false) : { ok: false };
     } catch (_err) {
       if (ctrl.signal.aborted) return { ok: false, aborted: true };
       // The candidate may already have heard this question when the stream failed.
-      return /[?？]/u.test(spoken) ? commit(spoken, false) : { ok: false, error: 'network' };
+      return released && /[?？]/u.test(spoken) ? commit(spoken, false) : { ok: false, error: 'network' };
     } finally {
+      clearTimeout(timer);
       if (me.abort === ctrl) {
         me.abort = null;
         me.pendingTurn = null;
