@@ -49,9 +49,17 @@
   let finishing = false;
   let player = null;
   let sttRetries = 0;
+  // The recording (mock_recording.js): the answer being given, the audio of
+  // the turn in flight, an answer to send again, and clips still being filed.
+  const R = C.mockRecording;
+  let recorder = null;
+  let pendingClip = null;
+  let replyClips = [];
+  let retry = null;
+  let audioJobs = [];
   const voice = C.createVoiceAnswer({
     onDraft: (text) => { M.partial = text; paint(); },
-    onSubmit: (text, hold) => submitAnswer(text, hold),
+    onSubmit: (text, hold) => submitAnswer(text, hold, recorder ? recorder.take() : []),
     finalize: () => {
       if (ws?.readyState !== 1) return false;
       ws.send(JSON.stringify({ type: 'Finalize' }));
@@ -377,6 +385,68 @@
       <section class="card" style="gap:12px"><span class="strong">Question by question</span>${questions}</section>`;
   }
 
+  const ISSUE_LABELS = {
+    gramatica: 'Grammar', concordancia: 'Agreement', regencia: 'Prepositions', tempo_verbal: 'Verb tense', ortografia: 'Spelling', pontuacao: 'Punctuation',
+    vocabulario: 'Word choice', repeticao: 'Repetition', vicio: 'Filler words', registro: 'Too informal', clareza: 'Clarity'
+  };
+  const issueLabel = (id) => C.t(ISSUE_LABELS[id] || ISSUE_LABELS.gramatica);
+
+  // Only how the answers were said (main/mock_language.js).
+  function languageHtml(r) {
+    const L = r.language;
+    if (!L || !(L.items || []).length) return '';
+    const ten = (v) => (v == null ? '-' : (v / 10).toFixed(1));
+    const items = L.items.map((it) => {
+      const fixes = (it.erros || []).map((e) => `<li><span class="pill warn" data-no-i18n>${esc(issueLabel(e.tipo))}</span> <del data-no-i18n>${esc(e.trecho)}</del> → <ins data-no-i18n>${esc(e.sugestao)}</ins>${e.motivo ? `<div class="small muted" data-no-i18n>${esc(e.motivo)}</div>` : ''}</li>`).join('');
+      const swaps = (it.trocas || []).map((sw) => `<li><del data-no-i18n>${esc(sw.de)}</del> → <ins data-no-i18n>${esc((sw.para || []).join(' · '))}</ins>${sw.motivo ? `<div class="small muted" data-no-i18n>${esc(sw.motivo)}</div>` : ''}</li>`).join('');
+      const clean = !(it.erros || []).length && !(it.trocas || []).length;
+      return `<details class="mock-lang-item stack" style="gap:6px">
+        <summary class="row" style="gap:8px"><span class="grow strong" data-no-i18n>${esc(it.question)}</span><span class="pill num">${it.nota == null ? '-' : it.nota} / 10</span></summary>
+        <span class="small muted" data-no-i18n>${esc(it.comentario || (clean ? C.t('No language issues in this answer.') : C.t('{n} points to adjust', { n: (it.erros || []).length + (it.trocas || []).length })))}</span>
+        <div class="row" style="gap:6px"><span class="pill">${it.falada ? 'Spoken answer' : 'Typed answer'}</span></div>
+        <div class="small"><strong>Your answer</strong> <span data-no-i18n>${esc(it.answer)}</span></div>
+        ${fixes ? `<div class="stack" style="gap:4px"><span class="small strong">What to fix</span><ul class="mock-fix">${fixes}</ul></div>` : ''}
+        ${swaps ? `<div class="stack" style="gap:4px"><span class="small strong">Better words</span><ul class="mock-fix">${swaps}</ul></div>` : ''}
+        ${it.corrigida ? `<div class="small"><strong>Corrected version</strong> <span data-no-i18n>${esc(it.corrigida)}</span></div>` : ''}
+      </details>`;
+    }).join('');
+    return `<section class="card" style="gap:12px" data-section="mock-language">
+        <div class="row" style="gap:8px">${icon('sparkle')}<span class="strong grow">Language review</span>${L.nota != null ? `<span class="pill num">${ten(L.nota)} / 10</span>` : ''}</div>
+        <span class="small muted">Only how you said it: grammar, word choice and speaking habits. The content is scored above.</span>
+        ${L.resumo ? `<span data-no-i18n>${esc(L.resumo)}</span>` : ''}
+        ${(L.tipos || []).length ? `<div class="row" style="gap:6px;flex-wrap:wrap">${L.tipos.map(({ id, n }) => `<span class="pill warn" data-no-i18n>${esc(issueLabel(id))} · ${n}</span>`).join('')}</div>` : ''}
+        ${(L.dicas || []).map((d) => `<div class="small" data-no-i18n>• ${esc(d)}</div>`).join('')}
+        ${items}
+        ${L.partial ? `<span class="small muted" data-no-i18n>${esc(C.t('{n} of {total} answers reviewed.', { n: L.items.length, total: L.answers }))}</span>` : ''}
+      </section>`;
+  }
+
+  // Each question and the answer to it, in separate players. The audio is
+  // loaded after rendering (afterRender), from the files main/mock_interview.js saved.
+  function recordingHtml(r) {
+    const audio = r.audio || [];
+    if (!audio.length) return '';
+    const files = new Map(audio.map((a) => [`${a.role}:${a.i}`, a.file]));
+    let n = 0;
+    const row = (who, label, item) => {
+      const key = `${who === 'orby' ? 'assistant' : 'user'}:${item.i}`;
+      const file = files.get(key);
+      const player = file ? `<audio controls preload="metadata" data-mock-audio="${esc(file)}" aria-label="${esc(label)}"></audio>` : '';
+      const fallback = !file && who === 'orby' ? `<button type="button" class="btn sm" data-action="mock-speak-text" data-i="${item.i}">Listen with the system voice</button>` : '';
+      const typed = !file && who === 'you' ? '<span class="small muted">Typed answer, or no audio was kept.</span>' : '';
+      return `<div class="mock-rec-row ${who} stack" style="gap:4px"><span class="small strong" data-no-i18n>${esc(label)}</span>${player}${fallback}${typed}<span class="small muted" data-no-i18n>${esc(item.text)}</span></div>`;
+    };
+    const pairs = R.recordingPairs(r.messages || [], audio).map(({ question, answer }) => {
+      if (question) n += 1;
+      return `<div class="mock-rec stack" style="gap:8px">${question ? row('orby', C.t('Question {n}', { n }), question) : ''}${answer ? row('you', C.t('Your answer'), answer) : ''}</div>`;
+    }).join('');
+    return `<section class="card" style="gap:12px" data-section="mock-recording" data-record="${esc(r.id)}">
+        <div class="row" style="gap:8px">${icon('waveform')}<span class="strong">Interview recording</span></div>
+        <span class="small muted">Each question and your answer to it, in separate players. The audio stays on this computer, for your 20 most recent interviews.</span>
+        ${pairs}
+      </section>`;
+  }
+
   function visualFeedbackHtml(r) {
     const notes = r.visualFeedback || [];
     if (!notes.length) return '';
@@ -417,7 +487,7 @@
         ${J && J.score != null ? `<div class="score-disc" style="--p:${J.score}"><div><span class="v">${(J.score / 10).toFixed(1)}</span><span class="num">/ 10</span></div></div>` : ''}
       </section>
       ${M.phase === 'finishing' ? `<section class="card"><div class="row" style="gap:8px">${icon('sparkle')}<span>Writing your feedback…</span></div></section>` : ''}
-      ${r ? coverageHtml(r) + evaluationHtml(r) + visualFeedbackHtml(r) + coachHtml(r) + transcriptHtml(r) : ''}
+      ${r ? coverageHtml(r) + evaluationHtml(r) + languageHtml(r) + recordingHtml(r) + visualFeedbackHtml(r) + coachHtml(r) + transcriptHtml(r) : ''}
       ${M.phase === 'done' && !r ? `<section class="card"><div class="muted">${esc(M.refunded ? 'The interview ended before any answer and was not counted.' : 'The interview ended before any answer.')}</div></section>` : ''}
       ${M.phase === 'done' && M.chargedMinutes != null ? `<div class="small muted" data-no-i18n>${esc(M.chargedMinutes > 0 ? C.t('{n} min used from your balance', { n: minutesText(M.chargedMinutes) }) : C.t('Nothing was charged: interviews under a minute are free.'))}</div>` : ''}
       ${M.phase === 'done' ? '<div class="row"><button type="button" class="btn primary" data-action="mock-reset">Back</button></div>' : ''}`;
@@ -456,6 +526,7 @@
     }
     const preview = document.getElementById('mockCameraPreview');
     if (preview && M.cameraStream && preview.srcObject !== M.cameraStream) preview.srcObject = M.cameraStream;
+    loadRecording();
     if (M.agentId && api.mockPrep && !(M.prep && M.prep[M.agentId]) && M.phase === 'idle') {
       const id = M.agentId;
       M.prep = { ...(M.prep || {}), [id]: { total: 0, questions: [] } };
@@ -465,6 +536,52 @@
       });
     }
   };
+
+  // Object URLs of the clips of the report on screen, made once per record.
+  const audioUrls = new Map();
+  function loadRecording() {
+    const r = M.record;
+    if (!r || !api.mockAudio) return;
+    for (const [key, url] of audioUrls) {
+      if (!key.startsWith(`${r.id}/`)) {
+        URL.revokeObjectURL(url);
+        audioUrls.delete(key);
+      }
+    }
+    for (const el of document.querySelectorAll('audio[data-mock-audio]')) {
+      const key = `${r.id}/${el.dataset.mockAudio}`;
+      if (audioUrls.has(key)) {
+        el.src = audioUrls.get(key);
+        continue;
+      }
+      api.mockAudio(r.id, el.dataset.mockAudio).then((bytes) => {
+        if (!bytes || M.record !== r) return;
+        const type = el.dataset.mockAudio.endsWith('.wav') ? 'audio/wav' : 'audio/mpeg';
+        if (!audioUrls.has(key)) audioUrls.set(key, URL.createObjectURL(new Blob([bytes], { type })));
+        el.src = audioUrls.get(key);
+      });
+    }
+  }
+
+  // Files the audio of the messages a turn added: the answer's own recording
+  // (null when typed) and the interviewer's sentences.
+  function keepTurnAudio(added, voiceClip, replies) {
+    if (!api.mockKeepAudio) return;
+    for (const { i, role } of added || []) {
+      if (role === 'user' && voiceClip) {
+        audioJobs.push(api.mockKeepAudio({ i, role, spoken: true, mime: 'audio/wav', bytes: R.answerAudio(voiceClip) }));
+      }
+      if (role === 'assistant' && replies.length) {
+        audioJobs.push(Promise.all(replies).then((parts) => {
+          const ok = parts.filter((b) => b && b.length);
+          if (!ok.length) return null;
+          const bytes = new Uint8Array(ok.reduce((n, b) => n + b.length, 0));
+          ok.reduce((at, b) => (bytes.set(b, at), at + b.length), 0);
+          return api.mockKeepAudio({ i, role, mime: 'audio/mpeg', bytes });
+        }));
+      }
+    }
+  }
 
   function paint() {
     const box = document.getElementById('mockLines');
@@ -604,11 +721,12 @@
     const source = ctx.createMediaStreamSource(stream);
     const node = ctx.createScriptProcessor(2048, 1, 1);
     node.onaudioprocess = (e) => {
-      if (!ws || ws.readyState !== 1 || (M.state !== 'listening' && !mayResume)) return;
+      if (M.state !== 'listening' && !mayResume) return;
       const input = e.inputBuffer.getChannelData(0);
       const pcm = new Int16Array(input.length);
       for (let i = 0; i < input.length; i += 1) pcm[i] = Math.max(-1, Math.min(1, input[i])) * 32767;
-      ws.send(pcm.buffer);
+      if (recorder) recorder.push(pcm);
+      if (ws && ws.readyState === 1) ws.send(pcm.buffer);
     };
     source.connect(node);
     node.connect(ctx.destination);
@@ -640,6 +758,7 @@
     M.lines.push({ who: 'ai', text });
     pending += 1;
     const clip = api.mockSpeak(text);
+    replyClips.push(clip.catch(() => null));
     queue = queue.then(async () => {
       const bytes = await clip;
       if (M.phase !== 'live') return;
@@ -662,10 +781,14 @@
     paint();
   }
 
-  async function runTurn(text, action = '', holdMs = 0) {
+  // `voiceClip` is the microphone audio of a spoken answer (null when typed).
+  async function runTurn(text, action = '', holdMs = 0, voiceClip = null) {
     const current = ++turnId;
     const lineStart = M.lines.length - (text ? 1 : 0);
     turnOpen = true;
+    pendingClip = voiceClip;
+    const replies = [];
+    replyClips = replies;
     setState('thinking');
     const r = await (holdMs > 0 ? api.mockTurn(text, action, holdMs) : action ? api.mockTurn(text, action) : api.mockTurn(text));
     if (current !== turnId || M.phase !== 'live') return;
@@ -677,6 +800,8 @@
       else {
         M.lines.splice(lineStart);
         M.error = 'The interviewer did not answer. Try your answer again.';
+        // Sent again unchanged, the answer keeps its recording.
+        if (text) retry = { text, clip: voiceClip };
         C.renderView();
         const input = document.getElementById('mockTyped');
         if (input && text) input.value = text;
@@ -684,7 +809,9 @@
     } else {
       M.topic = r.topic || M.topic;
       if (r.finished) finishing = true;
+      keepTurnAudio(r.added, voiceClip, replies);
     }
+    pendingClip = null;
     maybeListen();
   }
 
@@ -695,25 +822,34 @@
     turnId += 1;
     turnOpen = false;
     voice.restore();
+    if (recorder) recorder.restore(pendingClip);
+    pendingClip = null;
     M.lines.pop();
     api.mockCancelTurn();
     setState('listening');
   }
 
   // holdMs: how long the main process keeps a spoken answer's reply to itself.
-  function submitAnswer(value, holdMs = 0) {
+  // voiceClip: the recording of a spoken answer, null when typed.
+  function submitAnswer(value, holdMs = 0, voiceClip = null) {
     const text = String(value).trim();
     if (!text || M.phase !== 'live' || (M.mode === 'basic' ? M.state !== 'typing' : M.state !== 'listening')) return;
     M.lines.push({ who: 'me', text });
     mayResume = holdMs > 0;
     M.error = '';
-    runTurn(text, '', holdMs);
+    runTurn(text, '', holdMs, voiceClip);
   }
 
   async function finish() {
     if (M.phase !== 'live') return;
     M.phase = 'finishing';
     const unsent = voice.take();
+    // The answer still on its way: the turn in flight or what was being said.
+    const rest = recorder ? recorder.take() : null;
+    const clip = turnOpen ? (pendingClip ? [...pendingClip, ...(rest || [])] : null) : (unsent ? rest : null);
+    const pendingAudio = clip ? { spoken: true, bytes: R.answerAudio(clip) } : null;
+    recorder = null;
+    pendingClip = null;
     turnId += 1;
     turnOpen = false;
     clearInterval(timer);
@@ -724,7 +860,10 @@
     if (player) player.pause();
     if (M.cameraJob) await M.cameraJob.catch(() => null);
     C.renderView();
-    const r = await C.guard(() => api.mockEnd(unsent), 'Could not end the interview.');
+    // Clips of earlier turns are filed before the record is written.
+    const jobs = audioJobs.splice(0);
+    await Promise.race([Promise.allSettled(jobs), new Promise((resolve) => { setTimeout(resolve, 8000); })]);
+    const r = await C.guard(() => api.mockEnd(unsent, pendingAudio), 'Could not end the interview.');
     M.record = (r && r.record) || null;
     M.refunded = Boolean(r && r.refunded);
     M.chargedMinutes = r && Number.isFinite(r.chargedMinutes) ? r.chargedMinutes : null;
@@ -814,6 +953,9 @@
       }
     }
     M.endsAt = Date.now() + r.maxS * 1000;
+    recorder = M.mode === 'advanced' && R ? R.createAnswerRecorder() : null;
+    retry = null;
+    audioJobs = [];
     if (M.mode === 'advanced') {
       try {
         await startCapture(r.stt);
@@ -838,6 +980,7 @@
   C.actions['mock-ask'] = (el) => {
     if (M.phase !== 'live' || turnOpen || !['typing', 'listening'].includes(M.state)) return;
     voice.take();
+    if (recorder) recorder.take();
     runTurn('', el.dataset.ask);
   };
   C.actions['mock-finish'] = () => finish();
@@ -856,7 +999,11 @@
     if (!text || !['listening', 'typing'].includes(M.state)) return;
     input.value = '';
     voice.take();
-    submitAnswer(text);
+    // Typed: what the microphone heard meanwhile is not this answer.
+    if (recorder) recorder.take();
+    const clip = retry && retry.text === text ? retry.clip : null;
+    retry = null;
+    submitAnswer(text, 0, clip);
   };
   C.actions['mock-reset'] = () => {
     M.phase = 'idle';
@@ -882,6 +1029,16 @@
       b.setAttribute('aria-pressed', String(on));
     }
     for (const t of box.querySelectorAll('[data-rewrite]')) t.hidden = t.dataset.rewrite !== el.dataset.kind;
+  };
+  // A question whose audio was not kept, read by the system voice.
+  C.actions['mock-speak-text'] = (el) => {
+    const m = M.record && (M.record.messages || [])[Number(el.dataset.i)];
+    const synth = window.speechSynthesis;
+    if (!m || !synth || typeof SpeechSynthesisUtterance === 'undefined') return;
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(m.content);
+    u.lang = M.record.lang || 'pt-BR';
+    synth.speak(u);
   };
   C.actions['mock-for-agent'] = (el) => {
     if (M.phase === 'idle' || M.phase === 'done') {

@@ -457,3 +457,102 @@ test('a second interview for the same job opens with a generated question that k
   assert.match(f.said.join(' '), /trajetória/);
   fs.rmSync(f.dir, { recursive: true });
 });
+
+test('a voice interview keeps each question and answer as audio, and the language review', async () => {
+  const f = fakeDeps({ ok: true, data: { id: 'mock_rec', max_s: 1800, stt: { token: 't' } } });
+  const base = f.deps.fetch;
+  const reply = (content) => ({ ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify(content) } }] }) });
+  f.deps.fetch = async (url, init) => {
+    const body = JSON.parse(init.body);
+    const system = body.stream === false ? body.messages[0].content : '';
+    if (system.includes('somente a linguagem')) {
+      return reply({ nota: 6, erros: [{ tipo: 'concordancia', trecho: 'os dado', sugestao: 'os dados', motivo: 'Plural.' }], corrigida: 'Eu processei os dados com Kafka.' });
+    }
+    if (system.includes('resumo da revisão')) return reply({ resumo: 'Cuide da concordância.', dicas: ['Diga "os dados".'] });
+    return base(url, init);
+  };
+  const m = createMockInterviews(f.deps);
+  await m.start({ agentId: 'g1', lang: 'pt-BR' });
+  const opening = await m.turn('');
+  assert.deepStrictEqual(opening.added, [{ i: 0, role: 'assistant' }]);
+  const mp3 = new Uint8Array([0xff, 0xfb, 1, 2]);
+  assert.ok(m.keepAudio({ i: 0, role: 'assistant', mime: 'audio/mpeg', bytes: mp3 }).ok);
+  assert.strictEqual(m.keepAudio({ i: 0, role: 'user', mime: 'audio/wav', bytes: mp3 }).ok, false, 'the role must match the message');
+  assert.strictEqual(m.keepAudio({ i: 5, role: 'assistant', mime: 'audio/mpeg', bytes: mp3 }).ok, false);
+  assert.strictEqual(m.keepAudio({ i: 0, role: 'assistant', mime: 'text/html', bytes: mp3 }).ok, false);
+  const r = await m.turn('Eu processei os dado com Kafka.');
+  assert.deepStrictEqual(r.added, [{ i: 1, role: 'user' }, { i: 2, role: 'assistant' }]);
+  const wav = new Uint8Array(44 + 32000); // one second at 16 kHz
+  assert.ok(m.keepAudio({ i: 1, role: 'user', spoken: true, mime: 'audio/wav', bytes: wav }).ok);
+  // The answer still being said when the interview ends comes with end().
+  const { record } = await m.end('Também usei Go.', { spoken: true, bytes: wav });
+  assert.deepStrictEqual(record.audio, [
+    { i: 0, role: 'assistant', file: '0-assistant.mp3', s: null },
+    { i: 1, role: 'user', file: '1-user.wav', s: 1 },
+    { i: 3, role: 'user', file: '3-user.wav', s: 1 }
+  ]);
+  assert.deepStrictEqual([...m.audio('mock_rec', '0-assistant.mp3')], [...mp3]);
+  assert.strictEqual(m.audio('mock_rec', '../mock_rec.json'), null, 'only clip files are served');
+  assert.strictEqual(m.audio('mock_rec', '9-user.wav'), null);
+  assert.strictEqual(m.keepAudio({ i: 0, role: 'assistant', mime: 'audio/mpeg', bytes: mp3 }).ok, false, 'nothing after the end');
+  const L = record.language;
+  assert.deepStrictEqual(L.items.map((it) => [it.answer, it.falada]), [['Eu processei os dado com Kafka.', true], ['Também usei Go.', true]]);
+  assert.strictEqual(L.items[0].erros[0].sugestao, 'os dados');
+  assert.deepStrictEqual(L.items[1].erros, [], 'a correction must quote the answer it fixes');
+  assert.strictEqual(L.resumo, 'Cuide da concordância.');
+  assert.strictEqual(m.list()[0].language.nota, 60, 'kept with the record');
+  fs.rmSync(f.dir, { recursive: true });
+});
+
+test('only the newest interviews keep their audio', async () => {
+  const f = fakeDeps({ ok: true, data: { id: 'x', max_s: 1800, stt: { token: 't' } } });
+  let clock = 1000;
+  f.deps.now = () => clock;
+  const m = createMockInterviews(f.deps);
+  for (let n = 0; n < 22; n += 1) {
+    f.deps.api = async (_m, p) => (p === '/v1/mock/start' ? { ok: true, data: { id: `rec_${n}`, max_s: 1800, stt: { token: 't' } } } : { ok: true, data: {} });
+    clock += 1000;
+    await m.start({ agentId: 'g1', lang: 'pt-BR' });
+    await m.turn('');
+    m.keepAudio({ i: 0, role: 'assistant', mime: 'audio/mpeg', bytes: new Uint8Array([1, 2, 3]) });
+    await m.end('Trabalhei com Kafka.', { spoken: true, bytes: new Uint8Array(44 + 3200) });
+  }
+  const kept = fs.readdirSync(path.join(f.dir, 'mock_interviews', 'audio')).sort();
+  assert.strictEqual(kept.length, 20);
+  assert.ok(!kept.includes('rec_0') && !kept.includes('rec_1') && kept.includes('rec_21'));
+  assert.strictEqual(m.list().length, 22, 'the reports stay');
+  fs.rmSync(f.dir, { recursive: true });
+});
+
+test('the report plays each question and answer apart and shows the language review', () => {
+  const { loadRenderer, render, tags } = require('./helpers/renderer');
+  const r = loadRenderer({ state: { agents: [job] } });
+  Object.assign(r.S.mock, {
+    phase: 'done',
+    record: {
+      id: 'm9', company: 'Acme', role: 'Dev', lang: 'pt-BR',
+      messages: [{ role: 'assistant', content: 'Fale de você.' }, { role: 'user', content: 'Sou dev.' }, { role: 'assistant', content: 'E um projeto?' }, { role: 'user', content: 'O app de pagamentos.' }],
+      audio: [{ i: 0, role: 'assistant', file: '0-assistant.mp3', s: null }, { i: 1, role: 'user', file: '1-user.wav', s: 2 }],
+      language: {
+        nota: 65, resumo: 'Cuide da concordância.', dicas: ['Diga "os dados".'], tipos: [{ id: 'concordancia', n: 1 }], answers: 2, partial: true,
+        items: [{ index: 0, question: 'Fale de você.', answer: 'Sou dev dos dado.', falada: true, nota: 6, erros: [{ tipo: 'concordancia', trecho: 'dos dado', sugestao: 'dos dados', motivo: 'Plural.' }], trocas: [{ de: 'dev', para: ['desenvolvedor'], motivo: 'Mais formal.' }], corrigida: 'Sou desenvolvedor dos dados.', comentario: '' }]
+      }
+    }
+  });
+  const html = render(r.Cue, 'mock');
+  assert.match(html, /data-section="mock-language"[\s\S]*Language review[\s\S]*6\.5 \/ 10/);
+  assert.match(html, /<del data-no-i18n>dos dado<\/del> → <ins data-no-i18n>dos dados<\/ins>/);
+  assert.match(html, /<del data-no-i18n>dev<\/del> → <ins data-no-i18n>desenvolvedor<\/ins>/);
+  assert.match(html, /Corrected version<\/strong> <span data-no-i18n>Sou desenvolvedor dos dados\./);
+  assert.match(html, /Spoken answer/);
+  assert.match(html, /1 of 2 answers reviewed\./);
+  assert.match(html, /data-section="mock-recording"[\s\S]*Question 1[\s\S]*Your answer[\s\S]*Question 2/);
+  assert.strictEqual(tags(html, { 'data-mock-audio': '0-assistant.mp3' }).length, 1);
+  assert.strictEqual(tags(html, { 'data-mock-audio': '1-user.wav' }).length, 1);
+  // Question 2 was not kept: the system voice reads it. Answer 2 has no audio.
+  assert.deepStrictEqual(tags(html, { 'data-action': 'mock-speak-text' }).map((t) => t['data-i']), ['2']);
+  assert.match(html, /Typed answer, or no audio was kept\./);
+  // A report without either keeps its old shape.
+  r.S.mock.record = { id: 'm8', messages: [{ role: 'assistant', content: 'Oi?' }] };
+  assert.doesNotMatch(render(r.Cue, 'mock'), /mock-language|mock-recording/);
+});

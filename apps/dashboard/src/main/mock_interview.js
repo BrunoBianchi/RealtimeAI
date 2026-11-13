@@ -9,6 +9,7 @@ const path = require('node:path');
 
 const prompt = require('./mock_prompt');
 const { evaluateInterview } = require('./mock_evaluation');
+const { reviewLanguage } = require('./mock_language');
 const {
   FINISH_MARK, languageName, createInterview, prepareTurn, resolveQAndA,
   commitAnswer, commitTurn, evaluationPairs, coverageFor, takeSentences, bankQuestionsFor
@@ -16,11 +17,21 @@ const {
 
 // The longest a prepared reply waits for the candidate to be really done.
 const MAX_HOLD_MS = 2000;
+// The recording of a voice interview (renderer/mock_recording.js makes the
+// clips): the largest clip accepted and how many interviews keep their audio.
+const MAX_CLIP_BYTES = 40 * 1024 * 1024;
+const AUDIO_LIMIT = 20;
+const CLIP_TYPES = { 'audio/wav': 'wav', 'audio/mpeg': 'mp3' };
+const CLIP_FILE = /^\d+-(user|assistant)\.(wav|mp3)$/;
+
+// The messages the transcript gained since `before`.
+const addedSince = (messages, before) => messages.slice(before).map((m, n) => ({ i: before + n, role: m.role }));
 
 function createMockInterviews(deps) {
   let active = null;
   let starting = false;
   const folder = () => path.join(deps.dataDir(), 'mock_interviews');
+  const audioFolder = (id) => path.join(folder(), 'audio', path.basename(String(id)));
 
   function secondsLeft() {
     return active ? Math.max(0, active.maxS - (deps.now() - active.startedAt) / 1000) : 0;
@@ -58,7 +69,9 @@ function createMockInterviews(deps) {
         const previous = earlier.slice(0, 4).flatMap((rec) => (rec.messages || []).filter((m) => m.role === 'assistant').map((m) => m.content));
         active = {
           ...createInterview(selected, agents, deps.bank?.(), lang, modeFromServer, { ...settings, previous, round: earlier.length }, r.data.max_s),
-          id: r.data.id, visualFeedback: [], startedAt: deps.now(), abort: null, pendingTurn: null
+          id: r.data.id, visualFeedback: [], startedAt: deps.now(), abort: null, pendingTurn: null,
+          // Recorded messages by "role:i" and the answers that were spoken.
+          audio: new Map(), spoken: new Set()
         };
       }
     }
@@ -103,8 +116,10 @@ function createMockInterviews(deps) {
     const commit = async (spoken, finished) => {
       await gate;
       if (ctrl.signal.aborted) return { ok: false, aborted: true };
+      const before = me.messages.length;
       commitTurn(me, next, spoken);
-      return { ok: true, finished, secondsLeft: secondsLeft(), topic: me.topics[me.topicIndex] };
+      // Which messages this turn added, so the renderer can file their audio.
+      return { ok: true, finished, secondsLeft: secondsLeft(), topic: me.topics[me.topicIndex], added: addedSince(me.messages, before) };
     };
     let spoken = '';
     let buffer = '';
@@ -197,6 +212,66 @@ function createMockInterviews(deps) {
     return new Uint8Array(await res.arrayBuffer());
   }
 
+  // One clip of the recording: an answer (WAV, spoken: true) or an interviewer
+  // turn (MP3), for message i. A spoken answer with no usable audio is still
+  // marked as spoken for the language review.
+  function keepAudio(clip, me = active) {
+    if (!me || !clip || !Number.isInteger(clip.i) || clip.i < 0 || clip.i >= me.messages.length) return { ok: false };
+    const { i, role } = clip;
+    if (me.messages[i].role !== role) return { ok: false };
+    if (role === 'user' && clip.spoken) me.spoken.add(me.messages[i].content);
+    const bytes = clip.bytes ? Buffer.from(clip.bytes.buffer ? clip.bytes.buffer.slice(clip.bytes.byteOffset, clip.bytes.byteOffset + clip.bytes.byteLength) : clip.bytes) : null;
+    const ext = CLIP_TYPES[clip.mime];
+    if (!bytes || !bytes.length || bytes.length > MAX_CLIP_BYTES || !ext) return { ok: Boolean(clip.spoken) };
+    me.audio.set(`${role}:${i}`, { i, role, ext, bytes });
+    return { ok: true };
+  }
+
+  // Writes the recording next to the saved record and returns what the report
+  // lists: [{i, role, file, s}] in message order.
+  function saveAudio(me) {
+    const clips = [...me.audio.values()].sort((a, b) => a.i - b.i || a.role.localeCompare(b.role));
+    if (!clips.length) return [];
+    const dir = audioFolder(me.id);
+    const out = [];
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      for (const c of clips) {
+        const file = `${c.i}-${c.role}.${c.ext}`;
+        fs.writeFileSync(path.join(dir, file), c.bytes);
+        out.push({ i: c.i, role: c.role, file, s: c.ext === 'wav' ? Math.round(((c.bytes.length - 44) / 32000) * 10) / 10 : null });
+      }
+    } catch (_e) {
+      return out;
+    }
+    return out;
+  }
+
+  // Only the newest interviews keep their audio.
+  function pruneAudio(records) {
+    const keep = new Set(records.slice(0, AUDIO_LIMIT).map((r) => path.basename(String(r.id))));
+    let names = [];
+    try {
+      names = fs.readdirSync(path.join(folder(), 'audio'));
+    } catch (_e) {
+      return;
+    }
+    for (const name of names) {
+      if (!keep.has(name)) fs.rmSync(path.join(folder(), 'audio', name), { recursive: true, force: true });
+    }
+  }
+
+  // The bytes of one saved clip, for the report's players.
+  function audio(id, file) {
+    const name = String(file || '');
+    if (!id || !CLIP_FILE.test(name)) return null;
+    try {
+      return new Uint8Array(fs.readFileSync(path.join(audioFolder(id), name)));
+    } catch (_e) {
+      return null;
+    }
+  }
+
   async function analyzeFrame(image, previousImage = '') {
     if (!active || active.mode !== 'advanced' || !image) return { ok: false };
     const me = active;
@@ -220,18 +295,26 @@ function createMockInterviews(deps) {
   }
 
   // Ends it, writes the feedback and keeps the record. Asks for feedback before
-  // /end, while the server still accepts this interview.
-  async function end(unsent) {
+  // /end, while the server still accepts this interview. `pending` is the
+  // recording of the answer still being sent: {spoken, bytes} (a WAV).
+  async function end(unsent, pending = null) {
     if (!active) return { ok: false };
     const me = active;
     const durationS = Math.round((deps.now() - me.startedAt) / 1000);
     active = null;
     if (me.abort) me.abort.abort();
+    const before = me.messages.length;
     if (me.pendingTurn) commitAnswer(me, me.pendingTurn);
     else if (typeof unsent === 'string' && unsent.trim()) commitAnswer(me, prepareTurn(me, unsent, '', 0));
+    const last = addedSince(me.messages, before).find((m) => m.role === 'user');
+    if (last && pending && pending.spoken) keepAudio({ ...last, spoken: true, mime: 'audio/wav', bytes: pending.bytes }, me);
     const answered = me.messages.some((m) => m.role === 'user');
     const pairs = evaluationPairs(me);
-    const evaluation = await evaluateInterview((messages) => completeEvaluation(me, messages), me, pairs).catch(() => null);
+    const complete = (messages) => completeEvaluation(me, messages);
+    const [evaluation, language] = await Promise.all([
+      evaluateInterview(complete, me, pairs).catch(() => null),
+      reviewLanguage(complete, me, pairs, { spoken: (answer) => me.spoken.has(answer) }).catch(() => null)
+    ]);
     const ended = await deps.api('POST', `/v1/mock/${me.id}/end`, {});
     const refunded = Boolean(ended.ok && ended.data && ended.data.refunded);
     // Charged by the time used, from the same minutes as a live session.
@@ -240,11 +323,14 @@ function createMockInterviews(deps) {
     if (!answered) return { ok: true, refunded, chargedMinutes, record: null };
     const record = {
       id: me.id, agentId: me.agent.id, company: me.agent.company || '', role: me.agent.role || '', lang: me.lang, mode: me.mode,
-      startedAt: me.startedAt, durationS, messages: me.messages, evaluation, coach: [],
+      startedAt: me.startedAt, durationS, messages: me.messages, evaluation, language, coach: [],
       visualFeedback: me.visualFeedback, settings: me.settings, coverage: coverageFor(me),
-      bankUsed: [...me.bankUsed], bankLeft: me.bank.filter((q) => !me.bankUsed.has(q.text)).map((q) => q.text)
+      bankUsed: [...me.bankUsed], bankLeft: me.bank.filter((q) => !me.bankUsed.has(q.text)).map((q) => q.text),
+      audio: saveAudio(me)
     };
+    me.audio.clear();
     save(record);
+    pruneAudio(list());
     return { ok: true, refunded, chargedMinutes, record };
   }
 
@@ -303,7 +389,7 @@ function createMockInterviews(deps) {
     return { total: questions.length, questions: questions.slice(0, 5).map(({ text, category, reports }) => ({ text, category, reports })) };
   }
 
-  return { prep, start, turn, cancelTurn, speak, analyzeFrame, end, list, coach, sttToken, isActive: () => Boolean(active) };
+  return { prep, start, turn, cancelTurn, speak, keepAudio: (clip) => keepAudio(clip), audio, analyzeFrame, end, list, coach, sttToken, isActive: () => Boolean(active) };
 }
 
 module.exports = { ...prompt, createMockInterviews };
