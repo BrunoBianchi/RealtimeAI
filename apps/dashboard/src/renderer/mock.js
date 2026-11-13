@@ -9,13 +9,32 @@
   // Same list as main/mock_interview.js. Names stay in their own language.
   const LANGUAGES = [['pt-BR', 'Português (Brasil)'], ['en', 'English'], ['es', 'Español'], ['fr', 'Français'], ['it', 'Italiano'], ['ja', '日本語'], ['hi', 'हिन्दी'], ['zh', '中文']];
   const PERSONAS = [['recruiter', 'Recruiter / HR'], ['manager', 'Hiring manager'], ['global', 'Global Talent Lead'], ['technical', 'Technical lead']];
-  const TOPICS = { trajectory: 'Career path and interests', culture: 'Culture and values', academics: 'University and graduation', availability: 'Internship availability', motivation: 'Interest in the opportunity', skills: 'Technical deep dive', questions: 'Your questions' };
+  // Interview formats and levels of main/mock_prompt.js (KINDS, LEVELS).
+  const KINDS = [['behavioral', 'Behavioral'], ['screen', 'Recruiter screen'], ['deepdive', 'Project deep dive'], ['crossfunctional', 'Cross-functional partner'], ['leadership', 'Leadership'], ['ai', 'Using AI at work']];
+  const KIND_HINTS = {
+    behavioral: 'Tell me about yourself, your most impactful project, a conflict and other signal areas, answered as real stories.',
+    screen: 'Short and direct: how your background fits the job, the level and your motivation.',
+    deepdive: 'One project from start to finish: decisions, alternatives, people and results.',
+    crossfunctional: 'A product, design or business partner: plain language, empathy and trade-offs.',
+    leadership: 'Driving impact through people, values questions and tougher follow-ups.',
+    ai: 'What you deliver with AI, how you verify it, how your use improves and how you share it.'
+  };
+  const LEVELS = [['auto', 'Match the role'], ['entry', 'Entry level or internship'], ['mid', 'Mid level'], ['senior', 'Senior'], ['staff', 'Staff or lead']];
+  const TOPICS = {
+    trajectory: 'Tell me about yourself', project: 'Most impactful project', conflict: 'A conflict', signal: 'Another signal area',
+    culture: 'Culture and values', academics: 'University and graduation', availability: 'Internship availability', motivation: 'Interest in the opportunity', skills: 'Technical deep dive',
+    collaboration: 'Working with other areas', explain: 'Explaining without jargon', people: 'People and influence', values: 'Leadership principles',
+    dd_overview: 'The project and its result', dd_decisions: 'Decisions and alternatives', dd_people: 'People and alignment', dd_outcome: 'Measuring and looking back',
+    ai_work: 'What you build with AI', ai_trust: 'Verifying AI output', ai_iteration: 'Improving how you use AI', ai_growth: 'Keeping up with AI', ai_scaling: 'Spreading AI practices', ai_values: 'Your view on AI',
+    questions: 'Your questions'
+  };
   const COVERAGE = { answered: 'Answered', offered: 'Time offered', skipped: 'Skipped', unanswered: 'Unanswered' };
   const defaultGoal = 'Connect your background and motivation to the role with real examples.';
   const personaLabel = (persona) => C.t(PERSONAS.find(([id]) => id === persona)?.[1] || '');
   const skipLabel = (topic) => C.t(topic === 'questions' ? 'I have no more questions' : 'Skip');
   const topicLabel = (topic) => C.t(TOPICS[topic] || '');
-  const defaultSettings = { persona: 'recruiter', format: 'auto', depth: 1, goal: '', useBank: true };
+  const defaultSettings = { kind: 'behavioral', persona: 'recruiter', format: 'auto', level: 'auto', depth: 1, goal: '', useBank: true };
+  const kindLabel = (kind) => C.t(KINDS.find(([id]) => id === kind)?.[1] || '');
   const M = { phase: 'idle', agentId: '', lang: '', mode: 'basic', settings: { ...defaultSettings }, topic: '', modeTouched: false, consent: false, cameraStream: null, cameraTimer: null, cameraBusy: false, visualCount: 0, previousFrame: '', cameraJob: null, lines: [], partial: '', state: '', error: '', record: null, history: null, endsAt: 0, id: '' };
   S.mock = M;
   let ws = null;
@@ -133,6 +152,7 @@
             ${ent ? `<span class="small muted" data-tour="mock-balance" data-no-i18n>${esc(C.t('Balance: {n} min, shared with live sessions', { n: minutesText(minutesLeft()) }))}</span>` : ''}
           </div>
           <div class="mock-mode-grid">
+            <label class="field">Interview type<select class="select" data-change="mock-kind">${C.opts(KINDS, M.settings.kind)}</select><span class="small muted" data-no-i18n>${esc(C.t(KIND_HINTS[M.settings.kind] || ''))}</span></label>
             <label class="field">Interviewer<select class="select" data-change="mock-persona">${C.opts(PERSONAS, M.settings.persona)}</select></label>
             <label class="field">Interview language<select class="select" data-change="mock-lang" data-no-i18n>${C.opts(LANGUAGES, lang)}</select></label>
           </div>
@@ -141,6 +161,7 @@
             <div class="stack gap-8" style="margin-top:12px">
               <div class="mock-mode-grid">
                 <label class="field">Interview track<select class="select" data-change="mock-format">${C.opts([['auto', 'Match the role'], ['internship', 'Internship'], ['professional', 'Professional role']], M.settings.format)}</select></label>
+                <label class="field">Seniority<select class="select" data-change="mock-level">${C.opts(LEVELS, M.settings.level)}</select></label>
                 <label class="field">Follow-up depth<select class="select" data-change="mock-depth">${C.opts([['0', 'Main questions only'], ['1', 'Up to one per topic'], ['2', 'Up to two per topic']], String(M.settings.depth))}</select></label>
               </div>
               <label class="field">Practice goal<input class="input" type="text" maxlength="400" data-input="mock-goal" value="${esc(M.settings.goal)}" placeholder="Optional. Example: Explain my project impact with real examples." /></label>
@@ -258,6 +279,74 @@
 
   const JEV_LABELS = [['adequacao', 'Relevance'], ['cultura', 'Culture'], ['estrutura', 'Structure'], ['evidencias', 'Evidence'], ['objetividade', 'Objectivity']];
 
+  // Better versions of an answer (mock_evaluation.js). All are rendered; the
+  // buttons show one at a time without re-rendering the report (mock-rewrite).
+  const REWRITE_LABELS = [['melhorada', 'Improved'], ['curta', 'Shorter'], ['tecnica', 'More technical'], ['exemplo', 'With an example']];
+  function rewriteHtml(rw) {
+    if (!rw || !rw.melhorada) return '';
+    const kinds = REWRITE_LABELS.filter(([k]) => rw[k]);
+    const tabs = kinds.length > 1
+      ? `<div class="seg" role="group" aria-label="Better version" style="flex-wrap:wrap;width:fit-content">${kinds.map(([k, label], n) => `<button type="button" class="${n ? '' : 'on'}" aria-pressed="${!n}" data-action="mock-rewrite" data-kind="${k}">${label}</button>`).join('')}</div>`
+      : '';
+    const texts = kinds.map(([k], n) => `<div class="small" data-rewrite="${k}" data-no-i18n style="white-space:pre-wrap;line-height:1.55"${n ? ' hidden' : ''}>${esc(rw[k])}</div>`).join('');
+    return `<div class="card tight" data-rewrite-box style="gap:8px"><div class="row" style="gap:6px">${icon('sparkle')}<span class="strong small">Better version</span></div>${tabs}${texts}<span class="small muted">Built only from what you said and your materials. Fill in the [brackets] with your real data.</span></div>`;
+  }
+
+  const SIGNAL_LABELS = [['escopo', 'Scope'], ['ownership', 'Ownership'], ['ambiguidade', 'Ambiguity'], ['perseveranca', 'Perseverance'], ['conflito', 'Conflict'], ['comunicacao', 'Communication'], ['crescimento', 'Growth'], ['lideranca', 'Leadership'], ['ia', 'Judgment with AI']];
+  const PITFALLS = {
+    poucas_acoes: ['Few actions of your own', 'Spend most of the answer on the steps you took.'],
+    nos: ['"We" hides what you did', 'Say "I" for what you did yourself and name what the team did.'],
+    contexto_longo: ['Too much context', 'Keep the background to one or two sentences.'],
+    perfeito_demais: ['Too perfect an ending', 'Include a real obstacle or mistake and how you handled it.'],
+    sem_resultado: ['No result', 'End with what changed, measured or compared before and after.'],
+    sem_aprendizado: ['No learning', 'Say what you would do differently next time.'],
+    fora_do_sinal: ['Missed what was asked', 'Decide what the question tests before picking the story.'],
+    escopo_baixo: ['Scope below the level', 'Pick a story with the scope of the level you are applying for.'],
+    negativo: ['Blames others', 'Explain the other side and how the relationship ended up.'],
+    jargao: ['Jargon', 'Explain in terms someone outside your field would follow.']
+  };
+  const CARL_PARTS = [['c', 'Context'], ['a', 'Your actions'], ['r', 'Result'], ['l', 'Learning']];
+  const CARL_STATES = ['missing', 'weak', 'clear'];
+  const signalLabel = (id) => C.t(SIGNAL_LABELS.find(([k]) => k === id)?.[1] || '');
+
+  // The signal area this answer showed, its pitfalls and, for a story, which
+  // of context, actions, result and learning came through.
+  function itemSignalHtml(it) {
+    const tags = [
+      ...(it.sinal ? [`<span class="pill" data-no-i18n>${esc(signalLabel(it.sinal))}</span>`] : []),
+      ...(it.armadilhas || []).filter((p) => PITFALLS[p]).map((p) => `<span class="pill warn" data-no-i18n>${esc(C.t(PITFALLS[p][0]))}</span>`)
+    ].join('');
+    const carl = it.carl
+      ? `<div class="row" style="gap:6px;flex-wrap:wrap"><span class="small strong">Story</span>${CARL_PARTS.map(([k, label]) => `<span class="pill" style="gap:6px"><span>${label}</span><b data-no-i18n>${it.carl[k] == null ? '-' : esc(C.t(CARL_STATES[it.carl[k]]))}</b></span>`).join('')}</div>`
+      : '';
+    return (tags ? `<div class="row" style="gap:6px;flex-wrap:wrap">${tags}</div>` : '') + carl;
+  }
+
+  // Best answer per signal area and the pitfalls that came back most often.
+  function signalsHtml(J, kind) {
+    const shown = SIGNAL_LABELS.filter(([k]) => J.signals && J.signals[k] != null);
+    const missing = !kind || kind === 'behavioral' ? SIGNAL_LABELS.filter(([k]) => k !== 'ia' && !(J.signals && J.signals[k] != null)).map(([, label]) => C.t(label)) : [];
+    const signals = shown.length ? `<section class="card" style="gap:10px">
+        <span class="strong">Signal areas</span>
+        <span class="small muted">Your best answer in each area interviewers look for.</span>
+        <div class="row" style="gap:6px;flex-wrap:wrap">${shown.map(([k, label]) => `<span class="pill" style="gap:6px"><span>${label}</span><b class="num">${(J.signals[k] / 10).toFixed(1)}</b></span>`).join('')}</div>
+        ${missing.length ? `<span class="small muted" data-no-i18n>${esc(C.t('No story yet for: {list}', { list: missing.join(', ') }))}</span>` : ''}
+      </section>` : '';
+    const pitfalls = (J.pitfalls || []).filter(({ id }) => PITFALLS[id]);
+    const pits = pitfalls.length ? `<section class="card" style="gap:10px">
+        <span class="strong">Recurring pitfalls</span>
+        ${pitfalls.map(({ id, n }) => `<div class="stack" style="gap:2px"><div class="row" style="gap:8px"><span class="small strong" data-no-i18n>${esc(C.t(PITFALLS[id][0]))}</span><span class="small muted" data-no-i18n>${esc(n === 1 ? C.t('in 1 answer') : C.t('in {n} answers', { n }))}</span></div><span class="small" data-no-i18n>${esc(C.t(PITFALLS[id][1]))}</span></div>`).join('')}
+      </section>` : '';
+    return signals + pits;
+  }
+
+  // The scores the JEV gave this answer, criterion by criterion.
+  function itemNotesHtml(it) {
+    const notas = it.notas || {};
+    const row = JEV_LABELS.filter(([k]) => notas[k] != null).map(([k, label]) => `<span class="pill" style="gap:6px"><span>${label}</span><b class="num">${notas[k]}</b></span>`).join('');
+    return row ? `<div class="row" style="gap:6px;flex-wrap:wrap">${row}</div>` : '';
+  }
+
   function evaluationHtml(r) {
     const J = r.evaluation;
     if (!J) return r.feedback ? `<section class="card"><pre class="md" style="white-space:pre-wrap">${esc(r.feedback)}</pre></section>` : '<section class="card"><div class="muted">Feedback is unavailable right now. Your transcript was saved.</div></section>';
@@ -266,8 +355,12 @@
     const questions = (J.items || []).map((it) => `<div class="stack" style="gap:6px">
       <div class="row" style="gap:8px"><span class="grow strong" data-no-i18n>${esc(it.question || it.pergunta)}</span><span class="pill num">${it.score == null ? '-' : (it.score / 10).toFixed(1)} / 10</span></div>
       <span class="small muted" data-no-i18n>${esc(it.veredito)}</span>
+      ${itemNotesHtml(it)}
+      ${itemSignalHtml(it)}
+      ${detail('Your answer', it.answer)}
       ${detail('What was missing', it.lacuna)}
       ${detail('How to improve', it.dica)}
+      ${rewriteHtml(it.reescrita)}
       ${detail('What supported the score', it.trecho)}
       ${detail('Company value in the materials', it.valorCitado)}
     </div>`).join('');
@@ -278,6 +371,7 @@
         ${J.resumo ? `<span class="muted" data-no-i18n>${esc(J.resumo)}</span>` : ''}
         ${JEV_LABELS.map(([k, label]) => { const v = J.criteria && J.criteria[k] != null ? J.criteria[k] : null; const tone = C.scoreTone(v); return `<div class="crit-row"><span class="strong">${label}</span>${C.pctBar(v || 0, tone.cls === 'ok' ? '' : tone.cls)}<span class="score-num" style="color:${tone.color}">${v == null ? '—' : (v / 10).toFixed(1)}</span></div>`; }).join('')}
       </section>
+      ${signalsHtml(J, r.settings?.kind)}
       <section class="grid-2">${list('Strengths', 'check-circle', J.fortes || [])}${list('To improve', 'arrow-up-right', J.melhorar || [])}</section>
       ${J.proximo ? `<section class="card">${detail('Next practice step', J.proximo)}</section>` : ''}
       <section class="card" style="gap:12px"><span class="strong">Question by question</span>${questions}</section>`;
@@ -305,7 +399,7 @@
 
   function coverageHtml(record) {
     if (!record.coverage?.length) return '';
-    const persona = personaLabel(record.settings?.persona);
+    const persona = [kindLabel(record.settings?.kind), personaLabel(record.settings?.persona)].filter(Boolean).join(' · ');
     return `<section class="card" style="gap:10px">
       <span class="strong">Interview coverage</span>
       ${persona ? `<span class="small muted" data-no-i18n>${esc(persona)}</span>` : ''}
@@ -779,6 +873,16 @@
     }
     C.navigate('mock');
   };
+  C.actions['mock-rewrite'] = (el) => {
+    const box = el.closest('[data-rewrite-box]');
+    if (!box) return;
+    for (const b of box.querySelectorAll('[data-action="mock-rewrite"]')) {
+      const on = b === el;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', String(on));
+    }
+    for (const t of box.querySelectorAll('[data-rewrite]')) t.hidden = t.dataset.rewrite !== el.dataset.kind;
+  };
   C.actions['mock-for-agent'] = (el) => {
     if (M.phase === 'idle' || M.phase === 'done') {
       M.agentId = el.dataset.agent;
@@ -806,6 +910,8 @@
     C.renderView();
   };
   C.changes['mock-lang'] = (el) => { M.lang = el.value; };
+  C.changes['mock-kind'] = (el) => { M.settings.kind = el.value; C.refresh(); };
+  C.changes['mock-level'] = (el) => { M.settings.level = el.value; };
   C.changes['mock-persona'] = (el) => { M.settings.persona = el.value; };
   C.changes['mock-format'] = (el) => { M.settings.format = el.value; };
   C.changes['mock-depth'] = (el) => { M.settings.depth = Number(el.value); };

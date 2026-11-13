@@ -31,19 +31,21 @@ test('retrieval ranks current job sources and does not mix companies or repeat o
 test('the internship plan keeps mandatory topics, retrieves evidence and assesses a custom goal', () => {
   const agent = { ...job, role: 'Estágio Backend', company_research: 'Valorizamos a autonomia em equipes pequenas.' };
   const state = createInterview(agent, [], null, 'pt-BR', 'basic', { persona: 'manager', depth: 0, goal: 'Explicar meus resultados' }, 1800);
-  assert.deepStrictEqual(state.topics, ['trajectory', 'culture', 'academics', 'availability', 'motivation', 'questions']);
+  assert.deepStrictEqual(state.topics, ['trajectory', 'project', 'academics', 'availability', 'conflict', 'culture', 'signal', 'motivation', 'questions']);
+  assert.equal(state.settings.level, 'entry');
   const opening = prepareTurn(state, '', '', 1800);
   assert.match(opening.direct, /trajetória/);
   commitTurn(state, opening, opening.direct);
-  const culture = prepareTurn(state, 'Trabalhei com Kafka.', '', 1700);
-  assert.match(culture.messages[0].content, /gestor da área.*prioridades/);
-  assert.match(culture.messages[0].content, /Explicar meus resultados/);
-  assert.match(culture.messages[0].content, /Valorizamos a autonomia/);
-  assert.equal(culture.messages.at(-1).content, 'Trabalhei com Kafka.');
-  commitTurn(state, culture, 'Como você tomou uma decisão com autonomia?');
-  for (const [topic, question] of [['academics', 'Quando você se forma?'], ['availability', 'Qual é sua disponibilidade?'], ['motivation', 'O que te interessa na vaga?']]) {
+  const project = prepareTurn(state, 'Trabalhei com Kafka.', '', 1700);
+  assert.match(project.messages[0].content, /gestor da área.*prioridades/);
+  assert.match(project.messages[0].content, /Explicar meus resultados/);
+  assert.match(project.messages[0].content, /Nível da vaga: iniciante/);
+  assert.equal(project.messages.at(-1).content, 'Trabalhei com Kafka.');
+  commitTurn(state, project, 'Qual projeto mais te marcou?');
+  for (const [topic, question] of [['academics', 'Quando você se forma?'], ['availability', 'Qual é sua disponibilidade?'], ['conflict', 'Conte um conflito.'], ['culture', 'Como você age com autonomia?'], ['signal', 'Conte um erro.'], ['motivation', 'O que te interessa na vaga?']]) {
     const next = prepareTurn(state, 'Minha resposta.', '', 1500);
     assert.equal(state.topics[next.topicIndex], topic);
+    if (topic === 'culture') assert.match(next.messages[0].content, /Valorizamos a autonomia/);
     commitTurn(state, next, question);
   }
   const qAndA = prepareTurn(state, 'Quero aprender Go.', '', 1000);
@@ -135,8 +137,8 @@ test('a text interview follows its plan, grounds candidate Q&A, and keeps the sc
   f.deps.agents = () => [{ ...job, job_description: 'The role includes weekly mentoring sessions.' }];
   const encoder = new TextEncoder();
   const responses = [
-    'How did you collaborate with your team?',
     'What interests you about this role?',
+    'How did you collaborate with your team?',
     JSON.stringify({ fonte: 'D1', citacao: 'The role includes weekly mentoring sessions.', resposta: 'The role includes weekly mentoring sessions. Anything else?' })
   ];
   let judged;
@@ -153,11 +155,11 @@ test('a text interview follows its plan, grounds candidate Q&A, and keeps the sc
     return { ok: true, body: [encoder.encode('data: ' + event)] };
   };
   const mock = createMockInterviews(f.deps);
-  await mock.start({ agentId: job.id, lang: 'en', mode: 'basic', settings: { depth: 0, goal: 'Explain team impact' } });
+  await mock.start({ agentId: job.id, lang: 'en', mode: 'basic', settings: { depth: 0, goal: 'Explain team impact', kind: 'screen' } });
   assert.equal((await mock.turn('')).topic, 'trajectory');
-  assert.equal((await mock.turn('I built a Kafka pipeline.')).topic, 'culture');
-  assert.equal((await mock.turn('We reviewed changes in pairs.')).topic, 'motivation');
-  assert.equal((await mock.turn('I want to learn distributed systems.')).topic, 'questions');
+  assert.equal((await mock.turn('I built a Kafka pipeline.')).topic, 'motivation');
+  assert.equal((await mock.turn('I want to learn distributed systems.')).topic, 'culture');
+  assert.equal((await mock.turn('We reviewed changes in pairs.')).topic, 'questions');
   assert.equal((await mock.turn('How often are the mentoring sessions?')).finished, false);
   assert.match(f.said.join(' '), /includes weekly mentoring sessions/);
   assert.equal((await mock.turn('What is the salary?')).finished, false);
@@ -272,7 +274,7 @@ test('both modes are charged per minute from the one balance shared with live se
   await r.Cue.actions['mock-start']();
   const [agentId, lang, mode, settings] = r.called('mockStart')[0];
   assert.deepEqual([agentId, lang, mode], [job.id, 'es', 'basic']);
-  assert.deepEqual({ ...settings }, { persona: 'global', format: 'internship', depth: 1, goal: 'Explicar um projeto', useBank: true });
+  assert.deepEqual({ ...settings }, { kind: 'behavioral', persona: 'global', format: 'internship', level: 'auto', depth: 1, goal: 'Explicar um projeto', useBank: true });
   assert.deepEqual(r.called('mockTurn'), [['']]);
 
   const plan = render(r.Cue, 'settings/plan/interviews');
@@ -323,10 +325,11 @@ test('the question bank of the job feeds the interviewer, without repeating itse
   const qs = bankQuestionsFor({ company: 'Nubank' }, bank);
   assert.deepStrictEqual(qs.map((q) => q.text), ['Como escalar Kafka?', 'Por que o Nubank?', 'Conte sobre um conflito no time']);
   assert.deepStrictEqual(bankQuestionsFor({ company: 'Acme' }, bank), []);
-  const state = createInterview({ ...job, company: 'Nubank' }, [], bank, 'en', 'basic', { depth: 0 }, 1800);
+  const state = createInterview({ ...job, company: 'Nubank' }, [], bank, 'en', 'basic', { depth: 0, kind: 'screen' }, 1800);
   const opening = prepareTurn(state, '', '', 1800);
   assert.ok(!opening.bank);
   commitTurn(state, opening, opening.direct);
+  commitTurn(state, prepareTurn(state, 'I like the product.', '', 1750), 'Why this team?');
   const culture = prepareTurn(state, 'Resolvi um conflito no time.', '', 1700);
   assert.equal(culture.bank.text, 'Conte sobre um conflito no time');
   assert.equal(culture.messages.at(-1).content, 'Resolvi um conflito no time.');
@@ -355,7 +358,7 @@ test('follow-ups are bounded and older answers remain available in context', () 
   commitTurn(state, opening, opening.direct);
   for (const [i, answer] of ['Led an OpenTelemetry migration.', 'Wrote the proposal.', 'Measured the latency.'].entries()) {
     const next = prepareTurn(state, answer, '', 1700);
-    assert.equal(state.topics[next.topicIndex], i < 2 ? 'trajectory' : 'culture');
+    assert.equal(state.topics[next.topicIndex], i < 2 ? 'trajectory' : 'project');
     commitTurn(state, next, 'Question ' + i + '?');
   }
   for (let i = 0; i < 4; i += 1) {
@@ -369,7 +372,7 @@ test('follow-ups are bounded and older answers remain available in context', () 
 
 test('an answer that goes on after a pause cancels the turn and gives its bank question back', async () => {
   const f = fakeDeps({ ok: true, status: 200, data: { id: 'm1', max_s: 1800, stt: {} } });
-  f.deps.bank = () => ({ companies: [{ name: job.company, questions: [{ text: 'primeira pergunta do banco', category: 'Culture' }, { text: 'segunda pergunta do banco', category: 'Culture' }] }] });
+  f.deps.bank = () => ({ companies: [{ name: job.company, questions: [{ text: 'primeira pergunta do banco', category: 'Behavioral' }, { text: 'segunda pergunta do banco', category: 'Behavioral' }] }] });
   f.deps.emit = () => {};
   let sent = [];
   f.deps.fetch = (_url, init) => new Promise((_resolve, reject) => {
