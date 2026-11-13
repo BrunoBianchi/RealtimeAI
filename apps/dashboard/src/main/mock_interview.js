@@ -8,10 +8,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const prompt = require('./mock_prompt');
+const { evaluateInterview } = require('./mock_evaluation');
 const {
   FINISH_MARK, languageName, createInterview, prepareTurn, resolveQAndA,
-  commitAnswer, commitTurn, evaluationPairs, coverageFor, evaluationContext,
-  feedbackPrompt, takeSentences, bankQuestionsFor
+  commitAnswer, commitTurn, evaluationPairs, coverageFor, takeSentences, bankQuestionsFor
 } = prompt;
 
 // The longest a prepared reply waits for the candidate to be really done.
@@ -53,8 +53,11 @@ function createMockInterviews(deps) {
     if (modeFromServer !== 'advanced' || chosenMode === 'advanced') {
       if (active?.id !== r.data.id || !active.messages.length) {
         const selected = agents.find((a) => a.id === r.data.agent_id) || agent;
+        // What Orby already asked for this job, so a new interview takes other angles.
+        const earlier = list().filter((rec) => rec.agentId === selected.id);
+        const previous = earlier.slice(0, 4).flatMap((rec) => (rec.messages || []).filter((m) => m.role === 'assistant').map((m) => m.content));
         active = {
-          ...createInterview(selected, agents, deps.bank?.(), lang, modeFromServer, settings, r.data.max_s),
+          ...createInterview(selected, agents, deps.bank?.(), lang, modeFromServer, { ...settings, previous, round: earlier.length }, r.data.max_s),
           id: r.data.id, visualFeedback: [], startedAt: deps.now(), abort: null, pendingTurn: null
         };
       }
@@ -111,6 +114,11 @@ function createMockInterviews(deps) {
       spoken += (spoken ? ' ' : '') + clean;
       emit(clean);
     };
+    // A generated opening that failed or came back empty: the scripted one instead.
+    const scripted = () => {
+      takeSentences(next.fallback, true).sentences.forEach(emit);
+      return commit(next.fallback, false);
+    };
     try {
       if (next.direct) {
         takeSentences(next.direct, true).sentences.forEach(emit);
@@ -121,7 +129,10 @@ function createMockInterviews(deps) {
         signal: AbortSignal.any([ctrl.signal, AbortSignal.timeout(60000)]),
         body: JSON.stringify({ stream: true, temperature: 0.25, reasoning: { enabled: false }, messages: next.messages })
       });
-      if (!res.ok || !res.body) return { ok: false, status: res.status, over: res.status === 410 };
+      if (!res.ok || !res.body) {
+        if (next.fallback && res.status !== 410) return await scripted();
+        return { ok: false, status: res.status, over: res.status === 410 };
+      }
       const decoder = new TextDecoder();
       let sse = '';
       const readLine = (line) => {
@@ -150,9 +161,11 @@ function createMockInterviews(deps) {
         return await commit(reply, false);
       }
       takeSentences(buffer, true).sentences.forEach(add);
+      if (!spoken && next.fallback) return await scripted();
       return spoken ? await commit(spoken, false) : { ok: false };
     } catch (_err) {
       if (ctrl.signal.aborted) return { ok: false, aborted: true };
+      if (!spoken && next.fallback) return scripted();
       // The candidate may already have heard this question when the stream failed.
       return released && /[?？]/u.test(spoken) ? commit(spoken, false) : { ok: false, error: 'network' };
     } finally {
@@ -195,11 +208,11 @@ function createMockInterviews(deps) {
     return { ok: Boolean(text), text };
   }
 
-  async function feedback(me, pairs) {
-    const transcript = JSON.stringify(pairs);
+  async function completeEvaluation(me, messages) {
     const res = await deps.fetch(deps.url(`/v1/mock/${me.id}/chat`), {
       method: 'POST', headers: { ...deps.headers(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ stream: false, temperature: 0.3, messages: [{ role: 'system', content: feedbackPrompt(me) }, { role: 'user', content: transcript }] })
+      signal: AbortSignal.timeout(60000),
+      body: JSON.stringify({ stream: false, temperature: 0.1, reasoning: { enabled: false }, messages })
     }).catch(() => null);
     if (!res || !res.ok) return '';
     const data = await res.json().catch(() => null);
@@ -208,17 +221,17 @@ function createMockInterviews(deps) {
 
   // Ends it, writes the feedback and keeps the record. Asks for feedback before
   // /end, while the server still accepts this interview.
-  async function end() {
+  async function end(unsent) {
     if (!active) return { ok: false };
     const me = active;
+    const durationS = Math.round((deps.now() - me.startedAt) / 1000);
     active = null;
     if (me.abort) me.abort.abort();
     if (me.pendingTurn) commitAnswer(me, me.pendingTurn);
+    else if (typeof unsent === 'string' && unsent.trim()) commitAnswer(me, prepareTurn(me, unsent, '', 0));
     const answered = me.messages.some((m) => m.role === 'user');
     const pairs = evaluationPairs(me);
-    const evaluation = pairs.length && deps.evaluate ? await deps.evaluate(pairs, me.agent, me.lang, evaluationContext(me)).catch(() => null) : null;
-    // Without a rubric result the summary still comes from the LLM.
-    const text = pairs.length && !evaluation ? await feedback(me, pairs) : '';
+    const evaluation = await evaluateInterview((messages) => completeEvaluation(me, messages), me, pairs).catch(() => null);
     const ended = await deps.api('POST', `/v1/mock/${me.id}/end`, {});
     const refunded = Boolean(ended.ok && ended.data && ended.data.refunded);
     // Charged by the time used, from the same minutes as a live session.
@@ -227,7 +240,7 @@ function createMockInterviews(deps) {
     if (!answered) return { ok: true, refunded, chargedMinutes, record: null };
     const record = {
       id: me.id, agentId: me.agent.id, company: me.agent.company || '', role: me.agent.role || '', lang: me.lang, mode: me.mode,
-      startedAt: me.startedAt, durationS: Math.round((deps.now() - me.startedAt) / 1000), messages: me.messages, feedback: text, evaluation, coach: [],
+      startedAt: me.startedAt, durationS, messages: me.messages, evaluation, coach: [],
       visualFeedback: me.visualFeedback, settings: me.settings, coverage: coverageFor(me),
       bankUsed: [...me.bankUsed], bankLeft: me.bank.filter((q) => !me.bankUsed.has(q.text)).map((q) => q.text)
     };

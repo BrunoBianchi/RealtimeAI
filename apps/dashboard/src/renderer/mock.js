@@ -16,36 +16,13 @@
   const skipLabel = (topic) => C.t(topic === 'questions' ? 'I have no more questions' : 'Skip');
   const topicLabel = (topic) => C.t(TOPICS[topic] || '');
   const defaultSettings = { persona: 'recruiter', format: 'auto', depth: 1, goal: '', useBank: true };
-  // When a spoken answer is over. Two clocks run from the last word heard: the
-  // shorter one sends the answer, so Orby's question is prepared while we are
-  // still making sure the person stopped; the longer one is the earliest Orby
-  // may speak. Words in between take the answer back (resumeAnswer), so a pause
-  // to think costs nothing. Less quiet is needed after a finished sentence; while
-  // words are still arriving there is no head start. Same values as the site
-  // (Browser/Home/src/lib/mockTiming.js).
-  const SEND_AFTER_SENTENCE_MS = 350;
-  const SEND_AFTER_PAUSE_MS = 750;
-  const SEND_MID_SPEECH_MS = 1300;
-  const SPEAK_AFTER_SENTENCE_MS = 850;
-  const SPEAK_AFTER_PAUSE_MS = 1250;
-  const endsSentence = (text) => /[.!?…。！？।]$/.test(text);
-  const sendDelay = (isFinal, text) => {
-    if (!isFinal) return SEND_MID_SPEECH_MS;
-    return endsSentence(text) ? SEND_AFTER_SENTENCE_MS : SEND_AFTER_PAUSE_MS;
-  };
-  const speakDelay = (isFinal, text) => {
-    if (!isFinal) return SEND_MID_SPEECH_MS;
-    return endsSentence(text) ? SPEAK_AFTER_SENTENCE_MS : SPEAK_AFTER_PAUSE_MS;
-  };
-
   const M = { phase: 'idle', agentId: '', lang: '', mode: 'basic', settings: { ...defaultSettings }, topic: '', modeTouched: false, consent: false, cameraStream: null, cameraTimer: null, cameraBusy: false, visualCount: 0, previousFrame: '', cameraJob: null, lines: [], partial: '', state: '', error: '', record: null, history: null, endsAt: 0, id: '' };
   S.mock = M;
   let ws = null;
   let audio = null; // { ctx, stream, node }
   let timer = null;
-  let silence = null;
   let keepAlive = null;
-  let answer = '';
+  let autoVoice = true;
   let queue = Promise.resolve();
   let pending = 0;
   let turnOpen = false;
@@ -53,6 +30,15 @@
   let finishing = false;
   let player = null;
   let sttRetries = 0;
+  const voice = C.createVoiceAnswer({
+    onDraft: (text) => { M.partial = text; paint(); },
+    onSubmit: (text, hold) => submitAnswer(text, hold),
+    finalize: () => {
+      if (ws?.readyState !== 1) return false;
+      ws.send(JSON.stringify({ type: 'Finalize' }));
+      return true;
+    },
+  });
 
   const entitlement = () => (S.auth && S.auth.entitlement) || null;
   // Both modes are charged by the time used, from the same minutes as a live
@@ -261,6 +247,10 @@
           <div class="row between" style="padding:14px 16px 6px"><span class="strong">Conversation</span></div>
           <div id="mockLines" class="mock-lines">${linesHtml()}</div>
           ${M.error ? `<div class="small" role="alert" style="color:var(--danger);padding:0 16px 8px">${esc(M.error)}</div>` : ''}
+          ${M.mode === 'advanced' ? `<div class="mock-input">
+            <button type="button" class="btn primary" id="mockFinishAnswer" data-action="mock-finish-answer" disabled>Finish answer</button>
+            <button type="button" class="btn" id="mockAutoVoice" data-action="mock-auto-voice" aria-pressed="${autoVoice}" disabled>${esc(C.t(autoVoice ? 'Auto-send on' : 'Auto-send off'))}</button>
+          </div>` : ''}
           <div class="mock-input"><input class="input grow" id="mockTyped" placeholder="${M.mode === 'basic' ? 'Type your answer' : 'Or type your answer'}"/><button type="button" class="btn primary icon-only" data-action="mock-send" aria-label="Send answer" title="Send answer">${icon('send')}</button></div>
         </aside>
       </section>`;
@@ -272,14 +262,25 @@
     const J = r.evaluation;
     if (!J) return r.feedback ? `<section class="card"><pre class="md" style="white-space:pre-wrap">${esc(r.feedback)}</pre></section>` : '<section class="card"><div class="muted">Feedback is unavailable right now. Your transcript was saved.</div></section>';
     const list = (title, ic, rows) => `<div class="card tight"><div class="row">${icon(ic)}<span class="strong">${title}</span></div>${rows.map((x) => `<div class="small" data-no-i18n>${esc(x)}</div>`).join('') || '<div class="muted">—</div>'}</div>`;
+    const detail = (label, text) => text ? `<div class="small"><strong>${label}</strong> <span data-no-i18n>${esc(text)}</span></div>` : '';
+    const questions = (J.items || []).map((it) => `<div class="stack" style="gap:6px">
+      <div class="row" style="gap:8px"><span class="grow strong" data-no-i18n>${esc(it.question || it.pergunta)}</span><span class="pill num">${it.score == null ? '-' : (it.score / 10).toFixed(1)} / 10</span></div>
+      <span class="small muted" data-no-i18n>${esc(it.veredito)}</span>
+      ${detail('What was missing', it.lacuna)}
+      ${detail('How to improve', it.dica)}
+      ${detail('What supported the score', it.trecho)}
+      ${detail('Company value in the materials', it.valorCitado)}
+    </div>`).join('');
     return `<section class="card" style="gap:14px">
         <span class="eyebrow">JEV criteria</span>
+        ${J.partial && Number.isInteger(J.answers) ? `<span class="small muted">${esc(C.t('{n} of {total} answers scored', { n: J.items.length, total: J.answers }))}</span>` : ''}
         ${J.objetivo ? list('Practice goal assessment', 'check-circle', [J.objetivo]) : ''}
         ${J.resumo ? `<span class="muted" data-no-i18n>${esc(J.resumo)}</span>` : ''}
         ${JEV_LABELS.map(([k, label]) => { const v = J.criteria && J.criteria[k] != null ? J.criteria[k] : null; const tone = C.scoreTone(v); return `<div class="crit-row"><span class="strong">${label}</span>${C.pctBar(v || 0, tone.cls === 'ok' ? '' : tone.cls)}<span class="score-num" style="color:${tone.color}">${v == null ? '—' : (v / 10).toFixed(1)}</span></div>`; }).join('')}
       </section>
       <section class="grid-2">${list('Strengths', 'check-circle', J.fortes || [])}${list('To improve', 'arrow-up-right', J.melhorar || [])}</section>
-      <section class="card" style="gap:12px"><span class="strong">Question by question</span>${(J.items || []).map((it) => `<div class="stack" style="gap:3px"><div class="row" style="gap:8px"><span class="grow strong" data-no-i18n>${esc(it.pergunta)}</span><span class="pill num">${it.score == null ? '—' : it.score}</span></div><span class="small muted" data-no-i18n>${esc(it.veredito)}</span><span class="small" data-no-i18n>${esc(it.dica)}</span></div>`).join('')}</section>`;
+      ${J.proximo ? `<section class="card">${detail('Next practice step', J.proximo)}</section>` : ''}
+      <section class="card" style="gap:12px"><span class="strong">Question by question</span>${questions}</section>`;
   }
 
   function visualFeedbackHtml(r) {
@@ -390,6 +391,14 @@
     if (skip) skip.textContent = skipLabel(M.topic);
     const st = document.getElementById('mockState');
     if (st) st.textContent = C.t ? C.t(STATE_LABEL[M.state] || '') : STATE_LABEL[M.state] || '';
+    const done = document.getElementById('mockFinishAnswer');
+    if (done) done.disabled = M.state !== 'listening' || !M.partial;
+    const auto = document.getElementById('mockAutoVoice');
+    if (auto) {
+      auto.disabled = M.state !== 'listening' || ws?.readyState !== 1;
+      auto.setAttribute('aria-pressed', String(autoVoice));
+      auto.textContent = C.t(autoVoice ? 'Auto-send on' : 'Auto-send off');
+    }
   }
   function setState(s) {
     M.state = s;
@@ -398,7 +407,7 @@
 
   function stopCapture() {
     clearInterval(keepAlive);
-    clearTimeout(silence);
+    voice.suspend();
     if (ws) {
       const w = ws;
       ws = null;
@@ -456,42 +465,30 @@
   }
 
   let mayResume = false;
-  let lastAnswer = '';
 
   function connectStt(stt) {
     const q = new URLSearchParams({
       model: stt.model || 'nova-3', language: M.lang, encoding: 'linear16', sample_rate: '16000',
-      channels: '1', interim_results: 'true', endpointing: '300', smart_format: 'true'
+      channels: '1', interim_results: 'true', endpointing: '300', vad_events: 'true', smart_format: 'true'
     });
     const { url } = stt;
     const socket = new WebSocket(`${url}?${q}`, ['bearer', stt.token]);
     socket.binaryType = 'arraybuffer';
     socket.onmessage = (e) => {
-      if (M.state !== 'listening' && !mayResume) return;
+      if (ws !== socket || M.phase !== 'live' || (M.state !== 'listening' && !mayResume)) return;
       let msg;
       try { msg = JSON.parse(e.data); } catch (_e) { return; }
-      const text = msg.channel && msg.channel.alternatives && msg.channel.alternatives[0] && msg.channel.alternatives[0].transcript;
-      if (!text) return;
-      if (M.state === 'thinking') resumeAnswer();
-      if (M.state !== 'listening') return;
-      clearTimeout(silence);
-      if (msg.is_final) {
-        answer += (answer ? ' ' : '') + text;
-        M.partial = answer;
-      } else {
-        M.partial = `${answer} ${text}`.trim();
+      if (mayResume) {
+        if (msg.from_finalize || (msg.type !== 'SpeechStarted' && !msg.channel?.alternatives?.[0]?.transcript?.trim())) return;
+        resumeAnswer();
       }
-      paint();
-      if (answer) {
-        const final = Boolean(msg.is_final);
-        const wait = sendDelay(final, answer);
-        const hold = speakDelay(final, answer) - wait;
-        silence = setTimeout(() => submitAnswer('', hold), wait);
-      }
+      voice.receive(msg);
     };
-    socket.onopen = () => { sttRetries = 0; };
+    socket.onopen = () => { sttRetries = 0; paint(); };
     socket.onclose = async () => {
       if (ws !== socket || M.phase !== 'live') return;
+      voice.suspend();
+      paint();
       // Waits longer on each failure; typing still works meanwhile.
       sttRetries += 1;
       if (sttRetries > 6) {
@@ -534,8 +531,7 @@
       finish();
       return;
     }
-    answer = '';
-    M.partial = '';
+    voice.take();
     setState(M.mode === 'basic' ? 'typing' : 'listening');
   }
 
@@ -604,29 +600,26 @@
     mayResume = false;
     turnId += 1;
     turnOpen = false;
-    answer = lastAnswer;
+    voice.restore();
     M.lines.pop();
     api.mockCancelTurn();
     setState('listening');
   }
 
   // holdMs: how long the main process keeps a spoken answer's reply to itself.
-  function submitAnswer(typed, holdMs = 0) {
-    clearTimeout(silence);
-    const text = String(typed || answer).trim();
+  function submitAnswer(value, holdMs = 0) {
+    const text = String(value).trim();
     if (!text || M.phase !== 'live' || (M.mode === 'basic' ? M.state !== 'typing' : M.state !== 'listening')) return;
     M.lines.push({ who: 'me', text });
-    lastAnswer = text;
-    mayResume = !typed;
-    answer = '';
-    M.partial = '';
+    mayResume = holdMs > 0;
     M.error = '';
-    runTurn(text, '', typed ? 0 : holdMs);
+    runTurn(text, '', holdMs);
   }
 
   async function finish() {
     if (M.phase !== 'live') return;
     M.phase = 'finishing';
+    const unsent = voice.take();
     turnId += 1;
     turnOpen = false;
     clearInterval(timer);
@@ -637,7 +630,7 @@
     if (player) player.pause();
     if (M.cameraJob) await M.cameraJob.catch(() => null);
     C.renderView();
-    const r = await C.guard(() => api.mockEnd(), 'Could not end the interview.');
+    const r = await C.guard(() => api.mockEnd(unsent), 'Could not end the interview.');
     M.record = (r && r.record) || null;
     M.refunded = Boolean(r && r.refunded);
     M.chargedMinutes = r && Number.isFinite(r.chargedMinutes) ? r.chargedMinutes : null;
@@ -750,13 +743,25 @@
   };
   C.actions['mock-ask'] = (el) => {
     if (M.phase !== 'live' || turnOpen || !['typing', 'listening'].includes(M.state)) return;
+    voice.take();
     runTurn('', el.dataset.ask);
   };
   C.actions['mock-finish'] = () => finish();
+  C.actions['mock-finish-answer'] = () => {
+    if (M.phase === 'live' && M.state === 'listening') voice.finishAnswer();
+  };
+  C.actions['mock-auto-voice'] = () => {
+    if (M.phase !== 'live' || M.state !== 'listening' || ws?.readyState !== 1) return;
+    autoVoice = !autoVoice;
+    voice.setAuto(autoVoice);
+    paint();
+  };
   C.actions['mock-send'] = () => {
     const input = document.getElementById('mockTyped');
-    const text = input ? input.value : '';
-    if (input && text.trim() && (M.state === 'listening' || M.state === 'typing')) input.value = '';
+    const text = input?.value.trim();
+    if (!text || !['listening', 'typing'].includes(M.state)) return;
+    input.value = '';
+    voice.take();
     submitAnswer(text);
   };
   C.actions['mock-reset'] = () => {

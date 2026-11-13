@@ -55,7 +55,7 @@ contextBridge.exposeInMainWorld('rtai', {
   mockTurn: (text, action, holdMs) => ipcRenderer.invoke('rtai:mock-turn', text, action, holdMs),
   mockCancelTurn: () => ipcRenderer.invoke('rtai:mock-cancel-turn'),
   mockSpeak: (text) => ipcRenderer.invoke('rtai:mock-speak', text),
-  mockEnd: () => ipcRenderer.invoke('rtai:mock-end'),
+  mockEnd: (answer) => ipcRenderer.invoke('rtai:mock-end', answer),
   mockPrep: (agentId) => ipcRenderer.invoke('rtai:mock-prep', agentId),
   mockCoach: (id, question) => ipcRenderer.invoke('rtai:mock-coach', id, question),
   mockList: () => ipcRenderer.invoke('rtai:mock-list'),

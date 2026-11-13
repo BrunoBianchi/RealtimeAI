@@ -79,6 +79,17 @@ test('speech is cut into complete sentences while it streams', () => {
   assert.ok(takeSentences('a '.repeat(200)).sentences[0].length <= 221);
 });
 
+function rubricReply(messages) {
+  const asked = [...messages[1].content.matchAll(/^#(\d+)$/gm)].map((m) => Number(m[1]));
+  const result = messages[0].content.includes('feedback final')
+    ? { resumo: 'Bom', proximo_passo: 'Explique o resultado.' }
+    : { items: asked.map((i) => ({
+      i, tipo: 'factual', notas: { adequacao: 7, objetividade: 7 },
+      veredito: 'Citou Kafka.', dica: 'Explique o resultado.',
+    })) };
+  return { ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify(result) } }] }) };
+}
+
 function fakeDeps(apiResult) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mock-'));
   const said = [];
@@ -93,7 +104,7 @@ function fakeDeps(apiResult) {
       fetch: async (url, init) => {
         calls.push(url);
         const body = JSON.parse(init.body);
-        if (body.stream === false) return { ok: true, json: async () => ({ choices: [{ message: { content: 'Nota 7.' } }] }) };
+        if (body.stream === false) return rubricReply(body.messages);
         return { ok: true, body: [encoder.encode('data: {"choices":[{"delta":{"content":"Bom dia. Fale "}}]}\n'), encoder.encode('data: {"choices":[{"delta":{"content":"de você. [FIM]"}}]}\n\ndata: [DONE]\n')] };
       }
     }
@@ -112,7 +123,8 @@ test('the opening leads with trajectory, model markers cannot end it, and feedba
   assert.equal(f.calls.at(-1), '/v1/mock/mock_1/chat');
   assert.deepStrictEqual(f.said.slice(-2), ['Bom dia.', 'Fale de você.']);
   const done = await m.end();
-  assert.strictEqual(done.record.feedback, 'Nota 7.');
+  assert.strictEqual(done.record.evaluation.score, 70);
+  assert.strictEqual(done.record.evaluation.proximo, 'Explique o resultado.');
   assert.deepStrictEqual(m.list().map((r) => r.id), ['mock_1']);
   assert.ok(f.calls.indexOf('/v1/mock/mock_1/end') > f.calls.lastIndexOf('/v1/mock/mock_1/chat'), 'feedback before the end');
   fs.rmSync(f.dir, { recursive: true });
@@ -127,17 +139,18 @@ test('a text interview follows its plan, grounds candidate Q&A, and keeps the sc
     'What interests you about this role?',
     JSON.stringify({ fonte: 'D1', citacao: 'The role includes weekly mentoring sessions.', resposta: 'The role includes weekly mentoring sessions. Anything else?' })
   ];
-  f.deps.fetch = async (url) => {
+  let judged;
+  f.deps.fetch = async (url, init) => {
     assert.equal(url, '/v1/mock/mock_e2e/chat');
+    const body = JSON.parse(init.body);
+    if (body.stream === false) {
+      if (body.messages[0].content.includes('rubrica')) judged = body.messages[1].content;
+      return rubricReply(body.messages);
+    }
     const content = responses.shift();
     assert.ok(content, 'no model call for missing sources or for closing');
     const event = JSON.stringify({ choices: [{ delta: { content } }] });
     return { ok: true, body: [encoder.encode('data: ' + event)] };
-  };
-  let judged;
-  f.deps.evaluate = async (pairs, _agent, _lang, context) => {
-    judged = { pairs, context };
-    return { score: 80 };
   };
   const mock = createMockInterviews(f.deps);
   await mock.start({ agentId: job.id, lang: 'en', mode: 'basic', settings: { depth: 0, goal: 'Explain team impact' } });
@@ -152,8 +165,9 @@ test('a text interview follows its plan, grounds candidate Q&A, and keeps the sc
   assert.equal((await mock.turn('No more questions, thank you.')).finished, true);
   assert.equal(responses.length, 0);
   const { record } = await mock.end();
-  assert.equal(judged.pairs.length, 3);
-  assert.match(judged.context, /Explain team impact/);
+  assert.equal(record.evaluation.items.length, 3);
+  assert.match(judged, /Explain team impact/);
+  assert.doesNotMatch(judged, /What is the salary/);
   assert.equal(record.coverage.at(-1).status, 'offered');
   assert.ok(record.messages.some((m) => m.content === 'What is the salary?'));
   fs.rmSync(f.dir, { recursive: true });
@@ -201,18 +215,15 @@ test('a token this app cannot read asks for sign-in instead of an empty account'
 
 test('the end runs JEV on each question and answer, keeps the transcript, and the copilot answers from them', async () => {
   const f = fakeDeps({ ok: true, data: { id: 'mock_2', max_s: 1800, source: 'plan', stt: { token: 't' } } });
-  let pairs = null;
   let prompt = '';
-  f.deps.evaluate = async (p) => { pairs = p; return { score: 71, resumo: 'Bom', items: [] }; };
   f.deps.complete = async (messages) => { prompt = messages[0].content; return 'Cite números.'; };
   const m = createMockInterviews(f.deps);
   await m.start({ agentId: 'g1', lang: 'pt-BR' });
   await m.turn('');
-  await m.turn('Trabalhei com Kafka.');
-  const { record } = await m.end();
-  assert.match(pairs[0].question, /trajetória/);
-  assert.strictEqual(pairs[0].answer, 'Trabalhei com Kafka.');
-  assert.strictEqual(record.evaluation.score, 71);
+  const { record } = await m.end('Trabalhei com Kafka.');
+  assert.match(record.evaluation.items[0].question, /trajetória/);
+  assert.strictEqual(record.evaluation.items[0].answer, 'Trabalhei com Kafka.');
+  assert.strictEqual(record.evaluation.score, 70);
   assert.ok(record.messages.some((x) => x.content === 'Trabalhei com Kafka.'));
   const r = await m.coach('mock_2', 'O que melhorar?');
   assert.strictEqual(r.answer, 'Cite números.');
@@ -407,18 +418,39 @@ test('a spoken answer sent early holds the reply: nothing is said or committed u
   fs.rmSync(f.dir, { recursive: true });
 });
 
-test('the page sends a spoken answer before Orby may speak and asks the main process to hold the difference', () => {
-  const page = fs.readFileSync(path.join(__dirname, '../src/renderer/mock.js'), 'utf8');
-  const ms = (name) => Number(page.match(new RegExp(`const ${name} = ([0-9]+);`))[1]);
-  assert.ok(ms('SEND_AFTER_SENTENCE_MS') < ms('SPEAK_AFTER_SENTENCE_MS'));
-  assert.ok(ms('SEND_AFTER_PAUSE_MS') < ms('SPEAK_AFTER_PAUSE_MS'));
-  assert.ok(ms('SPEAK_AFTER_SENTENCE_MS') <= 900 && ms('SPEAK_AFTER_PAUSE_MS') <= 1300, 'never slower than the single wait it replaced');
-  assert.match(page, /api\.mockTurn\(text, action, holdMs\)/);
-  // The site keeps the same clocks, when it sits next to this repository.
-  const sitePath = path.join(__dirname, '../../../../Browser/Home/src/lib/mockTiming.js');
-  if (!fs.existsSync(sitePath)) return;
-  const site = fs.readFileSync(sitePath, 'utf8');
-  for (const name of ['SEND_AFTER_SENTENCE_MS', 'SEND_AFTER_PAUSE_MS', 'SEND_MID_SPEECH_MS', 'SPEAK_AFTER_SENTENCE_MS', 'SPEAK_AFTER_PAUSE_MS']) {
-    assert.strictEqual(ms(name), Number(site.match(new RegExp(`${name} = ([0-9]+);`))[1]), name);
-  }
+test('a second interview for the same job opens with a generated question that knows the earlier ones, and falls back to the script', async () => {
+  const f = fakeDeps({ ok: true, status: 200, data: { id: 'again_1', max_s: 1800, stt: {} } });
+  const interviews = createMockInterviews(f.deps);
+  await interviews.start({ agentId: 'g1', lang: 'pt-BR', settings: { depth: 0 } });
+  await interviews.turn('');
+  const scripted = f.said.join(' ');
+  assert.match(scripted, /trajetória/);
+  await interviews.turn('Trabalhei com Kafka.');
+  await interviews.end();
+
+  let sent = null;
+  const stream = f.deps.fetch;
+  f.deps.fetch = async (url, init) => {
+    const body = JSON.parse(init.body);
+    if (body.stream) sent = body.messages;
+    return stream(url, init);
+  };
+  f.deps.api = async (_m, p) => (p === '/v1/mock/start' ? { ok: true, status: 200, data: { id: 'again_2', max_s: 1800, stt: {} } } : { ok: true, data: {} });
+  f.said.length = 0;
+  await interviews.start({ agentId: 'g1', lang: 'pt-BR', settings: { depth: 0 } });
+  assert.strictEqual((await interviews.turn('')).ok, true);
+  assert.ok(sent[0].content.includes('Abra a entrevista'));
+  assert.ok(sent[0].content.includes(scripted), 'the earlier opening is listed as already asked');
+  assert.deepStrictEqual(f.said, ['Bom dia.', 'Fale de você.']);
+  await interviews.turn('Outra resposta.');
+  await interviews.end();
+
+  // The provider is down at the opening: the scripted question is used.
+  f.deps.api = async (_m, p) => (p === '/v1/mock/start' ? { ok: true, status: 200, data: { id: 'again_3', max_s: 1800, stt: {} } } : { ok: true, data: {} });
+  f.deps.fetch = async () => ({ ok: false, status: 503 });
+  f.said.length = 0;
+  await interviews.start({ agentId: 'g1', lang: 'pt-BR', settings: { depth: 0 } });
+  assert.strictEqual((await interviews.turn('')).ok, true);
+  assert.match(f.said.join(' '), /trajetória/);
+  fs.rmSync(f.dir, { recursive: true });
 });
