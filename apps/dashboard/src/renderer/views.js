@@ -309,7 +309,7 @@
     const stats = [
       ['Sessions', String(S.sessions.length), thisWeek ? C.t('+{n} this week', { n: thisWeek }) : C.t('None this week'), thisWeek ? 'up' : ''],
       ['Questions answered', String(totalQ), plural(totalA, 'copilot answer', 'copilot answers'), ''],
-      ['Average latency', lat ? `${lat}ms` : '—', latPts.length ? C.t(latPts.length === 1 ? 'Last measured session' : 'Last {n} sessions', { n: latPts.length }) : C.t('No measurements'), ''],
+      ['Average latency', lat ? `${lat} ms` : '—', latPts.length ? C.t(latPts.length === 1 ? 'Last measured session' : 'Last {n} sessions', { n: latPts.length }) : C.t('No measurements'), ''],
       ['Average JEV score', jevAvg == null ? '—' : (jevAvg / 10).toFixed(1), evald.length ? plural(evald.length, 'session evaluated', 'sessions evaluated') : C.t('No evaluations yet'), jevAvg != null && jevAvg < 80 ? 'warn' : '']
     ];
 
@@ -1239,6 +1239,10 @@
     </div>`;
   };
 
+  // A subcategory may be stored in Portuguese while the category label is the
+  // English source text: compare them as the reader sees them.
+  const sameLabel = (a, b) => C.norm(C.t(a)) === C.norm(C.t(b));
+
   function qCard(x) {
     const open = S.ui.qOpen === x.key;
     const text = fixText(x.q.text);
@@ -1251,7 +1255,7 @@
           <div class="row wrap" style="gap:8px 12px">
             <span class="small muted nowrap">${esc(C.catLabel(x.q.category))}</span>
             <span class="row" style="gap:3px">${x.companies.slice(0, 3).map((c) => `<span class="mono-tile xs">${esc(c.monogram || C.monogram(c.name))}</span>`).join('')}${x.companies.length > 3 ? `<span class="xs faint" style="margin-left:4px">+${x.companies.length - 3}</span>` : ''}</span>
-            ${sub && sub !== C.catLabel(x.q.category) ? `<span class="tag">${esc(sub.split(' · ')[0])}</span>` : ''}
+            ${sub && !sameLabel(sub.split(' · ')[0], C.catLabel(x.q.category)) ? `<span class="tag">${esc(sub.split(' · ')[0])}</span>` : ''}
           </div>
         </div>
         <div class="stack" style="align-items:flex-end;gap:6px;flex:none" title="In ${x.seen} of ${x.total} interviews"><span class="mono" style="font-size:12px;color:var(--text-body)">${x.seen}/${x.total}</span>${pctBar(x.freq, 'w56')}</div>

@@ -224,8 +224,12 @@
   function historyView() {
     const list = M.history || [];
     if (!list.length) return '';
-    return `<section class="card" style="gap:10px"><span class="strong">Past interviews</span>${list.map((r) => `
-      <button type="button" class="row btn ghost" style="gap:8px;justify-content:flex-start" data-action="mock-open" data-id="${esc(r.id)}"><span class="grow" style="text-align:left" data-no-i18n>${esc(r.company || '—')} · ${esc(r.role || '—')}</span>${SC.scorecard(r, []) && SC.scorecard(r, []).index != null ? `<span class="pill num">${SC.scorecard(r, []).index}</span>` : ''}<span class="small faint">${esc(new Date(r.startedAt).toLocaleDateString())}</span></button>`).join('')}</section>`;
+    return `<section class="card" style="gap:10px"><span class="strong">Past interviews</span>${list.map((r) => {
+      const score = SC.scorecard(r, [])?.index;
+      const label = score != null ? C.t('Score {n} of 100', { n: score }) : '';
+      return `
+      <button type="button" class="row btn ghost" style="gap:8px;justify-content:flex-start" data-action="mock-open" data-id="${esc(r.id)}"><span class="grow" style="text-align:left" data-no-i18n>${esc(r.company || '—')} · ${esc(r.role || '—')}</span>${score != null ? `<span class="pill num" style="gap:0" title="${esc(label)}" aria-label="${esc(label)}" data-no-i18n>${score}<span class="faint">/100</span></span>` : ''}<span class="small faint">${esc(new Date(r.startedAt).toLocaleDateString())}</span></button>`;
+    }).join('')}</section>`;
   }
 
   const STATE_LABEL = { speaking: 'Orby is speaking', thinking: 'Orby is thinking', listening: 'Your turn: answer out loud', typing: 'Your turn: type your answer', connecting: 'Connecting' };

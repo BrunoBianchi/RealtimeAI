@@ -577,6 +577,7 @@
       'Go to sessions': 'Ir para sessões',
       'Up to 30 minutes by voice, with feedback at the end.': 'Até 30 minutos por voz, com feedback no final.',
       'Past interviews': 'Entrevistas anteriores',
+      'Score {n} of 100': 'Nota {n} de 100',
       'Interviewer is speaking': 'O entrevistador está falando',
       'Interviewer is thinking': 'O entrevistador está pensando',
       'Your turn: answer out loud': 'Sua vez: responda em voz alta',

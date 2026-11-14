@@ -860,7 +860,7 @@ const NAV = [
   ['files', 'Files', 'folder'],
   ['questions', 'Question bank', 'question'],
   ['mock', 'Mock interview', 'microphone'],
-  ['study', 'Study', 'stack'],
+  ['study', 'Study', 'board'],
   ['pair', 'Pair programming', 'code'],
   ['live', 'Live', 'broadcast'],
   ['settings', 'Settings', 'gear']
