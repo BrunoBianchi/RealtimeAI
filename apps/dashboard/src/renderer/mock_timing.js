@@ -9,8 +9,11 @@
   // A few words are more often the start of an answer than all of it.
   const SHORT_ANSWER_WORDS = 10;
 
+  // `pauses` shortens the silences for a conversation (the study tutor) where
+  // the default ones, tuned to not cut off interview answers, feel slow.
   function createVoiceAnswer({
     onDraft, onSubmit, finalize, setTimer = setTimeout, clearTimer = clearTimeout,
+    pauses: { complete: completePause = COMPLETE_PAUSE_MS, thinking: thinkingPause = THINKING_PAUSE_MS } = {},
   }) {
     let final = '';
     let interim = '';
@@ -50,7 +53,7 @@
       if (suspended || !auto || !draft()) return;
       const settled = complete && draft().split(/\s+/u).length >= SHORT_ANSWER_WORDS;
       const hold = settled ? COMPLETE_HOLD_MS : THINKING_HOLD_MS;
-      timer = setTimer(() => submit(hold), settled ? COMPLETE_PAUSE_MS : THINKING_PAUSE_MS);
+      timer = setTimer(() => submit(hold), settled ? completePause : thinkingPause);
     }
 
     function receive(message) {
