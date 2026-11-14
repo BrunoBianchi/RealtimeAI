@@ -11,7 +11,7 @@ const prompt = require('./mock_prompt');
 const { evaluateInterview } = require('./mock_evaluation');
 const { reviewLanguage } = require('./mock_language');
 const {
-  FINISH_MARK, languageName, createInterview, prepareTurn, resolveQAndA,
+  FINISH_MARK, languageName, createInterview, interviewFiles, prepareTurn, resolveQAndA,
   commitAnswer, commitTurn, evaluationPairs, coverageFor, takeSentences, bankQuestionsFor
 } = prompt;
 
@@ -64,11 +64,14 @@ function createMockInterviews(deps) {
     if (modeFromServer !== 'advanced' || chosenMode === 'advanced') {
       if (active?.id !== r.data.id || !active.messages.length) {
         const selected = agents.find((a) => a.id === r.data.agent_id) || agent;
-        // What Orby already asked for this job, so a new interview takes other angles.
-        const earlier = list().filter((rec) => rec.agentId === selected.id);
-        const previous = earlier.slice(0, 4).flatMap((rec) => (rec.messages || []).filter((m) => m.role === 'assistant').map((m) => m.content));
+        // What Orby already asked (this job first, then the others), so a new
+        // interview takes other angles; the seed varies even a first interview.
+        const all = list();
+        const earlier = [...all.filter((rec) => rec.agentId === selected.id), ...all.filter((rec) => rec.agentId !== selected.id)];
+        const previous = earlier.slice(0, 6).flatMap((rec) => (rec.messages || []).filter((m) => m.role === 'assistant').map((m) => m.content));
+        const seed = deps.seed ? deps.seed() : 1 + Math.floor(Math.random() * 1000000);
         active = {
-          ...createInterview(selected, agents, deps.bank?.(), lang, modeFromServer, { ...settings, previous, round: earlier.length }, r.data.max_s),
+          ...createInterview(selected, agents, deps.bank?.(), lang, modeFromServer, { ...settings, previous, round: earlier.length, seed }, r.data.max_s),
           id: r.data.id, visualFeedback: [], startedAt: deps.now(), abort: null, pendingTurn: null,
           // Recorded messages by "role:i" and the answers that were spoken.
           audio: new Map(), spoken: new Set()
@@ -382,11 +385,14 @@ function createMockInterviews(deps) {
     return r.ok ? r.data : null;
   }
 
-  // What the page shows before starting.
+  // What the page shows before starting: the community questions and the
+  // files that can be marked as the main ones for the questions.
   function prep(agentId) {
-    const agent = deps.agents().find((a) => a.id === agentId);
+    const agents = deps.agents();
+    const agent = agents.find((a) => a.id === agentId);
     const questions = bankQuestionsFor(agent, deps.bank ? deps.bank() : null);
-    return { total: questions.length, questions: questions.slice(0, 5).map(({ text, category, reports }) => ({ text, category, reports })) };
+    const files = agent ? interviewFiles(agent, agents).map(({ key, title, type }) => ({ key, title, type })) : [];
+    return { total: questions.length, questions: questions.slice(0, 5).map(({ text, category, reports }) => ({ text, category, reports })), files };
   }
 
   return { prep, start, turn, cancelTurn, speak, keepAudio: (clip) => keepAudio(clip), audio, analyzeFrame, end, list, coach, sttToken, isActive: () => Boolean(active) };

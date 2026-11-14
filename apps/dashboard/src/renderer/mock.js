@@ -26,16 +26,31 @@
     collaboration: 'Working with other areas', explain: 'Explaining without jargon', people: 'People and influence', values: 'Leadership principles',
     dd_overview: 'The project and its result', dd_decisions: 'Decisions and alternatives', dd_people: 'People and alignment', dd_outcome: 'Measuring and looking back',
     ai_work: 'What you build with AI', ai_trust: 'Verifying AI output', ai_iteration: 'Improving how you use AI', ai_growth: 'Keeping up with AI', ai_scaling: 'Spreading AI practices', ai_values: 'Your view on AI',
-    questions: 'Your questions'
+    focus: 'Topics you asked for', questions: 'Your questions'
   };
   const COVERAGE = { answered: 'Answered', offered: 'Time offered', skipped: 'Skipped', unanswered: 'Unanswered' };
   const defaultGoal = 'Connect your background and motivation to the role with real examples.';
   const personaLabel = (persona) => C.t(PERSONAS.find(([id]) => id === persona)?.[1] || '');
   const skipLabel = (topic) => C.t(topic === 'questions' ? 'I have no more questions' : 'Skip');
   const topicLabel = (topic) => C.t(TOPICS[topic] || '');
-  const defaultSettings = { kind: 'behavioral', persona: 'recruiter', format: 'auto', level: 'auto', depth: 1, goal: '', useBank: true };
+  const defaultSettings = { kind: 'behavioral', persona: 'recruiter', format: 'auto', level: 'auto', depth: 1, goal: '', focus: '', useBank: true };
+  // The files marked as the main ones for the questions, by job id, kept on this computer.
+  const PRIORITY_KEY = 'lipcue_mock_priority';
+  const loadPriority = () => {
+    try {
+      const value = JSON.parse(localStorage.getItem(PRIORITY_KEY) || '{}');
+      return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    } catch (_e) {
+      return {};
+    }
+  };
+  const savePriority = (value) => {
+    try {
+      localStorage.setItem(PRIORITY_KEY, JSON.stringify(value));
+    } catch (_e) { /* Kept until the app closes. */ }
+  };
   const kindLabel = (kind) => C.t(KINDS.find(([id]) => id === kind)?.[1] || '');
-  const M = { phase: 'idle', agentId: '', lang: '', mode: 'basic', settings: { ...defaultSettings }, topic: '', modeTouched: false, consent: false, cameraStream: null, cameraTimer: null, cameraBusy: false, visualCount: 0, previousFrame: '', cameraJob: null, lines: [], partial: '', state: '', error: '', record: null, history: null, endsAt: 0, id: '' };
+  const M = { phase: 'idle', agentId: '', lang: '', mode: 'basic', settings: { ...defaultSettings }, topic: '', modeTouched: false, consent: false, cameraStream: null, cameraTimer: null, cameraBusy: false, visualCount: 0, previousFrame: '', cameraJob: null, lines: [], partial: '', state: '', error: '', record: null, history: null, endsAt: 0, id: '', priority: loadPriority() };
   S.mock = M;
   let ws = null;
   let audio = null; // { ctx, stream, node }
@@ -164,6 +179,8 @@
             <label class="field">Interviewer<select class="select" data-change="mock-persona">${C.opts(PERSONAS, M.settings.persona)}</select></label>
             <label class="field">Interview language<select class="select" data-change="mock-lang" data-no-i18n>${C.opts(LANGUAGES, lang)}</select></label>
           </div>
+          <label class="field">What can be asked<textarea class="input" rows="2" maxlength="600" data-input="mock-focus" placeholder="Optional. Example: Kafka at my last job, the payments app, leading the migration, why I want to move to data.">${esc(M.settings.focus)}</textarea><span class="small muted">Orby asks about these topics in its own words, along with the usual ones.</span></label>
+          ${mainFilesHtml()}
           <details class="mock-details">
             <summary class="strong">Interview settings</summary>
             <div class="stack gap-8" style="margin-top:12px">
@@ -510,6 +527,22 @@
       });
     }
   };
+  // The session files that can be marked as the main ones for the questions
+  // (they come with the community questions, from main/mock_interview.js prep).
+  function mainFilesHtml() {
+    const prep = M.prep && M.prep[M.agentId];
+    if (!prep) return '';
+    const files = Array.isArray(prep.files) ? prep.files : [];
+    const marked = M.priority[M.agentId] || [];
+    const chips = files.map((f) => {
+      const on = marked.includes(f.key);
+      return `<button type="button" class="mock-file ${on ? 'on' : ''}" aria-pressed="${on}" data-action="mock-file-main" data-key="${esc(f.key)}"><span aria-hidden="true">${on ? '★' : '☆'}</span><span data-no-i18n>${esc(f.title)}</span></button>`;
+    }).join('');
+    return `<div class="field"><span>Main files for the questions</span>
+      ${files.length ? `<div class="mock-files" role="group" aria-label="Main files for the questions">${chips}</div>` : '<span class="small muted">This job has no files yet. Add a résumé or project file to the job to choose one.</span>'}
+      <span class="small muted">Mark one or more files. Orby builds its questions on them first and uses the rest as support. Saved for this job.</span></div>`;
+  }
+
   C.afterRender.mock = function afterMock() {
     C.loadMockRecords();
     C.startOrbs();
@@ -913,7 +946,7 @@
     finishing = false;
     M.state = 'connecting';
     C.renderView();
-    const r = await C.guard(() => api.mockStart(M.agentId, M.lang, requestedMode, M.settings), 'Could not start the interview.');
+    const r = await C.guard(() => api.mockStart(M.agentId, M.lang, requestedMode, { ...M.settings, priority: M.priority[M.agentId] || [] }), 'Could not start the interview.');
     if (!r || !r.ok) {
       stopCamera();
       M.phase = 'idle';
@@ -1074,6 +1107,14 @@
   C.changes['mock-depth'] = (el) => { M.settings.depth = Number(el.value); };
   C.changes['mock-bank'] = (el) => { M.settings.useBank = Boolean(el.checked); };
   C.inputs['mock-goal'] = (el) => { M.settings.goal = el.value; };
+  C.inputs['mock-focus'] = (el) => { M.settings.focus = el.value; };
+  C.actions['mock-file-main'] = (el) => {
+    const key = el.dataset.key || '';
+    const now = M.priority[M.agentId] || [];
+    M.priority = { ...M.priority, [M.agentId]: now.includes(key) ? now.filter((k) => k !== key) : [...now, key].slice(-8) };
+    savePriority(M.priority);
+    C.renderView();
+  };
   C.actions['mock-mode-set'] = (el) => {
     M.mode = el.dataset.mode === 'advanced' ? 'advanced' : 'basic';
     M.modeTouched = true;

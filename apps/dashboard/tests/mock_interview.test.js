@@ -100,7 +100,7 @@ function fakeDeps(apiResult) {
   return {
     said, calls, dir,
     deps: {
-      dataDir: () => dir, agents: () => [job, other], now: () => 1000, emit: (e) => said.push(e.text),
+      dataDir: () => dir, agents: () => [job, other], now: () => 1000, seed: () => 0, emit: (e) => said.push(e.text),
       url: (p) => p, headers: () => ({}),
       api: async (m, p) => { calls.push(p); return p === '/v1/mock/start' ? apiResult : { ok: true, data: { refunded: false } }; },
       fetch: async (url, init) => {
@@ -274,7 +274,7 @@ test('both modes are charged per minute from the one balance shared with live se
   await r.Cue.actions['mock-start']();
   const [agentId, lang, mode, settings] = r.called('mockStart')[0];
   assert.deepEqual([agentId, lang, mode], [job.id, 'es', 'basic']);
-  assert.deepEqual({ ...settings }, { kind: 'behavioral', persona: 'global', format: 'internship', level: 'auto', depth: 1, goal: 'Explicar um projeto', useBank: true });
+  assert.deepEqual({ ...settings }, { kind: 'behavioral', persona: 'global', format: 'internship', level: 'auto', depth: 1, goal: 'Explicar um projeto', focus: '', useBank: true, priority: [] });
   assert.deepEqual(r.called('mockTurn'), [['']]);
 
   const plan = render(r.Cue, 'settings/plan/interviews');
@@ -555,4 +555,45 @@ test('the report plays each question and answer apart and shows the language rev
   // A report without either keeps its old shape.
   r.S.mock.record = { id: 'm8', messages: [{ role: 'assistant', content: 'Oi?' }] };
   assert.doesNotMatch(render(r.Cue, 'mock'), /mock-language|mock-recording/);
+});
+
+test('the topics asked for and the main files reach the interviewer, and each start gets its own seed', async () => {
+  const f = fakeDeps({ ok: true, data: { id: 'mock_focus', max_s: 1800, stt: { token: 't' } } });
+  let n = 0;
+  f.deps.seed = () => { n += 1; return 7; };
+  const systems = [];
+  const base = f.deps.fetch;
+  f.deps.fetch = async (url, init) => {
+    const body = JSON.parse(init.body);
+    if (body.stream !== false) systems.push(body.messages[0].content);
+    return base(url, init);
+  };
+  const m = createMockInterviews(f.deps);
+  const prep = m.prep('g1');
+  assert.deepStrictEqual(prep.files.map((x) => [x.key, x.type]), [['CV', 'resume'], ['Notas', 'upload']]);
+  const r = await m.start({ agentId: 'g1', lang: 'pt-BR', settings: { focus: 'Kafka no Nubank', priority: ['Notas'] } });
+  assert.strictEqual(n, 1);
+  assert.deepStrictEqual(r.topics.slice(0, 2), ['trajectory', 'focus']);
+  assert.deepStrictEqual(r.settings.priority, ['Notas']);
+  await m.turn('');
+  assert.strictEqual(systems.length, 1, 'with a seed the model opens');
+  assert.match(systems[0], /assuntos_pedidos/);
+  assert.match(systems[0], /"title":"Notas","prioridade":true/);
+  await m.end('');
+  fs.rmSync(f.dir, { recursive: true });
+});
+
+test('the setup offers the job files as main files and sends the marked ones with the start', async () => {
+  const { loadRenderer, render, tags } = require('./helpers/renderer');
+  const r = loadRenderer({ state: { agents: [job] } });
+  Object.assign(r.S.mock, { phase: 'idle', agentId: 'g1', prep: { g1: { total: 0, questions: [], files: [{ key: 'CV', title: 'CV', type: 'resume' }, { key: 'Notas', title: 'Notas', type: 'upload' }] } }, priority: { g1: ['Notas'] } });
+  const html = render(r.Cue, 'mock');
+  assert.match(html, /What can be asked/);
+  assert.strictEqual(tags(html, { 'data-input': 'mock-focus' }).length, 1);
+  const chips = tags(html, { 'data-action': 'mock-file-main' });
+  assert.deepStrictEqual(chips.map((t) => [t['data-key'], t['aria-pressed']]), [['CV', 'false'], ['Notas', 'true']]);
+  r.Cue.actions['mock-file-main']({ dataset: { key: 'CV' } });
+  assert.deepStrictEqual([...r.S.mock.priority.g1], ['Notas', 'CV']);
+  r.Cue.actions['mock-file-main']({ dataset: { key: 'Notas' } });
+  assert.deepStrictEqual([...r.S.mock.priority.g1], ['CV']);
 });

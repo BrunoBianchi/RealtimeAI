@@ -3822,6 +3822,12 @@ table.compare td.strong {
 .mock-config { gap: 18px; }
 .mock-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding-top: 14px; border-top: 1px solid var(--border-subtle); }
 .mock-details summary { cursor: pointer; }
+.mock-files { display: flex; flex-wrap: wrap; gap: 8px; }
+.mock-file { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border-subtle); background: transparent; color: var(--text-secondary); font-size: 13px; cursor: pointer; text-align: left; overflow-wrap: anywhere; }
+.mock-file:hover { color: var(--text); border-color: var(--accent-border); }
+.mock-file:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mock-file.on { color: var(--text); border-color: var(--accent-border); background: var(--accent-soft); }
+.mock-file.on span:first-child { color: var(--accent); }
 .mock-fix { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
 .mock-fix del { color: var(--danger); text-decoration: line-through; }
 .mock-fix ins { color: var(--accent); text-decoration: none; font-weight: 600; }

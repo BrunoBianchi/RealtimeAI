@@ -33,8 +33,13 @@ const LEVELS = {
 };
 const DEFAULT_GOAL = 'Comunicar a trajetória, a motivação e a adequação à vaga com exemplos reais, ações próprias, resultados ou aprendizados e disponibilidade quando relevante.';
 const GOAL_LIMIT = 400;
+// What the candidate wants to be asked about, and how many files can be marked
+// as the main ones for the questions.
+const FOCUS_LIMIT = 600;
+const PRIORITY_LIMIT = 8;
 const FINISH_MARK = '[FIM]';
 const TOPICS = {
+  focus: 'Assunto pedido pela pessoa: faça uma pergunta sobre um dos assuntos em assuntos_pedidos que ainda não foi explorado, ligada à vaga ou a um trecho quando possível.',
   trajectory: 'Apresentação ("fale sobre você"): resumo profissional com o que diferencia a pessoa, duas ou três realizações recentes ligadas à vaga e o que ela busca agora. Não é uma lista cronológica de empregos.',
   project: 'Projeto mais marcante: o de maior impacto e escopo em que a pessoa foi a principal responsável. Investigue o problema e o que estava em jogo, as ações próprias (técnicas e não técnicas), o resultado e o que faria diferente.',
   conflict: 'Conflito: uma discordância real e relevante (técnica, de prioridade, de prazo ou de processo) em que a pessoa agiu diretamente para resolver. Investigue o que fez, que dados usou e como ficou a relação depois. Se ela disser que nunca teve conflitos, peça uma discordância de opinião.',
@@ -132,14 +137,32 @@ function uploadType(doc) {
   return 'upload';
 }
 
-function buildIndex(agent, others = []) {
-  const docs = Array.isArray(agent.documents) ? agent.documents.filter(Boolean) : [];
-  const resume = findResume(agent, others.filter((a) => a.id !== agent.id));
+// The files of a session the interviewer reads (the résumé may come from
+// another session), as [{key, title, type}]. `key` is what settings.priority holds.
+function interviewFiles(agent, others = []) {
+  const docs = Array.isArray(agent?.documents) ? agent.documents.filter(Boolean) : [];
+  const resume = findResume(agent || {}, others.filter((a) => a && a.id !== agent?.id));
+  const out = [];
+  const seen = new Set();
+  const add = (doc, type, fallback) => {
+    const text = clean(doc.content, 60000);
+    const title = clean(doc.title || doc.name, 120) || fallback;
+    if (!text || seen.has(text)) return;
+    seen.add(text);
+    out.push({ key: title, title, type, text });
+  };
+  if (resume) add(resume, 'resume', 'Currículo');
+  for (const d of docs) if (!isResume(d)) add(d, uploadType(d), 'Material da sessão');
+  return out;
+}
+
+// `priority`: keys of the files marked as the main ones for the questions.
+function buildIndex(agent, others = [], priority = []) {
+  const main = new Set(priority);
   const sources = [
     { type: 'job', title: 'Descrição da vaga', text: clean(agent.job_description, 60000) },
     { type: 'company', title: 'Pesquisa desta empresa', text: companyResearch(agent) },
-    ...(resume ? [{ type: 'resume', title: clean(resume.title, 120) || 'Currículo', text: clean(resume.content, 60000) }] : []),
-    ...docs.filter((d) => !isResume(d)).map((d) => ({ type: uploadType(d), title: clean(d.title || d.name, 120) || 'Material da sessão', text: clean(d.content, 60000) }))
+    ...interviewFiles(agent, others).map((f) => ({ ...f, priority: main.has(f.key) }))
   ];
   const chunks = [];
   const seen = new Set();
@@ -156,7 +179,7 @@ function buildIndex(agent, others = []) {
         const tokens = terms(doc.title + ' ' + text);
         const counts = new Map();
         for (const token of tokens) counts.set(token, (counts.get(token) || 0) + 1);
-        chunks.push({ id: 'D' + (chunks.length + 1), source, type: doc.type, title: doc.title, text, start, end: start + size, counts, size: tokens.length });
+        chunks.push({ id: 'D' + (chunks.length + 1), source, type: doc.type, title: doc.title, priority: Boolean(doc.priority), text, start, end: start + size, counts, size: tokens.length });
       }
       if (start + size >= doc.text.length) break;
       start += size - 100;
@@ -171,12 +194,15 @@ function buildIndex(agent, others = []) {
   return { chunks, df, avg };
 }
 
+// `types`: the source types to search, or a function that picks the chunks.
+// Chunks of the files marked as the main ones rank higher.
 function retrieve(index, queries, k = 5, types = null) {
   const weights = new Map();
   for (const [query, weight] of typeof queries === 'string' ? [[queries, 1]] : queries) {
     for (const token of new Set(terms(query))) weights.set(token, Math.max(weights.get(token) || 0, weight));
   }
-  const scored = index.chunks.filter((c) => !types || types.includes(c.type)).map((c) => {
+  const wanted = typeof types === 'function' ? types : (c) => !types || types.includes(c.type);
+  const scored = index.chunks.filter(wanted).map((c) => {
     let score = 0;
     for (const [term, weight] of weights) {
       const tf = c.counts.get(term);
@@ -185,7 +211,7 @@ function retrieve(index, queries, k = 5, types = null) {
       const idf = Math.log(1 + (index.chunks.length - df + 0.5) / (df + 0.5));
       score += weight * idf * (tf * 2.2) / (tf + 1.2 * (0.25 + 0.75 * c.size / (index.avg || 1)));
     }
-    return { c, score };
+    return { c, score: c.priority ? score * 1.6 : score };
   }).filter((s) => s.score > 0).sort((a, b) => b.score - a.score);
   const picked = [];
   for (const { c } of scored) {
@@ -245,6 +271,8 @@ function normalizeSettings(agent, options = {}) {
   const track = format === 'auto' ? (internship ? 'internship' : 'professional') : format;
   return {
     persona, format: track, depth, goal: clean(options?.goal, GOAL_LIMIT), useBank: options?.useBank !== false,
+    focus: clean(options?.focus, FOCUS_LIMIT),
+    priority: [...new Set((Array.isArray(options?.priority) ? options.priority : []).map((key) => clean(key, 120)).filter(Boolean))].slice(0, PRIORITY_LIMIT),
     kind: Object.hasOwn(KINDS, options?.kind) ? options.kind : 'behavioral',
     // Without an explicit level, an internship is entry level and other roles
     // are judged without a fixed level.
@@ -252,9 +280,9 @@ function normalizeSettings(agent, options = {}) {
   };
 }
 
-// A different way into each topic on every new interview for the same job, so
-// rehearsing again does not replay the same questions. `round` is how many
-// interviews for this job came before this one.
+// A different way into each topic on every new interview, so rehearsing again
+// does not replay the same questions. `variant` is the number of earlier
+// interviews plus a random seed picked when the interview starts.
 const ANGLES = {
   trajectory: ['a história geral e o que trouxe a pessoa até esta oportunidade', 'um projeto ou experiência específica do currículo e o papel dela', 'uma decisão ou mudança de rumo e o motivo', 'um desafio ou erro e o que aprendeu com ele'],
   culture: ['colaboração com outras pessoas', 'autonomia e iniciativa', 'aprendizado e como recebe feedback', 'como lida com discordância ou pressão'],
@@ -266,29 +294,36 @@ const ANGLES = {
   values: ['como prioriza trabalhos concorrentes', 'como forma e mantém um time eficaz', 'como toma decisões técnicas difíceis', 'como lida com baixo desempenho ou desalinhamento'],
   ai_values: ['onde a IA cabe e onde não cabe no trabalho da pessoa', 'como equilibra velocidade e verificação do que a IA produz', 'como pensa a adoção de IA no time']
 };
-const angleFor = (topic, round) => (ANGLES[topic] ? ANGLES[topic][round % ANGLES[topic].length] : '');
+const angleFor = (topic, variant) => (ANGLES[topic] ? ANGLES[topic][variant % ANGLES[topic].length] : '');
 
 // The topics of one interview, in order. The most telling ones come first,
 // because a short interview jumps to the candidate's questions when time runs low.
-function interviewTopics(settings, round = 0) {
+// The topics the candidate asked for come right after the first question.
+function interviewTopics(settings, variant = 0) {
   const intern = settings.format === 'internship' ? ['academics', 'availability'] : [];
-  // Every other interview asks about motivation before culture.
-  const [second, later] = round % 2 ? ['motivation', 'culture'] : ['culture', 'motivation'];
-  switch (settings.kind) {
-    case 'screen': return ['trajectory', 'motivation', ...intern, 'culture', 'questions'];
-    case 'deepdive': return ['dd_overview', 'dd_decisions', 'dd_people', 'dd_outcome', 'questions'];
-    case 'crossfunctional': return ['trajectory', 'collaboration', 'conflict', 'explain', 'questions'];
-    case 'leadership': return ['trajectory', 'project', 'people', 'values', 'conflict', 'questions'];
-    case 'ai': return ['ai_work', 'ai_trust', 'ai_iteration', ...(['senior', 'staff'].includes(settings.level) ? ['ai_scaling'] : []), 'ai_growth', 'ai_values', 'questions'];
-    default: return [
-      'trajectory', 'project', ...intern, 'conflict', second, 'signal', later,
-      ...(settings.persona === 'technical' ? ['skills'] : []), 'questions'
-    ];
-  }
+  // The order of the middle topics changes between interviews.
+  const [second, later] = variant % 2 ? ['motivation', 'culture'] : ['culture', 'motivation'];
+  const [third, fourth] = Math.floor(variant / 2) % 2 ? ['signal', 'conflict'] : ['conflict', 'signal'];
+  // A deep dive stays on one project, so the topics asked for only guide it.
+  const focus = settings.focus && settings.kind !== 'deepdive' ? ['focus'] : [];
+  const plan = (() => {
+    switch (settings.kind) {
+      case 'screen': return ['trajectory', 'motivation', ...intern, 'culture', 'questions'];
+      case 'deepdive': return ['dd_overview', 'dd_decisions', 'dd_people', 'dd_outcome', 'questions'];
+      case 'crossfunctional': return ['trajectory', 'collaboration', 'conflict', 'explain', 'questions'];
+      case 'leadership': return ['trajectory', 'project', 'people', 'values', 'conflict', 'questions'];
+      case 'ai': return ['ai_work', 'ai_trust', 'ai_iteration', ...(['senior', 'staff'].includes(settings.level) ? ['ai_scaling'] : []), 'ai_growth', 'ai_values', 'questions'];
+      default: return [
+        'trajectory', 'project', ...intern, third, second, fourth, later,
+        ...(settings.persona === 'technical' ? ['skills'] : []), 'questions'
+      ];
+    }
+  })();
+  return [plan[0], ...focus, ...plan.slice(1)];
 }
 
-// The interviewer's questions from earlier interviews for this job, newest
-// first, without the scripted invitation and without repeats.
+// The interviewer's questions from earlier interviews (this job's first, then
+// the others, newest first), without the scripted invitation and without repeats.
 function priorQuestions(list, lang) {
   const scripted = new Set(SCRIPT[lang].slice(1).map(canonical));
   const seen = new Set();
@@ -299,22 +334,25 @@ function priorQuestions(list, lang) {
     if (!key || !/[?？]/u.test(text) || seen.has(key) || scripted.has(key)) continue;
     seen.add(key);
     out.push(text);
-    if (out.length >= 16) break;
+    if (out.length >= 24) break;
   }
   return out;
 }
 
-// options.previous: questions already asked for this job; options.round: how
-// many interviews for it came before.
+// options.previous: questions already asked in earlier interviews; options.round:
+// how many interviews came before; options.seed: a random number picked at the
+// start, so even the first interview for a job differs from the last one.
 function createInterview(agent, others, bank, lang, mode, options, maxS) {
   const settings = normalizeSettings(agent, options);
   const language = Object.hasOwn(LANGUAGES, lang) ? lang : 'en';
   const previous = priorQuestions(options?.previous, language);
   const round = Number.isInteger(options?.round) && options.round > 0 ? options.round : previous.length ? 1 : 0;
+  const seed = Number.isInteger(options?.seed) && options.seed > 0 ? options.seed % 1000003 : 0;
+  const variant = round + seed;
   return {
-    agent, lang: language, mode, settings, maxS, previous, round,
-    index: buildIndex(agent, others), bank: bankQuestionsFor(agent, bank),
-    bankUsed: new Set(), topics: interviewTopics(settings, round), topicIndex: 0, followUps: 0,
+    agent, lang: language, mode, settings, maxS, previous, round, seed, variant,
+    index: buildIndex(agent, others, settings.priority), bank: bankQuestionsFor(agent, bank),
+    bankUsed: new Set(), priorityUsed: new Set(), topics: interviewTopics(settings, variant), topicIndex: 0, followUps: 0,
     messages: [], answers: [], skipped: new Set(), currentQuestion: ''
   };
 }
@@ -336,7 +374,9 @@ function pickBank(interview, topic, query) {
     .map((q) => ({ q, score: [...new Set(terms(q.text))].filter((term) => wanted.has(term)).length }))
     .filter(({ score }) => topic !== 'skills' || score > 0);
   ranked.sort((a, b) => b.score - a.score || b.q.reports - a.q.reports);
-  return ranked[0]?.q || null;
+  // One of the best three, so the community bank does not open every interview the same way.
+  const top = ranked.slice(0, 3);
+  return top.length ? top[(interview.variant || 0) % top.length].q : null;
 }
 
 function memoryFor(answers, answer, topic) {
@@ -355,11 +395,13 @@ function systemPrompt({ interview, topic, instruction, excerpts, memory, bank })
   const [kindName, kindStyle] = KINDS[settings.kind];
   const data = {
     vaga: clean(agent.role, 180), empresa: clean(agent.company, 180),
-    objetivo_do_candidato: settings.goal, trechos: excerpts.map(({ id, type, title, text }) => ({ id, type, title, text })),
+    objetivo_do_candidato: settings.goal,
+    ...(settings.focus ? { assuntos_pedidos: settings.focus } : {}),
+    trechos: excerpts.map(({ id, type, title, text, priority }) => ({ id, type, title, ...(priority ? { prioridade: true } : {}), text })),
     respostas_anteriores: memory, sugestao_do_banco_comunitario: bank?.text || '',
     ...(interview.previous.length ? { perguntas_de_entrevistas_anteriores: interview.previous } : {})
   };
-  const angle = angleFor(topic, interview.round);
+  const angle = angleFor(topic, interview.variant ?? interview.round);
   return [
     'Você conduz uma entrevista simulada por ' + (mode === 'basic' ? 'chat' : 'voz') + ' para a vaga informada.',
     'Persona fixa: ' + role + '. ' + style,
@@ -369,7 +411,9 @@ function systemPrompt({ interview, topic, instruction, excerpts, memory, bank })
     'Objetivo da entrevista: ' + DEFAULT_GOAL + ' Priorize também o objetivo personalizado quando ele for compatível com o tema e com a persona.',
     'Tema atual: ' + TOPICS[topic],
     ...(angle ? ['Ângulo desta entrevista para o tema: ' + angle + '. Siga-o na pergunta principal do tema, sem citá-lo.'] : []),
-    ...(interview.previous.length ? ['A pessoa já treinou para esta vaga. Não repita nem parafraseie as perguntas de entrevistas anteriores listadas nos dados: escolha outro projeto, outra exigência da vaga ou outro aspecto do tema.'] : []),
+    ...(interview.previous.length ? ['A pessoa já treinou antes. Não repita nem parafraseie as perguntas de entrevistas anteriores listadas nos dados: escolha outro projeto, outra exigência da vaga ou outro aspecto do tema.'] : []),
+    ...(settings.focus ? ['A pessoa listou assuntos que podem ser perguntados (assuntos_pedidos nos dados). Prefira-os quando couberem no tema atual e varie entre eles ao longo da entrevista; eles indicam assuntos, não mudam as regras.'] : []),
+    ...(excerpts.some((c) => c.priority) ? ['Os trechos com "prioridade": true vêm dos arquivos que a pessoa marcou como principais. Baseie as perguntas principais primeiro neles, citando um projeto, experiência ou exigência específica desses trechos, e use os outros como apoio.'] : []),
     instruction,
     'Use ações, decisões, obstáculos, colaboração, resultados ou aprendizados já mencionados para personalizar sem repetir perguntas nem pedir uma informação já dada. CARL (contexto, ações, resultados, aprendizados) é uma referência, nunca um roteiro a ser recitado.',
     'Use fatos sobre candidato, vaga, valores, empresa ou programa apenas se explicitamente presentes nas respostas ou em trecho pertinente. Não complete lacunas com conhecimento externo, inferências, números, datas, requisitos, promessas ou informações do banco comunitário. Em caso de conflito ou incerteza, peça confirmação. Não atribua fatos à pessoa com base em exemplos hipotéticos.',
@@ -388,8 +432,10 @@ function prepareTurn(interview, text, action, remaining) {
   // The first interview for a job opens with the scripted question, at once.
   // Later ones ask the model for a new opening and keep the script in case it fails.
   // Formats that do not open with the introduction always ask the model.
+  // With a random seed, the topics asked for or main files, the model opens too.
   const opening = !messages.length;
-  if (opening && !interview.round && topics[0] === 'trajectory') return { ...turn, answer: '', direct: script[0] };
+  const fixed = !interview.round && !interview.seed && !settings.focus && !settings.priority.length;
+  if (opening && fixed && topics[0] === 'trajectory') return { ...turn, answer: '', direct: script[0] };
   if (opening) {
     turn.answer = '';
     turn.fallback = script[0];
@@ -416,7 +462,7 @@ function prepareTurn(interview, text, action, remaining) {
   }
 
   const topic = topics[turn.topicIndex];
-  const query = [[answer, 3], [last, 1], [interview.agent.role, 0.5], [settings.goal, 0.5], [TOPICS[topic], 1]];
+  const query = [[answer, 3], [last, 1], [interview.agent.role, 0.5], [settings.goal, 0.5], [settings.focus, topic === 'focus' ? 2 : 0.5], [TOPICS[topic], 1]];
   const excerpts = topic === 'questions'
     ? retrieve(index, [[answer, 1]], 4, ['job', 'company'])
     : retrieve(index, query);
@@ -429,6 +475,13 @@ function prepareTurn(interview, text, action, remaining) {
     const type = topic === 'culture' ? 'company' : ['motivation', 'availability', 'skills'].includes(topic) ? 'job' : 'resume';
     const baseline = index.chunks.find((c) => c.type === type);
     if (baseline && !excerpts.some((c) => c.type === type)) excerpts.push(baseline);
+    // A part of a main file not shown yet, so the questions go through all of it.
+    if (!excerpts.some((c) => c.priority)) {
+      const fresh = (c) => c.priority && !interview.priorityUsed?.has(c.id);
+      const main = retrieve(index, query, 1, fresh)[0] || index.chunks.find(fresh) || index.chunks.find((c) => c.priority);
+      if (main) excerpts.unshift(main);
+    }
+    turn.priorityShown = excerpts.filter((c) => c.priority).map((c) => c.id);
   }
   if (opening) {
     turn.instruction = 'Abra a entrevista: cumprimente em poucas palavras e faça a primeira pergunta do tema atual, pelo ângulo indicado, com palavras diferentes das usadas em entrevistas anteriores.';
@@ -481,6 +534,7 @@ function commitTurn(interview, turn, spoken) {
   interview.topicIndex = turn.topicIndex;
   interview.followUps = turn.followUps;
   if (turn.bank) interview.bankUsed.add(turn.bank.text);
+  for (const id of turn.priorityShown || []) interview.priorityUsed?.add(id);
   if (action === 'repeat') return;
   if (action === 'skip' && answeredTopic !== 'questions') interview.skipped.add(answeredTopic);
   commitAnswer(interview, turn);
@@ -550,7 +604,7 @@ function takeSentences(buffer, flush = false) {
 }
 
 module.exports = {
-  LANGUAGES, PERSONAS, KINDS, LEVELS, GOAL_LIMIT, FINISH_MARK, languageName, resumeText, buildIndex, retrieve, bankQuestionsFor,
+  LANGUAGES, PERSONAS, KINDS, LEVELS, GOAL_LIMIT, FOCUS_LIMIT, PRIORITY_LIMIT, FINISH_MARK, languageName, resumeText, interviewFiles, buildIndex, retrieve, bankQuestionsFor,
   normalizeSettings, interviewTopics, createInterview, prepareTurn, resolveQAndA, commitAnswer, commitTurn,
   evaluationPairs, coverageFor, evaluationContext, evaluationMaterials, systemPrompt, takeSentences
 };
