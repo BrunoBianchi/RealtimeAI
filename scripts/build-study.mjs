@@ -2,7 +2,7 @@
 // The page runs inside the main window, in a shadow root (embedded.jsx), so the
 // bundle is a classic script and the site's global selectors are rewritten for
 // a shadow root: :root -> :host, html/body -> the page container.
-import { readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
@@ -37,4 +37,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const cssFile = resolve(output, 'study.css');
   await writeFile(cssFile, shadowCss(await readFile(cssFile, 'utf8')));
   for (const old of ['index.html', 'pcm-worklet.js']) await rm(resolve(output, old), { force: true });
+  // The whiteboard's handwriting font (Kalam, OFL), loaded from study/fonts/ by handFont.js.
+  await mkdir(resolve(output, 'fonts'), { recursive: true });
+  for (const file of ['kalam-400.woff2', 'kalam-700.woff2', 'KALAM-OFL.txt']) {
+    await copyFile(resolve(web, 'public/fonts', file), resolve(output, 'fonts', file));
+  }
 }
