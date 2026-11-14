@@ -3900,6 +3900,9 @@ details[open] > summary .mock-sc-caret::before { content: '\2212'; }
 .mock-sc-row .mock-sc-dot { margin: 0; }
 .mock-sc-row b { text-align: right; }
 .mock-sc-next { border-color: var(--accent-border); background: var(--accent-soft); }
+.mock-study-cta { flex-direction: row; align-items: center; gap: 16px; padding: 18px 20px; border-color: var(--accent-border); background: linear-gradient(90deg, var(--accent-soft), transparent 60%), var(--surface-card); }
+.mock-study-cta .btn { flex: none; }
+@media (max-width: 640px) { .mock-study-cta { flex-wrap: wrap; } .mock-study-cta .btn { width: 100%; justify-content: center; } }
 .mock-sc-more { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
 .mock-sc-sec { gap: 12px; padding-top: 8px; padding-bottom: 8px; }
 .mock-sc-sec[open] { grid-column: 1 / -1; padding-bottom: 16px; }

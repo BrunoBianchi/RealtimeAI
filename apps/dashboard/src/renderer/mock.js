@@ -628,6 +628,16 @@
       ${record.coverage.map(({ id, status }) => `<div class="row between"><span data-no-i18n>${esc(topicLabel(id))}</span><span class="small muted" data-no-i18n>${esc(C.t(COVERAGE[status] || ''))}</span></div>`).join('')}`);
   }
 
+  // The way from a finished or saved interview into Study, which needs an account.
+  function studyCtaHtml(r) {
+    if (M.phase !== 'done' || !r || C.localMode()) return '';
+    return `<section class="card mock-study-cta">
+        ${C.orb('happy', 44, 'tight')}
+        <div class="stack grow" style="gap:4px;min-width:0"><span class="strong">Study with Orby</span><span class="small muted">Orby uses this score and feedback to plan a study on the whiteboard.</span></div>
+        <button type="button" class="btn primary" data-action="mock-study">${icon('board')}<span>Study with Orby</span></button>
+      </section>`;
+  }
+
   function doneView() {
     const r = M.record;
     const J = r && r.evaluation;
@@ -636,7 +646,7 @@
         <div class="stack grow" style="gap:6px;min-width:0"><span class="eyebrow on-aurora">Mock result</span><h1 class="h1 xl">Interview feedback</h1><span class="on-aurora-soft" data-no-i18n>${esc(r ? `${r.company || '—'} · ${r.role || '—'}` : '')}</span></div>
       </section>
       ${M.phase === 'finishing' ? `<section class="card"><div class="row" style="gap:8px">${icon('sparkle')}<span>Writing your feedback…</span></div></section>` : ''}
-      ${r ? `${evaluationHtml(r, J ? SC.scorecard(r, C.mockRecords()) : null)}<div class="mock-sc-more">${evaluationSections(r)}${languageHtml(r)}${recordingHtml(r)}${coverageHtml(r)}${visualFeedbackHtml(r)}${transcriptHtml(r)}</div>${coachHtml(r)}` : ''}
+      ${r ? `${evaluationHtml(r, J ? SC.scorecard(r, C.mockRecords()) : null)}${studyCtaHtml(r)}<div class="mock-sc-more">${evaluationSections(r)}${languageHtml(r)}${recordingHtml(r)}${coverageHtml(r)}${visualFeedbackHtml(r)}${transcriptHtml(r)}</div>${coachHtml(r)}` : ''}
       ${M.phase === 'done' && !r ? `<section class="card"><div class="muted">${esc(M.refunded ? 'The interview ended before any answer and was not counted.' : 'The interview ended before any answer.')}</div></section>` : ''}
       ${M.phase === 'done' && M.chargedMinutes != null ? `<div class="small muted" data-no-i18n>${esc(M.chargedMinutes > 0 ? C.t('{n} min used from your balance', { n: minutesText(M.chargedMinutes) }) : C.t('Nothing was charged: interviews under a minute are free.'))}</div>` : ''}
       ${M.phase === 'done' ? `<div class="row" style="gap:8px;flex-wrap:wrap"><button type="button" class="btn primary" data-action="mock-reset">Back</button><span class="grow"></span>${r ? `<button type="button" class="btn" data-action="mock-export-pdf">${icon('file-pdf')}<span>Export PDF</span></button><button type="button" class="btn" data-action="mock-export-chat">${icon('download')}<span>Conversation (.txt)</span></button><button type="button" class="btn" data-action="mock-export-study">${icon('download')}<span>Export for study</span></button>` : ''}</div>` : ''}`;
@@ -1212,6 +1222,17 @@
   C.actions['mock-export-pdf'] = () => exportRecord('pdf');
   C.actions['mock-export-chat'] = () => exportRecord('txt');
   C.actions['mock-export-study'] = () => exportRecord('json');
+  // Opens Study with this interview chosen (Study reads the id when it loads:
+  // lib/study/handoff.js in the site's bundle).
+  C.actions['mock-study'] = () => {
+    if (!M.record) return;
+    try {
+      sessionStorage.setItem('lipcue_study_from', M.record.id);
+    } catch {
+      // Study then opens with its usual choice.
+    }
+    C.navigate('study');
+  };
   // A question whose audio was not kept, read by the system voice.
   C.actions['mock-speak-text'] = (el) => {
     const m = M.record && (M.record.messages || [])[Number(el.dataset.i)];

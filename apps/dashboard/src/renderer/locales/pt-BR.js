@@ -578,6 +578,8 @@
       'Up to 30 minutes by voice, with feedback at the end.': 'Até 30 minutos por voz, com feedback no final.',
       'Past interviews': 'Entrevistas anteriores',
       'Score {n} of 100': 'Nota {n} de 100',
+  'Study with Orby': 'Estudar com o Orby',
+  'Orby uses this score and feedback to plan a study on the whiteboard.': 'O Orby usa esta nota e este feedback para montar um estudo no quadro.',
       'Interviewer is speaking': 'O entrevistador está falando',
       'Interviewer is thinking': 'O entrevistador está pensando',
       'Your turn: answer out loud': 'Sua vez: responda em voz alta',
