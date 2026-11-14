@@ -31,6 +31,7 @@ test('Client-side Router: hash routes map to views', async () => {
     [`review/${SESSION_ID}`, 'review', [SESSION_ID]],
     ['files', 'files', []],
     ['questions', 'questions', []],
+    ['study', 'study', []],
     ['live', 'live', []],
     ['settings/calendar', 'settings', ['calendar']],
     ['nao-existe', 'home', []]
@@ -57,8 +58,8 @@ test('Prep Session & Goal Workspace Navigation: links go where they say', async 
   assert.strictEqual(r.page('crumb').textContent, 'Sessions / Nubank · Backend');
 
   // Every internal link on every screen points at a route the router knows.
-  const known = new Set(['home', 'sessions', 'history', 'session', 'review', 'files', 'questions', 'mock', 'pair', 'profile', 'live', 'settings']);
-  for (const path of ['home', 'sessions', 'history', 'session/a1', `review/${SESSION_ID}`, 'files', 'questions', 'live', 'settings/general']) {
+  const known = new Set(['home', 'sessions', 'history', 'session', 'review', 'files', 'questions', 'mock', 'study', 'pair', 'profile', 'live', 'settings']);
+  for (const path of ['home', 'sessions', 'history', 'session/a1', `review/${SESSION_ID}`, 'files', 'questions', 'study', 'live', 'settings/general']) {
     r.Cue.navigate(path);
     const links = tags(r.page('view').innerHTML + r.page('sideNav').innerHTML, { 'data-action': 'go' });
     for (const l of links) assert.ok(known.has(String(l['data-to']).split('/')[0]), `#/${path}: link to unknown route ${l['data-to']}`);
