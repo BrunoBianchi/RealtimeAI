@@ -309,6 +309,17 @@ Conversa por texto com a IA sobre entrevistas já feitas (specs/006). Usa as mes
 | `basic`/`advanced` | `study` | — | — | `400 wrong_mode` |
 | `basic`/`advanced` | outros | sem mudança | sem mudança | até 150 |
 
+#### Quadros compartilhados (`/v1/boards`)
+
+O quadro de um estudo pode ser compartilhado por link: qualquer pessoa com o link vê uma cópia somente leitura, sem login (specs/006).
+
+- `POST /v1/boards` (autenticado) `{study_id, title?, lang?, elements: [...]}` → `200 {id, url, updated_at}`. `id` é `brd_` + 128 bits aleatórios e `url` é `PUBLIC_URL/b/{id}`. Compartilhar de novo o mesmo `study_id` substitui a cópia e mantém o link.
+- Os elementos seguem `Browser/Home/src/lib/study/scene.js` (`note`, `text`, `frame`, `arrow`, `answer`, `correction`, `stroke`, `shape`). O servidor guarda só os campos que desenha, com tamanhos limitados: até 1.200 elementos, 40 mil coordenadas e corpo de 2 MB. Cores e formas fora da lista viram o padrão.
+- Erros: `400 invalid_study`, `invalid_board` ou `empty_board`; `409 board_limit` passados 50 quadros por conta.
+- `DELETE /v1/boards/{id}` (só o dono) → `200 {ok: true}`; para outros, `404`. Excluir a conta apaga os quadros.
+- `GET /b/{id}` (público): página HTML com CSP por nonce, `X-Robots-Tag: noindex` e textos em `en` ou `pt-BR` (`lang` do quadro). Arrastar move, a roda do mouse dá zoom. Link inexistente → `404`.
+- No Windows, o estudo chega a essas rotas pela ponte `rtai.study` (`study_bridge.js`), que só aceita `POST /v1/boards` e `DELETE /v1/boards/brd_…`, além das rotas do estudo.
+
 ### `POST /v1/session` — credenciais da sessão (engine)
 
 Bearer. Feita no início de cada sessão ao vivo e depois em segundo plano a cada

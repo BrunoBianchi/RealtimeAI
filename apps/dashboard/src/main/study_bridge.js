@@ -4,6 +4,19 @@ const { ipcMain } = require('electron');
 // shadow root by the site's embedded bundle). Its requests reach the server
 // only through these handlers, and only from the main window's own page.
 const operation = /^\/v1\/mock\/(?:start|mock_[\w-]+\/(?:chat|tts|stt|end))$/;
+// The board can be shared by link (POST) and the link taken down (DELETE).
+const shareRoute = '/v1/boards';
+const unshareRoute = /^\/v1\/boards\/brd_[\w-]{16,40}$/;
+const MAX_BODY = 64 * 1024;
+const MAX_BOARD_BODY = 2 * 1024 * 1024;
+
+function allowed(method, route, body) {
+  if (typeof route !== 'string') return false;
+  if (method === 'DELETE') return unshareRoute.test(route) && (body === null || body === undefined || body === '');
+  if (method !== 'POST' || typeof body !== 'string') return false;
+  if (route === shareRoute) return Buffer.byteLength(body) <= MAX_BOARD_BODY;
+  return operation.test(route) && Buffer.byteLength(body) <= MAX_BODY;
+}
 
 function isDashboardPage(url) {
   return typeof url === 'string' && url.startsWith('file://') && /\/renderer\/index\.html(?:[?#].*)?$/.test(url);
@@ -25,8 +38,7 @@ function createStudyBridge({ getWindow, getAccount, getEndpoint, getHistory, get
   });
   ipcMain.on('rtai:study-cancel', (ev, key) => { if (trusted(ev)) chatRequests.get(key)?.abort(); });
   ipcMain.handle('rtai:study-request', async (ev, method, route, body, key) => {
-    if (!trusted(ev) || method !== 'POST' || typeof route !== 'string' || !operation.test(route) ||
-        typeof body !== 'string' || Buffer.byteLength(body) > 64 * 1024 ||
+    if (!trusted(ev) || !allowed(method, route, body) ||
         (route.endsWith('/chat') && (typeof key !== 'string' || !/^[\w-]{36}$/.test(key) || chatRequests.has(key)))) {
       return { status: 400, code: 'invalid_request' };
     }
@@ -38,7 +50,10 @@ function createStudyBridge({ getWindow, getAccount, getEndpoint, getHistory, get
     const timer = setTimeout(() => ctrl.abort(), 60_000);
     try {
       const res = await fetch(new URL(route, endpoint.url), {
-        method, headers: { ...endpoint.headers, 'Content-Type': 'application/json' }, body, signal: ctrl.signal,
+        method,
+        headers: method === 'POST' ? { ...endpoint.headers, 'Content-Type': 'application/json' } : { ...endpoint.headers },
+        body: method === 'POST' ? body : undefined,
+        signal: ctrl.signal,
       });
       if (res.ok && route.endsWith('/chat')) {
         const decoder = new TextDecoder();

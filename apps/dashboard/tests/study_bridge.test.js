@@ -41,9 +41,22 @@ test('Study runs inside the main window and only that page can reach the server'
     assert.equal(options.body, '{}');
     return new Response('data: example\n\n');
   });
+  assert.equal((await request(event, 'DELETE', '/v1/mock/start', null)).status, 400);
+  assert.equal((await request(event, 'DELETE', '/v1/boards/../me', null)).status, 400);
   const key = '12345678-1234-1234-1234-123456789abc';
   assert.equal((await request(event, 'POST', '/v1/mock/mock_valid/chat', '{}', key)).status, 200);
   assert.deepEqual(sent, [['rtai:study-chunk', key, 'data: example\n\n']]);
+
+  // Sharing the board: a larger body to /v1/boards, and DELETE to take it down.
+  const big = JSON.stringify({ study_id: 'mock_valid', elements: [{ text: 'x'.repeat(200 * 1024) }] });
+  const seen = [];
+  t.mock.method(global, 'fetch', async (url, options) => {
+    seen.push([options.method, url.pathname, options.body === undefined]);
+    return new Response('{"id":"brd_abcdefghijklmnop","url":"https://study.test/b/brd_abcdefghijklmnop"}', { status: 200 });
+  });
+  assert.equal((await request(event, 'POST', '/v1/boards', big)).status, 200);
+  assert.equal((await request(event, 'DELETE', '/v1/boards/brd_abcdefghijklmnop', null)).status, 200);
+  assert.deepEqual(seen, [['POST', '/v1/boards', false], ['DELETE', '/v1/boards/brd_abcdefghijklmnop', true]]);
 });
 
 test('Study no longer opens a window of its own', () => {
