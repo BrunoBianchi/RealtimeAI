@@ -178,7 +178,7 @@ Bearer. Resposta `200`:
     "period_end": "2026-12-01",
     "credit_minutes": 0,
     "minutes_left": 85,
-    "training": { "rate": 1, "max_minutes": 30, "free_under_s": 60 },
+    "training": { "rate": 1, "max_minutes": 30, "study_max_minutes": 60, "free_under_s": 60 },
     "mocks_limit": 0, "mocks_used": 0, "mock_credits": 0,
     "mock_tokens": { "included_limit": 0, "included_left": 0, "purchased": 85, "basic_cost": 1, "advanced_cost": 1 }
   },
@@ -186,7 +186,7 @@ Bearer. Resposta `200`:
 }
 ```
 
-`plan.minutes_left` é o saldo que a conta pode gastar agora, ao vivo ou treinando, já com a regra da sessão única do Free (depois dela, só os minutos comprados). Use esse número em vez de calcular no cliente. `plan.training` diz como a entrevista simulada é cobrada (veja "Entrevista simulada"). `mock_tokens`, `mocks_limit`, `mocks_used` e `mock_credits` existem só para apps antigos: o "saldo de tokens" é o saldo inteiro em minutos e cada modo custa 1, para que esses apps liberem o treino.
+`plan.minutes_left` é o saldo que a conta pode gastar agora, ao vivo ou treinando, já com a regra da sessão única do Free (depois dela, só os minutos comprados). Use esse número em vez de calcular no cliente. `plan.training` diz como a entrevista simulada é cobrada (veja "Entrevista simulada"); `study_max_minutes` = `min(60, floor(minutes_left))` é a duração máxima de um estudo (0 sem saldo). Clientes sem o campo usam essa mesma conta. `mock_tokens`, `mocks_limit`, `mocks_used` e `mock_credits` existem só para apps antigos: o "saldo de tokens" é o saldo inteiro em minutos e cada modo custa 1, para que esses apps liberem o treino.
 
 `401` = login expirado (o app volta para a tela de login). `preferences.feedback_prompt` (padrão `true`) diz se o app e o site podem pedir avaliação ao fim das sessões; veja "Avaliações e preferências".
 
@@ -291,6 +291,23 @@ Básico e Avançado descontam o tempo usado do mesmo saldo da ajuda ao vivo (`pl
 - `POST /v1/mock/{id}/end` → `{refunded, charged_minutes, minutes_left}`. Cobra `min(tempo decorrido, max_s + 30 s)`; `refunded: true` quando nada foi cobrado (até 60 s). Repetir devolve o mesmo resultado sem cobrar de novo. Entrevistas iniciadas antes da troca para minutos (com `token_debit`) seguem a regra antiga: até 1 min, o débito volta como minutos comprados.
 - Entrevista abandonada (sem `/end`): é encerrada depois de `expires_at` + 3 min e cobrada até a última chamada (`chat`, `tts`, `stt`, `vision`), na próxima leitura de `GET /v1/me` ou em `POST /v1/mock/start`.
 - Depois do limite: `410 mock_over`.
+
+#### Estudo (`mode: "study"`)
+
+Conversa por texto com a IA sobre entrevistas já feitas (specs/006). Usa as mesmas rotas e a mesma cobrança da entrevista: 1 minuto do saldo por minuto, nada até 60 s, `end` igual.
+
+- `POST /v1/mock/start` `{agent_id?, mode: "study"}` → `{id, mode: "study", source, billing: "minutes", max_s, minutes_left, vision_enabled: false, agent_id}`, sem `stt`. `max_s` = `min(3600, floor(minutes_left) × 60)`; numa retomada, é o tempo que falta. Sem `mode`, continua `advanced`.
+- Um mock aberto por conta. `start` do mesmo tipo retoma; de outro tipo (estudo aberto e `basic`/`advanced`, ou entrevista aberta e `study`) responde `409 mock_in_progress` ("Finish the mock interview in progress before starting another one."). Mocks vencidos são fechados e cobrados antes dessa conta.
+- `POST /v1/mock/{id}/chat` com `purpose: "study"` (ou sem `purpose`): o servidor usa `MOCK_STUDY_MODEL` (padrão: o modelo de `MOCK_EVAL_MODEL`) e `max_tokens` 1600, até 400 chamadas (`429 mock_limit` depois). Num estudo, `purpose` `evaluation`/`review` → `400 wrong_mode`; numa entrevista, `purpose: "study"` → `400 wrong_mode`.
+- Novos estudos exigem histórico na conta. Uma entrevista simulada encerrada com chamadas de conversa ou uma sessão ao vivo encerrada com duração positiva habilita o servidor. Sem histórico, `403 study_history_required`. O site e o Windows também exigem pelo menos uma resposta registrada na entrevista selecionada.
+- `tts` aceita até 500 caracteres por pedido e até 60 mil por estudo. `stt` emite a credencial sob demanda quando a pessoa ativa o microfone. `vision` devolve `400 wrong_mode`. Conversa, TTS e STT recebem `410 mock_over` ao fechar o estudo ou atingir o limite.
+
+| `mode` do mock | `purpose` | Modelo | `max_tokens` | Chamadas |
+|---|---|---|---|---|
+| `study` | `study` ou ausente | `MOCK_STUDY_MODEL` | 1600 | até 400 |
+| `study` | `evaluation` / `review` | — | — | `400 wrong_mode` |
+| `basic`/`advanced` | `study` | — | — | `400 wrong_mode` |
+| `basic`/`advanced` | outros | sem mudança | sem mudança | até 150 |
 
 ### `POST /v1/session` — credenciais da sessão (engine)
 

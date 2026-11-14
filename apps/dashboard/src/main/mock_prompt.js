@@ -115,6 +115,46 @@ function terms(text) {
 }
 const clean = (value, max) => typeof value === 'string' ? value.trim().slice(0, max) : '';
 const companyResearch = (agent) => clean(agent.company_research || agent.company_dossier, 60000);
+
+// Words found in any job posting, which say nothing about this one's requirements.
+const GENERIC = new Set(tokenize('experiencia experiencias conhecimento conhecimentos trabalho trabalhar equipe equipes empresa vaga vagas requisitos requisito responsabilidades atividades desejavel desejaveis diferencial diferenciais area areas pessoa pessoas buscamos procuramos oportunidade oportunidades beneficios anos ano nivel boa bom boas bons forte fortes capacidade habilidade habilidades ferramentas projetos projeto cliente clientes time times todos todas muito mais ser ter estar fazer job jobs role roles team teams work working experience knowledge skills skill ability abilities years year required requirements responsibilities preferred plus strong good company candidate candidates opportunity benefits tools tool projects project including include across within ensure well also must should other new using use'));
+
+// The terms that stand for this job's requirements (tools, skills, domains),
+// most frequent first; a term written with capitals or symbols (Kafka, C#) weighs double.
+function jobKeywords(agent, max = 12) {
+  const text = clean(agent?.job_description, 12000);
+  const counts = new Map();
+  const shown = new Map();
+  const named = new Set();
+  for (const m of text.matchAll(/[\p{L}\p{N}][\p{L}\p{N}+#.-]*[\p{L}\p{N}+#]|[\p{L}\p{N}]/gu)) {
+    const raw = m[0];
+    const [key] = tokenize(raw);
+    // Capitals inside a sentence, inner capitals or symbols mark a name (Kafka, PostgreSQL, C#).
+    const start = /(^|[.!?:;\n]\s*|[-•*]\s*)$/.test(text.slice(Math.max(0, m.index - 3), m.index));
+    const name = /[A-Z+#]/.test(raw.slice(1)) || (/^\p{Lu}/u.test(raw) && !start);
+    // Two letters only for names such as Go, AI or C#.
+    if (!key || GENERIC.has(key) || /^\p{N}+$/u.test(key) || (key.length < 3 && !name)) continue;
+    counts.set(key, (counts.get(key) || 0) + 1);
+    if (!shown.has(key) || (name && !named.has(key))) shown.set(key, raw);
+    if (name) named.add(key);
+  }
+  // A plain word mentioned once is a requirement only when it is long enough to be specific.
+  return [...counts.keys()].filter((key) => named.has(key) || counts.get(key) > 1 || key.length >= 7)
+    .map((key, at) => ({ key, at, weight: counts.get(key) * (named.has(key) ? 2 : 1) }))
+    .sort((a, b) => b.weight - a.weight || a.at - b.at).slice(0, max)
+    .map(({ key }) => ({ key, label: shown.get(key) }));
+}
+
+// How many of the job's terms came up in the answers: {score 0-100, covered, missing}.
+function jobCoverage(agent, answers) {
+  const terms = jobKeywords(agent);
+  if (terms.length < 3) return null;
+  const said = tokenize(answers.join(' '));
+  const has = (key) => said.some((w) => w === key || (key.length >= 5 && w.startsWith(key.slice(0, -1))));
+  const covered = terms.filter((t) => has(t.key)).map((t) => t.label);
+  const missing = terms.filter((t) => !has(t.key)).map((t) => t.label);
+  return { score: Math.round((covered.length / terms.length) * 100), covered, missing };
+}
 const isResume = (doc) => /resume|\bcv\b|curric/.test(ascii(doc?.tag + ' ' + doc?.title));
 
 function findResume(agent, others) {
@@ -159,11 +199,17 @@ function interviewFiles(agent, others = []) {
 // `priority`: keys of the files marked as the main ones for the questions.
 function buildIndex(agent, others = [], priority = []) {
   const main = new Set(priority);
-  const sources = [
+  return buildChunkIndex([
     { type: 'job', title: 'Descrição da vaga', text: clean(agent.job_description, 60000) },
     { type: 'company', title: 'Pesquisa desta empresa', text: companyResearch(agent) },
     ...interviewFiles(agent, others).map((f) => ({ ...f, priority: main.has(f.key) }))
-  ];
+  ]);
+}
+
+// BM25 index over any texts: each source is {type, title, text, priority?, meta?}.
+// Windows of 860 characters, cut at a line or sentence end, overlapping by
+// about 100 at a word boundary. The study library (lib/study) uses it too.
+function buildChunkIndex(sources) {
   const chunks = [];
   const seen = new Set();
   for (const [source, doc] of sources.entries()) {
@@ -179,7 +225,9 @@ function buildIndex(agent, others = [], priority = []) {
         const tokens = terms(doc.title + ' ' + text);
         const counts = new Map();
         for (const token of tokens) counts.set(token, (counts.get(token) || 0) + 1);
-        chunks.push({ id: 'D' + (chunks.length + 1), source, type: doc.type, title: doc.title, priority: Boolean(doc.priority), text, start, end: start + size, counts, size: tokens.length });
+        const chunk = { id: 'D' + (chunks.length + 1), source, type: doc.type, title: doc.title, priority: Boolean(doc.priority), text, start, end: start + size, counts, size: tokens.length };
+        if (doc.meta !== undefined) chunk.meta = doc.meta;
+        chunks.push(chunk);
       }
       if (start + size >= doc.text.length) break;
       start += size - 100;
@@ -560,7 +608,7 @@ function evaluationMaterials(interview) {
   return {
     empresa: clean(interview.agent.company, 180),
     vaga: clean(interview.agent.role, 180),
-    descricao: clean(interview.agent.job_description, 1200),
+    descricao: clean(interview.agent.job_description, 2500),
     trechos: evidence.map(({ type, title, text }) => ({ type, title, text })),
   };
 }
@@ -604,7 +652,7 @@ function takeSentences(buffer, flush = false) {
 }
 
 module.exports = {
-  LANGUAGES, PERSONAS, KINDS, LEVELS, GOAL_LIMIT, FOCUS_LIMIT, PRIORITY_LIMIT, FINISH_MARK, languageName, resumeText, interviewFiles, buildIndex, retrieve, bankQuestionsFor,
-  normalizeSettings, interviewTopics, createInterview, prepareTurn, resolveQAndA, commitAnswer, commitTurn,
+  LANGUAGES, PERSONAS, KINDS, LEVELS, GOAL_LIMIT, FOCUS_LIMIT, PRIORITY_LIMIT, FINISH_MARK, languageName, resumeText, interviewFiles, buildIndex, buildChunkIndex, retrieve, terms, bankQuestionsFor,
+  normalizeSettings, interviewTopics, createInterview, prepareTurn, resolveQAndA, commitAnswer, commitTurn, jobKeywords, jobCoverage,
   evaluationPairs, coverageFor, evaluationContext, evaluationMaterials, systemPrompt, takeSentences
 };

@@ -33,6 +33,7 @@ const localBackend = require('./local_backend');
 const { settingsSectionFromArgv } = require('./launch_args');
 const jevEngine = require('./jev_engine');
 const { createMockInterviews } = require('./mock_interview');
+const { createStudyWindow } = require('./study_window');
 const { createPairProgramming } = require('./pair_programming');
 const companyLogoService = require('./company_logo_service');
 
@@ -47,6 +48,48 @@ const APP_ICON = path.join(APP_ROOT, 'assets', 'icon.png');
 const WINDOWS_APP_ID = app.isPackaged ? 'com.raiado.realtimeai' : 'com.raiado.realtimeai.dev';
 
 let mainWindow = null;
+
+// Saves a mock interview report: 'txt' is the conversation as it comes; 'pdf'
+// is built by main/mock_report.js from the record, the scorecard and the chart
+// pictures (renderer/mock_scorecard.js), then printed in a hidden window with scripts off.
+const MOCK_EXPORT_MAX = 8 * 1024 * 1024;
+async function exportMockFile(kind, name, content) {
+  if (kind === 'json') {
+    if (!content || typeof content.id !== 'string' || !Array.isArray(content.messages)) return { ok: false };
+    const { id, agentId, company, role, lang, mode, startedAt, durationS, messages, evaluation, language } = content;
+    content = JSON.stringify({ format: 'lipcue-mock', version: 1,
+      record: { id, agentId, company, role, lang, mode, startedAt, durationS, messages, evaluation, language } });
+  }
+  if (kind === 'pdf') {
+    const ok = content && typeof content === 'object' && content.record && content.labels && content.parts;
+    if (!ok) return { ok: false };
+    content = require('./mock_report').reportHtml(content.record, content.card || null, content.labels, content.parts);
+  }
+  if (!['pdf', 'txt', 'json'].includes(kind) || typeof content !== 'string' || Buffer.byteLength(content) > MOCK_EXPORT_MAX) return { ok: false };
+  const ext = kind === 'json' ? '.lipcue-mock.json' : `.${kind}`;
+  const base = String(name || '').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '-').replace(/\.(pdf|txt|lipcue-mock\.json)$/i, '').slice(0, 120) || 'lipcue-mock';
+  const res = await dialog.showSaveDialog(mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined, {
+    defaultPath: path.join(app.getPath('documents'), base + ext),
+    filters: [{ name: { pdf: 'PDF', txt: 'Text', json: 'LipCue' }[kind], extensions: [kind] }]
+  });
+  if (res.canceled || !res.filePath) return { ok: false, canceled: true };
+  if (kind !== 'pdf') {
+    fs.writeFileSync(res.filePath, content, 'utf8');
+    return { ok: true, path: res.filePath };
+  }
+  const tmp = path.join(os.tmpdir(), `lipcue-report-${process.pid}-${Date.now()}.html`);
+  const win = new BrowserWindow({ show: false, width: 794, height: 1123, webPreferences: { javascript: false, sandbox: true, contextIsolation: true, nodeIntegration: false } });
+  try {
+    fs.writeFileSync(tmp, content, 'utf8');
+    await win.loadFile(tmp);
+    const pdf = await win.webContents.printToPDF({ printBackground: true, pageSize: 'A4', preferCSSPageSize: true, margins: { marginType: 'none' } });
+    fs.writeFileSync(res.filePath, pdf);
+    return { ok: true, path: res.filePath };
+  } finally {
+    win.destroy();
+    fs.rmSync(tmp, { force: true });
+  }
+}
 let overlayProcess = null;
 let overlayMode = null;
 let overlayCodingInterview = false;
@@ -3467,10 +3510,13 @@ app.whenReady().then(() => {
     // Only the bundled UI (file://) may use the microphone meter, clipboard and
     // notifications; anything remote that ends up in a window gets nothing.
     const isBundledUi = (url) => typeof url === 'string' && url.startsWith('file://');
-    session.defaultSession.setPermissionCheckHandler((webContents, _permission, requestingOrigin) =>
-      isBundledUi(requestingOrigin) || isBundledUi(webContents && webContents.getURL()));
-    session.defaultSession.setPermissionRequestHandler((webContents, _permission, callback, details) => {
-      callback(isBundledUi((details && details.requestingUrl) || (webContents && webContents.getURL())));
+    const isStudyUi = (webContents, permission, details) =>
+      webContents?.getURL() === 'lipcue-study://app/index.html' && permission === 'media' &&
+      (details?.mediaType === 'audio' || (details?.mediaTypes?.length === 1 && details.mediaTypes[0] === 'audio'));
+    session.defaultSession.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) =>
+      isBundledUi(requestingOrigin) || isBundledUi(webContents?.getURL()) || isStudyUi(webContents, permission, details));
+    session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
+      callback(isBundledUi(details?.requestingUrl || webContents?.getURL()) || isStudyUi(webContents, permission, details));
     });
   }
   // A fresh install starts empty: no starter goal. Older versions created an
@@ -3774,6 +3820,27 @@ app.whenReady().then(() => {
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('rtai:mock-event', event);
     }
   });
+  const studyWindow = createStudyWindow({
+    rendererDir: RENDERER_DIR, preloadDir: PRELOAD_DIR, getParent: () => mainWindow,
+    getAccount: async (force) => (await cloudAccount.status(force)).account,
+    getEndpoint: () => isLocalMode(readConfigIni()) ? null : cloudAccount.aiEndpoint(),
+    getLocale: () => resolveUiLocale(readConfigIni().ui_language, systemLanguages(app)),
+    getHistory: () => ({
+      mocks: mockInterviews.list().slice(0, 40),
+      live: loadPastSessions().slice(0, 40).map((record) => ({
+        ...readSessionEvents(record.id), job: record.goalLabel ? { company: record.goalLabel } : null
+      }))
+    }),
+    navigate: (target) => {
+      const route = { train: 'mock', live: 'live', plan: 'settings/plan' }[target];
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('rtai:study-go', route);
+    }
+  });
+  ipcMain.handle('rtai:study-open', () => {
+    const cfg = readConfigIni();
+    if (isLocalMode(cfg) || !isSignedIn(cfg)) return;
+    studyWindow.open();
+  });
   ipcMain.handle('rtai:mock-start', async (_ev, agentId, lang, mode, settings) => {
     if (isLocalMode(readConfigIni())) return { ok: false, error: 'Mock interviews need a lipcue.com account.' };
     return mockInterviews.start({ agentId, lang, mode, settings });
@@ -3788,6 +3855,7 @@ app.whenReady().then(() => {
   ipcMain.handle('rtai:mock-prep', async (_ev, agentId) => mockInterviews.prep(agentId));
   ipcMain.handle('rtai:mock-coach', async (_ev, id, question) => mockInterviews.coach(id, question));
   ipcMain.handle('rtai:mock-list', async () => mockInterviews.list());
+  ipcMain.handle('rtai:mock-export', async (_ev, kind, name, content) => exportMockFile(kind, name, content));
   ipcMain.handle('rtai:mock-stt-token', async () => mockInterviews.sttToken());
   ipcMain.handle('rtai:cloud-billing', async (_ev, kind, pack) => cloudAccount.billing(kind === 'portal' ? 'portal' : 'checkout', pack));
   ipcMain.handle('rtai:feedback-submit', async (_ev, p) => feedback.submit(p || {}));
@@ -3796,6 +3864,7 @@ app.whenReady().then(() => {
   ipcMain.handle('rtai:feedback-save-prompt', async (_ev, v) => feedback.savePrompt(Boolean(v)));
   ipcMain.handle('rtai:feedback-get-prompt', async () => feedback.getPrompt());
   ipcMain.handle('rtai:cloud-logout', async () => {
+    studyWindow.close();
     closeFeedbackDialog();
     if (isOverlayRunning()) stopRunningOverlay();
     const res = await cloudAccount.logout();

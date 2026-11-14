@@ -540,7 +540,7 @@ test('the report plays each question and answer apart and shows the language rev
     }
   });
   const html = render(r.Cue, 'mock');
-  assert.match(html, /data-section="mock-language"[\s\S]*Language review[\s\S]*6\.5 \/ 10/);
+  assert.match(html, /data-section="mock-language"[\s\S]*Language review[\s\S]*65 \/ 100/);
   assert.match(html, /<del data-no-i18n>dos dado<\/del> → <ins data-no-i18n>dos dados<\/ins>/);
   assert.match(html, /<del data-no-i18n>dev<\/del> → <ins data-no-i18n>desenvolvedor<\/ins>/);
   assert.match(html, /Corrected version<\/strong> <span data-no-i18n>Sou desenvolvedor dos dados\./);
@@ -555,6 +555,50 @@ test('the report plays each question and answer apart and shows the language rev
   // A report without either keeps its old shape.
   r.S.mock.record = { id: 'm8', messages: [{ role: 'assistant', content: 'Oi?' }] };
   assert.doesNotMatch(render(r.Cue, 'mock'), /mock-language|mock-recording/);
+});
+
+test('the report shows the index, the charts and the stages, and exports the PDF and the conversation', async () => {
+  const { loadRenderer, render, tags, settle } = require('./helpers/renderer');
+  const saved = [];
+  const r = loadRenderer({ state: { agents: [job] }, api: { mockExport: async (kind, name, content) => { saved.push([kind, name, content]); return { ok: true, path: `C:/x/${name}` }; } } });
+  const evaluation = (criteria, measured, extra = {}) => ({
+    version: 4, score: 70, criteria, measured, signals: {}, pitfalls: [{ id: 'nos', n: 1 }], answers: 1,
+    items: [{ index: 0, question: 'Fale de um projeto.', answer: 'Eu migrei para Kafka.', score: 82, veredito: 'Bom exemplo.', notas: { adequacao: 8 } }],
+    resumo: 'Bom começo.', vaga: 'Passaria na etapa de mensageria.', fortes: ['Exemplo real'], melhorar: ['Números'], proximo: 'Treine Go.', ...extra
+  });
+  const now = Date.UTC(2026, 10, 14);
+  const record = {
+    id: 'm2', startedAt: now, company: 'Acme', role: 'Dev', lang: 'pt-BR', durationS: 600,
+    messages: [{ role: 'assistant', content: 'Fale de um projeto.' }, { role: 'user', content: 'Eu migrei para Kafka.' }],
+    evaluation: evaluation({ adequacao: 80, evidencias: 60, estrutura: 70, objetividade: 90, vaga: 70, cultura: null },
+      { ownership: 80, results: 40, pace: 100, fillers: 90, coverage: { score: 50, covered: ['Kafka'], missing: ['Go'] } }),
+    language: { nota: 80, items: [] }
+  };
+  const earlier = { id: 'm1', startedAt: now - 1000, company: 'Acme', role: 'Dev', messages: [], evaluation: evaluation({ adequacao: 50, cultura: 40, estrutura: 30, evidencias: 50, objetividade: 60 }) };
+  Object.assign(r.S.mock, { phase: 'done', record, history: [record, earlier] });
+  const html = render(r.Cue, 'mock');
+  assert.match(html, /Readiness index[\s\S]*<b>72<\/b>[\s\S]*Ready for the job/, 'the index out of 100 and its band');
+  assert.match(html, /Average of your last 1 interviews: <b>45<\/b><span class="mock-sc-delta up">\+27<\/span>/);
+  assert.match(html, /What makes up your score[\s\S]*<svg/);
+  assert.match(html, /Where you are strong[\s\S]*<polygon/);
+  assert.match(html, /Verdict for this job[\s\S]*Passaria na etapa de mensageria\.[\s\S]*mock-sc-term ok[^>]*>Kafka/);
+  assert.match(html, /Compared with your earlier interviews/);
+  assert.strictEqual(tags(html, { class: 'mock-sc-stage' }).length, 3, 'three stages that open');
+  assert.match(html, /<details class="mock-sc-stage" open>[\s\S]*Content/, 'the first stage starts open');
+  assert.match(html, /<details class="card mock-sc-sec">[\s\S]*Question by question/, 'the details are closed');
+  assert.doesNotMatch(html, /score-disc/);
+
+  r.Cue.actions['mock-export-pdf']();
+  r.Cue.actions['mock-export-chat']();
+  await settle();
+  assert.deepStrictEqual(saved.map(([kind, name]) => [kind, name]), [['pdf', 'lipcue-mock-acme-dev-2026-11-14.pdf'], ['txt', 'lipcue-mock-acme-dev-2026-11-14-conversation.txt']]);
+  const pdf = saved[0][2];
+  assert.strictEqual(pdf.card.index, 72);
+  assert.match(pdf.parts.donut, /^<svg/);
+  assert.strictEqual(pdf.labels.stages.aderencia, 'Job fit');
+  const doc = require('../src/main/mock_report').reportHtml(pdf.record, pdf.card, pdf.labels, pdf.parts);
+  assert.match(doc, /^<!doctype html>[\s\S]*<title>lipcue-mock-acme-dev-2026-11-14<\/title>[\s\S]*Readiness index/);
+  assert.strictEqual(saved[1][2], 'Mock interview: Acme · Dev\n' + saved[1][2].split('\n')[1] + '\n\nOrby:\nFale de um projeto.\n\nYou:\nEu migrei para Kafka.\n');
 });
 
 test('the topics asked for and the main files reach the interviewer, and each start gets its own seed', async () => {

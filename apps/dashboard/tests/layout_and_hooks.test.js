@@ -52,7 +52,7 @@ test('Feature: dashboard-ui-redesign, Property 5: Preservação da estrutura de 
   // Scripts load core first, then the views that register on window.Cue.
   assert.deepStrictEqual(
     [...indexHtml.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]),
-    ['i18n.js', 'locales/pt-BR.js', 'icons.js', 'app.js', 'views.js', 'coding_answer.js', 'live.js', 'settings.js', 'orb.js', 'mock_timing.js', 'mock_recording.js', 'mock.js', 'referral.js', 'pair.js', 'profile.js', 'modals.js', 'auth.js', 'vendor/driver/driver.iife.js', 'tour.js']
+    ['i18n.js', 'locales/pt-BR.js', 'icons.js', 'app.js', 'views.js', 'coding_answer.js', 'live.js', 'settings.js', 'orb.js', 'mock_timing.js', 'mock_recording.js', 'mock_scorecard.js', 'mock.js', 'referral.js', 'pair.js', 'profile.js', 'modals.js', 'auth.js', 'vendor/driver/driver.iife.js', 'tour.js']
   );
   // Every view the sidebar links to is registered.
   const { Cue } = loadRenderer();

@@ -67,6 +67,7 @@
   // The recording (mock_recording.js): the answer being given, the audio of
   // the turn in flight, an answer to send again, and clips still being filed.
   const R = C.mockRecording;
+  const SC = C.mockScorecard;
   let recorder = null;
   let pendingClip = null;
   let replyClips = [];
@@ -224,7 +225,7 @@
     const list = M.history || [];
     if (!list.length) return '';
     return `<section class="card" style="gap:10px"><span class="strong">Past interviews</span>${list.map((r) => `
-      <button type="button" class="row btn ghost" style="gap:8px;justify-content:flex-start" data-action="mock-open" data-id="${esc(r.id)}"><span class="grow" style="text-align:left" data-no-i18n>${esc(r.company || '—')} · ${esc(r.role || '—')}</span>${r.evaluation && r.evaluation.score != null ? `<span class="pill num">${r.evaluation.score}</span>` : ''}<span class="small faint">${esc(new Date(r.startedAt).toLocaleDateString())}</span></button>`).join('')}</section>`;
+      <button type="button" class="row btn ghost" style="gap:8px;justify-content:flex-start" data-action="mock-open" data-id="${esc(r.id)}"><span class="grow" style="text-align:left" data-no-i18n>${esc(r.company || '—')} · ${esc(r.role || '—')}</span>${SC.scorecard(r, []) && SC.scorecard(r, []).index != null ? `<span class="pill num">${SC.scorecard(r, []).index}</span>` : ''}<span class="small faint">${esc(new Date(r.startedAt).toLocaleDateString())}</span></button>`).join('')}</section>`;
   }
 
   const STATE_LABEL = { speaking: 'Orby is speaking', thinking: 'Orby is thinking', listening: 'Your turn: answer out loud', typing: 'Your turn: type your answer', connecting: 'Connecting' };
@@ -347,38 +348,32 @@
     return (tags ? `<div class="row" style="gap:6px;flex-wrap:wrap">${tags}</div>` : '') + carl;
   }
 
-  // Best answer per signal area and the pitfalls that came back most often.
-  function signalsHtml(J, kind) {
+  // Best answer per signal area (inside the "Signal areas" section).
+  function signalsBody(J, kind) {
     const shown = SIGNAL_LABELS.filter(([k]) => J.signals && J.signals[k] != null);
     const missing = !kind || kind === 'behavioral' ? SIGNAL_LABELS.filter(([k]) => k !== 'ia' && !(J.signals && J.signals[k] != null)).map(([, label]) => C.t(label)) : [];
-    const signals = shown.length ? `<section class="card" style="gap:10px">
-        <span class="strong">Signal areas</span>
-        <span class="small muted">Your best answer in each area interviewers look for.</span>
-        <div class="row" style="gap:6px;flex-wrap:wrap">${shown.map(([k, label]) => `<span class="pill" style="gap:6px"><span>${label}</span><b class="num">${(J.signals[k] / 10).toFixed(1)}</b></span>`).join('')}</div>
-        ${missing.length ? `<span class="small muted" data-no-i18n>${esc(C.t('No story yet for: {list}', { list: missing.join(', ') }))}</span>` : ''}
-      </section>` : '';
-    const pitfalls = (J.pitfalls || []).filter(({ id }) => PITFALLS[id]);
-    const pits = pitfalls.length ? `<section class="card" style="gap:10px">
-        <span class="strong">Recurring pitfalls</span>
-        ${pitfalls.map(({ id, n }) => `<div class="stack" style="gap:2px"><div class="row" style="gap:8px"><span class="small strong" data-no-i18n>${esc(C.t(PITFALLS[id][0]))}</span><span class="small muted" data-no-i18n>${esc(n === 1 ? C.t('in 1 answer') : C.t('in {n} answers', { n }))}</span></div><span class="small" data-no-i18n>${esc(C.t(PITFALLS[id][1]))}</span></div>`).join('')}
-      </section>` : '';
-    return signals + pits;
+    return `<span class="small muted">Your best answer in each area interviewers look for.</span>
+        <div class="row" style="gap:6px;flex-wrap:wrap">${shown.map(([k, label]) => `<span class="pill" style="gap:6px"><span>${label}</span><b class="num">${Math.round(J.signals[k])}</b></span>`).join('')}</div>
+        ${missing.length ? `<span class="small muted" data-no-i18n>${esc(C.t('No story yet for: {list}', { list: missing.join(', ') }))}</span>` : ''}`;
   }
 
-  // The scores the JEV gave this answer, criterion by criterion.
+  // The pitfalls that came back most often.
+  function pitfallsBody(J) {
+    return (J.pitfalls || []).filter(({ id }) => PITFALLS[id]).map(({ id, n }) => `<div class="stack" style="gap:2px"><div class="row" style="gap:8px"><span class="small strong" data-no-i18n>${esc(C.t(PITFALLS[id][0]))}</span><span class="small muted" data-no-i18n>${esc(n === 1 ? C.t('in 1 answer') : C.t('in {n} answers', { n }))}</span></div><span class="small" data-no-i18n>${esc(C.t(PITFALLS[id][1]))}</span></div>`).join('');
+  }
+
+  // The scores this answer got, criterion by criterion (0 to 10, averaged by the two judges).
   function itemNotesHtml(it) {
     const notas = it.notas || {};
     const row = JEV_LABELS.filter(([k]) => notas[k] != null).map(([k, label]) => `<span class="pill" style="gap:6px"><span>${label}</span><b class="num">${notas[k]}</b></span>`).join('');
     return row ? `<div class="row" style="gap:6px;flex-wrap:wrap">${row}</div>` : '';
   }
 
-  function evaluationHtml(r) {
-    const J = r.evaluation;
-    if (!J) return r.feedback ? `<section class="card"><pre class="md" style="white-space:pre-wrap">${esc(r.feedback)}</pre></section>` : '<section class="card"><div class="muted">Feedback is unavailable right now. Your transcript was saved.</div></section>';
-    const list = (title, ic, rows) => `<div class="card tight"><div class="row">${icon(ic)}<span class="strong">${title}</span></div>${rows.map((x) => `<div class="small" data-no-i18n>${esc(x)}</div>`).join('') || '<div class="muted">—</div>'}</div>`;
+  // Each answer: score, assessment, what was missing and a better version.
+  function questionsBody(J) {
     const detail = (label, text) => text ? `<div class="small"><strong>${label}</strong> <span data-no-i18n>${esc(text)}</span></div>` : '';
-    const questions = (J.items || []).map((it) => `<div class="stack" style="gap:6px">
-      <div class="row" style="gap:8px"><span class="grow strong" data-no-i18n>${esc(it.question || it.pergunta)}</span><span class="pill num">${it.score == null ? '-' : (it.score / 10).toFixed(1)} / 10</span></div>
+    return (J.items || []).map((it) => `<details class="mock-sc-q stack">
+      <summary class="row" style="gap:10px"><span class="pill num ${`sc-${SC.band(it.score == null ? null : it.score)}`}">${it.score == null ? '-' : Math.round(it.score)}</span><span class="grow strong" data-no-i18n>${esc(it.question || it.pergunta)}</span><span class="mock-sc-caret" aria-hidden="true"></span></summary>
       <span class="small muted" data-no-i18n>${esc(it.veredito)}</span>
       ${itemNotesHtml(it)}
       ${itemSignalHtml(it)}
@@ -388,18 +383,159 @@
       ${rewriteHtml(it.reescrita)}
       ${detail('What supported the score', it.trecho)}
       ${detail('Company value in the materials', it.valorCitado)}
-    </div>`).join('');
-    return `<section class="card" style="gap:14px">
-        <span class="eyebrow">JEV criteria</span>
-        ${J.partial && Number.isInteger(J.answers) ? `<span class="small muted">${esc(C.t('{n} of {total} answers scored', { n: J.items.length, total: J.answers }))}</span>` : ''}
-        ${J.objetivo ? list('Practice goal assessment', 'check-circle', [J.objetivo]) : ''}
-        ${J.resumo ? `<span class="muted" data-no-i18n>${esc(J.resumo)}</span>` : ''}
-        ${JEV_LABELS.map(([k, label]) => { const v = J.criteria && J.criteria[k] != null ? J.criteria[k] : null; const tone = C.scoreTone(v); return `<div class="crit-row"><span class="strong">${label}</span>${C.pctBar(v || 0, tone.cls === 'ok' ? '' : tone.cls)}<span class="score-num" style="color:${tone.color}">${v == null ? '—' : (v / 10).toFixed(1)}</span></div>`; }).join('')}
+    </details>`).join('');
+  }
+
+  // A card that opens to show the rest.
+  const section = (title, ic, badge, body, attrs = '') => `<details class="card mock-sc-sec"${attrs}>
+      <summary class="row" style="gap:8px">${ic ? icon(ic) : ''}<span class="strong grow">${title}</span>${badge}<span class="mock-sc-caret" aria-hidden="true"></span></summary>
+      <div class="stack" style="gap:12px">${body}</div>
+    </details>`;
+  const countBadge = (n) => (n ? `<span class="pill num" data-no-i18n>${n}</span>` : '');
+
+  // The scorecard (renderer/mock_scorecard.js): three stages, the index out of
+  // 100 against the earlier interviews, and the charts.
+  const STAGE_TEXT = {
+    conteudo: ['Content', 'Answered what was asked, with evidence of your own'],
+    comunicacao: ['Communication', 'Structure, focus and language'],
+    aderencia: ['Job fit', 'What this job and company ask for']
+  };
+  const AXIS_TEXT = {
+    adequacao: ['Relevance', 'Answered what was asked'],
+    evidencias: ['Evidence', 'What you did yourself, results and real obstacles'],
+    estrutura: ['Structure', 'Context, your actions, result and learning'],
+    objetividade: ['Objectivity', 'Straight to the point'],
+    idioma: ['Language', 'Grammar and word choice'],
+    vaga: ['Job requirements', 'Showed what this job and level ask for'],
+    cultura: ['Culture', "Tied to the company's documented values"]
+  };
+  const MEASURED_TEXT = {
+    ownership: ['Ownership', 'How often you said "I" for what you did, not "we"'],
+    results: ['Results', 'Answers that name a number or an outcome'],
+    pace: ['Answer length', 'Answers of about 30 seconds to 2 minutes'],
+    fillers: ['Few filler words', 'Less "like", "you know", "um"'],
+    coverage: ['Job terms', 'Terms of the job description that came up']
+  };
+  const BAND_TEXT = {
+    low: ['Needs preparation', 'Below 40: rework the basics before the real interview.'],
+    mid: ['Developing', '40 to 69: a solid base, but some answers still lose points.'],
+    high: ['Ready for the job', '70 or more: answers that would pass this stage.']
+  };
+  const METHOD = 'Each stage is 75% the criteria judged by two AI reviewers and 25% signals counted in your answers.';
+
+  function scoreLabels(r) {
+    const t = (s) => C.t(s);
+    const pick = (map, i) => Object.fromEntries(Object.entries(map).map(([k, v]) => [k, t(v[i])]));
+    const minutes = r.durationS ? C.t('{n} min', { n: Math.max(1, Math.round(r.durationS / 60)) }) : '';
+    return {
+      lang: S.lang.locale,
+      title: t('Mock interview'),
+      subtitle: t('Mock interview report'),
+      date: new Date(r.startedAt).toLocaleDateString(S.lang.locale, { day: '2-digit', month: 'short', year: 'numeric' }),
+      meta: [minutes, kindLabel(r.settings?.kind), personaLabel(r.settings?.persona)].filter(Boolean).join(' · '),
+      index: t('Readiness index'),
+      of100: t('of 100'),
+      noScore: t('Feedback is unavailable right now. Your transcript was saved.'),
+      band: { ...pick(BAND_TEXT, 0), none: '-' },
+      bandHint: { ...pick(BAND_TEXT, 1), none: '' },
+      stages: pick(STAGE_TEXT, 0),
+      stageHint: pick(STAGE_TEXT, 1),
+      criteria: pick(AXIS_TEXT, 0),
+      criteriaHint: pick(AXIS_TEXT, 1),
+      measured: pick(MEASURED_TEXT, 0),
+      measuredHint: pick(MEASURED_TEXT, 1),
+      judged: t('Judged by AI'),
+      measuredTag: t('Counted'),
+      compose: t('What makes up your score'),
+      composeHint: t('Each stage adds up to a third of the index.'),
+      strong: t('Where you are strong'),
+      fewAxes: t('Not enough criteria were scored for this chart.'),
+      you: t('You'),
+      avg: t('Your earlier average'),
+      avgOf: t('Average of your last {n} interviews'),
+      first: t('Your first scored interview: there is nothing earlier to compare with yet.'),
+      compare: t('Compared with your earlier interviews'),
+      bandsLegend: t('The lines at 40 and 70 mark the bands.'),
+      signals: t('Signals by stage'),
+      breakdown: t('Score breakdown'),
+      verdict: t('Verdict for this job'),
+      summary: t('Summary'),
+      strengths: t('Strengths'),
+      improve: t('To improve'),
+      next: t('Next step'),
+      goal: t('Practice goal'),
+      pitfalls: t('Recurring pitfalls'),
+      pitfall: Object.fromEntries(Object.entries(PITFALLS).map(([k, v]) => [k, t(v[0])])),
+      pitfallFix: Object.fromEntries(Object.entries(PITFALLS).map(([k, v]) => [k, t(v[1])])),
+      questions: t('Question by question'),
+      gap: t('What was missing'),
+      tip: t('How to improve'),
+      rewrite: t('Better version'),
+      coverageCovered: t('Job terms you mentioned'),
+      coverageMissing: t('Job terms that did not come up'),
+      language: t('Language review'),
+      transcript: t('Transcript'),
+      speakerYou: t('You'),
+      speakerOrby: 'Orby',
+      method: t(METHOD)
+    };
+  }
+
+  const segHtml = (v) => `<span class="mock-sc-seg ${`l${SC.level(v)}`}" aria-hidden="true"><i></i><i></i><i></i></span>`;
+  const num100 = (v) => (v == null ? '-' : String(Math.round(v)));
+
+  function scorecardHtml(r, card, L) {
+    const J = r.evaluation;
+    const cov = card.coverage;
+    const terms = cov && cov.covered.length + cov.missing.length
+      ? `<div class="row" style="gap:6px;flex-wrap:wrap" data-no-i18n>${cov.covered.map((x) => `<span class="mock-sc-term ok" title="${esc(L.coverageCovered)}">${esc(x)}</span>`).join('')}${cov.missing.map((x) => `<span class="mock-sc-term" title="${esc(L.coverageMissing)}">${esc(x)}</span>`).join('')}</div>
+        <span class="small muted" data-no-i18n><span class="mock-sc-swatch ok"></span>${esc(L.coverageCovered)} · <span class="mock-sc-swatch"></span>${esc(L.coverageMissing)}</span>`
+      : '';
+    const cmp = card.avg
+      ? `${esc(C.t('Average of your last {n} interviews', { n: card.avg.n }))}: <b>${card.avg.index}</b>${card.delta != null ? `<span class="mock-sc-delta ${card.delta >= 0 ? 'up' : 'down'}">${card.delta >= 0 ? '+' : ''}${card.delta}</span>` : ''}`
+      : esc(L.first);
+    const dot = (i) => `<span class="mock-sc-dot d${i + 1}" aria-hidden="true"></span>`;
+    const radar = SC.radarSvg(card, L);
+    const stages = card.stages.map((s, i) => `<details class="mock-sc-stage"${i === 0 ? ' open' : ''}>
+        <summary class="row" style="gap:12px">${dot(i)}<span class="stack grow" style="gap:1px;min-width:0"><span class="strong">${esc(L.stages[s.key])}</span><span class="small muted">${esc(L.stageHint[s.key])}</span></span>
+          <span class="mock-sc-stage-score"><b>${num100(s.score)}</b><small>${esc(L.of100)}</small></span>${segHtml(s.score)}<span class="mock-sc-caret" aria-hidden="true"></span></summary>
+        <div class="mock-sc-rows">${s.rows.map((row) => `<div class="mock-sc-row">${dot(i)}<span class="stack" style="gap:1px;min-width:0"><span class="small strong">${esc(row.kind === 'judged' ? L.criteria[row.key] : L.measured[row.key])}</span><span class="small faint">${esc(row.kind === 'judged' ? L.judged : L.measuredTag)}</span></span>${segHtml(row.value)}<b class="num">${row.value}</b><span class="small muted">${esc(row.kind === 'judged' ? L.criteriaHint[row.key] : L.measuredHint[row.key])}</span></div>`).join('')}</div>
+      </details>`).join('');
+    const list = (title, ic, rows) => (rows && rows.length ? `<div class="card tight"><div class="row">${icon(ic)}<span class="strong">${title}</span></div>${rows.map((x) => `<div class="small" data-no-i18n>• ${esc(x)}</div>`).join('')}</div>` : '');
+    return `<section class="card mock-sc-hero" data-no-i18n>
+        <div class="mock-sc-index"><span class="eyebrow">${esc(L.index)}</span><span class="mock-sc-big"><b>${card.index}</b><small>${esc(L.of100)}</small></span><span class="mock-sc-band ${card.band}">${esc(L.band[card.band])}</span></div>
+        <div class="stack grow" style="gap:6px;min-width:0"><span class="strong">${esc(r.company || '—')} · ${esc(r.role || '—')}</span><span class="small muted">${esc(L.date)}${L.meta ? ` · ${esc(L.meta)}` : ''}</span>
+          ${J.resumo ? `<span class="muted">${esc(J.resumo)}</span>` : ''}<span class="small mock-sc-cmp">${cmp}</span>
+          ${J.partial && Number.isInteger(J.answers) ? `<span class="small muted">${esc(C.t('{n} of {total} answers scored', { n: J.items.length, total: J.answers }))}</span>` : ''}</div>
+        <div class="mock-sc-tiles">${card.stages.map((s, i) => `<div class="mock-sc-tile"><span class="small">${dot(i)}${esc(L.stages[s.key])}</span><b>${num100(s.score)}</b><span class="mock-sc-mini"><i class="d${i + 1}" style="width:${s.score || 0}%"></i></span></div>`).join('')}</div>
       </section>
-      ${signalsHtml(J, r.settings?.kind)}
-      <section class="grid-2">${list('Strengths', 'check-circle', J.fortes || [])}${list('To improve', 'arrow-up-right', J.melhorar || [])}</section>
-      ${J.proximo ? `<section class="card">${detail('Next practice step', J.proximo)}</section>` : ''}
-      <section class="card" style="gap:12px"><span class="strong">Question by question</span>${questions}</section>`;
+      <section class="mock-sc-grid" data-no-i18n>
+        <div class="card mock-sc-chart"><span class="strong">${esc(L.compose)}</span><div class="mock-sc-donut">${SC.donutSvg(card, L)}<div class="stack" style="gap:10px">${card.stages.map((s, i) => `<div class="row between"><span class="small">${dot(i)}${esc(L.stages[s.key])}</span><b class="num">${num100(s.score)}</b></div>`).join('')}</div></div><span class="small muted">${esc(L.composeHint)}</span></div>
+        <div class="card mock-sc-chart"><span class="strong">${esc(L.strong)}</span>${radar ? `<div class="mock-sc-radar">${radar}</div>` : `<span class="small muted">${esc(L.fewAxes)}</span>`}${card.avg ? `<span class="small muted mock-sc-key"><span class="me"></span>${esc(L.you)}<span class="avg"></span>${esc(L.avg)}</span>` : ''}</div>
+        <div class="card mock-sc-chart"><span class="strong">${esc(L.verdict)}</span>${J.vaga ? `<span class="muted">${esc(J.vaga)}</span>` : `<span class="small muted">${esc(C.t('Interviews scored before this version have no verdict for the job.'))}</span>`}${terms}</div>
+        <div class="card mock-sc-chart"><span class="strong">${esc(L.compare)}</span>${SC.barsSvg(SC.compareRows(card, L), L)}<span class="small muted">${card.avg ? `${esc(C.t('Average of your last {n} interviews', { n: card.avg.n }))} (▮). ` : `${esc(L.first)} `}${esc(L.bandsLegend)}</span></div>
+      </section>
+      <section class="card mock-sc-signals" data-no-i18n><div class="row between" style="gap:4px 16px;flex-wrap:wrap;align-items:baseline"><span class="strong">${esc(L.signals)}</span><span class="small muted" style="max-width:520px">${esc(L.method)}</span></div>${stages}</section>
+      ${J.fortes?.length || J.melhorar?.length || J.proximo ? `<section class="mock-sc-grid three">${list('Strengths', 'check-circle', J.fortes)}${list('To improve', 'arrow-up-right', J.melhorar)}${J.proximo ? `<div class="card tight mock-sc-next"><span class="eyebrow">Next step</span><span class="small" data-no-i18n>${esc(J.proximo)}</span></div>` : ''}</section>` : ''}`;
+  }
+
+  function evaluationHtml(r, card) {
+    const J = r.evaluation;
+    if (!J) return r.feedback ? `<section class="card"><pre class="md" style="white-space:pre-wrap">${esc(r.feedback)}</pre></section>` : '<section class="card"><div class="muted">Feedback is unavailable right now. Your transcript was saved.</div></section>';
+    const L = scoreLabels(r);
+    return card && card.index != null ? scorecardHtml(r, card, L) : '';
+  }
+
+  // The parts of the evaluation that open on demand.
+  function evaluationSections(r) {
+    const J = r.evaluation;
+    if (!J) return '';
+    const pits = pitfallsBody(J);
+    const shownSignals = SIGNAL_LABELS.filter(([k]) => J.signals && J.signals[k] != null).length;
+    return `${(J.items || []).length ? section('Question by question', 'list', countBadge(J.items.length), questionsBody(J)) : ''}
+        ${J.objetivo ? section('Practice goal', 'check-circle', '', `<span class="small muted" data-no-i18n>${esc(r.settings?.goal || C.t(defaultGoal))}</span><span data-no-i18n>${esc(J.objetivo)}</span>`) : ''}
+        ${pits ? section('Recurring pitfalls', 'arrow-up-right', countBadge((J.pitfalls || []).length), pits) : ''}
+        ${shownSignals ? section('Signal areas', 'sparkle', countBadge(shownSignals), signalsBody(J, r.settings?.kind)) : ''}`;
   }
 
   const ISSUE_LABELS = {
@@ -412,13 +548,12 @@
   function languageHtml(r) {
     const L = r.language;
     if (!L || !(L.items || []).length) return '';
-    const ten = (v) => (v == null ? '-' : (v / 10).toFixed(1));
     const items = L.items.map((it) => {
       const fixes = (it.erros || []).map((e) => `<li><span class="pill warn" data-no-i18n>${esc(issueLabel(e.tipo))}</span> <del data-no-i18n>${esc(e.trecho)}</del> → <ins data-no-i18n>${esc(e.sugestao)}</ins>${e.motivo ? `<div class="small muted" data-no-i18n>${esc(e.motivo)}</div>` : ''}</li>`).join('');
       const swaps = (it.trocas || []).map((sw) => `<li><del data-no-i18n>${esc(sw.de)}</del> → <ins data-no-i18n>${esc((sw.para || []).join(' · '))}</ins>${sw.motivo ? `<div class="small muted" data-no-i18n>${esc(sw.motivo)}</div>` : ''}</li>`).join('');
       const clean = !(it.erros || []).length && !(it.trocas || []).length;
       return `<details class="mock-lang-item stack" style="gap:6px">
-        <summary class="row" style="gap:8px"><span class="grow strong" data-no-i18n>${esc(it.question)}</span><span class="pill num">${it.nota == null ? '-' : it.nota} / 10</span></summary>
+        <summary class="row" style="gap:8px"><span class="grow strong" data-no-i18n>${esc(it.question)}</span><span class="pill num">${it.nota == null ? '-' : Math.round(it.nota * 10)}</span></summary>
         <span class="small muted" data-no-i18n>${esc(it.comentario || (clean ? C.t('No language issues in this answer.') : C.t('{n} points to adjust', { n: (it.erros || []).length + (it.trocas || []).length })))}</span>
         <div class="row" style="gap:6px"><span class="pill">${it.falada ? 'Spoken answer' : 'Typed answer'}</span></div>
         <div class="small"><strong>Your answer</strong> <span data-no-i18n>${esc(it.answer)}</span></div>
@@ -427,15 +562,13 @@
         ${it.corrigida ? `<div class="small"><strong>Corrected version</strong> <span data-no-i18n>${esc(it.corrigida)}</span></div>` : ''}
       </details>`;
     }).join('');
-    return `<section class="card" style="gap:12px" data-section="mock-language">
-        <div class="row" style="gap:8px">${icon('sparkle')}<span class="strong grow">Language review</span>${L.nota != null ? `<span class="pill num">${ten(L.nota)} / 10</span>` : ''}</div>
+    return section('Language review', 'sparkle', L.nota != null ? `<span class="pill num">${Math.round(L.nota)} / 100</span>` : '', `
         <span class="small muted">Only how you said it: grammar, word choice and speaking habits. The content is scored above.</span>
         ${L.resumo ? `<span data-no-i18n>${esc(L.resumo)}</span>` : ''}
         ${(L.tipos || []).length ? `<div class="row" style="gap:6px;flex-wrap:wrap">${L.tipos.map(({ id, n }) => `<span class="pill warn" data-no-i18n>${esc(issueLabel(id))} · ${n}</span>`).join('')}</div>` : ''}
         ${(L.dicas || []).map((d) => `<div class="small" data-no-i18n>• ${esc(d)}</div>`).join('')}
         ${items}
-        ${L.partial ? `<span class="small muted" data-no-i18n>${esc(C.t('{n} of {total} answers reviewed.', { n: L.items.length, total: L.answers }))}</span>` : ''}
-      </section>`;
+        ${L.partial ? `<span class="small muted" data-no-i18n>${esc(C.t('{n} of {total} answers reviewed.', { n: L.items.length, total: L.answers }))}</span>` : ''}`, ' data-section="mock-language"');
   }
 
   // Each question and the answer to it, in separate players. The audio is
@@ -457,17 +590,14 @@
       if (question) n += 1;
       return `<div class="mock-rec stack" style="gap:8px">${question ? row('orby', C.t('Question {n}', { n }), question) : ''}${answer ? row('you', C.t('Your answer'), answer) : ''}</div>`;
     }).join('');
-    return `<section class="card" style="gap:12px" data-section="mock-recording" data-record="${esc(r.id)}">
-        <div class="row" style="gap:8px">${icon('waveform')}<span class="strong">Interview recording</span></div>
-        <span class="small muted">Each question and your answer to it, in separate players. The audio stays on this computer, for your 20 most recent interviews.</span>
-        ${pairs}
-      </section>`;
+    return section('Interview recording', 'waveform', '', `<span class="small muted">Each question and your answer to it, in separate players. The audio stays on this computer, for your 20 most recent interviews.</span>
+        ${pairs}`, ` data-section="mock-recording" data-record="${esc(r.id)}"`);
   }
 
   function visualFeedbackHtml(r) {
     const notes = r.visualFeedback || [];
     if (!notes.length) return '';
-    return `<section class="card" style="gap:10px"><div class="row">${icon('camera')}<span class="strong">Camera feedback</span></div><span class="small muted">Based on snapshots from your Advanced interview. The camera images were not saved.</span>${notes.map((n) => `<div class="small" data-no-i18n>${esc(n.text || n)}</div>`).join('')}</section>`;
+    return section('Camera feedback', 'camera', countBadge(notes.length), `<span class="small muted">Based on snapshots from your Advanced interview. The camera images were not saved.</span>${notes.map((n) => `<div class="small" data-no-i18n>${esc(n.text || n)}</div>`).join('')}`);
   }
 
   function coachHtml(r) {
@@ -481,18 +611,17 @@
   }
 
   function transcriptHtml(r) {
-    return `<section class="card" style="gap:10px"><span class="strong">Transcript</span>${(r.messages || []).map((m) => `<div class="stack" style="gap:2px"><span class="small faint">${m.role === 'user' ? 'You' : 'Orby'}</span><span data-no-i18n>${esc(m.content)}</span></div>`).join('')}</section>`;
+    const messages = r.messages || [];
+    return messages.length ? section('Transcript', 'chat', countBadge(messages.length), messages.map((m) => `<div class="stack" style="gap:2px"><span class="small faint">${m.role === 'user' ? 'You' : 'Orby'}</span><span data-no-i18n>${esc(m.content)}</span></div>`).join('')) : '';
   }
 
   function coverageHtml(record) {
     if (!record.coverage?.length) return '';
     const persona = [kindLabel(record.settings?.kind), personaLabel(record.settings?.persona)].filter(Boolean).join(' · ');
-    return `<section class="card" style="gap:10px">
-      <span class="strong">Interview coverage</span>
+    return section('Interview coverage', 'list-checks', countBadge(record.coverage.length), `
       ${persona ? `<span class="small muted" data-no-i18n>${esc(persona)}</span>` : ''}
       <span class="small" data-no-i18n>${esc(record.settings?.goal || C.t(defaultGoal))}</span>
-      ${record.coverage.map(({ id, status }) => `<div class="row between"><span data-no-i18n>${esc(topicLabel(id))}</span><span class="small muted" data-no-i18n>${esc(C.t(COVERAGE[status] || ''))}</span></div>`).join('')}
-    </section>`;
+      ${record.coverage.map(({ id, status }) => `<div class="row between"><span data-no-i18n>${esc(topicLabel(id))}</span><span class="small muted" data-no-i18n>${esc(C.t(COVERAGE[status] || ''))}</span></div>`).join('')}`);
   }
 
   function doneView() {
@@ -501,13 +630,12 @@
     return `<section class="mock-hero mock-done-hero">
         ${C.orb(M.phase === 'finishing' ? 'thinking' : 'happy', 120, 'tight')}
         <div class="stack grow" style="gap:6px;min-width:0"><span class="eyebrow on-aurora">Mock result</span><h1 class="h1 xl">Interview feedback</h1><span class="on-aurora-soft" data-no-i18n>${esc(r ? `${r.company || '—'} · ${r.role || '—'}` : '')}</span></div>
-        ${J && J.score != null ? `<div class="score-disc" style="--p:${J.score}"><div><span class="v">${(J.score / 10).toFixed(1)}</span><span class="num">/ 10</span></div></div>` : ''}
       </section>
       ${M.phase === 'finishing' ? `<section class="card"><div class="row" style="gap:8px">${icon('sparkle')}<span>Writing your feedback…</span></div></section>` : ''}
-      ${r ? coverageHtml(r) + evaluationHtml(r) + languageHtml(r) + recordingHtml(r) + visualFeedbackHtml(r) + coachHtml(r) + transcriptHtml(r) : ''}
+      ${r ? `${evaluationHtml(r, J ? SC.scorecard(r, C.mockRecords()) : null)}<div class="mock-sc-more">${evaluationSections(r)}${languageHtml(r)}${recordingHtml(r)}${coverageHtml(r)}${visualFeedbackHtml(r)}${transcriptHtml(r)}</div>${coachHtml(r)}` : ''}
       ${M.phase === 'done' && !r ? `<section class="card"><div class="muted">${esc(M.refunded ? 'The interview ended before any answer and was not counted.' : 'The interview ended before any answer.')}</div></section>` : ''}
       ${M.phase === 'done' && M.chargedMinutes != null ? `<div class="small muted" data-no-i18n>${esc(M.chargedMinutes > 0 ? C.t('{n} min used from your balance', { n: minutesText(M.chargedMinutes) }) : C.t('Nothing was charged: interviews under a minute are free.'))}</div>` : ''}
-      ${M.phase === 'done' ? '<div class="row"><button type="button" class="btn primary" data-action="mock-reset">Back</button></div>' : ''}`;
+      ${M.phase === 'done' ? `<div class="row" style="gap:8px;flex-wrap:wrap"><button type="button" class="btn primary" data-action="mock-reset">Back</button><span class="grow"></span>${r ? `<button type="button" class="btn" data-action="mock-export-pdf">${icon('file-pdf')}<span>Export PDF</span></button><button type="button" class="btn" data-action="mock-export-chat">${icon('download')}<span>Conversation (.txt)</span></button><button type="button" class="btn" data-action="mock-export-study">${icon('download')}<span>Export for study</span></button>` : ''}</div>` : ''}`;
   }
 
   C.views.mock = function mock() {
@@ -1063,6 +1191,23 @@
     }
     for (const t of box.querySelectorAll('[data-rewrite]')) t.hidden = t.dataset.rewrite !== el.dataset.kind;
   };
+  // The report as a PDF (printed by main.js) and the conversation as text.
+  async function exportRecord(kind) {
+    const r = M.record;
+    if (!r || !api.mockExport) return;
+    const card = r.evaluation ? SC.scorecard(r, C.mockRecords()) : null;
+    const labels = scoreLabels(r);
+    const content = kind === 'json' ? r : kind === 'pdf'
+      ? { record: r, card, labels, parts: SC.reportParts(r, card, labels) }
+      : SC.transcriptText(r, { title: C.t('Mock interview'), date: new Date(r.startedAt).toLocaleDateString(S.lang.locale, { day: '2-digit', month: 'short', year: 'numeric' }), you: C.t('You'), orby: 'Orby' });
+    const name = kind === 'json' ? SC.fileStem(r) : kind === 'pdf' ? `${SC.fileStem(r)}.pdf` : `${SC.fileStem(r)}-${C.t('conversation')}.txt`;
+    const res = await C.guard(() => api.mockExport(kind, name, content), 'The file could not be saved.');
+    if (res && res.ok) C.toast(C.t('Saved to {path}', { path: res.path }));
+    else if (res && !res.canceled) C.toast('The file could not be saved.', 'error');
+  }
+  C.actions['mock-export-pdf'] = () => exportRecord('pdf');
+  C.actions['mock-export-chat'] = () => exportRecord('txt');
+  C.actions['mock-export-study'] = () => exportRecord('json');
   // A question whose audio was not kept, read by the system voice.
   C.actions['mock-speak-text'] = (el) => {
     const m = M.record && (M.record.messages || [])[Number(el.dataset.i)];

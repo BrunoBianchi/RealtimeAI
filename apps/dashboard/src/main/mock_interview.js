@@ -286,11 +286,13 @@ function createMockInterviews(deps) {
     return { ok: Boolean(text), text };
   }
 
-  async function completeEvaluation(me, messages) {
+  // `purpose` picks the server's model: 'evaluation' (scores and feedback) or
+  // 'review' (the second judge).
+  async function completeEvaluation(me, messages, purpose = 'evaluation') {
     const res = await deps.fetch(deps.url(`/v1/mock/${me.id}/chat`), {
       method: 'POST', headers: { ...deps.headers(), 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(60000),
-      body: JSON.stringify({ stream: false, temperature: 0.1, reasoning: { enabled: false }, messages })
+      signal: AbortSignal.timeout(90000),
+      body: JSON.stringify({ stream: false, temperature: 0.1, purpose, reasoning: { enabled: false }, messages })
     }).catch(() => null);
     if (!res || !res.ok) return '';
     const data = await res.json().catch(() => null);
@@ -313,7 +315,7 @@ function createMockInterviews(deps) {
     if (last && pending && pending.spoken) keepAudio({ ...last, spoken: true, mime: 'audio/wav', bytes: pending.bytes }, me);
     const answered = me.messages.some((m) => m.role === 'user');
     const pairs = evaluationPairs(me);
-    const complete = (messages) => completeEvaluation(me, messages);
+    const complete = (messages, purpose) => completeEvaluation(me, messages, purpose);
     const [evaluation, language] = await Promise.all([
       evaluateInterview(complete, me, pairs).catch(() => null),
       reviewLanguage(complete, me, pairs, { spoken: (answer) => me.spoken.has(answer) }).catch(() => null)

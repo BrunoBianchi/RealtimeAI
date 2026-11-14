@@ -61,7 +61,10 @@ contextBridge.exposeInMainWorld('rtai', {
   mockPrep: (agentId) => ipcRenderer.invoke('rtai:mock-prep', agentId),
   mockCoach: (id, question) => ipcRenderer.invoke('rtai:mock-coach', id, question),
   mockList: () => ipcRenderer.invoke('rtai:mock-list'),
+  mockExport: (kind, name, content) => ipcRenderer.invoke('rtai:mock-export', kind, name, content),
   mockSttToken: () => ipcRenderer.invoke('rtai:mock-stt-token'),
+  studyOpen: () => ipcRenderer.invoke('rtai:study-open'),
+  onStudyNavigate: (callback) => ipcRenderer.on('rtai:study-go', (_event, route) => callback(route)),
   onMockEvent: (cb) => {
     const handler = (_event, msg) => cb(msg);
     ipcRenderer.on('rtai:mock-event', handler);

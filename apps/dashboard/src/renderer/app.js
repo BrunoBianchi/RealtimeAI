@@ -756,6 +756,7 @@ Cue.stopCopilot = stopCopilot;
 const CRUMBS = {
   home: 'Home',
   mock: 'Mock interview',
+  study: 'Study',
   pair: 'Pair programming',
   profile: 'Profile',
   sessions: 'Sessions',
@@ -858,6 +859,7 @@ const NAV = [
   ['files', 'Files', 'folder'],
   ['questions', 'Question bank', 'question'],
   ['mock', 'Mock interview', 'microphone'],
+  ['study', 'Study', 'stack'],
   ['pair', 'Pair programming', 'code'],
   ['live', 'Live', 'broadcast'],
   ['settings', 'Settings', 'gear']
@@ -1092,6 +1094,12 @@ Cue.actions['go-pro'] = async () => {
   navigate('home', true);
 };
 Cue.actions['open-path'] = (el) => api.openExternalPath(el.dataset.path || undefined);
+Cue.views.study = () => `<div class="page"><div class="empty boxed"><span class="t">Study</span>
+  <span>Review a completed interview with the AI tutor.</span>
+  ${Cue.localMode() ? '<span>Sign in to your LipCue account to study your interviews.</span>' :
+    '<button type="button" class="btn primary" data-action="study-open">Open Study</button>'}</div></div>`;
+Cue.actions['study-open'] = () => api.studyOpen();
+api.onStudyNavigate?.((route) => Cue.navigate(route));
 Cue.actions['open-url'] = async (el) => {
   const res = await api.openUrl(el.dataset.url);
   if (!res || !res.ok) toast('Could not open the link.', 'error');
