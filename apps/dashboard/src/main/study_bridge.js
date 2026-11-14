@@ -1,48 +1,27 @@
-const { BrowserWindow, ipcMain, protocol } = require('electron');
-const fs = require('node:fs/promises');
-const path = require('node:path');
+const { ipcMain } = require('electron');
 
-const origin = 'lipcue-study://app';
-const files = new Map([
-  ['/index.html', 'text/html; charset=utf-8'],
-  ['/study.js', 'text/javascript; charset=utf-8'],
-  ['/study.css', 'text/css; charset=utf-8'],
-  ['/pcm-worklet.js', 'text/javascript; charset=utf-8'],
-]);
+// Study (specs/006) runs inside the main window (renderer/study, drawn in a
+// shadow root by the site's embedded bundle). Its requests reach the server
+// only through these handlers, and only from the main window's own page.
 const operation = /^\/v1\/mock\/(?:start|mock_[\w-]+\/(?:chat|tts|stt|end))$/;
 
-protocol?.registerSchemesAsPrivileged([{
-  scheme: 'lipcue-study', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true }
-}]);
+function isDashboardPage(url) {
+  return typeof url === 'string' && url.startsWith('file://') && /\/renderer\/index\.html(?:[?#].*)?$/.test(url);
+}
 
-function createStudyWindow({ rendererDir, preloadDir, getParent, getAccount, getEndpoint, getHistory, getLocale, navigate }) {
-  let win;
+function createStudyBridge({ getWindow, getAccount, getEndpoint, getHistory, getLocale }) {
   const requests = new Set();
   const chatRequests = new Map();
-  const trusted = (ev) => win && !win.isDestroyed() && ev.sender === win.webContents && ev.senderFrame?.url === `${origin}/index.html`;
-
-  protocol.handle('lipcue-study', async (request) => {
-    const url = new URL(request.url);
-    const type = files.get(url.pathname);
-    if (url.host !== 'app' || !type) return new Response(null, { status: 404 });
-    try {
-      const body = await fs.readFile(path.join(rendererDir, 'study', path.basename(url.pathname)));
-      return new Response(body, { headers: { 'Content-Type': type } });
-    } catch {
-      return new Response(null, { status: 404 });
-    }
-  });
+  const trusted = (ev) => {
+    const win = getWindow();
+    return Boolean(win && !win.isDestroyed() && ev.sender === win.webContents && isDashboardPage(ev.senderFrame?.url));
+  };
 
   ipcMain.handle('rtai:study-bootstrap', async (ev) => {
-    if (!trusted(ev)) throw new Error('Invalid study window.');
+    if (!trusted(ev)) throw new Error('Invalid study page.');
     const account = await getAccount();
     const history = account ? await getHistory() : { mocks: [], live: [] };
     return { account, ...history, lang: getLocale() };
-  });
-  ipcMain.on('rtai:study-navigate', (ev, target) => {
-    if (!trusted(ev) || !['train', 'live', 'plan'].includes(target)) return;
-    win.close();
-    navigate(target);
   });
   ipcMain.on('rtai:study-cancel', (ev, key) => { if (trusted(ev)) chatRequests.get(key)?.abort(); });
   ipcMain.handle('rtai:study-request', async (ev, method, route, body, key) => {
@@ -93,26 +72,13 @@ function createStudyWindow({ rendererDir, preloadDir, getParent, getAccount, get
   });
 
   return {
-    open() {
-      if (win && !win.isDestroyed()) return win.focus();
-      win = new BrowserWindow({
-        parent: getParent(), title: getLocale() === 'pt-BR' ? 'LipCue · Estudar' : 'LipCue · Study',
-        width: 1380, height: 900, minWidth: 750, minHeight: 620, backgroundColor: '#0a0b0c',
-        webPreferences: { preload: path.join(preloadDir, 'study.js'), contextIsolation: true, sandbox: true, nodeIntegration: false },
-      });
-      win.setMenuBarVisibility(false);
-      win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-      win.webContents.on('will-navigate', (event) => event.preventDefault());
-      win.on('closed', () => {
-        for (const ctrl of requests) ctrl.abort();
-        requests.clear();
-        chatRequests.clear();
-        win = null;
-      });
-      win.loadURL(`${origin}/index.html`);
+    // Sign-out: whatever is in flight stops.
+    abortAll() {
+      for (const ctrl of requests) ctrl.abort();
+      requests.clear();
+      chatRequests.clear();
     },
-    close() { win?.close(); },
   };
 }
 
-module.exports = { createStudyWindow };
+module.exports = { createStudyBridge, isDashboardPage };

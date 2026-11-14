@@ -63,8 +63,22 @@ contextBridge.exposeInMainWorld('rtai', {
   mockList: () => ipcRenderer.invoke('rtai:mock-list'),
   mockExport: (kind, name, content) => ipcRenderer.invoke('rtai:mock-export', kind, name, content),
   mockSttToken: () => ipcRenderer.invoke('rtai:mock-stt-token'),
-  studyOpen: () => ipcRenderer.invoke('rtai:study-open'),
-  onStudyNavigate: (callback) => ipcRenderer.on('rtai:study-go', (_event, route) => callback(route)),
+  // Study (specs/006), drawn inside this window by renderer/study/study.js.
+  study: {
+    bootstrap: () => ipcRenderer.invoke('rtai:study-bootstrap'),
+    request: (method, route, body, key) => ipcRenderer.invoke('rtai:study-request', method, route, body, key),
+    cancel: (key) => ipcRenderer.send('rtai:study-cancel', key),
+    onChunk: (key, callback) => {
+      const listener = (_event, id, text) => { if (id === key) callback(text); };
+      ipcRenderer.on('rtai:study-chunk', listener);
+      return () => ipcRenderer.removeListener('rtai:study-chunk', listener);
+    },
+    onAccount: (callback) => {
+      const listener = (_event, account) => callback(account);
+      ipcRenderer.on('rtai:study-account', listener);
+      return () => ipcRenderer.removeListener('rtai:study-account', listener);
+    },
+  },
   onMockEvent: (cb) => {
     const handler = (_event, msg) => cb(msg);
     ipcRenderer.on('rtai:mock-event', handler);

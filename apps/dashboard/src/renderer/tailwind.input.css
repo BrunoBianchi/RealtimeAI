@@ -4627,3 +4627,7 @@ button.prep-mark:hover { border-color: var(--accent-bright); }
 .live-room.is-preparing .answer-pane { padding: 26px; }
 @media (max-width: 1100px) { .live-room.is-preparing { grid-template-columns: minmax(0, 1fr); height: auto; } .live-room.is-preparing .live-side { min-height: 240px; } }
 @media (max-width: 620px) { .live-mode-options, .live-setup-checks { grid-template-columns: minmax(0, 1fr); } .live-room.is-preparing .answer-pane { padding: 18px; } .live-setup-launch .btn { width: 100%; } }
+
+/* Study (specs/006): drawn by renderer/study/study.js inside its own shadow root. */
+.study-host { display: block; min-height: 100%; }
+.study-host[hidden] { display: none; }

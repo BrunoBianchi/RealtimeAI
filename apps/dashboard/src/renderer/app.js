@@ -835,6 +835,7 @@ function renderView(resetScroll) {
   host.innerHTML = html;
   hydrateIcons(host);
   if (resetScroll) document.getElementById('content').scrollTop = 0;
+  syncStudy(!locked && S.route.view === 'study' && !localMode());
   const after = locked ? Cue.afterRender.login : Cue.afterRender[S.route.view];
   if (after) after(S.route.parts);
   renderShell();
@@ -1094,12 +1095,54 @@ Cue.actions['go-pro'] = async () => {
   navigate('home', true);
 };
 Cue.actions['open-path'] = (el) => api.openExternalPath(el.dataset.path || undefined);
-Cue.views.study = () => `<div class="page"><div class="empty boxed"><span class="t">Study</span>
-  <span>Review a completed interview with the AI tutor.</span>
-  ${Cue.localMode() ? '<span>Sign in to your LipCue account to study your interviews.</span>' :
-    '<button type="button" class="btn primary" data-action="study-open">Open Study</button>'}</div></div>`;
-Cue.actions['study-open'] = () => api.studyOpen();
-api.onStudyNavigate?.((route) => Cue.navigate(route));
+// Study (specs/006) is drawn inside this window, in #studyHost, by the site's
+// bundle (study/study.js, loaded the first time the page opens). The host sits
+// outside #view so re-rendering a view never resets a study in progress; away
+// from the page it is only hidden, which also closes the microphone.
+const study = { handle: null, loading: null };
+function loadStudyBundle() {
+  if (window.LipcueStudy) return Promise.resolve(window.LipcueStudy);
+  study.loading ||= new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'study/study.js';
+    script.onload = () => (window.LipcueStudy ? resolve(window.LipcueStudy) : reject(new Error('Study could not load.')));
+    script.onerror = () => { study.loading = null; reject(new Error('Study could not load.')); };
+    document.head.appendChild(script);
+  });
+  return study.loading;
+}
+function syncStudy(show) {
+  const host = document.getElementById('studyHost');
+  if (!host) return;
+  host.hidden = !show;
+  document.getElementById('content')?.classList.toggle('study-open', show);
+  if (!show) {
+    study.handle?.setHidden(true);
+    return;
+  }
+  if (study.handle) {
+    study.handle.setHidden(false);
+    study.handle.load();
+    return;
+  }
+  loadStudyBundle().then((lib) => {
+    if (study.handle) return;
+    study.handle = lib.mount(host, {
+      bridge: api.study,
+      styleUrl: new URL('study/study.css', location.href).href,
+      go: (target) => navigate({ train: 'mock', live: 'live', plan: 'settings/plan' }[target] || 'home'),
+    });
+    if (host.hidden) study.handle.setHidden(true);
+  }).catch((err) => {
+    console.error(err);
+    toast('Study could not load.', 'error');
+  });
+}
+Cue.views.study = () => (Cue.localMode()
+  ? `<div class="page"><div class="empty boxed"><span class="t">Study</span>
+      <span>Review a completed interview with the AI tutor.</span>
+      <span>Sign in to your LipCue account to study your interviews.</span></div></div>`
+  : '');
 Cue.actions['open-url'] = async (el) => {
   const res = await api.openUrl(el.dataset.url);
   if (!res || !res.ok) toast('Could not open the link.', 'error');

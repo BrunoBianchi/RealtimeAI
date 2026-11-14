@@ -33,7 +33,7 @@ const localBackend = require('./local_backend');
 const { settingsSectionFromArgv } = require('./launch_args');
 const jevEngine = require('./jev_engine');
 const { createMockInterviews } = require('./mock_interview');
-const { createStudyWindow } = require('./study_window');
+const { createStudyBridge } = require('./study_bridge');
 const { createPairProgramming } = require('./pair_programming');
 const companyLogoService = require('./company_logo_service');
 
@@ -3510,13 +3510,10 @@ app.whenReady().then(() => {
     // Only the bundled UI (file://) may use the microphone meter, clipboard and
     // notifications; anything remote that ends up in a window gets nothing.
     const isBundledUi = (url) => typeof url === 'string' && url.startsWith('file://');
-    const isStudyUi = (webContents, permission, details) =>
-      webContents?.getURL() === 'lipcue-study://app/index.html' && permission === 'media' &&
-      (details?.mediaType === 'audio' || (details?.mediaTypes?.length === 1 && details.mediaTypes[0] === 'audio'));
-    session.defaultSession.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) =>
-      isBundledUi(requestingOrigin) || isBundledUi(webContents?.getURL()) || isStudyUi(webContents, permission, details));
+    session.defaultSession.setPermissionCheckHandler((webContents, permission, requestingOrigin) =>
+      isBundledUi(requestingOrigin) || isBundledUi(webContents?.getURL()));
     session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
-      callback(isBundledUi(details?.requestingUrl || webContents?.getURL()) || isStudyUi(webContents, permission, details));
+      callback(isBundledUi(details?.requestingUrl || webContents?.getURL()));
     });
   }
   // A fresh install starts empty: no starter goal. Older versions created an
@@ -3820,8 +3817,8 @@ app.whenReady().then(() => {
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('rtai:mock-event', event);
     }
   });
-  const studyWindow = createStudyWindow({
-    rendererDir: RENDERER_DIR, preloadDir: PRELOAD_DIR, getParent: () => mainWindow,
+  const studyBridge = createStudyBridge({
+    getWindow: () => mainWindow,
     getAccount: async (force) => (await cloudAccount.status(force)).account,
     getEndpoint: () => isLocalMode(readConfigIni()) ? null : cloudAccount.aiEndpoint(),
     getLocale: () => resolveUiLocale(readConfigIni().ui_language, systemLanguages(app)),
@@ -3830,16 +3827,7 @@ app.whenReady().then(() => {
       live: loadPastSessions().slice(0, 40).map((record) => ({
         ...readSessionEvents(record.id), job: record.goalLabel ? { company: record.goalLabel } : null
       }))
-    }),
-    navigate: (target) => {
-      const route = { train: 'mock', live: 'live', plan: 'settings/plan' }[target];
-      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('rtai:study-go', route);
-    }
-  });
-  ipcMain.handle('rtai:study-open', () => {
-    const cfg = readConfigIni();
-    if (isLocalMode(cfg) || !isSignedIn(cfg)) return;
-    studyWindow.open();
+    })
   });
   ipcMain.handle('rtai:mock-start', async (_ev, agentId, lang, mode, settings) => {
     if (isLocalMode(readConfigIni())) return { ok: false, error: 'Mock interviews need a lipcue.com account.' };
@@ -3864,7 +3852,7 @@ app.whenReady().then(() => {
   ipcMain.handle('rtai:feedback-save-prompt', async (_ev, v) => feedback.savePrompt(Boolean(v)));
   ipcMain.handle('rtai:feedback-get-prompt', async () => feedback.getPrompt());
   ipcMain.handle('rtai:cloud-logout', async () => {
-    studyWindow.close();
+    studyBridge.abortAll();
     closeFeedbackDialog();
     if (isOverlayRunning()) stopRunningOverlay();
     const res = await cloudAccount.logout();

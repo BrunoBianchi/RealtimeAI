@@ -499,6 +499,7 @@
       'Export for study': 'Exportar para estudo',
       'Review a completed interview with the AI tutor.': 'Revise uma entrevista concluída com o tutor de IA.',
       'Sign in to your LipCue account to study your interviews.': 'Entre na sua conta LipCue para estudar suas entrevistas.',
+      'Study could not load.': 'Não foi possível carregar o Estudo.',
       'A realistic voice interview with AI, built from the job, your résumé and your files.': 'Uma entrevista realista por voz com IA, feita a partir da vaga, do seu currículo e dos seus arquivos.',
       'Rehearse before the real one': 'Ensaie antes da entrevista real',
       'Spoken, like the real thing': 'Falada, como na vida real',

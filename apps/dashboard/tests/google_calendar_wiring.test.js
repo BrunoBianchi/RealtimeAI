@@ -8,7 +8,8 @@ const path = require('node:path');
 const { loadRenderer, render, sources, tags } = require('./helpers/renderer');
 
 const root = path.resolve(__dirname, '..');
-const mainJs = fs.readFileSync(path.join(root, 'src', 'main', 'main.js'), 'utf8');
+// Study's handlers live in study_bridge.js, which main.js wires up.
+const mainJs = ['main.js', 'study_bridge.js'].map((f) => fs.readFileSync(path.join(root, 'src', 'main', f), 'utf8')).join('\n');
 const preload = fs.readFileSync(path.join(root, 'src', 'preload', 'preload.js'), 'utf8');
 
 test('every invoked IPC channel has a handler in main.js', () => {
