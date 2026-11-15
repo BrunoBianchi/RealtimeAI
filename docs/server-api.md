@@ -300,13 +300,13 @@ Conversa por texto com a IA sobre entrevistas já feitas (specs/006). Usa as mes
 
 - `POST /v1/mock/start` `{agent_id?, mode: "study"}` → `{id, mode: "study", source, billing: "minutes", max_s, minutes_left, vision_enabled: false, agent_id}`, sem `stt`. `max_s` = `min(3600, floor(minutes_left) × 60)`; numa retomada, é o tempo que falta. Sem `mode`, continua `advanced`.
 - Um mock aberto por conta. `start` do mesmo tipo retoma; de outro tipo (estudo aberto e `basic`/`advanced`, ou entrevista aberta e `study`) responde `409 mock_in_progress` ("Finish the mock interview in progress before starting another one."). Mocks vencidos são fechados e cobrados antes dessa conta.
-- `POST /v1/mock/{id}/chat` com `purpose: "study"` (ou sem `purpose`): o servidor usa `MOCK_STUDY_MODEL` (padrão: o modelo de `MOCK_MODEL`, rápido e sem raciocínio, porque cada resposta é falada) e `max_tokens` 1600, até 400 chamadas (`429 mock_limit` depois). Num estudo, `purpose` `evaluation`/`review` → `400 wrong_mode`; numa entrevista, `purpose: "study"` → `400 wrong_mode`.
+- `POST /v1/mock/{id}/chat` com `purpose: "study"` (ou sem `purpose`): o servidor usa `MOCK_STUDY_MODEL` (padrão: o modelo de `MOCK_MODEL`, rápido e sem raciocínio, porque cada resposta é falada) e `max_tokens` 2600 (raciocínio curto escrito pelo próprio tutor num bloco oculto, a fala e os blocos do quadro entre as frases), até 400 chamadas (`429 mock_limit` depois). Num estudo, `purpose` `evaluation`/`review` → `400 wrong_mode`; numa entrevista, `purpose: "study"` → `400 wrong_mode`.
 - Novos estudos exigem histórico na conta. Uma entrevista simulada encerrada com chamadas de conversa ou uma sessão ao vivo encerrada com duração positiva habilita o servidor. Sem histórico, `403 study_history_required`. O site e o Windows também exigem pelo menos uma resposta registrada na entrevista selecionada.
 - `tts` aceita até 500 caracteres por pedido e até 60 mil por estudo. `stt` emite a credencial sob demanda quando a pessoa ativa o microfone. `vision` devolve `400 wrong_mode`. Conversa, TTS e STT recebem `410 mock_over` ao fechar o estudo ou atingir o limite.
 
 | `mode` do mock | `purpose` | Modelo | `max_tokens` | Chamadas |
 |---|---|---|---|---|
-| `study` | `study` ou ausente | `MOCK_STUDY_MODEL` | 1600 | até 400 |
+| `study` | `study` ou ausente | `MOCK_STUDY_MODEL` | 2600 | até 400 |
 | `study` | `evaluation` / `review` | — | — | `400 wrong_mode` |
 | `basic`/`advanced` | `study` | — | — | `400 wrong_mode` |
 | `basic`/`advanced` | outros | sem mudança | sem mudança | até 150 |
