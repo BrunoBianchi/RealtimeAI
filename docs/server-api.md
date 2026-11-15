@@ -178,7 +178,7 @@ Bearer. Resposta `200`:
     "period_end": "2026-12-01",
     "credit_minutes": 0,
     "minutes_left": 85,
-    "training": { "rate": 1, "max_minutes": 30, "study_max_minutes": 60, "free_under_s": 60 },
+    "training": { "rate": 1, "max_minutes": 60, "study_max_minutes": 60, "free_under_s": 60 },
     "mocks_limit": 0, "mocks_used": 0, "mock_credits": 0,
     "mock_tokens": { "included_limit": 0, "included_left": 0, "purchased": 85, "basic_cost": 1, "advanced_cost": 1 }
   },
@@ -281,15 +281,16 @@ Bearer. Devolve o código da conta (criado no primeiro uso) e o andamento:
 
 ### Entrevista simulada (`/v1/mock`)
 
-Básico e Avançado descontam o tempo usado do mesmo saldo da ajuda ao vivo (`plan.minutes_left`): 1 minuto do saldo por minuto de entrevista, arredondado para cima em 0,1 min, no fim. Até 60 s não desconta nada. Para começar é preciso ter pelo menos 1 minuto, e a entrevista dura no máximo `min(30 min, saldo)`. Primeiro saem os minutos do plano, depois os comprados. No Free, o treino usa os mesmos 15 minutos e **não** conta como a sessão única ao vivo; depois que essa sessão é usada, os minutos do plano acabam para tudo.
+Básico e Avançado descontam o tempo usado do mesmo saldo da ajuda ao vivo (`plan.minutes_left`): 1 minuto do saldo por minuto de entrevista, arredondado para cima em 0,1 min, no fim. Até 60 s não desconta nada. Para começar é preciso ter pelo menos 1 minuto, e a entrevista dura no máximo `min(60 min, saldo)` (`plan.training.max_minutes`). O site e o Windows oferecem 15, 30, 45 ou 60 minutos, e o app encerra na duração escolhida; o servidor só aplica o teto. Primeiro saem os minutos do plano, depois os comprados. No Free, o treino usa os mesmos 15 minutos e **não** conta como a sessão única ao vivo; depois que essa sessão é usada, os minutos do plano acabam para tudo.
 
-- `POST /v1/mock/start` `{agent_id, mode: "basic" | "advanced"}` → `{id, source, billing: "minutes", mode, max_s, minutes_left, vision_enabled, stt?}`. `max_s` = `min(1800, floor(minutes_left) × 60)`; `minutes_left` é o saldo antes desta entrevista. Básico conversa com Orby por texto. Avançado inclui voz e pede consentimento para analisar imagens ocasionais da câmera. Uma entrevista em andamento é retomada sem nova cobrança. Menos de 1 minuto: `402 mock_not_included` ("You don't have minutes left for a mock interview."), código mantido para apps antigos. `ai_unavailable`, `stt_unavailable`, `vision_unavailable` e `invalid_mode` vêm antes e não custam nada.
-- `POST /v1/mock/{id}/chat`: corpo chat/completions; o servidor impõe o modelo de conversa e `max_tokens`. Aceito até 3 min depois do limite (feedback final).
+- `POST /v1/mock/start` `{agent_id, mode: "basic" | "advanced"}` → `{id, source, billing: "minutes", mode, max_s, minutes_left, vision_enabled, stt?}`. `max_s` = `min(3600, floor(minutes_left) × 60)`; `minutes_left` é o saldo antes desta entrevista. As cotas da entrevista crescem com `max_s`, por minuto concedido, a partir de um piso (tabela abaixo). Básico conversa com Orby por texto. Avançado inclui voz e pede consentimento para analisar imagens ocasionais da câmera. Uma entrevista em andamento é retomada sem nova cobrança. Menos de 1 minuto: `402 mock_not_included` ("You don't have minutes left for a mock interview."), código mantido para apps antigos. `ai_unavailable`, `stt_unavailable`, `vision_unavailable` e `invalid_mode` vêm antes e não custam nada.
+- `POST /v1/mock/{id}/chat`: corpo chat/completions; o servidor impõe o modelo de conversa e `max_tokens`. Aceito até 3 min depois do limite (feedback final). Até 5 chamadas por minuto concedido, no mínimo 150 (300 numa entrevista de 60 min); depois, `429 mock_limit`.
   - `purpose` escolhe o modelo: ausente → `MOCK_MODEL` (padrão `anthropic/claude-haiku-5.5`), `max_tokens` 900; `evaluation` → `MOCK_EVAL_MODEL` (padrão `anthropic/claude-sonnet-5.5`), `max_tokens` 2824 e `reasoning` `{max_tokens: 1024, exclude: true}` imposto pelo servidor (esse modelo recusa `reasoning.enabled: false`; o raciocínio fica oculto e a resposta mantém 1800 tokens); `review` → `MOCK_REVIEW_MODEL` (padrão `openai/gpt-5.6-terra`), `max_tokens` 1800. `purpose` não é repassado.
-  - Se o provedor recusa o pedido (4xx/5xx), o status e o corpo dele voltam ao cliente, e o servidor registra a mensagem no log.
-- `POST /v1/mock/{id}/tts` `{text}` (até 500 caracteres; 15 mil por entrevista Avançada) → áudio mp3 (`TTS_MODEL`, padrão `elevenlabs/eleven-turbo-v2.5`; `TTS_VOICE`, padrão `sarah`; o modelo detecta o idioma do texto). Indisponível no Básico.
+  - Se o provedor recusa o pedido (4xx/5xx), o status e o corpo dele voltam ao cliente, e o servidor registra a mensagem no log. A exceção é `402` (a conta do provedor ficou sem créditos ou passou do limite da chave): o saldo da pessoa está certo, então ela recebe `503 ai_unavailable` ("The AI is unavailable right now. Try again in a few minutes."), nunca um pedido de pagamento, e o log diz para adicionar créditos ao provedor. Sem resposta a tempo: `504 upstream_timeout`; falha de conexão: `502 upstream_unavailable`. Vale para todas as rotas que passam pelo relay (entrevista, estudo e `/v1/llm`).
+  - Os clientes tentam de novo uma vez, em silêncio, depois de 1,5 s, quando a falha é passageira (rede, `busy`, `500`/`502`/`503`/`504`, `upstream_timeout`, `upstream_unavailable`) e nada da resposta chegou. `ai_unavailable` não é repetido: o app mostra a mensagem e guarda a resposta da pessoa.
+- `POST /v1/mock/{id}/tts` `{text}` (até 500 caracteres por pedido; por entrevista Avançada, 500 por minuto concedido, no mínimo 15 mil, ou 30 mil numa de 60 min; depois, `429 mock_limit`) → áudio mp3 (`TTS_MODEL`, padrão `elevenlabs/eleven-turbo-v2.5`; `TTS_VOICE`, padrão `sarah`; o modelo detecta o idioma do texto). Indisponível no Básico.
 - `POST /v1/mock/{id}/stt` → nova credencial de transcrição. Indisponível no Básico.
-- `POST /v1/mock/{id}/vision` `{image, previous_image?, language}` analisa até dois JPEGs pequenos, com limite de 30 chamadas por entrevista e intervalo mínimo de 55 s. Usa `MOCK_VISION_MODEL` (padrão `openai/gpt-5.4-mini` via OpenRouter) para observações de enquadramento, direção do olhar, postura, vestimenta, organização do fundo e movimentos visíveis. As imagens são retransmitidas para o modelo e não são armazenadas pelo servidor.
+- `POST /v1/mock/{id}/vision` `{image, previous_image?, language}` analisa até dois JPEGs pequenos, com limite de 1 chamada por minuto concedido (no mínimo 30, ou 60 numa entrevista de 60 min) e intervalo mínimo de 55 s. Usa `MOCK_VISION_MODEL` (padrão `openai/gpt-5.4-mini` via OpenRouter) para observações de enquadramento, direção do olhar, postura, vestimenta, organização do fundo e movimentos visíveis. As imagens são retransmitidas para o modelo e não são armazenadas pelo servidor.
 - `POST /v1/mock/{id}/end` → `{refunded, charged_minutes, minutes_left}`. Cobra `min(tempo decorrido, max_s + 30 s)`; `refunded: true` quando nada foi cobrado (até 60 s). Repetir devolve o mesmo resultado sem cobrar de novo. Entrevistas iniciadas antes da troca para minutos (com `token_debit`) seguem a regra antiga: até 1 min, o débito volta como minutos comprados.
 - Entrevista abandonada (sem `/end`): é encerrada depois de `expires_at` + 3 min e cobrada até a última chamada (`chat`, `tts`, `stt`, `vision`), na próxima leitura de `GET /v1/me` ou em `POST /v1/mock/start`.
 - Depois do limite: `410 mock_over`.
@@ -309,7 +310,7 @@ Conversa por texto com a IA sobre entrevistas já feitas (specs/006). Usa as mes
 | `study` | `study` ou ausente | `MOCK_STUDY_MODEL` | 2600 | até 400 |
 | `study` | `evaluation` / `review` | — | — | `400 wrong_mode` |
 | `basic`/`advanced` | `study` | — | — | `400 wrong_mode` |
-| `basic`/`advanced` | outros | sem mudança | sem mudança | até 150 |
+| `basic`/`advanced` | outros | sem mudança | sem mudança | 5 por minuto concedido, no mínimo 150 |
 
 #### Quadros compartilhados (`/v1/boards`)
 
