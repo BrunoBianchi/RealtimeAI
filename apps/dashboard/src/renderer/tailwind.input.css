@@ -4181,6 +4181,11 @@ button.prep-mark:hover { border-color: var(--accent-bright); }
 .bubble.ai { align-self: flex-start; }
 .bubble-who { font-size: 11px; color: var(--text-tertiary); }
 .bubble-text { font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* The coach's tips on an answer, between it and Orby's reply; green when the answer had no gap. */
+.mock-tip { display: flex; flex-direction: column; gap: 3px; align-self: center; max-width: 94%; padding: 8px 12px; border-radius: 12px; border: 1px dashed var(--warning-border); background: var(--warning-soft); }
+.mock-tip .bubble-who { color: var(--warning); font-weight: 600; }
+.mock-tip.good { border-color: color-mix(in srgb, var(--accent) 40%, transparent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.mock-tip.good .bubble-who { color: var(--accent-bright); }
 .mock-input { display: flex; align-items: center; gap: 8px; padding: 10px 16px 14px; border-top: 1px solid var(--border-subtle); }
 .mock-done-hero .score-disc { margin-left: auto; }
 .score-disc { --p: 0; flex: none; width: 96px; height: 96px; display: grid; place-items: center; border-radius: 50%; background: conic-gradient(var(--accent) calc(var(--p) * 1%), rgba(255, 255, 255, .12) 0); }

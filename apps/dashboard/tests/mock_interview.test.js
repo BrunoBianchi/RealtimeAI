@@ -207,6 +207,132 @@ test('the end reports the minutes charged by the server', async () => {
   fs.rmSync(f.dir, { recursive: true });
 });
 
+test('the length picked caps the interview within what the server allows', async () => {
+  for (const [minutes, serverMax, expected] of [[10, 1800, 600], [20, 900, 900], [45, 1800, 1800], [undefined, 1200, 1200]]) {
+    const f = fakeDeps({ ok: true, data: { id: `mock_len_${expected}`, max_s: serverMax, stt: { token: 't' } } });
+    const m = createMockInterviews(f.deps);
+    const r = await m.start({ agentId: 'g1', lang: 'en', settings: { minutes } });
+    assert.strictEqual(r.maxS, expected, `${minutes} min with ${serverMax} s on the server`);
+    fs.rmSync(f.dir, { recursive: true });
+  }
+});
+
+test('the coach measures each answer, a request to repeat is not scored, and the last answer can be given again', async () => {
+  const f = fakeDeps({ ok: true, data: { id: 'mock_coach', max_s: 1800, stt: { token: 't' } } });
+  const m = createMockInterviews(f.deps);
+  await m.start({ agentId: 'g1', lang: 'pt-BR', settings: { depth: 0 } });
+  const opening = await m.turn('');
+  assert.deepStrictEqual([opening.tips, opening.canRedo], [[], false], 'nothing to measure or take back yet');
+  m.keepAudio({ i: 0, role: 'assistant', mime: 'audio/mpeg', bytes: new Uint8Array([1, 2]) });
+
+  const team = 'Nós migramos o sistema para Kafka e nós cuidamos da fila de pedidos com a equipe toda durante meses de trabalho em conjunto com outras áreas da empresa toda.';
+  const first = await m.turn(team);
+  assert.deepStrictEqual(first.tips.map((t) => t.id), ['nos', 'result']);
+  assert.deepStrictEqual([first.tips[0].team, first.tips[0].own], [2, 0]);
+  assert.deepStrictEqual([first.clarify, first.canRedo], [false, true]);
+  assert.ok(m.keepAudio({ i: 1, role: 'user', spoken: true, mime: 'audio/wav', bytes: new Uint8Array(64) }).ok);
+  assert.ok(m.keepAudio({ i: 2, role: 'assistant', mime: 'audio/mpeg', bytes: new Uint8Array([3]) }).ok);
+
+  // Answer again: the answer, the reply and their audio go; the question stays.
+  const back = m.redo();
+  assert.deepStrictEqual([back.ok, back.topic, back.messages], [true, 'trajectory', 1]);
+  assert.match(back.question, /trajetória/);
+  assert.deepStrictEqual({ ...m.redo() }, { ok: false }, 'only once');
+
+  const clarify = await m.turn('Pode repetir a pergunta?');
+  assert.deepStrictEqual([clarify.clarify, clarify.canRedo, clarify.tips], [true, false, []]);
+  assert.strictEqual(clarify.topic, 'trajectory', 'the same question, in other words');
+
+  const story = 'Eu estudei computação e entrei numa fintech como estagiário de backend. Eu construí sozinho a fila de pagamentos em Kafka e reduzi as falhas em 30% em três meses. Depois eu liderei a migração do faturamento, eu escrevi os testes de carga e eu treinei duas pessoas novas no time, o que deixou as entregas mais rápidas e seguras para todos.';
+  const good = await m.turn(story);
+  assert.deepStrictEqual(good.tips.map((t) => t.id), ['good']);
+
+  const { record } = await m.end();
+  assert.deepStrictEqual(record.evaluation.items.map((x) => x.answer), [story], 'the answer taken back and the request to repeat are not scored');
+  assert.ok(!record.messages.some((x) => x.content === team));
+  assert.ok(record.messages.some((x) => x.content === 'Pode repetir a pergunta?'), 'the request stays in the conversation');
+  assert.deepStrictEqual(record.audio.map((c) => `${c.i}-${c.role}`), ['0-assistant'], 'the audio of the answer taken back is gone');
+  fs.rmSync(f.dir, { recursive: true });
+});
+
+test('filler words count only in a spoken answer, and the coach can be turned off', async () => {
+  const f = fakeDeps({ ok: true, data: { id: 'mock_fillers', max_s: 1800, stt: { token: 't' } } });
+  const m = createMockInterviews(f.deps);
+  await m.start({ agentId: 'g1', lang: 'en', settings: { depth: 0 } });
+  await m.turn('');
+  const answer = 'Um, I studied computer science and, um, I joined a fintech as a backend intern. I built the payment queue on Kafka myself and, you know, I reduced the failed payments by 30 percent in three months. Um, then I led the migration of the billing service and I mentored two new engineers on the team.';
+  const spoken = await m.turn(answer, '', 0, true);
+  assert.deepStrictEqual(spoken.tips.map((t) => [t.id, t.n]), [['fillers', 4]]);
+  assert.ok(m.redo().ok);
+  assert.deepStrictEqual((await m.turn(answer)).tips, [], 'typed, the same answer has no fillers');
+  await m.end();
+
+  const off = fakeDeps({ ok: true, data: { id: 'mock_quiet', max_s: 1800, stt: { token: 't' } } });
+  const quiet = createMockInterviews(off.deps);
+  await quiet.start({ agentId: 'g1', lang: 'pt-BR', settings: { coach: false } });
+  await quiet.turn('');
+  const r = await quiet.turn('Nós fizemos.');
+  assert.deepStrictEqual([r.tips, r.canRedo], [[], true], 'a realistic interview still lets the answer be given again');
+  fs.rmSync(f.dir, { recursive: true });
+  fs.rmSync(off.dir, { recursive: true });
+});
+
+test('the coach tip sits under the answer and Answer again takes it back', async () => {
+  const { entitlement } = require('../src/main/plans');
+  const { loadRenderer, render, settle } = require('./helpers/renderer');
+  let say = () => {};
+  const replies = {
+    '': { sentence: 'Tell me about yourself?', r: { ok: true, finished: false, topic: 'trajectory', added: [], tips: [], clarify: false, canRedo: false } },
+    'We built it.': { sentence: 'What did you do yourself?', r: { ok: true, finished: false, topic: 'trajectory', added: [], tips: [{ id: 'nos', team: 1, own: 0, words: 3, minutes: 1 }, { id: 'short', team: 1, own: 0, words: 3, minutes: 1 }], clarify: false, canRedo: true } },
+    'Can you repeat?': { sentence: 'Sure: what is your background?', r: { ok: true, finished: false, topic: 'trajectory', added: [], tips: [], clarify: true, canRedo: false } }
+  };
+  const r = loadRenderer({
+    state: { agents: [job], auth: { signedIn: true, entitlement: entitlement({ plan: { id: 'pro', minutes_left: 100 } }) } },
+    api: {
+      onMockEvent: (cb) => { say = cb; },
+      mockStart: async () => ({ ok: true, id: 'm1', mode: 'basic', maxS: 900, messages: [] }),
+      mockTurn: async (text) => {
+        say({ type: 'sentence', text: replies[text].sentence });
+        return replies[text].r;
+      },
+      mockRedo: async () => ({ ok: true, question: 'Tell me about yourself?', topic: 'trajectory', messages: 1 })
+    }
+  });
+  render(r.Cue, 'mock');
+  await r.Cue.actions['mock-start']();
+  await settle();
+  const page = r.document.getElementById;
+  const typed = { value: '', focused: false, addEventListener() {}, focus() { typed.focused = true; } };
+  r.document.getElementById = (id) => (id === 'mockTyped' ? typed : page(id));
+  const send = async (text) => {
+    typed.value = text;
+    r.Cue.actions['mock-send']();
+    await settle();
+  };
+
+  await send('We built it.');
+  let live = render(r.Cue, 'mock');
+  assert.match(live, /bubble me[\s\S]*We built it\.[\s\S]*class="mock-tip "[\s\S]*Coach tip[\s\S]*You said &quot;we&quot; 1× and &quot;I&quot; 0×[\s\S]*Short answer[\s\S]*bubble ai[\s\S]*What did you do yourself\?/);
+  assert.match(live, /id="mockRedo" title="[^"]*" >Answer again/, 'the answer can be taken back');
+  assert.match(live, /Question <span class="mono" id="mockQIndex"[^>]*>2</);
+
+  await r.Cue.actions['mock-redo']();
+  live = render(r.Cue, 'mock');
+  assert.doesNotMatch(live, /We built it\.|What did you do yourself/);
+  assert.match(live, /bubble ai[\s\S]*Tell me about yourself\?[\s\S]*class="mock-tip "[\s\S]*Short answer/, 'the tip stays: it says what to fix');
+  assert.match(live, /id="mockRedo"[^>]*hidden/);
+  assert.match(live, /id="mockNotice"[^>]*>Your last answer was taken back\. Answer the same question again\./);
+  assert.deepEqual(r.called('mockRedo'), [[]]);
+  assert.strictEqual(typed.focused, true, 'the answer box takes the focus of the button that went away');
+
+  await send('Can you repeat?');
+  live = render(r.Cue, 'mock');
+  assert.match(live, /Question <span class="mono" id="mockQIndex"[^>]*>1</, 'the question said again is not a new one');
+  assert.strictEqual(live.match(/Coach tip/g).length, 1, 'no tip on a request to repeat');
+  assert.doesNotMatch(live, /id="mockNotice"[^>]*>Your last/);
+  assert.deepEqual(r.called('mockTurn'), [[''], ['We built it.'], ['Can you repeat?']], 'typed answers do not ask for filler counts');
+});
+
 test('a token this app cannot read asks for sign-in instead of an empty account', async () => {
   const { createCloudAccount } = require('../src/main/cloud_account');
   const acc = createCloudAccount({ getServerUrl: () => 'http://x.test', hasToken: () => true, readToken: () => '', saveToken() {}, openBrowser() {}, appVersion: '1' });
@@ -274,7 +400,7 @@ test('both modes are charged per minute from the one balance shared with live se
   await r.Cue.actions['mock-start']();
   const [agentId, lang, mode, settings] = r.called('mockStart')[0];
   assert.deepEqual([agentId, lang, mode], [job.id, 'es', 'basic']);
-  assert.deepEqual({ ...settings }, { kind: 'behavioral', persona: 'global', format: 'internship', level: 'auto', depth: 1, goal: 'Explicar um projeto', focus: '', useBank: true, priority: [] });
+  assert.deepEqual({ ...settings }, { kind: 'behavioral', persona: 'global', format: 'internship', level: 'auto', depth: 1, goal: 'Explicar um projeto', focus: '', useBank: true, coach: true, minutes: 30, priority: [] });
   assert.deepEqual(r.called('mockTurn'), [['']]);
 
   const plan = render(r.Cue, 'settings/plan/interviews');

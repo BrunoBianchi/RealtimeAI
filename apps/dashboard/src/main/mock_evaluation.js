@@ -8,7 +8,7 @@
 // averaged here, a quote must come from the answer it justifies, and an answer
 // the models skipped is asked again once and then reported as not evaluated.
 
-const { evaluationContext, evaluationMaterials, jobCoverage, languageName } = require('./mock_prompt');
+const { answerSignals, evaluationContext, evaluationMaterials, jobCoverage, languageName } = require('./mock_prompt');
 
 const EVALUATION_VERSION = 4;
 // vaga: how much the answer shows the job's requirements (added in version 4).
@@ -181,31 +181,25 @@ function mergeJudges(primary, review) {
   return out;
 }
 
-const SINGULAR = new Set('eu me meu minha meus minhas mim comigo i my mine myself yo mi mis conmigo je moi mon ma mes io mio mia miei mie'.split(' '));
-const PLURAL = new Set('nos nosso nossa nossos nossas gente we our ours us ourselves nosotros nosotras nuestro nuestra nuestros nuestras nous notre nos noi nostro nostra nostri nostre'.split(' '));
-const RESULT = /\p{N}|%|\b(reduzi\w*|aumentei|aumentamos|diminui\w*|economiz\w*|dobr\w*|cresceu|cresceram|resultado\w*|impacto\w*|entreguei|entregamos|lancei|lancamos|increas\w*|reduc\w*|improv\w*|sav\w*|grew|doubl\w*|launch\w*|deliver\w*|result\w*|impact\w*|reduj\w*|aument\w*|ahorr\w*)\b/u;
-const FILLERS = ['ne', 'tipo', 'tipo assim', 'entao', 'assim', 'basicamente', 'enfim', 'tipo que', 'like', 'basically', 'actually', 'you know', 'um', 'uh', 'uhm', 'hum', 'eh', 'ahn', 'o sea', 'pues', 'bueno'];
 // Words of an answer that read well aloud: about 30 seconds to 2 minutes.
 const PACE = [60, 260];
 
-// Measured, not judged: counted in each answer and averaged over the interview.
-// ownership: share of "I" among "I" and "we" words; results: answers that name a
-// number or an outcome; pace: answers of a workable length; fillers: filler
-// words per 100 words, as a score; coverage: the job's terms that came up.
+// Measured, not judged: counted in each answer (answerSignals in mockPrompt.js,
+// with the filler words of the interview language) and averaged over the
+// interview. ownership: share of "I" among "I" and "we" words; results: answers
+// that name a number or an outcome; pace: answers of a workable length;
+// fillers: filler words per 100 words, as a score; coverage: the job's terms
+// that came up.
 function measureAnswers(interview, pairs) {
   const answers = pairs.map((p, index) => {
-    const words = plain(p.answer).split(' ').filter(Boolean);
-    const n = words.length;
-    const own = words.filter((w) => SINGULAR.has(w)).length;
-    const team = words.filter((w) => PLURAL.has(w)).length;
-    const joined = ` ${words.join(' ')} `;
-    const fillers = FILLERS.reduce((sum, f) => sum + (joined.split(` ${f} `).length - 1), 0);
+    const m = answerSignals(p.answer, interview.lang);
+    const n = m.words;
     const pace = n >= PACE[0] && n <= PACE[1] ? 100 : n < PACE[0] ? Math.round((n / PACE[0]) * 100) : Math.max(40, Math.round(100 - (n - PACE[1]) / 4));
     return {
       index, words: n, pace,
-      ownership: own + team >= 2 ? Math.round((own / (own + team)) * 100) : null,
-      results: RESULT.test(plain(p.answer)) || /\p{N}/u.test(p.answer),
-      fillers: n ? Math.round((fillers / n) * 1000) / 10 : 0,
+      ownership: m.own + m.team >= 2 ? Math.round((m.own / (m.own + m.team)) * 100) : null,
+      results: m.result,
+      fillers: n ? Math.round((m.fillers / n) * 1000) / 10 : 0,
     };
   });
   const avg = (values) => (values.length ? Math.round(mean(values)) : null);

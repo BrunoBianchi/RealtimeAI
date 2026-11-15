@@ -33,7 +33,49 @@
   const personaLabel = (persona) => C.t(PERSONAS.find(([id]) => id === persona)?.[1] || '');
   const skipLabel = (topic) => C.t(topic === 'questions' ? 'I have no more questions' : 'Skip');
   const topicLabel = (topic) => C.t(TOPICS[topic] || '');
-  const defaultSettings = { kind: 'behavioral', persona: 'recruiter', format: 'auto', level: 'auto', depth: 1, goal: '', focus: '', useBank: true };
+  const defaultSettings = { kind: 'behavioral', persona: 'recruiter', format: 'auto', level: 'auto', depth: 1, goal: '', focus: '', useBank: true, coach: true, minutes: 30 };
+  // The lengths main/mock_interview.js accepts (LENGTHS); the server still caps them.
+  const LENGTHS = [['10', '10 min'], ['20', '20 min'], ['30', '30 min']];
+  // The coach's tips on an answer (coachTips in main/mock_prompt.js), by id.
+  const TIPS = {
+    unsure: 'No example? That is fine: use one from university, a personal project or another job, even a small one.',
+    nos: 'You said "we" {team}× and "I" {own}×. Say what you did yourself: your decisions and your steps.',
+    result: 'No result yet: say what changed and how you measured it, with a number if you have one.',
+    short: 'Short answer: add a concrete example and the reason behind it.',
+    long: 'Long answer (about {minutes} min out loud). Aim for under 2 minutes and let the interviewer ask for details.',
+    fillers: 'You used {n} filler words. Swap them for a short pause: it sounds more confident.',
+    good: 'Complete answer: you said what you did and what came of it. Keep this structure.'
+  };
+  // The choices of the last interview, kept on this computer. The subjects and
+  // the goal belong to one interview and are left out.
+  const SETTINGS_KEY = 'lipcue_mock_settings';
+  const VALID = {
+    kind: (v) => KINDS.some(([id]) => id === v),
+    persona: (v) => PERSONAS.some(([id]) => id === v),
+    format: (v) => ['auto', 'internship', 'professional'].includes(v),
+    level: (v) => LEVELS.some(([id]) => id === v),
+    depth: (v) => [0, 1, 2].includes(v),
+    useBank: (v) => typeof v === 'boolean',
+    coach: (v) => typeof v === 'boolean',
+    minutes: (v) => [10, 20, 30].includes(v)
+  };
+  const loadSettings = () => {
+    try {
+      const value = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+      const out = Object.fromEntries(Object.keys(VALID).filter((k) => VALID[k](value[k])).map((k) => [k, value[k]]));
+      if (LANGUAGES.some(([id]) => id === value.lang)) out.lang = value.lang;
+      return out;
+    } catch (_e) {
+      return {};
+    }
+  };
+  const saveSettings = () => {
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ lang: M.lang, ...Object.fromEntries(Object.keys(VALID).map((k) => [k, M.settings[k]])) }));
+    } catch (_e) { /* Kept until the app closes. */ }
+  };
+  const { lang: savedLang = '', ...savedSettings } = loadSettings();
   // The files marked as the main ones for the questions, by job id, kept on this computer.
   const PRIORITY_KEY = 'lipcue_mock_priority';
   const loadPriority = () => {
@@ -50,7 +92,7 @@
     } catch (_e) { /* Kept until the app closes. */ }
   };
   const kindLabel = (kind) => C.t(KINDS.find(([id]) => id === kind)?.[1] || '');
-  const M = { phase: 'idle', agentId: '', lang: '', mode: 'basic', settings: { ...defaultSettings }, topic: '', modeTouched: false, consent: false, cameraStream: null, cameraTimer: null, cameraBusy: false, visualCount: 0, previousFrame: '', cameraJob: null, lines: [], partial: '', state: '', error: '', record: null, history: null, endsAt: 0, id: '', priority: loadPriority() };
+  const M = { phase: 'idle', agentId: '', lang: savedLang, mode: 'basic', settings: { ...defaultSettings, ...savedSettings }, topic: '', canRedo: false, notice: '', modeTouched: false, consent: false, cameraStream: null, cameraTimer: null, cameraBusy: false, visualCount: 0, previousFrame: '', cameraJob: null, lines: [], partial: '', state: '', error: '', record: null, history: null, endsAt: 0, id: '', priority: loadPriority() };
   S.mock = M;
   let ws = null;
   let audio = null; // { ctx, stream, node }
@@ -166,8 +208,8 @@
         <div class="card mock-config">
           <h2 class="h2">Set up your interview</h2>
           <label class="field">Which job is this for?<select class="select" data-change="mock-agent" data-no-i18n>${agents.map((x) => `<option value="${esc(x.id)}" ${x.id === M.agentId ? 'selected' : ''}>${esc(`${C.agentCompany(x) || x.name || '—'} · ${x.role || '—'}`)}</option>`).join('')}</select></label>
-          <div class="field"><span>Interview type</span>
-            <div class="mock-mode-grid" role="group" aria-label="Interview type">
+          <div class="field"><span>Mode</span>
+            <div class="mock-mode-grid" role="group" aria-label="Mode">
               ${modes.map(([mode, ic, label, description]) => `<button type="button" aria-pressed="${M.mode === mode}" class="mock-mode ${M.mode === mode ? 'active' : ''}" data-action="mock-mode-set" data-mode="${mode}">
                 <span class="mock-mode-icon">${icon(ic)}</span><span class="strong">${label}</span><span class="small muted">${description}</span>
                 <span class="mock-availability" data-no-i18n>${esc(availability(mode))}</span>
@@ -179,7 +221,9 @@
             <label class="field">Interview type<select class="select" data-change="mock-kind">${C.opts(KINDS, M.settings.kind)}</select><span class="small muted" data-no-i18n>${esc(C.t(KIND_HINTS[M.settings.kind] || ''))}</span></label>
             <label class="field">Interviewer<select class="select" data-change="mock-persona">${C.opts(PERSONAS, M.settings.persona)}</select></label>
             <label class="field">Interview language<select class="select" data-change="mock-lang" data-no-i18n>${C.opts(LANGUAGES, lang)}</select></label>
+            <label class="field">Duration<select class="select" data-change="mock-minutes">${C.opts(LENGTHS, String(M.settings.minutes))}</select></label>
           </div>
+          <label class="mock-consent"><input type="checkbox" data-change="mock-tips" ${M.settings.coach ? 'checked' : ''}/><span class="stack" style="gap:2px"><span>Coach tips during the interview</span><span class="small muted">A short tip after each answer, measured from what you said. Turn it off for a realistic interview.</span></span></label>
           <label class="field">What can be asked<textarea class="input" rows="2" maxlength="600" data-input="mock-focus" placeholder="Optional. Example: Kafka at my last job, the payments app, leading the migration, why I want to move to data.">${esc(M.settings.focus)}</textarea><span class="small muted">Orby asks about these topics in its own words, along with the usual ones.</span></label>
           ${mainFilesHtml()}
           <details class="mock-details">
@@ -200,7 +244,7 @@
           <details class="mock-details small muted"><summary>How camera analysis works</summary><p>About once a minute, a camera still is sent to AI; when available, it is compared with the previous still for framing, eye direction, posture, clothing, background organization and visible movement. The app does not record video or save camera images.</p></details>` : ''}
           ${M.error ? `<div class="banner warn" role="alert">${icon('alert')}<span class="grow">${esc(M.error)}</span></div>` : ''}
           <div class="mock-actions">
-            ${canStartMode ? `<button type="button" class="btn primary lg" data-action="mock-start" ${M.mode === 'advanced' && !M.consent ? 'disabled' : ''}>${icon(M.mode === 'basic' ? 'chat' : 'camera')}${M.resumeMode === M.mode ? 'Resume interview' : M.mode === 'basic' ? 'Start Basic interview' : 'Start Advanced interview'}</button><span class="small muted" data-no-i18n>${esc(C.t('Up to {n} minutes', { n: maxMinutes() }))}</span>`
+            ${canStartMode ? `<button type="button" class="btn primary lg" data-action="mock-start" ${M.mode === 'advanced' && !M.consent ? 'disabled' : ''}>${icon(M.mode === 'basic' ? 'chat' : 'camera')}${M.resumeMode === M.mode ? 'Resume interview' : M.mode === 'basic' ? 'Start Basic interview' : 'Start Advanced interview'}</button><span class="small muted" data-no-i18n>${esc(C.t('Up to {n} minutes', { n: Math.min(maxMinutes(), M.settings.minutes) }))}</span>`
               : `<span class="small muted">${ent ? 'You have no minutes left for a mock interview.' : 'Could not read your balance.'}</span>${planLink}`}
           </div>
         </div>
@@ -238,11 +282,14 @@
     // One turn arrives sentence by sentence: same speaker, same block.
     const turns = M.lines.reduce((out, l) => {
       const last = out[out.length - 1];
-      if (last && last.who === l.who) last.text += ` ${l.text}`;
+      if (last && last.who === l.who && l.who !== 'coach') last.text += ` ${l.text}`;
       else out.push({ ...l });
       return out;
     }, []);
-    const rows = turns.map((l) => `<div class="bubble ${l.who === 'me' ? 'me' : 'ai'}"><span class="bubble-who">${l.who === 'me' ? 'You' : 'Orby'}</span><span class="bubble-text" data-no-i18n>${esc(l.text)}</span></div>`);
+    const rows = turns.map((l) => (l.who === 'coach'
+      // The coach's tips sit between the answer and Orby's reply.
+      ? `<div class="mock-tip ${l.tips.every((tip) => tip.id === 'good') ? 'good' : ''}" role="note"><span class="bubble-who">Coach tip</span>${l.tips.map((tip) => `<span class="bubble-text" data-no-i18n>${esc(C.t(TIPS[tip.id] || '', tip))}</span>`).join('')}</div>`
+      : `<div class="bubble ${l.who === 'me' ? 'me' : 'ai'}"><span class="bubble-who">${l.who === 'me' ? 'You' : 'Orby'}</span><span class="bubble-text" data-no-i18n>${esc(l.text)}</span></div>`));
     if (M.partial) rows.push(`<div class="stack" style="gap:2px;opacity:.65"><span class="small faint">You</span><span data-no-i18n>${esc(M.partial)}</span></div>`);
     return rows.join('');
   }
@@ -259,11 +306,13 @@
     return text;
   }
 
+  // Orby's questions so far; the question said again after "can you repeat?"
+  // (`again`) is not a new one.
   function questionCount() {
     let n = 0;
     let prev = '';
     for (const l of M.lines) {
-      if (l.who === 'ai' && prev !== 'ai') n += 1;
+      if (l.who === 'ai' && prev !== 'ai' && !l.again) n += 1;
       prev = l.who;
     }
     return n;
@@ -287,6 +336,7 @@
             <p class="mock-caption" id="mockCaption" data-no-i18n>${esc(lastOrbyLine())}</p>
           </div>
           <div class="mock-room-controls">
+            <button type="button" class="btn pillish" data-action="mock-redo" id="mockRedo" title="Take back your last answer and answer the same question again." ${M.canRedo ? '' : 'hidden'}>Answer again</button>
             <button type="button" class="btn pillish" data-action="mock-ask" data-ask="repeat">Repeat question</button>
             <button type="button" class="btn pillish" data-action="mock-ask" data-ask="skip" id="mockSkip" data-no-i18n>${esc(skipLabel(M.topic))}</button>
             <button type="button" class="btn pillish accent" data-action="mock-ask" data-ask="hint">Orby hint</button>
@@ -298,6 +348,7 @@
           <div class="row between" style="padding:14px 16px 6px"><span class="strong">Conversation</span></div>
           <div id="mockLines" class="mock-lines">${linesHtml()}</div>
           ${M.error ? `<div class="small" role="alert" style="color:var(--danger);padding:0 16px 8px">${esc(M.error)}</div>` : ''}
+          <div class="small muted" id="mockNotice" role="status" style="padding:0 16px 8px" ${M.notice ? '' : 'hidden'}>${esc(M.notice)}</div>
           ${M.mode === 'advanced' ? `<div class="mock-input">
             <button type="button" class="btn primary" id="mockFinishAnswer" data-action="mock-finish-answer" disabled>Finish answer</button>
             <button type="button" class="btn" id="mockAutoVoice" data-action="mock-auto-voice" aria-pressed="${autoVoice}" disabled>${esc(C.t(autoVoice ? 'Auto-send on' : 'Auto-send off'))}</button>
@@ -777,6 +828,16 @@
     if (skip) skip.textContent = skipLabel(M.topic);
     const st = document.getElementById('mockState');
     if (st) st.textContent = C.t ? C.t(STATE_LABEL[M.state] || '') : STATE_LABEL[M.state] || '';
+    const redo = document.getElementById('mockRedo');
+    if (redo) {
+      redo.hidden = !M.canRedo;
+      redo.disabled = !['typing', 'listening'].includes(M.state);
+    }
+    const notice = document.getElementById('mockNotice');
+    if (notice) {
+      notice.hidden = !M.notice;
+      notice.textContent = M.notice ? C.t(M.notice) : '';
+    }
     const done = document.getElementById('mockFinishAnswer');
     if (done) done.disabled = M.state !== 'listening' || !M.partial;
     const auto = document.getElementById('mockAutoVoice');
@@ -965,7 +1026,9 @@
     const replies = [];
     replyClips = replies;
     setState('thinking');
-    const r = await (holdMs > 0 ? api.mockTurn(text, action, holdMs) : action ? api.mockTurn(text, action) : api.mockTurn(text));
+    // A spoken answer (it has a recording) tells the coach to count filler words.
+    const fromVoice = Array.isArray(voiceClip);
+    const r = await (fromVoice ? api.mockTurn(text, action, holdMs, true) : holdMs > 0 ? api.mockTurn(text, action, holdMs) : action ? api.mockTurn(text, action) : api.mockTurn(text));
     if (current !== turnId || M.phase !== 'live') return;
     turnOpen = false;
     mayResume = false;
@@ -984,6 +1047,11 @@
     } else {
       M.topic = r.topic || M.topic;
       if (r.finished) finishing = true;
+      M.canRedo = Boolean(r.canRedo);
+      // "Can you repeat?": Orby says the same question in other words.
+      if (r.clarify) M.lines.slice(lineStart).forEach((l) => { if (l.who === 'ai') l.again = true; });
+      // The coach's tips go right under the answer they are about.
+      if (text && Array.isArray(r.tips) && r.tips.length) M.lines.splice(lineStart + 1, 0, { who: 'coach', tips: r.tips });
       keepTurnAudio(r.added, voiceClip, replies);
     }
     pendingClip = null;
@@ -1012,6 +1080,7 @@
     M.lines.push({ who: 'me', text });
     mayResume = holdMs > 0;
     M.error = '';
+    M.notice = '';
     runTurn(text, '', holdMs, voiceClip);
   }
 
@@ -1085,6 +1154,8 @@
     M.partial = '';
     M.record = null;
     M.id = '';
+    M.canRedo = false;
+    M.notice = '';
     finishing = false;
     M.state = 'connecting';
     C.renderView();
@@ -1157,6 +1228,31 @@
     voice.take();
     if (recorder) recorder.take();
     runTurn('', el.dataset.ask);
+  };
+  // Takes back the last answer and Orby's reply to it (main/mock_interview.js
+  // redo), so the candidate answers the same question again.
+  C.actions['mock-redo'] = async () => {
+    if (M.phase !== 'live' || turnOpen || pending > 0 || !M.canRedo || !['typing', 'listening'].includes(M.state) || !api.mockRedo) return;
+    voice.take();
+    if (recorder) recorder.take();
+    retry = null;
+    // No answer leaves while this one is taken back.
+    M.state = 'thinking';
+    const r = await api.mockRedo();
+    if (M.phase !== 'live') return;
+    if (r && r.ok) {
+      // The coach's tips on the answer taken back stay: they say what to fix.
+      const at = M.lines.map((l) => l.who).lastIndexOf('me');
+      if (at >= 0) M.lines = [...M.lines.slice(0, at), ...M.lines.slice(at + 1).filter((l) => l.who === 'coach')];
+      M.topic = r.topic || M.topic;
+      M.canRedo = false;
+      M.error = '';
+      M.notice = 'Your last answer was taken back. Answer the same question again.';
+      C.renderView();
+      // The button goes away with the answer: typing is next.
+      if (M.mode === 'basic') document.getElementById('mockTyped')?.focus();
+    }
+    maybeListen();
   };
   C.actions['mock-finish'] = () => finish();
   C.actions['mock-finish-answer'] = () => {
@@ -1269,13 +1365,20 @@
     M.agentId = el.value;
     C.renderView();
   };
-  C.changes['mock-lang'] = (el) => { M.lang = el.value; };
-  C.changes['mock-kind'] = (el) => { M.settings.kind = el.value; C.refresh(); };
-  C.changes['mock-level'] = (el) => { M.settings.level = el.value; };
-  C.changes['mock-persona'] = (el) => { M.settings.persona = el.value; };
-  C.changes['mock-format'] = (el) => { M.settings.format = el.value; };
-  C.changes['mock-depth'] = (el) => { M.settings.depth = Number(el.value); };
-  C.changes['mock-bank'] = (el) => { M.settings.useBank = Boolean(el.checked); };
+  C.changes['mock-lang'] = (el) => { M.lang = el.value; saveSettings(); };
+  C.changes['mock-kind'] = (el) => { M.settings.kind = el.value; saveSettings(); C.refresh(); };
+  C.changes['mock-level'] = (el) => { M.settings.level = el.value; saveSettings(); };
+  C.changes['mock-persona'] = (el) => { M.settings.persona = el.value; saveSettings(); };
+  C.changes['mock-format'] = (el) => { M.settings.format = el.value; saveSettings(); };
+  C.changes['mock-depth'] = (el) => { M.settings.depth = Number(el.value); saveSettings(); };
+  C.changes['mock-bank'] = (el) => { M.settings.useBank = Boolean(el.checked); saveSettings(); };
+  C.changes['mock-tips'] = (el) => { M.settings.coach = Boolean(el.checked); saveSettings(); };
+  C.changes['mock-minutes'] = (el) => {
+    const n = Number(el.value);
+    if (VALID.minutes(n)) M.settings.minutes = n;
+    saveSettings();
+    C.refresh();
+  };
   C.inputs['mock-goal'] = (el) => { M.settings.goal = el.value; };
   C.inputs['mock-focus'] = (el) => { M.settings.focus = el.value; };
   C.actions['mock-file-main'] = (el) => {

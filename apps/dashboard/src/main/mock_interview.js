@@ -12,11 +12,13 @@ const { evaluateInterview } = require('./mock_evaluation');
 const { reviewLanguage } = require('./mock_language');
 const {
   FINISH_MARK, languageName, createInterview, interviewFiles, prepareTurn, resolveQAndA,
-  commitAnswer, commitTurn, evaluationPairs, coverageFor, takeSentences, bankQuestionsFor
+  commitAnswer, commitTurn, undoTurn, coachTips, evaluationPairs, coverageFor, takeSentences, bankQuestionsFor
 } = prompt;
 
 // The longest a prepared reply waits for the candidate to be really done.
 const MAX_HOLD_MS = 2000;
+// The lengths the setup offers; the server still caps it (30 min or the balance).
+const LENGTHS = [10, 20, 30];
 // The recording of a voice interview (renderer/mock_recording.js makes the
 // clips): the largest clip accepted and how many interviews keep their audio.
 const MAX_CLIP_BYTES = 40 * 1024 * 1024;
@@ -70,8 +72,11 @@ function createMockInterviews(deps) {
         const earlier = [...all.filter((rec) => rec.agentId === selected.id), ...all.filter((rec) => rec.agentId !== selected.id)];
         const previous = earlier.slice(0, 6).flatMap((rec) => (rec.messages || []).filter((m) => m.role === 'assistant').map((m) => m.content));
         const seed = deps.seed ? deps.seed() : 1 + Math.floor(Math.random() * 1000000);
+        const minutes = LENGTHS.includes(settings?.minutes) ? settings.minutes : 30;
         active = {
-          ...createInterview(selected, agents, deps.bank?.(), lang, modeFromServer, { ...settings, previous, round: earlier.length, seed }, r.data.max_s),
+          ...createInterview(selected, agents, deps.bank?.(), lang, modeFromServer, { ...settings, previous, round: earlier.length, seed }, Math.min(r.data.max_s ?? 1800, minutes * 60)),
+          // The coach's tips after each answer (coachTips), on unless turned off.
+          coach: settings?.coach !== false,
           id: r.data.id, visualFeedback: [], startedAt: deps.now(), abort: null, pendingTurn: null,
           // Recorded messages by "role:i" and the answers that were spoken.
           audio: new Map(), spoken: new Set()
@@ -79,7 +84,8 @@ function createMockInterviews(deps) {
       }
     }
     return {
-      ok: true, id: r.data.id, agentId: active?.agent.id, maxS: r.data.max_s, lang: active?.lang,
+      // The time left: the length picked, within what the server allows.
+      ok: true, id: r.data.id, agentId: active?.agent.id, maxS: active?.id === r.data.id ? Math.min(r.data.max_s ?? 1800, secondsLeft()) : r.data.max_s, lang: active?.lang,
       mode: modeFromServer, settings: active?.settings, topics: active?.topics, topic: active?.topics[active.topicIndex],
       messages: active?.messages || [], vision: Boolean(r.data.vision_enabled), stt: r.data.stt, source: r.data.source
     };
@@ -91,12 +97,14 @@ function createMockInterviews(deps) {
   // holdMs is for a spoken answer sent early: the interviewer's reply is
   // prepared at once, but no sentence leaves and nothing is committed for that
   // long, so cancelTurn() can still take the answer back if the candidate was
-  // only pausing.
-  async function turn(text, action = '', holdMs = 0) {
+  // only pausing. `fromVoice`: the answer came from the microphone, so the
+  // coach's tips count filler words.
+  async function turn(text, action = '', holdMs = 0, fromVoice = false) {
     const me = active;
     if (!me || me.abort) return { ok: false };
     if (me.messages.length && !String(text || '').trim() && !['repeat', 'hint', 'skip'].includes(action)) return { ok: false };
     const next = prepareTurn(me, text, action, secondsLeft());
+    const tips = me.coach && next.answer ? coachTips(next.answer, me.lang, next.answeredTopic, fromVoice === true) : [];
     const ctrl = new AbortController();
     me.abort = ctrl;
     me.pendingTurn = next;
@@ -121,8 +129,13 @@ function createMockInterviews(deps) {
       if (ctrl.signal.aborted) return { ok: false, aborted: true };
       const before = me.messages.length;
       commitTurn(me, next, spoken);
-      // Which messages this turn added, so the renderer can file their audio.
-      return { ok: true, finished, secondsLeft: secondsLeft(), topic: me.topics[me.topicIndex], added: addedSince(me.messages, before) };
+      // Which messages this turn added, so the renderer can file their audio;
+      // the coach's tips, whether it only asked to hear the question again and
+      // whether the answer can still be taken back (redo).
+      return {
+        ok: true, finished, secondsLeft: secondsLeft(), topic: me.topics[me.topicIndex], added: addedSince(me.messages, before),
+        tips, clarify: Boolean(next.clarify), canRedo: Boolean(me.undo)
+      };
     };
     let spoken = '';
     let buffer = '';
@@ -203,6 +216,21 @@ function createMockInterviews(deps) {
     me.abort = null;
     me.pendingTurn = null;
     return { ok: true };
+  }
+
+  // Takes back the last answer and the reply to it, with their audio, so the
+  // candidate answers the same question again (undoTurn). Only the latest
+  // answer, before the next turn.
+  function redo() {
+    const me = active;
+    if (!me || me.abort || !me.undo) return { ok: false };
+    const keep = me.undo.messages;
+    const removed = me.messages[keep]?.content;
+    const question = undoTurn(me);
+    if (!question) return { ok: false };
+    for (const [key, clip] of me.audio) if (clip.i >= keep) me.audio.delete(key);
+    if (removed && !me.messages.some((m) => m.role === 'user' && m.content === removed)) me.spoken.delete(removed);
+    return { ok: true, question, topic: me.topics[me.topicIndex], messages: me.messages.length };
   }
 
   async function speak(text) {
@@ -397,7 +425,7 @@ function createMockInterviews(deps) {
     return { total: questions.length, questions: questions.slice(0, 5).map(({ text, category, reports }) => ({ text, category, reports })), files };
   }
 
-  return { prep, start, turn, cancelTurn, speak, keepAudio: (clip) => keepAudio(clip), audio, analyzeFrame, end, list, coach, sttToken, isActive: () => Boolean(active) };
+  return { prep, start, turn, cancelTurn, redo, speak, keepAudio: (clip) => keepAudio(clip), audio, analyzeFrame, end, list, coach, sttToken, isActive: () => Boolean(active) };
 }
 
 module.exports = { ...prompt, createMockInterviews };

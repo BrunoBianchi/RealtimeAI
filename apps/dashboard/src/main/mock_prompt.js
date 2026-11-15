@@ -401,7 +401,7 @@ function createInterview(agent, others, bank, lang, mode, options, maxS) {
     agent, lang: language, mode, settings, maxS, previous, round, seed, variant,
     index: buildIndex(agent, others, settings.priority), bank: bankQuestionsFor(agent, bank),
     bankUsed: new Set(), priorityUsed: new Set(), topics: interviewTopics(settings, variant), topicIndex: 0, followUps: 0,
-    messages: [], answers: [], skipped: new Set(), currentQuestion: ''
+    messages: [], answers: [], skipped: new Set(), currentQuestion: '', undo: null
   };
 }
 
@@ -437,6 +437,93 @@ function memoryFor(answers, answer, topic) {
     .filter(Boolean).map((p) => ({ tema: p.topic, pergunta: p.question.slice(0, 250), resposta: p.answer.slice(0, 650) }));
 }
 
+// What an answer shows on its face, counted in code and never judged by a
+// model: its words, "I" against "we", whether it names a result, the filler
+// words of the interview language, and whether it asks to repeat or explain
+// the question or says "I don't know". The interviewer probes the gaps it
+// finds (prepareTurn), the live tips come from it (coachTips) and the report
+// counts with it (measureAnswers in mockEvaluation.js).
+const SINGULAR = new Set('eu me meu minha meus minhas mim comigo i my mine myself yo mi mis conmigo je moi mon ma mes io mio mia miei mie मैं मैंने मुझे मेरा मेरी मेरे'.split(' '));
+const PLURAL = new Set('nos nosso nossa nossos nossas gente we our ours us ourselves nosotros nosotras nuestro nuestra nuestros nuestras nous notre noi nostro nostra nostri nostre हम हमने हमें हमारा हमारी हमारे'.split(' '));
+const CJK_OWN = /我(?!们)|私(?!たち)|僕(?!ら|たち)/gu;
+const CJK_TEAM = /我们|私たち|僕ら|僕たち/gu;
+const CJK_TEXT = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u;
+const RESULT = /\b(reduzi\w*|aumentei|aumentamos|diminui\w*|economiz\w*|dobr\w*|cresceu|cresceram|resultado\w*|impacto\w*|entreguei|entregamos|lancei|lancamos|increas\w*|reduc\w*|improv\w*|sav\w*|grew|doubl\w*|launch\w*|deliver\w*|result\w*|impact\w*|reduj\w*|aument\w*|ahorr\w*)\b|成果|結果|结果|效果|削減|增长|提升|परिणाम/u;
+// Only words that are fillers in nearly every use: "um" is a filler in English
+// and an article in Portuguese, so each language has its own list.
+const FILLERS = {
+  'pt-BR': /\b(?:ne|tipo assim|basicamente|enfim|hum+|ahn+|eh+)\b|\btipo\b(?! (?:de|do|da|dos|das)\b)/g,
+  en: /\b(?:you know|basically|um+|uh+|uhm+|hmm+|i mean)\b/g,
+  es: /\b(?:o sea|eh+|ehm+|mmm+)\b/g,
+  fr: /\b(?:euh+|bah|ben|du coup)\b/g,
+  it: /\b(?:cioe|ehm+|insomma)\b/g,
+  ja: /えーと|えっと|あのー/g,
+  zh: /嗯|那个那个|就是说/g,
+  hi: /मतलब|वो क्या है/g
+};
+const UNSURE = /\b(?:nao sei|nao lembro|nao me lembro|sei la|nao tenho (?:nenhum |um )?exemplo|nunca (?:passei|tive|vivi)|i don t know|i do not know|no idea|not sure|i can t (?:think|remember)|i don t (?:remember|have (?:an|any) example)|never had|no lo se|no sabria|no recuerdo|no tengo (?:un |ningun )?ejemplo|je ne sais pas|je sais pas|aucune idee|je ne me souviens pas|non lo so|non so|non ricordo|non ho (?:un |nessun )?esempio)\b|わかりません|分かりません|思いつきません|覚えていません|不知道|不记得|想不起来|पता नहीं|नहीं पता|याद नहीं/u;
+const CLARIFY = /\b(?:pode repetir|poderia repetir|repete|repita|nao entendi|como assim|o que (?:voce )?quer dizer|pode explicar melhor|qual (?:era|e) a pergunta|can you repeat|could you repeat|repeat the question|say that again|what do you mean|i didn t (?:get|understand|catch)|can you rephrase|could you rephrase|pardon|puedes repetir|puede repetir|repite|no entendi|que quieres decir|a que te refieres|pouvez vous repeter|vous pouvez repeter|tu peux repeter|je n ai pas compris|qu est ce que vous voulez dire|puoi ripetere|puo ripetere|non ho capito|cosa intendi)\b|もう一度|繰り返して|どういう意味|再说一遍|重复一下|什么意思|没听懂|फिर से|दोबारा बोल|समझ नहीं/u;
+// Words of an answer that read well aloud: about 30 seconds to 2 minutes.
+const PACE = [60, 260];
+
+function answerSignals(answer, lang = 'en') {
+  const text = String(answer || '');
+  const folded = canonical(text);
+  const words = !folded ? [] : CJK_TEXT.test(folded)
+    ? [...segmenter.segment(folded)].filter((s) => s.isWordLike).map((s) => s.segment)
+    : folded.split(' ');
+  const n = words.length;
+  return {
+    words: n,
+    own: words.filter((w) => SINGULAR.has(w)).length + (text.match(CJK_OWN) || []).length,
+    team: words.filter((w) => PLURAL.has(w)).length + (text.match(CJK_TEAM) || []).length,
+    result: RESULT.test(folded) || /\p{N}|%/u.test(text),
+    fillers: (` ${folded} `.match(Object.hasOwn(FILLERS, lang) ? FILLERS[lang] : FILLERS.en) || []).length,
+    unsure: n > 0 && n <= 20 && UNSURE.test(folded),
+    clarify: n > 0 && n <= 15 && CLARIFY.test(folded)
+  };
+}
+
+// Topics answered with a story (context, own actions, result, learning) and
+// topics answered with a fact; the others ask for an opinion or a reason.
+const STORY_TOPICS = new Set(['trajectory', 'focus', 'project', 'conflict', 'signal', 'collaboration', 'people', 'culture', 'skills', 'dd_overview', 'dd_decisions', 'dd_people', 'dd_outcome', 'ai_work', 'ai_trust', 'ai_iteration', 'ai_scaling']);
+const FACT_TOPICS = new Set(['academics', 'availability']);
+
+// The gaps of one answer worth a follow-up, most telling first.
+function answerGaps(signals, topic) {
+  if (!signals || topic === 'questions' || FACT_TOPICS.has(topic)) return [];
+  if (signals.unsure) return ['unsure'];
+  const story = STORY_TOPICS.has(topic);
+  const gaps = [];
+  if (story && signals.team > signals.own && (signals.own === 0 || signals.team >= 2)) gaps.push('nos');
+  if (story && !signals.result && signals.words >= 25) gaps.push('result');
+  if (signals.words < (story ? 40 : 15)) gaps.push('short');
+  if (signals.words > PACE[1]) gaps.push('long');
+  return gaps;
+}
+
+// How the measured gaps read to the interviewer.
+const GAP_TEXT = {
+  nos: (s) => `usou "nós" ${s.team} vez(es) e "eu" ${s.own}: não ficou claro o que a pessoa fez`,
+  result: () => 'não disse o resultado nem como mediu',
+  short: (s) => `resposta curta (${s.words} palavras): faltam os passos que a pessoa tomou`
+};
+
+// Up to two tips for the answer just given, as codes the screen puts in words:
+// {id, words, own, team, minutes, n}. `spoken`: the answer came from the
+// microphone, so filler words count. Nothing for a request to repeat the
+// question or for the candidate's own questions.
+function coachTips(answer, lang, topic, spoken = false) {
+  if (!answer || topic === 'questions') return [];
+  const s = answerSignals(answer, lang);
+  if (s.clarify) return [];
+  const facts = { words: s.words, own: s.own, team: s.team, minutes: Math.max(1, Math.round(s.words / 130)) };
+  const tips = answerGaps(s, topic).map((id) => ({ id, ...facts }));
+  if (spoken && s.words >= 20 && s.fillers >= 3 && s.fillers / s.words >= 0.03) tips.push({ id: 'fillers', ...facts, n: s.fillers });
+  if (!tips.length && STORY_TOPICS.has(topic) && s.words >= PACE[0]) tips.push({ id: 'good', ...facts });
+  return tips.slice(0, 2);
+}
+
 function systemPrompt({ interview, topic, instruction, excerpts, memory, bank }) {
   const { agent, settings, lang, mode } = interview;
   const [role, style] = PERSONAS[settings.persona];
@@ -455,7 +542,7 @@ function systemPrompt({ interview, topic, instruction, excerpts, memory, bank })
     'Persona fixa: ' + role + '. ' + style,
     'Formato: ' + kindName + '. ' + kindStyle,
     ...(settings.level ? ['Nível da vaga: ' + LEVELS[settings.level] + ' Compare o escopo das histórias com esse nível.'] : []),
-    'Fale somente em ' + languageName(lang) + '. Use até duas frases naturais, sem listas, markdown, emojis, cabeçalhos ou feedback. Faça uma pergunta de cada vez, salvo quando estiver respondendo ao candidato.',
+    'Fale somente em ' + languageName(lang) + '. Use até duas frases naturais, sem listas, markdown, emojis, cabeçalhos ou feedback. Faça uma pergunta de cada vez, salvo quando estiver respondendo ao candidato. Como numa conversa real, pode abrir com um reconhecimento curto e neutro do que a pessoa acabou de dizer (sem elogiar nem avaliar), com palavras diferentes a cada vez.',
     'Objetivo da entrevista: ' + DEFAULT_GOAL + ' Priorize também o objetivo personalizado quando ele for compatível com o tema e com a persona.',
     'Tema atual: ' + TOPICS[topic],
     ...(angle ? ['Ângulo desta entrevista para o tema: ' + angle + '. Siga-o na pergunta principal do tema, sem citá-lo.'] : []),
@@ -489,8 +576,15 @@ function prepareTurn(interview, text, action, remaining) {
     turn.fallback = script[0];
   } else if (action === 'repeat') return { ...turn, direct: last };
 
+  // What the answer shows: a request to hear the question again, a "don't
+  // know", and the gaps a follow-up should probe.
+  const signals = !opening && !action && current !== 'questions' ? answerSignals(answer, lang) : null;
+  const gaps = signals ? answerGaps(signals, current) : [];
   if (opening) {
     // Nothing to advance yet.
+  } else if (signals?.clarify) {
+    // Not an answer: the same question, in other words, on the same topic.
+    turn.clarify = true;
   } else if (current === 'questions') {
     if (action === 'skip' || remaining <= 8 || noMoreQuestions[lang].test(canonical(answer))) {
       return { ...turn, direct: script[2], finished: true };
@@ -500,7 +594,9 @@ function prepareTurn(interview, text, action, remaining) {
     const reserve = Math.min(55, Math.max(12, interview.maxS * 0.12));
     // A deep dive stays on one project, so each part gets one follow-up more.
     const maxFollowUps = settings.depth + (settings.kind === 'deepdive' ? 1 : 0);
-    if (remaining > reserve + (unanswered + 1) * 42 && followUps < maxFollowUps && action !== 'skip') {
+    // A complete story already probed once moves on, leaving time for more topics.
+    const complete = STORY_TOPICS.has(current) && !gaps.length && signals?.words >= PACE[0];
+    if (remaining > reserve + (unanswered + 1) * 42 && followUps < maxFollowUps && action !== 'skip' && !(complete && followUps >= 1)) {
       turn.followUps += 1;
     } else {
       turn.topicIndex = remaining <= reserve ? topics.length - 1 : topicIndex + 1;
@@ -535,13 +631,20 @@ function prepareTurn(interview, text, action, remaining) {
     turn.instruction = 'Abra a entrevista: cumprimente em poucas palavras e faça a primeira pergunta do tema atual, pelo ângulo indicado, com palavras diferentes das usadas em entrevistas anteriores.';
   } else if (action === 'hint') {
     turn.instruction = 'Dê só uma dica breve para a pergunta anterior, sem fornecer uma resposta, e mantenha o tema atual.';
+  } else if (turn.clarify) {
+    turn.instruction = 'A pessoa pediu para repetir ou explicar a pergunta. Refaça a mesma pergunta com outras palavras, mais curta e concreta, sem mudar de tema, sem responder por ela e sem avaliar.';
   } else if (topic === 'questions') {
     turn.instruction = 'Use [SEM_FONTE] se os trechos não respondem à pergunta, ou JSON {"fonte":"ID do trecho", "citacao":"frase completa copiada exatamente do trecho que responde à pergunta", "resposta":"tradução fiel da citação no idioma escolhido seguida de um convite para outra pergunta"}. Preserve ressalvas e condições, sem completar a tradução com outros fatos. Se precisar de mais de um trecho ou de uma inferência, use [SEM_FONTE].';
     turn.sources = excerpts;
+  } else if (turn.topicIndex === topicIndex && gaps[0] === 'unsure') {
+    turn.instruction = 'A pessoa disse que não sabe ou que não lembra de um exemplo. Não repita o mesmo pedido nem a faça se sentir mal: ofereça um caminho mais fácil dentro do tema atual, como um exemplo da faculdade, de um projeto pessoal ou de outro trabalho, ou uma versão menor da pergunta.';
   } else if (turn.topicIndex === topicIndex) {
-    turn.instruction = 'Faça um único aprofundamento ancorado na última resposta, sobre o ponto mais fraco dela dentro do tema atual: se disse "nós" sem deixar claro o que fez, pergunte o que fez pessoalmente; se contou contexto e poucas ações, peça os passos que tomou; se faltou resultado, como mediu ou o que mudou; se tudo pareceu perfeito, qual foi a parte mais difícil ou o que deu errado; se faltou aprendizado, o que faria diferente; numa decisão, que alternativas considerou e por quê. Se o ponto principal já foi respondido, escolha outro aspecto do mesmo tema.';
+    const measured = gaps.filter((g) => GAP_TEXT[g]).map((g) => GAP_TEXT[g](signals));
+    turn.instruction = (measured.length ? 'Medido na última resposta: ' + measured.join('; ') + '. Comece pelo primeiro ponto medido, a não ser que a resposta já o resolva. ' : '')
+      + 'Faça um único aprofundamento ancorado na última resposta, sobre o ponto mais fraco dela dentro do tema atual: se disse "nós" sem deixar claro o que fez, pergunte o que fez pessoalmente; se contou contexto e poucas ações, peça os passos que tomou; se faltou resultado, como mediu ou o que mudou; se tudo pareceu perfeito, qual foi a parte mais difícil ou o que deu errado; se faltou aprendizado, o que faria diferente; numa decisão, que alternativas considerou e por quê. Se o ponto principal já foi respondido, escolha outro aspecto do mesmo tema.';
   } else {
-    turn.instruction = 'Mude para o tema indicado e faça uma única pergunta principal. Use uma resposta anterior como ponte quando relevante, sem insistir no tema anterior.';
+    turn.instruction = 'Mude para o tema indicado e faça uma única pergunta principal. Use uma resposta anterior como ponte quando relevante, sem insistir no tema anterior.'
+      + (gaps[0] === 'unsure' ? ' A pessoa não lembrou de um exemplo na resposta anterior: siga em frente sem insistir.' : '');
     turn.bank = pickBank(interview, topic, answer + ' ' + interview.agent.role + ' ' + settings.goal);
   }
   const memory = memoryFor(interview.answers, answer, topic);
@@ -570,24 +673,50 @@ function resolveQAndA(interview, turn, spoken) {
   return SCRIPT[interview.lang][3];
 }
 
+// A request to repeat the question stays in the conversation but is not an
+// answer to score.
 function commitAnswer(interview, turn) {
   const { answer, question, answeredTopic } = turn;
   if (!answer) return;
   interview.messages.push({ role: 'user', content: answer });
-  interview.answers.push({ topic: answeredTopic, question, answer });
+  if (!turn.clarify) interview.answers.push({ topic: answeredTopic, question, answer });
 }
 
 function commitTurn(interview, turn, spoken) {
   const { action, answeredTopic } = turn;
+  // What an answer changes, so the person can answer the same question again (undoTurn).
+  const undo = turn.answer && !turn.clarify && !action && answeredTopic !== 'questions' ? {
+    topicIndex: interview.topicIndex, followUps: interview.followUps, currentQuestion: interview.currentQuestion,
+    messages: interview.messages.length, answers: interview.answers.length,
+    bank: turn.bank?.text || '', priority: (turn.priorityShown || []).filter((id) => !interview.priorityUsed?.has(id))
+  } : null;
   interview.topicIndex = turn.topicIndex;
   interview.followUps = turn.followUps;
   if (turn.bank) interview.bankUsed.add(turn.bank.text);
   for (const id of turn.priorityShown || []) interview.priorityUsed?.add(id);
   if (action === 'repeat') return;
+  interview.undo = undo;
   if (action === 'skip' && answeredTopic !== 'questions') interview.skipped.add(answeredTopic);
   commitAnswer(interview, turn);
   interview.messages.push({ role: 'assistant', content: spoken });
   if (action !== 'hint') interview.currentQuestion = spoken;
+}
+
+// Takes back the last answer and the reply to it, so the person answers the
+// same question again. Returns that question, or '' when there is nothing to
+// take back (only the latest answer can be, and only before another turn).
+function undoTurn(interview) {
+  const u = interview.undo;
+  if (!u) return '';
+  interview.undo = null;
+  interview.topicIndex = u.topicIndex;
+  interview.followUps = u.followUps;
+  interview.currentQuestion = u.currentQuestion;
+  interview.messages.length = u.messages;
+  interview.answers.length = u.answers;
+  if (u.bank) interview.bankUsed.delete(u.bank);
+  for (const id of u.priority) interview.priorityUsed?.delete(id);
+  return u.currentQuestion;
 }
 
 function evaluationPairs(interview) {
@@ -653,6 +782,6 @@ function takeSentences(buffer, flush = false) {
 
 module.exports = {
   LANGUAGES, PERSONAS, KINDS, LEVELS, GOAL_LIMIT, FOCUS_LIMIT, PRIORITY_LIMIT, FINISH_MARK, languageName, resumeText, interviewFiles, buildIndex, buildChunkIndex, retrieve, terms, bankQuestionsFor,
-  normalizeSettings, interviewTopics, createInterview, prepareTurn, resolveQAndA, commitAnswer, commitTurn, jobKeywords, jobCoverage,
-  evaluationPairs, coverageFor, evaluationContext, evaluationMaterials, systemPrompt, takeSentences
+  normalizeSettings, interviewTopics, createInterview, prepareTurn, resolveQAndA, commitAnswer, commitTurn, undoTurn, jobKeywords, jobCoverage,
+  answerSignals, coachTips, evaluationPairs, coverageFor, evaluationContext, evaluationMaterials, systemPrompt, takeSentences
 };

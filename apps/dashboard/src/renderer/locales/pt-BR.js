@@ -1979,10 +1979,25 @@
       'Copy': 'Copiar',
       'Done': 'Concluído',
       'Error': 'Erro',
-      'Warning': 'Aviso'
+      'Warning': 'Aviso',
+      // Mock interview: coach tips, duration and answering again.
+      'Mode': 'Modo',
+      'Coach tips during the interview': 'Dicas do coach durante a entrevista',
+      'A short tip after each answer, measured from what you said. Turn it off for a realistic interview.': 'Uma dica curta depois de cada resposta, medida no que você disse. Desligue para simular uma entrevista real.',
+      'Coach tip': 'Dica do coach',
+      'Answer again': 'Responder de novo',
+      'Take back your last answer and answer the same question again.': 'Desfaz sua última resposta para você responder a mesma pergunta de novo.',
+      'Your last answer was taken back. Answer the same question again.': 'Sua última resposta foi desfeita. Responda a mesma pergunta de novo.',
+      'No example? That is fine: use one from university, a personal project or another job, even a small one.': 'Sem exemplo? Tudo bem: use um da faculdade, de um projeto pessoal ou de outro trabalho, mesmo que pequeno.',
+      'No result yet: say what changed and how you measured it, with a number if you have one.': 'Faltou o resultado: diga o que mudou e como você mediu, com um número se tiver.',
+      'Short answer: add a concrete example and the reason behind it.': 'Resposta curta: acrescente um exemplo concreto e o porquê.',
+      'Complete answer: you said what you did and what came of it. Keep this structure.': 'Resposta completa: você disse o que fez e o resultado. Mantenha essa estrutura.'
     },
 
     templates: {
+      'You said "we" {team}× and "I" {own}×. Say what you did yourself: your decisions and your steps.': 'Você disse "nós" {team}× e "eu" {own}×. Conte o que você fez: suas decisões e seus passos.',
+      'Long answer (about {minutes} min out loud). Aim for under 2 minutes and let the interviewer ask for details.': 'Resposta longa (cerca de {minutes} min falando). Tente ficar abaixo de 2 minutos e deixe o entrevistador pedir detalhes.',
+      'You used {n} filler words. Swap them for a short pause: it sounds more confident.': 'Você usou {n} vícios de linguagem. Troque-os por uma pausa curta: passa mais segurança.',
       "{n} of 5 stars": "{n} de 5 estrelas",
       "Your next interview is {x}. {n} prep steps left.": "Sua próxima entrevista é {x}. Faltam {n} etapas de preparo.",
       "Your next interview is {x}.": "Sua próxima entrevista é {x}.",
