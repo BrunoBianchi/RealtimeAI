@@ -1,5 +1,5 @@
 // AI mock interviews (Basic text chat or Advanced voice and opt-in camera review).
-// The server debits the shared token wallet and enforces the 30-minute limit;
+// The server charges the minutes used and enforces the 60-minute limit;
 // this module grounds the interviewer in the job, résumé and uploads, and
 // streams interviewer turns as soon as each sentence is ready.
 'use strict';
@@ -17,8 +17,29 @@ const {
 
 // The longest a prepared reply waits for the candidate to be really done.
 const MAX_HOLD_MS = 2000;
-// The lengths the setup offers; the server still caps it (30 min or the balance).
-const LENGTHS = [10, 20, 30];
+// The lengths the setup offers; the server still caps it (60 min or the balance).
+const LENGTHS = [15, 30, 45, 60];
+// A request that fails before any of the reply arrived (a dropped connection,
+// a gateway or a slow provider) gets one quiet second try after this long.
+// The AI provider out of credits (ai_unavailable) does not.
+const RETRY_MS = 1500;
+const PASSING_STATUS = new Set([500, 502, 503, 504]);
+// The server's own error code from a failed reply ({"error":{"code":…}}).
+async function errorCode(res) {
+  try {
+    const data = typeof res.json === 'function' ? await res.json() : null;
+    const code = data && (typeof data.error === 'string' ? data.error : data.error && data.error.code);
+    return typeof code === 'string' ? code : '';
+  } catch (_e) {
+    return '';
+  }
+}
+// Waits `ms`, or less when the signal aborts.
+const pause = (ms, signal) => new Promise((resolve) => {
+  if (signal.aborted) return resolve();
+  const timer = setTimeout(resolve, ms);
+  signal.addEventListener('abort', () => { clearTimeout(timer); resolve(); }, { once: true });
+});
 // The recording of a voice interview (renderer/mock_recording.js makes the
 // clips): the largest clip accepted and how many interviews keep their audio.
 const MAX_CLIP_BYTES = 40 * 1024 * 1024;
@@ -74,7 +95,7 @@ function createMockInterviews(deps) {
         const seed = deps.seed ? deps.seed() : 1 + Math.floor(Math.random() * 1000000);
         const minutes = LENGTHS.includes(settings?.minutes) ? settings.minutes : 30;
         active = {
-          ...createInterview(selected, agents, deps.bank?.(), lang, modeFromServer, { ...settings, previous, round: earlier.length, seed }, Math.min(r.data.max_s ?? 1800, minutes * 60)),
+          ...createInterview(selected, agents, deps.bank?.(), lang, modeFromServer, { ...settings, previous, round: earlier.length, seed }, Math.min(r.data.max_s ?? 3600, minutes * 60)),
           // The coach's tips after each answer (coachTips), on unless turned off.
           coach: settings?.coach !== false,
           id: r.data.id, visualFeedback: [], startedAt: deps.now(), abort: null, pendingTurn: null,
@@ -85,7 +106,7 @@ function createMockInterviews(deps) {
     }
     return {
       // The time left: the length picked, within what the server allows.
-      ok: true, id: r.data.id, agentId: active?.agent.id, maxS: active?.id === r.data.id ? Math.min(r.data.max_s ?? 1800, secondsLeft()) : r.data.max_s, lang: active?.lang,
+      ok: true, id: r.data.id, agentId: active?.agent.id, maxS: active?.id === r.data.id ? Math.min(r.data.max_s ?? 3600, secondsLeft()) : r.data.max_s, lang: active?.lang,
       mode: modeFromServer, settings: active?.settings, topics: active?.topics, topic: active?.topics[active.topicIndex],
       messages: active?.messages || [], vision: Boolean(r.data.vision_enabled), stt: r.data.stt, source: r.data.source
     };
@@ -155,14 +176,31 @@ function createMockInterviews(deps) {
         takeSentences(next.direct, true).sentences.forEach(emit);
         return await commit(next.direct, next.finished);
       }
-      const res = await deps.fetch(deps.url(`/v1/mock/${me.id}/chat`), {
-        method: 'POST', headers: { ...deps.headers(), 'Content-Type': 'application/json' },
-        signal: AbortSignal.any([ctrl.signal, AbortSignal.timeout(60000)]),
-        body: JSON.stringify({ stream: true, temperature: 0.25, reasoning: { enabled: false }, messages: next.messages })
-      });
-      if (!res.ok || !res.body) {
+      const retryMs = deps.retryMs ?? RETRY_MS;
+      let res;
+      for (let tries = 0; ; tries += 1) {
+        try {
+          res = await deps.fetch(deps.url(`/v1/mock/${me.id}/chat`), {
+            method: 'POST', headers: { ...deps.headers(), 'Content-Type': 'application/json' },
+            signal: AbortSignal.any([ctrl.signal, AbortSignal.timeout(60000)]),
+            body: JSON.stringify({ stream: true, temperature: 0.25, reasoning: { enabled: false }, messages: next.messages })
+          });
+        } catch (err) {
+          // An opening that fails has its scripted question instead, at once.
+          if (tries > 0 || ctrl.signal.aborted || next.fallback) throw err;
+          await pause(retryMs, ctrl.signal);
+          if (ctrl.signal.aborted) return { ok: false, aborted: true };
+          continue;
+        }
+        if (res.ok && res.body) break;
+        const code = await errorCode(res);
+        if (tries === 0 && !next.fallback && PASSING_STATUS.has(res.status) && code !== 'ai_unavailable') {
+          await pause(retryMs, ctrl.signal);
+          if (ctrl.signal.aborted) return { ok: false, aborted: true };
+          continue;
+        }
         if (next.fallback && res.status !== 410) return await scripted();
-        return { ok: false, status: res.status, over: res.status === 410 };
+        return { ok: false, status: res.status, over: res.status === 410, code };
       }
       const decoder = new TextDecoder();
       let sse = '';

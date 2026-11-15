@@ -35,7 +35,7 @@
   const topicLabel = (topic) => C.t(TOPICS[topic] || '');
   const defaultSettings = { kind: 'behavioral', persona: 'recruiter', format: 'auto', level: 'auto', depth: 1, goal: '', focus: '', useBank: true, coach: true, minutes: 30 };
   // The lengths main/mock_interview.js accepts (LENGTHS); the server still caps them.
-  const LENGTHS = [['10', '10 min'], ['20', '20 min'], ['30', '30 min']];
+  const MINUTES = [15, 30, 45, 60];
   // The coach's tips on an answer (coachTips in main/mock_prompt.js), by id.
   const TIPS = {
     unsure: 'No example? That is fine: use one from university, a personal project or another job, even a small one.',
@@ -57,13 +57,16 @@
     depth: (v) => [0, 1, 2].includes(v),
     useBank: (v) => typeof v === 'boolean',
     coach: (v) => typeof v === 'boolean',
-    minutes: (v) => [10, 20, 30].includes(v)
+    minutes: (v) => MINUTES.includes(v)
   };
   const loadSettings = () => {
     try {
       const value = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
       if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
       const out = Object.fromEntries(Object.keys(VALID).filter((k) => VALID[k](value[k])).map((k) => [k, value[k]]));
+      // A length saved before (10 or 20 minutes) becomes the nearest one offered now.
+      const was = Number(value.minutes);
+      if (!out.minutes && was > 0) out.minutes = MINUTES.reduce((a, b) => (Math.abs(b - was) < Math.abs(a - was) ? b : a));
       if (LANGUAGES.some(([id]) => id === value.lang)) out.lang = value.lang;
       return out;
     } catch (_e) {
@@ -132,7 +135,7 @@
   const canRunMode = (mode) => entitlement()?.canMock === true || M.resumeMode === mode;
   const maxMinutes = () => {
     const t = entitlement()?.training;
-    return t && t.maxMinutes > 0 ? t.maxMinutes : Math.min(30, Math.floor(minutesLeft()));
+    return t && t.maxMinutes > 0 ? t.maxMinutes : Math.min(60, Math.floor(minutesLeft()));
   };
   const minutesText = (n) => (Math.round(n * 10) / 10).toLocaleString(S.lang.locale);
   const planLink = '<button type="button" class="btn sm" data-action="go" data-to="settings/plan/interviews">View plan and minutes</button>';
@@ -217,11 +220,15 @@
             </div>
             ${ent ? `<span class="small muted" data-tour="mock-balance" data-no-i18n>${esc(C.t('Balance: {n} min, shared with live sessions', { n: minutesText(minutesLeft()) }))}</span>` : ''}
           </div>
+          <div class="field"><span>Duration</span>
+            <div class="segmented mock-length" role="group" aria-label="Duration">
+              ${MINUTES.map((n) => `<button type="button" aria-pressed="${M.settings.minutes === n}" class="${M.settings.minutes === n ? 'active' : ''}" data-action="mock-minutes-set" data-minutes="${n}">${n} min</button>`).join('')}
+            </div>
+          </div>
           <div class="mock-mode-grid">
             <label class="field">Interview type<select class="select" data-change="mock-kind">${C.opts(KINDS, M.settings.kind)}</select><span class="small muted" data-no-i18n>${esc(C.t(KIND_HINTS[M.settings.kind] || ''))}</span></label>
             <label class="field">Interviewer<select class="select" data-change="mock-persona">${C.opts(PERSONAS, M.settings.persona)}</select></label>
             <label class="field">Interview language<select class="select" data-change="mock-lang" data-no-i18n>${C.opts(LANGUAGES, lang)}</select></label>
-            <label class="field">Duration<select class="select" data-change="mock-minutes">${C.opts(LENGTHS, String(M.settings.minutes))}</select></label>
           </div>
           <label class="mock-consent"><input type="checkbox" data-change="mock-tips" ${M.settings.coach ? 'checked' : ''}/><span class="stack" style="gap:2px"><span>Coach tips during the interview</span><span class="small muted">A short tip after each answer, measured from what you said. Turn it off for a realistic interview.</span></span></label>
           <label class="field">What can be asked<textarea class="input" rows="2" maxlength="600" data-input="mock-focus" placeholder="Optional. Example: Kafka at my last job, the payments app, leading the migration, why I want to move to data.">${esc(M.settings.focus)}</textarea><span class="small muted">Orby asks about these topics in its own words, along with the usual ones.</span></label>
@@ -1037,7 +1044,9 @@
       if (r && r.over) finishing = true;
       else {
         M.lines.splice(lineStart);
-        M.error = 'The interviewer did not answer. Try your answer again.';
+        M.error = r && r.code === 'ai_unavailable'
+          ? 'The AI is unavailable right now. Your answer is kept: try again in a few minutes.'
+          : 'The interviewer did not answer. Try your answer again.';
         // Sent again unchanged, the answer keeps its recording.
         if (text) retry = { text, clip: voiceClip };
         C.renderView();
@@ -1373,8 +1382,8 @@
   C.changes['mock-depth'] = (el) => { M.settings.depth = Number(el.value); saveSettings(); };
   C.changes['mock-bank'] = (el) => { M.settings.useBank = Boolean(el.checked); saveSettings(); };
   C.changes['mock-tips'] = (el) => { M.settings.coach = Boolean(el.checked); saveSettings(); };
-  C.changes['mock-minutes'] = (el) => {
-    const n = Number(el.value);
+  C.actions['mock-minutes-set'] = (el) => {
+    const n = Number(el.dataset.minutes);
     if (VALID.minutes(n)) M.settings.minutes = n;
     saveSettings();
     C.refresh();

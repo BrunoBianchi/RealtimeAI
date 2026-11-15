@@ -768,6 +768,7 @@
       'The interview ended before any answer and was not counted.': 'A entrevista terminou antes de qualquer resposta e não foi contada.',
       'The interview ended before any answer.': 'A entrevista terminou antes de qualquer resposta.',
       'The interviewer did not answer. Try your answer again.': 'O entrevistador não respondeu. Tente sua resposta de novo.',
+      'The AI is unavailable right now. Your answer is kept: try again in a few minutes.': 'A IA está indisponível agora. Sua resposta foi guardada: tente de novo em alguns minutos.',
       'Could not end the interview.': 'Não foi possível encerrar a entrevista.',
       'Could not start the interview.': 'Não foi possível iniciar a entrevista.',
       'Microphone unavailable: you can type your answers.': 'Microfone indisponível: você pode digitar suas respostas.',

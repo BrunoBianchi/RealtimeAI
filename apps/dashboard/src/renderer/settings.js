@@ -655,7 +655,7 @@
     const ent = S.auth?.entitlement;
     if (!ent) return card('Mock interview minutes', '', '<span class="small muted">Could not read your balance.</span>');
     const n = (v) => (Math.round(v * 10) / 10).toLocaleString(S.lang.locale);
-    const max = ent.training && ent.training.maxMinutes > 0 ? ent.training.maxMinutes : Math.min(30, Math.floor(ent.minutesLeft));
+    const max = ent.training && ent.training.maxMinutes > 0 ? ent.training.maxMinutes : Math.min(60, Math.floor(ent.minutesLeft));
     return card('Mock interview minutes', 'Basic and Advanced are charged per minute used, from the same balance as live sessions. Interviews under a minute are free.',
       `<div class="row wrap small muted plan-interview-balance" data-no-i18n>
         <span>${esc(C.t('{n} min available', { n: n(ent.minutesLeft) }))}</span>

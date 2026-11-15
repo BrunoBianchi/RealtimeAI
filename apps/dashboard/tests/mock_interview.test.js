@@ -101,7 +101,7 @@ function fakeDeps(apiResult) {
     said, calls, dir,
     deps: {
       dataDir: () => dir, agents: () => [job, other], now: () => 1000, seed: () => 0, emit: (e) => said.push(e.text),
-      url: (p) => p, headers: () => ({}),
+      url: (p) => p, headers: () => ({}), retryMs: 0,
       api: async (m, p) => { calls.push(p); return p === '/v1/mock/start' ? apiResult : { ok: true, data: { refunded: false } }; },
       fetch: async (url, init) => {
         calls.push(url);
@@ -208,7 +208,12 @@ test('the end reports the minutes charged by the server', async () => {
 });
 
 test('the length picked caps the interview within what the server allows', async () => {
-  for (const [minutes, serverMax, expected] of [[10, 1800, 600], [20, 900, 900], [45, 1800, 1800], [undefined, 1200, 1200]]) {
+  const cases = [
+    [15, 3600, 900], [30, 900, 900], [45, 3600, 2700], [60, 3600, 3600], [60, 1800, 1800],
+    [10, 3600, 1800], // a length no longer offered is 30 minutes
+    [undefined, 1200, 1200],
+  ];
+  for (const [minutes, serverMax, expected] of cases) {
     const f = fakeDeps({ ok: true, data: { id: `mock_len_${expected}`, max_s: serverMax, stt: { token: 't' } } });
     const m = createMockInterviews(f.deps);
     const r = await m.start({ agentId: 'g1', lang: 'en', settings: { minutes } });
@@ -581,6 +586,51 @@ test('a second interview for the same job opens with a generated question that k
   await interviews.start({ agentId: 'g1', lang: 'pt-BR', settings: { depth: 0 } });
   assert.strictEqual((await interviews.turn('')).ok, true);
   assert.match(f.said.join(' '), /trajetória/);
+  fs.rmSync(f.dir, { recursive: true });
+});
+
+test('a reply that fails before anything arrived gets one quiet second try; the AI out of credits does not', async () => {
+  const f = fakeDeps({ ok: true, status: 200, data: { id: 'retry_1', max_s: 3600, stt: {} } });
+  const stream = f.deps.fetch;
+  const interviews = createMockInterviews(f.deps);
+  await interviews.start({ agentId: 'g1', lang: 'pt-BR', settings: { depth: 0 } });
+  await interviews.turn('');
+  let chats = 0;
+  // The first `fails` chat requests fail with `failure`, the next ones answer.
+  const failing = (failure, fails = 1) => {
+    let left = fails;
+    f.deps.fetch = async (url, init) => {
+      if (JSON.parse(init.body).stream) chats += 1;
+      if (left > 0) {
+        left -= 1;
+        return failure();
+      }
+      return stream(url, init);
+    };
+  };
+  const down = (status, code) => () => ({ ok: false, status, json: async () => ({ error: { code, message: 'LLM upstream failed: dial tcp' } }) });
+
+  failing(down(502, 'upstream_unavailable'));
+  assert.strictEqual((await interviews.turn('Trabalhei com Kafka.')).ok, true);
+  assert.strictEqual(chats, 2, 'a gateway error: tried again');
+
+  chats = 0;
+  failing(() => { throw new TypeError('fetch failed'); });
+  assert.strictEqual((await interviews.turn('Liderei a migração.')).ok, true);
+  assert.strictEqual(chats, 2, 'a dropped connection: tried again');
+
+  chats = 0;
+  failing(down(503, 'ai_unavailable'), 5);
+  const credits = await interviews.turn('Medimos a latência.');
+  assert.deepStrictEqual({ ok: credits.ok, status: credits.status, code: credits.code }, { ok: false, status: 503, code: 'ai_unavailable' });
+  assert.strictEqual(chats, 1, 'the AI out of credits is not tried again');
+
+  chats = 0;
+  failing(down(502, 'upstream_unavailable'), 5);
+  const lasting = await interviews.turn('Medimos a latência.');
+  assert.strictEqual(lasting.ok, false);
+  assert.strictEqual(chats, 2, 'a failure that lasts is tried once more, then reported');
+  await interviews.end();
   fs.rmSync(f.dir, { recursive: true });
 });
 

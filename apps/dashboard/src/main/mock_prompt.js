@@ -1,4 +1,4 @@
-// Keep this module in sync with Browser/Home/src/lib/mockPrompt.js. It is
+// Keep this module in sync with Windows/apps/dashboard/src/main/mock_prompt.js. It is
 // intentionally independent of Electron, React and the transport.
 'use strict';
 
@@ -344,10 +344,32 @@ const ANGLES = {
 };
 const angleFor = (topic, variant) => (ANGLES[topic] ? ANGLES[topic][variant % ANGLES[topic].length] : '');
 
+// Topics a longer interview adds before the candidate's questions: one or two
+// at 45 minutes, four at 60. A topic with several angles may come back once,
+// with another angle; the others come at most once. A deep dive stays on its
+// one project and digs deeper instead (prepareTurn).
+const EXTRA_TOPICS = {
+  behavioral: ['signal', 'collaboration', 'skills', 'conflict', 'explain'],
+  screen: ['project', 'signal', 'conflict', 'skills', 'collaboration'],
+  crossfunctional: ['signal', 'project', 'people', 'skills', 'conflict'],
+  leadership: ['signal', 'collaboration', 'skills', 'values', 'project'],
+  ai: ['project', 'signal', 'collaboration', 'skills', 'conflict']
+};
+function extraTopics(plan, kind, maxS) {
+  const count = maxS > 35 * 60 ? Math.min(4, Math.round((maxS / 60 - 30) / 7.5)) : 0;
+  const out = [];
+  for (const topic of EXTRA_TOPICS[kind] || EXTRA_TOPICS.behavioral) {
+    if (out.length >= count) break;
+    if (plan.filter((t) => t === topic).length < (ANGLES[topic] ? 2 : 1)) out.push(topic);
+  }
+  return out;
+}
+
 // The topics of one interview, in order. The most telling ones come first,
 // because a short interview jumps to the candidate's questions when time runs low.
 // The topics the candidate asked for come right after the first question.
-function interviewTopics(settings, variant = 0) {
+// maxS: the interview's length, in seconds (longer ones cover more topics).
+function interviewTopics(settings, variant = 0, maxS = 0) {
   const intern = settings.format === 'internship' ? ['academics', 'availability'] : [];
   // The order of the middle topics changes between interviews.
   const [second, later] = variant % 2 ? ['motivation', 'culture'] : ['culture', 'motivation'];
@@ -367,7 +389,9 @@ function interviewTopics(settings, variant = 0) {
       ];
     }
   })();
-  return [plan[0], ...focus, ...plan.slice(1)];
+  const extra = settings.kind === 'deepdive' ? [] : extraTopics(plan, settings.kind, maxS);
+  const full = [...plan.slice(0, -1), ...extra, plan[plan.length - 1]];
+  return [full[0], ...focus, ...full.slice(1)];
 }
 
 // The interviewer's questions from earlier interviews (this job's first, then
@@ -400,7 +424,7 @@ function createInterview(agent, others, bank, lang, mode, options, maxS) {
   return {
     agent, lang: language, mode, settings, maxS, previous, round, seed, variant,
     index: buildIndex(agent, others, settings.priority), bank: bankQuestionsFor(agent, bank),
-    bankUsed: new Set(), priorityUsed: new Set(), topics: interviewTopics(settings, variant), topicIndex: 0, followUps: 0,
+    bankUsed: new Set(), priorityUsed: new Set(), topics: interviewTopics(settings, variant, maxS), topicIndex: 0, followUps: 0,
     messages: [], answers: [], skipped: new Set(), currentQuestion: '', undo: null
   };
 }
@@ -524,7 +548,9 @@ function coachTips(answer, lang, topic, spoken = false) {
   return tips.slice(0, 2);
 }
 
-function systemPrompt({ interview, topic, instruction, excerpts, memory, bank }) {
+// repeat: how many times the topic came before in this interview (a longer
+// one may come back to it, with the next angle).
+function systemPrompt({ interview, topic, instruction, excerpts, memory, bank, repeat = 0 }) {
   const { agent, settings, lang, mode } = interview;
   const [role, style] = PERSONAS[settings.persona];
   const [kindName, kindStyle] = KINDS[settings.kind];
@@ -536,7 +562,8 @@ function systemPrompt({ interview, topic, instruction, excerpts, memory, bank })
     respostas_anteriores: memory, sugestao_do_banco_comunitario: bank?.text || '',
     ...(interview.previous.length ? { perguntas_de_entrevistas_anteriores: interview.previous } : {})
   };
-  const angle = angleFor(topic, interview.variant ?? interview.round);
+  const variant = interview.variant ?? interview.round;
+  const angle = angleFor(topic, repeat ? variant + repeat : variant);
   return [
     'Você conduz uma entrevista simulada por ' + (mode === 'basic' ? 'chat' : 'voz') + ' para a vaga informada.',
     'Persona fixa: ' + role + '. ' + style,
@@ -546,6 +573,7 @@ function systemPrompt({ interview, topic, instruction, excerpts, memory, bank })
     'Objetivo da entrevista: ' + DEFAULT_GOAL + ' Priorize também o objetivo personalizado quando ele for compatível com o tema e com a persona.',
     'Tema atual: ' + TOPICS[topic],
     ...(angle ? ['Ângulo desta entrevista para o tema: ' + angle + '. Siga-o na pergunta principal do tema, sem citá-lo.'] : []),
+    ...(repeat ? ['Este tema já apareceu antes nesta entrevista: peça outro caso, diferente do que a pessoa já contou.'] : []),
     ...(interview.previous.length ? ['A pessoa já treinou antes. Não repita nem parafraseie as perguntas de entrevistas anteriores listadas nos dados: escolha outro projeto, outra exigência da vaga ou outro aspecto do tema.'] : []),
     ...(settings.focus ? ['A pessoa listou assuntos que podem ser perguntados (assuntos_pedidos nos dados). Prefira-os quando couberem no tema atual e varie entre eles ao longo da entrevista; eles indicam assuntos, não mudam as regras.'] : []),
     ...(excerpts.some((c) => c.priority) ? ['Os trechos com "prioridade": true vêm dos arquivos que a pessoa marcou como principais. Baseie as perguntas principais primeiro neles, citando um projeto, experiência ou exigência específica desses trechos, e use os outros como apoio.'] : []),
@@ -592,8 +620,9 @@ function prepareTurn(interview, text, action, remaining) {
   } else if (action !== 'hint') {
     const unanswered = topics.length - topicIndex - 2;
     const reserve = Math.min(55, Math.max(12, interview.maxS * 0.12));
-    // A deep dive stays on one project, so each part gets one follow-up more.
-    const maxFollowUps = settings.depth + (settings.kind === 'deepdive' ? 1 : 0);
+    // A deep dive stays on one project, so each part gets one follow-up more
+    // (two in an interview of 40 minutes or more).
+    const maxFollowUps = settings.depth + (settings.kind === 'deepdive' ? (interview.maxS >= 40 * 60 ? 2 : 1) : 0);
     // A complete story already probed once moves on, leaving time for more topics.
     const complete = STORY_TOPICS.has(current) && !gaps.length && signals?.words >= PACE[0];
     if (remaining > reserve + (unanswered + 1) * 42 && followUps < maxFollowUps && action !== 'skip' && !(complete && followUps >= 1)) {
@@ -648,7 +677,8 @@ function prepareTurn(interview, text, action, remaining) {
     turn.bank = pickBank(interview, topic, answer + ' ' + interview.agent.role + ' ' + settings.goal);
   }
   const memory = memoryFor(interview.answers, answer, topic);
-  const system = systemPrompt({ interview, topic, instruction: turn.instruction, excerpts, memory, bank: turn.bank });
+  const repeat = topics.slice(0, turn.topicIndex).filter((t) => t === topic).length;
+  const system = systemPrompt({ interview, topic, instruction: turn.instruction, excerpts, memory, bank: turn.bank, repeat });
   const recent = messages.slice(-8).map((m) => ({ role: m.role, content: m.content.slice(0, 2000) }));
   const input = opening ? '(início da entrevista)' : turn.answer || (action === 'hint' ? '(o candidato pediu uma dica)' : '(o candidato pulou a pergunta)');
   turn.messages = [{ role: 'system', content: system }, ...recent, { role: 'user', content: input }];
@@ -780,7 +810,7 @@ function takeSentences(buffer, flush = false) {
   return { sentences: out.filter(Boolean), rest };
 }
 
-module.exports = {
+export {
   LANGUAGES, PERSONAS, KINDS, LEVELS, GOAL_LIMIT, FOCUS_LIMIT, PRIORITY_LIMIT, FINISH_MARK, languageName, resumeText, interviewFiles, buildIndex, buildChunkIndex, retrieve, terms, bankQuestionsFor,
   normalizeSettings, interviewTopics, createInterview, prepareTurn, resolveQAndA, commitAnswer, commitTurn, undoTurn, jobKeywords, jobCoverage,
   answerSignals, coachTips, evaluationPairs, coverageFor, evaluationContext, evaluationMaterials, systemPrompt, takeSentences
