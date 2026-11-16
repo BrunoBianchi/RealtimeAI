@@ -29,7 +29,11 @@ async function errorCode(res) {
   try {
     const data = typeof res.json === 'function' ? await res.json() : null;
     const code = data && (typeof data.error === 'string' ? data.error : data.error && data.error.code);
-    return typeof code === 'string' ? code : '';
+    if (typeof code === 'string') return code;
+    // The AI provider's own 402 (its account is out of credits), passed on as
+    // it came by a server from before ai_unavailable. The server's own 402s
+    // always carry a word for a code, so this one is the AI being down.
+    return res.status === 402 && data && data.error && typeof data.error === 'object' ? 'ai_unavailable' : '';
   } catch (_e) {
     return '';
   }

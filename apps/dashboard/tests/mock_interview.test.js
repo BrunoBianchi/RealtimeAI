@@ -625,6 +625,17 @@ test('a reply that fails before anything arrived gets one quiet second try; the 
   assert.deepStrictEqual({ ok: credits.ok, status: credits.status, code: credits.code }, { ok: false, status: 503, code: 'ai_unavailable' });
   assert.strictEqual(chats, 1, 'the AI out of credits is not tried again');
 
+  // An older server passes the provider's own 402 on as it came (a number for
+  // a code): the same thing for the person. The server's own 402 keeps its code.
+  chats = 0;
+  failing(() => ({ ok: false, status: 402, json: async () => ({ error: { code: 402, message: 'Insufficient credits' } }) }), 5);
+  const relayed = await interviews.turn('Medimos a latência.');
+  assert.deepStrictEqual({ ok: relayed.ok, status: relayed.status, code: relayed.code }, { ok: false, status: 402, code: 'ai_unavailable' });
+  assert.strictEqual(chats, 1, 'the provider out of credits is not tried again');
+  chats = 0;
+  failing(down(402, 'mock_not_included'), 5);
+  assert.strictEqual((await interviews.turn('Medimos a latência.')).code, 'mock_not_included');
+
   chats = 0;
   failing(down(502, 'upstream_unavailable'), 5);
   const lasting = await interviews.turn('Medimos a latência.');
