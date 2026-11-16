@@ -1989,6 +1989,7 @@
       'Answer again': 'Responder de novo',
       'Take back your last answer and answer the same question again.': 'Desfaz sua última resposta para você responder a mesma pergunta de novo.',
       'Your last answer was taken back. Answer the same question again.': 'Sua última resposta foi desfeita. Responda a mesma pergunta de novo.',
+      "Orby's voice is unavailable right now, so the system voice is reading the questions.": 'A voz do Orby está indisponível agora, então a voz do sistema está lendo as perguntas.',
       'No example? That is fine: use one from university, a personal project or another job, even a small one.': 'Sem exemplo? Tudo bem: use um da faculdade, de um projeto pessoal ou de outro trabalho, mesmo que pequeno.',
       'No result yet: say what changed and how you measured it, with a number if you have one.': 'Faltou o resultado: diga o que mudou e como você mediu, com um número se tiver.',
       'Short answer: add a concrete example and the reason behind it.': 'Resposta curta: acrescente um exemplo concreto e o porquê.',

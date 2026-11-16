@@ -990,6 +990,25 @@
     setState(M.mode === 'basic' ? 'typing' : 'listening');
   }
 
+  // Resolves when the system voice has read `text` (or at once without one).
+  function speakWithSystemVoice(text) {
+    const synth = window.speechSynthesis;
+    if (!synth || typeof SpeechSynthesisUtterance === 'undefined' || M.phase !== 'live') return Promise.resolve();
+    return new Promise((resolve) => {
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = M.lang || 'pt-BR';
+      const voice = synth.getVoices().find((v) => v.lang && v.lang.toLowerCase().startsWith(u.lang.slice(0, 2).toLowerCase()));
+      if (voice) u.voice = voice;
+      // A voice that never reports its end must not hold the interview.
+      const guard = setTimeout(resolve, 2000 + text.length * 120);
+      u.onend = u.onerror = () => {
+        clearTimeout(guard);
+        resolve();
+      };
+      synth.speak(u);
+    });
+  }
+
   // Sentences are requested as they arrive and played in order.
   function speakSentence(text) {
     if (M.mode === 'basic') {
@@ -1006,7 +1025,17 @@
       const bytes = await clip;
       if (M.phase !== 'live') return;
       setState('speaking');
-      if (!bytes) return;
+      if (!bytes) {
+        // Orby's voice failed on the server: the system voice reads the
+        // sentence instead of leaving the person in silence.
+        if (!M.voiceFallback) {
+          M.voiceFallback = true;
+          M.notice = "Orby's voice is unavailable right now, so the system voice is reading the questions.";
+          paint();
+        }
+        await speakWithSystemVoice(text);
+        return;
+      }
       if (M.phase !== 'live') return;
       const blobUrl = URL.createObjectURL(new Blob([bytes], { type: 'audio/mpeg' }));
       await new Promise((resolve) => {
@@ -1111,6 +1140,7 @@
     M.previousFrame = '';
     M.consent = false;
     if (player) player.pause();
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
     if (M.cameraJob) await M.cameraJob.catch(() => null);
     C.renderView();
     // Clips of earlier turns are filed before the record is written.
@@ -1165,6 +1195,7 @@
     M.id = '';
     M.canRedo = false;
     M.notice = '';
+    M.voiceFallback = false;
     finishing = false;
     M.state = 'connecting';
     C.renderView();
